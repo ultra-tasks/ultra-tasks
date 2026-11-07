@@ -212,8 +212,10 @@
   }
 
   // Mobile specific
+  // Full screen: Browse is a page of its own, not a side sheet.
   &.mobile {
-    width: var(--sidenav-width-expanded);
+    width: 100%;
+    max-width: none;
     background: var(--sidenav-bg-mobile);
     box-shadow: var(--elev-2);
     // Remove CSS transitions - let Angular animations handle it

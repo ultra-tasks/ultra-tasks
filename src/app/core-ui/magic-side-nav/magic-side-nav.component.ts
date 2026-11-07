@@ -46,7 +46,6 @@ import { T } from '../../t.const';
 // 56px = 24px icon + 16px (var(--s2)) padding on each side, so the left-aligned
 // nav icons sit centered in the collapsed rail.
 const COLLAPSED_WIDTH = 56;
-const MOBILE_NAV_WIDTH = 300;
 const FOCUS_DELAY_MS = 10;
 const INITIAL_ENTER_ANIMATION_DURATION_MS = 425;
 // `--transition-duration-l` (320ms) plus a 50ms buffer — the duration the panel
@@ -188,7 +187,8 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
 
   // Computed values
   sidenavWidth = computed(() => {
-    if (this.isMobile()) return MOBILE_NAV_WIDTH;
+    // The phone drawer is full screen: its width comes from the stylesheet.
+    if (this.isMobile()) return null;
     if (!this.isFullMode()) return COLLAPSED_WIDTH;
     return this.currentWidth();
   });
