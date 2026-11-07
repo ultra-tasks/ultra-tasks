@@ -1,6 +1,6 @@
 # Thank you for considering to contribute!
 
-Ultra Tasks is independently maintained and published by Adrian Chase ([@ac9492](https://github.com/ac9492)). Please bring fork-specific questions, bug reports, and ideas to the [Ultra Tasks issue tracker](https://github.com/ac9492/ultra-tasks/issues). For private vulnerability reports, follow the [security policy](../SECURITY.md).
+Ultra Tasks is independently maintained and published by Adrian Chase ([@ac9492](https://github.com/ac9492)). Please bring fork-specific questions, bug reports, and ideas to the [Ultra Tasks issue tracker](https://github.com/ultra-tasks/ultra-tasks/issues). For private vulnerability reports, follow the [security policy](../SECURITY.md).
 
 ## Licensing contributions
 
@@ -33,7 +33,7 @@ Design and accessibility feedback is welcome.
 
 - See our [translation guide](../docs/TRANSLATING.md) for how to contribute translations
 
-### Documentation/[Wiki](https://github.com/ac9492/ultra-tasks/tree/main/docs/wiki)
+### Documentation/[Wiki](https://github.com/ultra-tasks/ultra-tasks/tree/main/docs/wiki)
 
 - Flagging outdated or incorrect documentation (or correcting via Pull Requests) is greatly appreciated.
 - Creating [guides and workflow examples](../docs/wiki/1.00-Quickstarts.md) with short videos or screenshots would be welcomed.

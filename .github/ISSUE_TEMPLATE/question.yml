@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Ultra Tasks is maintained by Adrian Chase (@ac9492).
-        For vulnerabilities, use [private security reporting](https://github.com/ac9492/ultra-tasks/security/advisories/new).
+        For vulnerabilities, use [private security reporting](https://github.com/ultra-tasks/ultra-tasks/security/advisories/new).
         Use sample data and leave out personal information, credentials, and private task contents.
   - type: textarea
     id: question
