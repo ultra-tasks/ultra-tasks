@@ -175,7 +175,10 @@ test.describe('Calendar #10047', () => {
     // list -- so that intermediate state proves nothing; only the check back
     // on Today, below, is meaningful.) ---
     await page.getByRole('menuitem', { name: 'Inbox' }).click();
+    await expect(page).toHaveURL(/\/project\/INBOX_PROJECT\/tasks/);
+    await expect(page.locator('main-header page-title')).toContainText('Inbox');
     await page.getByRole('menuitem', { name: 'Today' }).click();
+    await expect(page.locator('main-header page-title')).toContainText('Today');
 
     // --- Expected: once the poll-driven reschedule lands, the task should
     // have a reminder, same as if it had been imported with a time from the

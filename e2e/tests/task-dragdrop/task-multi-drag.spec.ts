@@ -339,7 +339,9 @@ test.describe('Multi-task drag', () => {
     expect(titlesBox!.height).toBeLessThanOrEqual(360);
     expect(previewBox!.height - titlesBox!.height).toBeLessThan(100);
     await page.keyboard.press('Escape');
-    await drop(page, page.locator('.section-container task-list').first());
+    await drop(page, page.locator('.section-container task-list').first(), {
+      isCancelled: true,
+    });
     await expect(page.locator('.no-section task')).toHaveCount(500);
     await select(page, ['Large 496', 'Large 497']);
     await page
@@ -401,7 +403,9 @@ test.describe('Multi-task drag', () => {
       page.locator('task.isMultiSelected').first().locator('done-toggle'),
     );
     await page.keyboard.press('Escape');
-    await drop(page, page.locator('.section-container task-list').first());
+    await drop(page, page.locator('.section-container task-list').first(), {
+      isCancelled: true,
+    });
     await expect(page.locator('.no-section task')).toHaveCount(2);
     await expect(page.locator('.section-container task')).toHaveCount(0);
     await expect(page.locator('.no-section task').first()).toHaveCSS('opacity', '1');
