@@ -19,11 +19,18 @@ const ENDPOINT_KEYS = new Set([
 const HOST_PATTERN = /^[a-z0-9._\-[\]:]{1,260}$/;
 
 const getHttpHost = (value: unknown): string | null => {
-  if (typeof value !== 'string' || !/^https?:\/\//i.test(value)) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  const hasHttpScheme = /^https?:\/\//i.test(trimmed);
+  // Only endpoint fields reach this helper. Providers may accept bare hosts,
+  // but an explicit non-HTTP scheme must never confer certificate trust.
+  if (!trimmed || (!hasHttpScheme && /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed))) {
     return null;
   }
   try {
-    return new URL(value).host || null;
+    return new URL(hasHttpScheme ? trimmed : `https://${trimmed}`).host || null;
   } catch {
     // not a URL — just some other config string
     return null;
@@ -99,5 +106,5 @@ export const isCertErrorTrusted = (
 
 /** One-shot preload API; claimed by trusted startup code before plugins load. */
 export interface CertTrustElectronApi {
-  setTrustedHosts(hosts: string[]): void;
+  setTrustedHosts(hosts: string[]): Promise<void>;
 }
