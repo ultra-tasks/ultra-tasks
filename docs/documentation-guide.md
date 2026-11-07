@@ -4,7 +4,7 @@ Rules and conventions for keeping Ultra Tasks's documentation in sync with the c
 
 ## Why this matters
 
-The `docs/wiki/` directory is the manually curated, human-focused wiki. On every push to `main` that changes it, `.github/workflows/wiki-sync.yml` lints it and mirrors it to the repository's [GitHub Wiki](https://github.com/ac9492/ultra-tasks/wiki) (`ac9492/ultra-tasks.wiki`), overwriting edits made there. GitHub creates that wiki repository only when its first page is saved on github.com; until then the sync job fails at its wiki checkout. The wiki is what users read for context, intent, and how features fit together; code mechanics belong in code comments and the developer docs under `docs/`.
+The `docs/wiki/` directory is the manually curated, human-focused wiki. On every push to `main` that changes it, `.github/workflows/wiki-sync.yml` lints it and mirrors it to the repository's [GitHub Wiki](https://github.com/ultra-tasks/ultra-tasks/wiki) (`ultra-tasks/ultra-tasks.wiki`), overwriting edits made there. GitHub creates that wiki repository only when its first page is saved on github.com; until then the sync job fails at its wiki checkout. The wiki is what users read for context, intent, and how features fit together; code mechanics belong in code comments and the developer docs under `docs/`.
 
 ## When to update the wiki
 

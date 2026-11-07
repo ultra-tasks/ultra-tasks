@@ -23,7 +23,7 @@ If you cannot agree, discuss alternatives before submitting copyrighted material
 
 ## Checklist
 
-- [ ] I have included relevant changes to the documentation/[wiki](https://github.com/ac9492/ultra-tasks/tree/main/docs/wiki).
+- [ ] I have included relevant changes to the documentation/[wiki](https://github.com/ultra-tasks/ultra-tasks/tree/main/docs/wiki).
 - [ ] I have run `npm run checkFile` on changed `.ts`/`.scss` files
 - [ ] I have added tests for my changes (if applicable)
 - [ ] Existing tests still pass

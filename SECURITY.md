@@ -6,7 +6,7 @@ Productivity.
 
 ## Reporting a vulnerability
 
-Use [Ultra Tasks private vulnerability reporting](https://github.com/ac9492/ultra-tasks/security/advisories/new)
+Use [Ultra Tasks private vulnerability reporting](https://github.com/ultra-tasks/ultra-tasks/security/advisories/new)
 to contact the maintainer privately. GitHub private vulnerability reporting is
 enabled for this repository; no public email address is required.
 
@@ -14,7 +14,7 @@ Include the affected version or commit, platform, impact, and steps to reproduce
 with sample data. Do not put vulnerability details, credentials, task contents,
 or other personal data in public issues.
 
-For ordinary bugs and questions, use the [Ultra Tasks issue tracker](https://github.com/ac9492/ultra-tasks/issues).
+For ordinary bugs and questions, use the [Ultra Tasks issue tracker](https://github.com/ultra-tasks/ultra-tasks/issues).
 Reports about this fork should reach its maintainer first; inherited issues can
 then be coordinated with Super Productivity as appropriate.
 

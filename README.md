@@ -1,92 +1,106 @@
+<div align="center">
+
+<a href="https://ultratasks.app"><img src="src/assets/ultra-tasks/logo.svg" alt="Ultra Tasks" width="80" /></a>
+
 # Ultra Tasks
 
-<img src="src/assets/ultra-tasks/logo.svg" alt="Ultra Tasks logo" width="88" />
+### A clearer day. A little more you.
 
-**A clearer everyday interface for tasks, planning, and time tracking.**
+A calm, free and open-source to-do list, planner and time tracker.<br />
+Make room for your work, your plans, and everything in between.
 
-Ultra Tasks is an independent, UX-focused fork of [Super Productivity](https://github.com/super-productivity/super-productivity). It builds on that project's local-first task management, time tracking, integrations, and sync foundation, with a focus on making daily work easier to understand and faster to manage.
+**[Download Ultra Tasks](#download)** · [Explore the website](https://ultratasks.app) · [Give feedback](https://github.com/ultra-tasks/ultra-tasks/issues/new/choose)
 
-**Status: early development.** Ultra Tasks 0.1.0 is the first public desktop release, for Windows and macOS. Cross-client sync validation is still in progress. It is not an official Super Productivity release.
+Windows · macOS · Linux<br />
+**Works offline. No account needed. No ads or tracking in the app.**
 
-Maintained and published by **Adrian Chase**. The planned project website is [ultratasks.app](https://ultratasks.app); downloads and support are available through this GitHub repository while the website is being set up.
+</div>
 
-[UX priorities](#three-ux-priorities) · [Compatibility](#data-and-sync-compatibility) · [Build from source](#build-from-source) · [Give feedback](https://github.com/ac9492/ultra-tasks/issues)
+![Ultra Tasks Today in light mode, with tasks, project labels, estimates, and navigation in one workspace.](docs/brand/screenshots/today-light.png)
 
-## Why Ultra Tasks?
+<details>
+<summary>Prefer the lights down? See dark mode.</summary>
 
-Super Productivity provides a capable foundation for focused individual work. Ultra Tasks explores how that foundation can feel more consistent: clearer dates and counts, predictable task entry, and navigation that helps you stay oriented.
+![The same Today workspace in dark mode, showing a mix of work and personal tasks.](docs/brand/screenshots/today-dark.png)
 
-The direction is practical: improve frequent interactions, keep the interface calm, preserve keyboard access, and keep the underlying data compatible with upstream. Small, testable improvements will guide the redesign.
+</details>
 
-## Already in this fork
+## From a full head to a calmer day
 
-| Area                      | Current changes                                                                                                                                                                          |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dates at a glance         | Optional weekday labels for the next seven days, date-format choices such as `3-Dec` and `December 3rd`, and distinct colors for overdue, today, tomorrow, and upcoming scheduled dates. |
-| Consistent task counts    | The Today sidebar and optional desktop app-icon badge share the due-task count, with a tooltip breakdown of overdue and today tasks.                                                     |
-| Task organization         | Inline task creation within sections, bulk moves between sections, and completed/total subtask counts.                                                                                   |
-| Separate desktop identity | Ultra Tasks has its own application identity, data folder, and desktop URL scheme, so it can be installed alongside Super Productivity.                                                  |
+### Capture it. Get back to what matters.
 
-These additions sit on top of the inherited tasks, projects, tags, notes, planning, time-tracking, and integration features. Some changes may also exist in newer upstream versions.
+Add a task in a few keystrokes, right where it belongs. Projects, tags, estimates, and scheduling shorthand help you get the details down while the thought is still fresh.
 
-The first workspace refresh adds restrained glass panels, a white checkmark on a deep-teal tile as the app identity, search at the top of navigation, clearer active navigation, a visible capture destination, and direct scheduling actions.
+Keep a quick thought in your Inbox, add something directly to a project section, or break a bigger task into smaller steps. Use as much structure as you need.
 
-**Glass appearance** frosts the navigation and header over a slight, blurred view of the desktop (macOS and Windows 11 desktop app) or of your background image or palette gradient (web, mobile, Linux). It can be turned off under Settings → General → Appearance; the switch stays on the device, outside synced task data, and accessibility preferences can force solid panels.
+### See the week, not just today.
 
-## Three UX priorities
+Upcoming brings the days ahead into view so you can spread the load. Use the calendar to give work a time slot, and keep Today for the things you want to focus on now.
 
-These remain ongoing design priorities. The first implementation addresses scanning, capture context, scheduling shortcuts, and active navigation; further changes will follow user feedback.
+![Upcoming in Ultra Tasks, with tasks and time estimates arranged across the days ahead.](docs/brand/screenshots/upcoming.png)
 
-| Priority                               | Problem to address                                                                           | What improvement should achieve                                                                                                                                                 |
-| -------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Clearer task lists**              | Dates, status, progress, counts, and row actions compete for attention.                      | Make it easy to scan what needs attention and act on it, with consistent spacing and labels in light and dark themes. Build on the date and count improvements already present. |
-| **2. Faster task capture and editing** | It can be difficult to tell where a new task will land or which date field to change.        | Make the destination project/section and the distinction between a scheduled date and a deadline obvious; keep common edits quick and keyboard-accessible.                      |
-| **3. More predictable navigation**     | Switching between Today, Inbox, projects, and planning views can interrupt the flow of work. | Keep the current context visible and make frequent destinations easy to reach, while preserving access to advanced features.                                                    |
+### One task. One timer. Room to focus.
 
-The [UX direction and research notes](docs/ultra-tasks-ux-direction.md) explain the evidence, initial prior art, and compatibility boundaries. Concrete designs will be prototyped and tested with users before implementation.
+Start tracking time on a task, or settle into Focus mode for a quieter workspace. Your time stays connected to your tasks, so you can look back at where the day went.
 
-## Data and sync compatibility
+![Ultra Tasks Focus mode with a running countdown for a single task.](docs/brand/screenshots/focus.png)
 
-**Upstream-compatible data and sync are a project requirement.** Ultra Tasks should not introduce a separate task-storage format, sync protocol, encryption scheme, or conflict-resolution model. Upstream migrations must continue to be followed. New display preferences should be device-local where possible and must not require fork-only fields in synced task records.
+### A little structure. Your way.
 
-The fork inherits upstream's sync implementations, including Nextcloud/WebDAV, Dropbox, SuperSync, local-file sync on desktop, and OneDrive where supported. However, a complete provider-by-provider and mixed Ultra Tasks/Super Productivity test matrix has **not** yet been completed. Rebranded sign-in callbacks also need validation; inherited provider code alone is not a compatibility guarantee.
+Keep projects as lists, turn their sections into board columns, or switch to Calendar or Upcoming. Add subtasks and notes when a plan needs more detail. Choose light or dark mode and a palette that feels like you.
 
-Keep a backup before trying development builds. The separate Ultra Tasks data folder does not automatically import an existing Super Productivity installation. See the [desktop build notes](docs/ultra-tasks-builds.md) and [inherited sync reference](docs/wiki/3.08-Sync-Integration-Comparison.md) for details and platform limitations.
+![The Work project in Board layout, with tasks grouped into This week, Up next, and Ideas.](docs/brand/screenshots/project-board.png)
 
-## Downloads and release status
+Screenshots show the current development build with sample tasks. Released builds may look slightly different.
 
-Download Ultra Tasks 0.1.0 from the [latest Ultra Tasks release](https://github.com/ac9492/ultra-tasks/releases/latest): a Setup installer or Portable app for Windows, and DMG or ZIP downloads for macOS on Apple Silicon (`arm64`) or Intel (`x64`), plus a universal DMG. `SHA256SUMS.txt` lists a checksum for every download. Upstream app-store links install Super Productivity.
+## Your tasks. Your time. Your business.
 
-Windows builds are unsigned, so SmartScreen may ask for confirmation. Mac builds are ad-hoc signed and are not Apple-notarized; macOS may require approval under System Settings → Privacy & Security. There are no Linux, mobile, or app-store builds, and the app does not update itself: the optional update check only tells you when a newer release is available.
+- **Local first.** Core tasks, planning, and time tracking work on your device, offline, without an account.
+- **Quiet by default.** No ads, analytics, or telemetry in the app. Reminders are there when you choose to enable them.
+- **Your data stays yours.** Export a backup, protect it with a password, or browse local recovery points.
+- **Sync is optional.** Connect a provider when you need it. Provider support and encryption options are explained in the [sync guide](docs/wiki/3.08-Sync-Integration-Comparison.md). The hosted Ultra Tasks sync service is coming soon.
+- **Open source.** Read the code, run it yourself, and help improve it.
 
-## Build from source
+## And the details you would hope for
 
-Use the Node.js and package-manager versions declared in [package.json](package.json).
+- **Repeating tasks and reminders.** Keep everyday routines in reach.
+- **Keyboard shortcuts.** Capture, navigate, and start working without reaching for the mouse.
+- **Todoist and TickTick imports.** Preview a file import before bringing your tasks over.
+- **Optional integrations.** Connect tools such as Jira, GitHub, GitLab, and Linear. Setup and capabilities vary by provider; see the [integration guide](docs/wiki/3.07-Issue-Integration-Comparison.md).
 
-```sh
-git clone https://github.com/ac9492/ultra-tasks.git
-cd ultra-tasks
-npm ci
-npm run startFrontend
-```
+## Download
 
-For desktop packaging, follow the [Ultra Tasks build instructions](docs/ultra-tasks-builds.md). The inherited [repository map](docs/repository-map.md) explains the codebase and focused checks.
+**[Get the latest release](https://github.com/ultra-tasks/ultra-tasks/releases/latest)** · [What's new in 0.2.0](https://github.com/ultra-tasks/ultra-tasks/releases/tag/ultra-tasks-v0.2.0)
 
-## Help shape Ultra Tasks
+Ultra Tasks is free and in early development. The current desktop release is **0.2.0**.
 
-Ultra Tasks is maintained and published by **Adrian Chase** ([@ac9492](https://github.com/ac9492)). General questions, bug reports, and ideas belong in this repository; private vulnerability reports go through the [security policy](SECURITY.md).
+| Your computer                      | Download 0.2.0                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Windows** · x64 and ARM64        | [Installer](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-Setup.exe) · [Portable](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-Portable.exe)                                                                                                                                        |
+| **macOS** · Apple Silicon or Intel | [Apple Silicon DMG](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-arm64.dmg) · [Intel DMG](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-x64.dmg) · [Universal DMG](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-universal.dmg) |
+| **Linux** · x64                    | [AppImage](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-x86_64.AppImage) · [DEB](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-amd64.deb) · [RPM](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-x86_64.rpm)                     |
 
-Designers, accessibility reviewers, testers, documentation contributors, and developers are welcome.
+ZIP alternatives and checksums are on the release page. Linux AppImages may need FUSE support. Mobile and app-store releases are not available yet. Updates are installed manually; the optional update check tells you when a new release is available.
 
-- [Report an issue or suggest an improvement](https://github.com/ac9492/ultra-tasks/issues/new). Describe the task you were trying to do, what happened, and the outcome you expected.
-- Share a small mockup or a reproducible example for one of the three UX priorities. Please use sample tasks and remove personal information from screenshots and logs.
-- Test keyboard navigation, light/dark themes, long task lists, installation, and the sync service you actually use. Include the platform and build version in feedback.
-- Discuss substantial interface changes before opening a large pull request. The [feature review guide](docs/feature-review-guide.md) covers prior art, scope, and long-term compatibility costs.
+<details>
+<summary>Installing an early release</summary>
 
-Please bring fork-specific support and feedback to this repository. We aim to contribute generally useful fixes upstream and keep the relationship constructive.
+Windows downloads are unsigned, so SmartScreen may ask for confirmation. macOS downloads are ad-hoc signed and are not Apple-notarized; you may need to approve the app under **System Settings → Privacy & Security → Open Anyway**.
 
-## Credits and license
+Keep a backup before trying a development build or upgrading. Ultra Tasks installs separately from Super Productivity; existing tasks are transferred through an explicit backup export/import. Mixed-client and provider-by-provider sync validation is still in progress. See the [installation and compatibility notes](docs/ultra-tasks-builds.md).
 
-Ultra Tasks is based on Super Productivity, created by Johannes Millan and its contributors. Their work provides the foundation for this fork. Ultra Tasks is independently maintained and is not affiliated with or endorsed by the upstream project.
+</details>
 
-The current Ultra Tasks combined distribution uses [GNU AGPL-3.0-only](LICENSE), including original client, sync and server improvements. Inherited Super Productivity code retains its **MIT rights and notices**, preserved in [LICENSES/MIT-UPSTREAM.txt](LICENSES/MIT-UPSTREAM.txt), and prior MIT grants cannot be revoked. Third-party components keep their applicable licenses. See [LICENSING.md](LICENSING.md) and the [Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md) for details.
+## Help shape what comes next
+
+Ultra Tasks is independently maintained by [Adrian Chase](https://github.com/ac9492). Early feedback helps decide what deserves attention next.
+
+[Report a bug](https://github.com/ultra-tasks/ultra-tasks/issues/new/choose), [suggest an improvement](https://github.com/ultra-tasks/ultra-tasks/issues/new?template=feature_request.yml), or share how it fits into your day. Include your platform, app version, and what you were trying to do. Please use sample tasks in screenshots and keep personal data out of reports.
+
+Designers, testers, accessibility reviewers, translators, and developers are welcome. Start with the [contribution guide](CONTRIBUTING.md), [development setup](docs/wiki/2.11-Run-the-Development-Server.md), or [desktop build notes](docs/ultra-tasks-builds.md). For private vulnerability reports, follow the [security policy](SECURITY.md).
+
+## Built on good work
+
+Ultra Tasks began as a UX-focused fork of [Super Productivity](https://github.com/super-productivity/super-productivity), created by Johannes Millan and its contributors. It builds on their task management, planning, time-tracking, and integration foundation, with an independent direction focused on a calmer everyday experience. It is not affiliated with or endorsed by Super Productivity. Please bring fork-specific support to this repository.
+
+The combined Ultra Tasks distribution is licensed under [GNU AGPL-3.0-only](LICENSE). Inherited Super Productivity code retains its [MIT rights and notices](LICENSES/MIT-UPSTREAM.txt); third-party components retain their own licenses. See the [licensing policy](LICENSING.md) and [Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md).
