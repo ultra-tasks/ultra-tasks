@@ -486,6 +486,7 @@ test.describe('Sections', () => {
       'Another Inbox task',
     ]);
     await expect(add).toBeVisible();
+    await flushPendingWrites(page);
     await page.reload();
     await workViewPage.waitForTaskList();
     await expect(add).toBeVisible();

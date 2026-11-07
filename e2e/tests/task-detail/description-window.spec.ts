@@ -1,5 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { fillMarkdownEditor } from '../../utils/markdown-editor';
+import { flushPendingWrites } from '../../utils/waits';
 
 test('task description uses a bounded window and preserves formatting and saved content', async ({
   page,
@@ -55,6 +56,7 @@ test('task description uses a bounded window and preserves formatting and saved 
   await dialog.locator('#T-save-note').click();
   await expect(dialog).toHaveCount(0);
   await expect(markdown).toContainText('Important context');
+  await flushPendingWrites(page);
   await page.reload();
   await workViewPage.waitForTaskList();
   await taskPage.openTaskDetail(taskPage.getTaskByText('Description window task'));

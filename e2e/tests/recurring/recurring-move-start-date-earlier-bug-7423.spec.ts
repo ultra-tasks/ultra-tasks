@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test.fixture';
+import { closeDetailPanelIfOpen } from '../../utils/schedule-task-helper';
 import {
   gotoHashRoute,
   openRecurDialog,
@@ -56,6 +57,7 @@ test.describe('Recurring Task - Move Start Date Earlier (#7423)', () => {
     // After the first save the task moves out of TODAY (dueDay = May 4) and the
     // detail panel re-renders. Reopen the panel via the Inbox project view,
     // which lists tasks regardless of due day.
+    await closeDetailPanelIfOpen(page);
     const taskAfterFirstSave = page
       .locator('task')
       .filter({ hasText: taskTitle })

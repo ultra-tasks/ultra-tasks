@@ -1,6 +1,7 @@
 import { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import { ProjectPage } from '../../pages/project.page';
+import { waitForMenuSettled } from '../../utils/waits';
 import {
   addPlainspaceProvider,
   FakePlainspace,
@@ -33,6 +34,7 @@ const setUp = async (page: Page, projectPage: ProjectPage): Promise<FakePlainspa
 const openContextMenu = async (page: Page, title: string): Promise<void> => {
   await taskRow(page, title).locator('task-title').first().click({ button: 'right' });
   await expect(page.locator('.mat-mdc-menu-panel').first()).toBeVisible();
+  await waitForMenuSettled(page);
 };
 
 const menuItem = (page: Page, name: string): ReturnType<Page['locator']> =>
@@ -138,7 +140,8 @@ test.describe('Plainspace handoff (#8648)', () => {
     const server = await setUp(page, projectPage);
 
     await openContextMenu(page, 'Buy tent');
-    await menuItem(page, 'Assign to…').click();
+    await menuItem(page, 'Assign to…').hover();
+    await waitForMenuSettled(page);
     await menuItem(page, 'Bob').click();
 
     await expect(snack(page, 'Assigned to Bob in Plainspace.')).toBeVisible();
@@ -185,7 +188,8 @@ test.describe('Plainspace handoff (#8648)', () => {
     // Handed off before that poll: the rename is pushed first, then the
     // assignee alone, so the Space has the title the task was handed off with.
     await openContextMenu(page, 'Buy a bigger tent');
-    await menuItem(page, 'Assign to…').click();
+    await menuItem(page, 'Assign to…').hover();
+    await waitForMenuSettled(page);
     await menuItem(page, 'Bob').click();
 
     await expect(snack(page, 'Assigned to Bob in Plainspace.')).toBeVisible();
@@ -233,7 +237,7 @@ test.describe('Plainspace handoff (#8648)', () => {
     const server = await setUp(page, projectPage);
     server.isOldServer = true;
 
-    // No members endpoint: 404.
+    // No members endpoint: 404 closes the menu and opens an error snack.
     await openContextMenu(page, 'Buy tent');
     await menuItem(page, 'Assign to…').click();
     const membersSnack = snack(page, 'Plainspace server too old to assign.');
