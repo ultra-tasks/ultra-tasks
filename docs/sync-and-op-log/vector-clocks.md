@@ -459,7 +459,7 @@ Rules that must hold for the system to be correct. Use these to verify implement
 | Server: DoS cap (sanitize, no pruning)                      | `packages/super-sync-server/src/sync/services/validation.service.ts`         |
 | Server: snapshot clock pruning during download optimization | `packages/super-sync-server/src/sync/services/operation-download.service.ts` |
 
-[server-operation-upload]: ../../packages/super-sync-server/src/sync/services/operation-upload.service.ts
+[server-operation-upload]: https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/sync/services/operation-upload.service.ts
 
 ---
 

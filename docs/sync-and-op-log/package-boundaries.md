@@ -1,7 +1,7 @@
 # Sync Package Boundaries
 
 **Status:** Active
-**Last Updated:** May 13, 2026
+**Last Updated:** November 7, 2026
 
 This note documents the package split used by the operation-log sync stack. The
 goal is to keep reusable sync logic framework-agnostic while leaving Super
@@ -19,7 +19,7 @@ src/app
 src/app
   -> @sp/sync-core
 
-packages/super-sync-server
+ultra-tasks-server/apps/server
   -> @sp/sync-core
   -> @sp/shared-schema
 ```
@@ -36,8 +36,10 @@ Rules:
   Super Productivity-specific model wiring.
 - `packages/shared-schema` owns schema contracts and validators shared between
   app and server. It has no dependency on `@sp/sync-core`.
-- `packages/super-sync-server` depends on both `@sp/shared-schema` (HTTP contract
+- `ultra-tasks-server/apps/server` depends on both `@sp/shared-schema` (HTTP contract
   types and validation schemas) and `@sp/sync-core` (vector-clock algorithms).
+
+The native SDK and contract are owned by the separate server repository. The application consumes exact published artifacts through `@sp/sync-providers/ultra-tasks` and shared-schema compatibility exports. Frozen legacy server compatibility artifacts preserve source ownership here; no duplicate server implementation is maintained in this repository.
 
 ## Ownership
 
