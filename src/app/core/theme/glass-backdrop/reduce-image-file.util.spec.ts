@@ -31,6 +31,8 @@ const imageSize = (dataUrl: string): Promise<[number, number]> =>
   });
 
 describe('reduceImageFile()', () => {
+  // Canvas codecs run asynchronously and exceeded the global 2s deadline in the
+  // full suite. This checks output limits, not encoding speed.
   it('stores even a noisy photo small: ≤ 256 px and ≤ 24 KB', async () => {
     const dataUrl = await reduceImageFile(await noisyPng(1200, 800));
     expect(dataUrl).toMatch(/^data:image\/(webp|jpeg);base64,/);
@@ -38,7 +40,7 @@ describe('reduceImageFile()', () => {
     const [width, height] = await imageSize(dataUrl);
     expect(Math.max(width, height)).toBeLessThanOrEqual(MAX_STORED_IMAGE_EDGE);
     expect(width / height).toBeCloseTo(1.5, 1);
-  });
+  }, 5000);
 
   it('does not enlarge a small image', async () => {
     const dataUrl = await reduceImageFile(await noisyPng(40, 20));
