@@ -241,6 +241,7 @@ test.describe('First-run onboarding', () => {
     // Closing the menu hands focus back to the play button.
     await playBtn.click({ button: 'right' });
     await expect(disableItem).toBeVisible();
+    await expect(disableItem).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(disableItem).toHaveCount(0);
     await expect(playBtn).toBeFocused();

@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/test.fixture';
+import { waitForMenuSettled } from '../../utils/waits';
 
 /**
  * Tests for mat-menu touch submenu fix.
@@ -42,17 +43,19 @@ test.describe('Mat Menu Touch Submenu Fix', () => {
     // Wait for context menu
     const contextMenu = page.locator('.mat-mdc-menu-content');
     await contextMenu.waitFor({ state: 'visible', timeout: 5000 });
+    await waitForMenuSettled(page);
 
     // Click on Toggle Tags to open submenu
     const toggleTagsBtn = page.locator(
       'button.e2e-edit-tags-btn, button:has-text("Toggle Tags")',
     );
     await toggleTagsBtn.waitFor({ state: 'visible', timeout: 5000 });
-    await toggleTagsBtn.click();
+    await toggleTagsBtn.hover();
 
     // Wait for submenu to appear (the tag button in the menu)
     const tagBtn = page.locator('.mat-mdc-menu-content button', { hasText: tagName });
     await tagBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await waitForMenuSettled(page);
 
     // Wait for 300ms touch protection delay to expire, plus buffer for CI stability
     // This is a timing-based protection feature being tested, so timeout is justified
