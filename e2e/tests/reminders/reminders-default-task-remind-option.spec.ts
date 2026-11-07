@@ -75,11 +75,7 @@ test.describe('Default task reminder option', () => {
 
     // Click on the schedule item in the detail panel
     const scheduleItem = page
-      .locator(
-        'task-detail-item:has(mat-icon:text("alarm")), ' +
-          'task-detail-item:has(mat-icon:text("today")), ' +
-          'task-detail-item:has(mat-icon:text("schedule")), task-detail-item:has(mat-icon:text("calendar_month"))',
-      )
+      .locator('task-detail-panel .st-planning-actions > button:first-child')
       .first();
     await scheduleItem.waitFor({ state: 'visible', timeout: 10000 });
     await scheduleItem.click();
@@ -166,11 +162,7 @@ test.describe('Default task reminder option', () => {
 
     // Click on the schedule item in the detail panel (using icon-based selector for robustness)
     const scheduleItem = page
-      .locator(
-        'task-detail-item:has(mat-icon:text("alarm")), ' +
-          'task-detail-item:has(mat-icon:text("today")), ' +
-          'task-detail-item:has(mat-icon:text("schedule")), task-detail-item:has(mat-icon:text("calendar_month"))',
-      )
+      .locator('task-detail-panel .st-planning-actions > button:first-child')
       .first();
     await scheduleItem.waitFor({ state: 'visible', timeout: 10000 });
     await scheduleItem.click();

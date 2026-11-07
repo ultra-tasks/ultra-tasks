@@ -2,16 +2,10 @@ import type { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import { ensureGlobalAddTaskBarOpen } from '../../utils/element-helpers';
 
-// Settings is a dialog over the workspace, and the colour editor folds away
-// inside it ("Customize colors"). A reload drops the dialog, so each visit
-// opens both again.
+// Settings is a dialog over the workspace. A reload drops it, so each visit
+// opens Appearance again.
 const openColorEditor = async (page: Page): Promise<void> => {
-  await page.goto('/#/config?tab=0');
-  const details = page.locator('theme-selector details.theme-select');
-  await details.waitFor({ state: 'attached', timeout: 10000 });
-  if (!(await details.evaluate((el: HTMLDetailsElement) => el.open))) {
-    await details.locator('summary').click();
-  }
+  await page.goto('/#/config?tab=6');
   await expect(
     page.locator('theme-selector').locator('[data-color="background"]'),
   ).toBeVisible();
@@ -44,7 +38,7 @@ test('three colors reach the page, cards, add controls, and persisted selection'
   await expect(picker.locator('.palette-hint')).toContainText(
     'Light mode keeps light backgrounds',
   );
-  await expect(picker.locator('h3')).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(picker.locator('h4')).toHaveCSS('color', 'rgb(0, 0, 0)');
   await expect(picker.locator('.preview-action')).toHaveCSS(
     'color',
     'rgb(255, 255, 255)',
@@ -131,7 +125,7 @@ test('presets, independent modes, system preference, and reset work on mobile', 
   await expect(picker.locator('[data-color="background"]')).toHaveValue('#e8eee7');
   await picker.locator('[data-color="surface"]').fill('#000000');
   // Light mode keeps light cards, so the text stays black.
-  await expect(picker.locator('h3')).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(picker.locator('h4')).toHaveCSS('color', 'rgb(0, 0, 0)');
   await picker.locator('mat-button-toggle[value="dark"]').click();
   await expect(picker.locator('[data-color="background"]')).toHaveValue('#17221b');
   await picker.locator('[data-color="accent"]').fill('#ffffff');

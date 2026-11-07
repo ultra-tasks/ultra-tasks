@@ -25,7 +25,7 @@ import type { Page } from '@playwright/test';
 
 const openGlobalSearch = async (page: Page): Promise<void> => {
   await page.keyboard.press('Shift+F');
-  await expect(page).toHaveURL(/\/#\/search$/);
+  await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
   await expect(page.locator('search-page')).toBeVisible();
 };
 

@@ -2,7 +2,7 @@ import { expect, test } from '../../fixtures/test.fixture';
 
 const openGlobalSearch = async (page: import('@playwright/test').Page): Promise<void> => {
   await page.keyboard.press('Shift+F');
-  await expect(page).toHaveURL(/\/#\/search$/);
+  await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
   await expect(page.locator('search-page')).toBeVisible();
 };
 

@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test.fixture';
+import { flushPendingWrites } from '../../utils/waits';
 
 /**
  * Basic e2e coverage for the Sections feature.
@@ -619,6 +620,7 @@ test.describe('Sections', () => {
     await page.keyboard.press('Escape');
     const expectedOrder = ['Section anchor task', 'Existing suggested task'];
     await expect(section.locator('task task-title')).toContainText(expectedOrder);
+    await flushPendingWrites(page);
     await page.reload();
     await workViewPage.waitForTaskList();
     await expect(section.locator('task task-title')).toContainText(expectedOrder);

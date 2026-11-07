@@ -63,6 +63,7 @@ const ctrlSelect = async (taskPage: TaskPage, titles: string[]): Promise<void> =
     // A row leaving another list animates out; wait for the single live one.
     await expect(task).toHaveCount(1);
     await task.click({ modifiers: ['Control'] });
+    await expect(task).toHaveClass(/isMultiSelected/);
   }
 };
 
@@ -347,7 +348,7 @@ test.describe('Task multi-select bulk actions', () => {
     await ctrlSelect(taskPage, titles);
 
     await openActions(page);
-    await openSubmenu(page, /toggle tags/i);
+    await openSubmenu(page, /\bTags\b/i);
     await menuItem(page, tagName).click();
     await closeMenus(page);
     for (const title of titles) {
@@ -357,7 +358,7 @@ test.describe('Task multi-select bulk actions', () => {
     }
 
     await openActions(page);
-    await openSubmenu(page, /toggle tags/i);
+    await openSubmenu(page, /\bTags\b/i);
     await menuItem(page, tagName).click();
     await closeMenus(page);
     for (const title of titles) {

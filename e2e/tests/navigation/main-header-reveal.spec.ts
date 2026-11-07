@@ -64,6 +64,11 @@ test.describe('main header action-row reveal', () => {
     await page.setViewportSize({ width: 720, height: 860 });
     await workViewPage.addTask('track me');
 
+    // The lean header fits at this width until a panel takes part of its space.
+    await page.locator('.e2e-toggle-notes-btn').first().click();
+    await expect(page.locator('right-panel.isOpen')).toBeVisible();
+    await expect(page.locator('right-panel.isPanelAnimating')).toHaveCount(0);
+
     // Park the row at its end, the state in which the play button is hidden
     // behind the start edge with the weakest cue.
     await scroller(page).evaluate((el) => {

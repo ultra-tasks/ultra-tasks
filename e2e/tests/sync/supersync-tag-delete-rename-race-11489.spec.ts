@@ -65,6 +65,9 @@ const renameTag = async (page: Page, oldName: string, newName: string): Promise<
   await renameBtn.click();
   const prompt = page.locator('dialog-prompt');
   await prompt.waitFor({ state: 'visible', timeout: 5000 });
+  // NgModel installs its initial value asynchronously after the dialog appears.
+  // Filling before that write lets the original title overwrite the edit.
+  await expect(prompt.locator('input')).toHaveValue(oldName);
   await prompt.locator('input').fill(newName);
   await prompt.locator('button[mat-flat-button]').click();
   await prompt.waitFor({ state: 'hidden', timeout: 5000 });
@@ -163,7 +166,9 @@ const runRace = async (
         'precondition: A archived T1 without the deleted tag (#11466 fix)',
       ).toEqual([]);
       await renameTag(clientB.page, tagName, renamedTag);
-      expect(await getStoreTagIdByTitle(clientB.page, renamedTag)).toBe(tagId);
+      await expect
+        .poll(() => getStoreTagIdByTitle(clientB!.page, renamedTag))
+        .toBe(tagId);
       await clientB.sync.syncAndWait();
     } else {
       // A deletes X first (not synced yet), then B renames X, so the rename
@@ -172,7 +177,9 @@ const runRace = async (
       // here; the marked delete must win instead.
       await tagPageA.deleteTag(tagName);
       await renameTag(clientB.page, tagName, renamedTag);
-      expect(await getStoreTagIdByTitle(clientB.page, renamedTag)).toBe(tagId);
+      await expect
+        .poll(() => getStoreTagIdByTitle(clientB!.page, renamedTag))
+        .toBe(tagId);
       await clientB.sync.syncAndWait();
       await clientA.sync.syncAndWait();
     }

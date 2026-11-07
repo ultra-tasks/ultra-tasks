@@ -50,7 +50,8 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   await expect
     .poll(() => attachmentPath(page, originalId))
     .toBe('https://attachment.example.test/original');
-  await page.keyboard.press('Escape');
+  await original.locator('.show-additional-info-btn').click();
+  await expect(panel).toBeHidden();
   await page.locator(`[id="${originalId}"]`).focus();
   await page.keyboard.press('Control+d');
   const copy = page.locator('task').filter({ hasText: '(copy)' });
@@ -75,7 +76,8 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   await expect
     .poll(() => attachmentPath(page, originalId))
     .toBe('https://attachment.example.test/original');
-  await page.keyboard.press('Escape');
+  await page.locator(`[id="${originalId}"] .show-additional-info-btn`).click();
+  await expect(panel).toBeHidden();
   await page.locator(`[id="${copyId}"]`).focus();
   if (!(await panel.isVisible())) await page.keyboard.press('i');
   await expect

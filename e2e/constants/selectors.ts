@@ -122,8 +122,7 @@ export const cssSelectors = {
   RIGHT_PANEL: '.right-panel',
   DETAIL_PANEL: 'task-detail-panel',
   DETAIL_PANEL_BTN: '.show-additional-info-btn',
-  SCHEDULE_TASK_ITEM:
-    'task-detail-item:has(mat-icon:text("alarm")), task-detail-item:has(mat-icon:text("today")), task-detail-item:has(mat-icon:text("schedule")), task-detail-item:has(mat-icon:text("calendar_month"))',
+  SCHEDULE_TASK_ITEM: 'task-detail-panel .st-planning-actions > button:first-child',
   TASK_SCHEDULE_BTN: '.ico-btn.schedule-btn',
 
   // ============================================================================

@@ -224,6 +224,7 @@
         (keyboardUnToggle)="focusItem(noteWrapperElRef)"
         [isFocus]="panelState.isFocusNotes()"
         [isShowControls]="true"
+        [isShowChecklistToggle]="true"
         [isScrollable]="true"
         [ariaLabel]="T.F.TASK.D_DESCRIPTION.TITLE | translate"
         [model]="task().notes || ''"

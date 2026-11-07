@@ -115,7 +115,7 @@ test.describe('Quick tour', () => {
     await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
     await expect(page.locator('.section-appFeatures')).toBeVisible();
     await expect(
-      page.getByRole('switch', { name: 'Planner', exact: true }),
+      page.getByRole('switch', { name: 'Upcoming', exact: true }),
     ).toBeVisible();
     await expect(card).toHaveCount(0);
 
@@ -318,8 +318,9 @@ test.describe('Quick tour', () => {
       await expect(hint).toContainText('Plan the next days');
       await expect(hint).toContainText('2 of 3');
 
-      // The drawer stays open, so the tip points at its Planner.
-      await page.locator('magic-side-nav .tour-planner').first().tap();
+      // Upcoming lives in the bottom navigation on phones, below the Browse drawer.
+      await page.locator('.nav-sidenav.mobile .mobile-menu-close').tap();
+      await page.locator('.e2e-bottom-nav-upcoming').tap();
       await expect(page).toHaveURL(/\/planner/);
       const card = page.locator('quick-tour-card');
       await expect(card).toContainText('3 of 3');

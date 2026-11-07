@@ -47,11 +47,13 @@ const archiveDoneTasks = async (page: Page): Promise<void> => {
   await finishDayBtn.click();
   await page.waitForURL(/daily-summary/, { timeout: 15000 });
   const saveAndGoHomeBtn = page.locator(
-    'daily-summary button[mat-flat-button]:has(mat-icon:has-text("wb_sunny"))',
+    'daily-summary button[mat-flat-button]:has(mat-icon:has-text("check_circle"))',
   );
   await saveAndGoHomeBtn.waitFor({ state: 'visible', timeout: 10000 });
-  await saveAndGoHomeBtn.click();
-  await page.waitForURL(/(active\/tasks|tag\/TODAY\/tasks)/, { timeout: 15000 });
+  await Promise.all([
+    page.waitForURL(/(active\/tasks|tag\/TODAY(?!\/daily-summary))/, { timeout: 15000 }),
+    saveAndGoHomeBtn.click(),
+  ]);
 };
 
 const syncOk = async (page: Page, syncPage: SyncPage): Promise<void> => {

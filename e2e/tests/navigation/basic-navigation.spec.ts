@@ -82,7 +82,7 @@ test.describe('Basic Navigation', () => {
     await settingsPage.closeSettings();
 
     // Side nav buttons change the route: Planner, then back via the Today tag
-    await sideNav.getByText('Planner', { exact: true }).click();
+    await sideNav.getByText('Upcoming', { exact: true }).click();
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/#\/planner/);
 

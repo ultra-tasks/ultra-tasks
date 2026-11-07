@@ -16,7 +16,7 @@ const { DETAIL_PANEL, DETAIL_PANEL_BTN } = cssSelectors;
  */
 
 const EDITED_NOTE = 'edited note of task A';
-// A line of the stock notes template every fresh task shows.
+// Explicit shared content: opening a fresh note need not install the stock template.
 const TEMPLATE_LINE = 'What do I want?';
 
 const notesEditor = (page: Page): Locator =>
@@ -115,7 +115,12 @@ test.describe('Note edit survives a task switch (#10405)', () => {
     await workViewPage.addTask('Task A 10405');
     const taskA = taskPage.getTaskByText('Task A 10405').first();
     const taskC = taskPage.getTaskByText('Task C 10405').first();
+    await selectTask(page, taskC, 'Task C 10405');
+    await replaceNote(page, TEMPLATE_LINE);
+    await notesEditor(page).blur();
     await selectTask(page, taskA, 'Task A 10405');
+    await replaceNote(page, TEMPLATE_LINE);
+    await notesEditor(page).blur();
 
     await replaceNote(page, EDITED_NOTE);
     await taskC.locator('task-title').click({ delay: 0 });

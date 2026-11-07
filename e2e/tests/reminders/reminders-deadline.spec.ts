@@ -11,7 +11,8 @@ const REMINDER_DIALOG_TASK_1 = `${REMINDER_DIALOG_TASK}:first-of-type`;
 const DEADLINE_DIALOG = 'dialog-deadline';
 const SCHEDULE_MAX_WAIT_TIME = 60000;
 
-const DETAIL_PANEL_DEADLINE_ITEM = 'task-detail-item:has(mat-icon:text("flag"))';
+const DETAIL_PANEL_DEADLINE_ITEM =
+  'task-detail-panel .st-planning-actions > button:has(mat-icon:text("flag"))';
 
 test.describe('Deadline Reminders', () => {
   test('should show reminder dialog when deadline with reminder is reached and dismiss correctly', async ({

@@ -16,12 +16,7 @@ const SCHEDULE_DIALOG = 'mat-dialog-container:has(dialog-schedule-task)';
 /** Open the recurring-config dialog via the task detail panel's schedule row. */
 export const openRecurDialog = async (page: Page): Promise<Locator> => {
   const scheduleItem = page
-    .locator('task-detail-item')
-    .filter({
-      has: page.locator('mat-icon', {
-        hasText: /^(alarm|today|schedule|calendar_month|repeat)$/,
-      }),
-    })
+    .locator('task-detail-panel .st-planning-actions > button')
     .first();
   await expect(scheduleItem).toBeVisible({ timeout: 5000 });
   await scheduleItem.click();

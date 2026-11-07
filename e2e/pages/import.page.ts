@@ -20,7 +20,7 @@ export class ImportPage extends BasePage {
     super(page);
     // The import button contains text "Import from file" and has the upload icon
     this.importFromFileBtn = page.locator(
-      'file-imex button:has(mat-icon:text-is("upload"))',
+      'file-imex button:has(mat-icon:text-is("upload_file"))',
     );
     this.fileInput = page.locator('file-imex input[type="file"]');
     this.importFromUrlBtn = page.locator(
@@ -36,7 +36,7 @@ export class ImportPage extends BasePage {
    * Navigate to the import/export controls.
    *
    * Settings is a dialog with a category list; the import/export buttons
-   * (`file-imex`) are always visible in the "Sync & Backup" category, there is
+   * (`file-imex`) are always visible in the "Import & export" category, there is
    * no expander to open.
    */
   async navigateToImportPage(): Promise<void> {
@@ -45,7 +45,7 @@ export class ImportPage extends BasePage {
 
     const syncBackupCategory = this.page
       .locator('config-page .settings-categories')
-      .getByRole('button', { name: 'Sync & Backup', exact: true });
+      .getByRole('button', { name: 'Import & export', exact: true });
     await syncBackupCategory.waitFor({ state: 'visible', timeout: 10000 });
     await syncBackupCategory.click();
     await expect(syncBackupCategory).toHaveAttribute('aria-current', 'page');

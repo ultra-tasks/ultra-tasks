@@ -95,7 +95,7 @@ test.describe('Global Search — collapsed section (#8780)', () => {
     await expect(taskRow).toHaveCount(0);
 
     await page.keyboard.press('Shift+F');
-    await expect(page).toHaveURL(/\/#\/search$/);
+    await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
     await page.locator('search-page .search-field input').fill(taskName);
     const result = page
       .locator('search-page .search-result')
@@ -172,7 +172,7 @@ test.describe('Global Search — collapsed section (#8780)', () => {
     await expect(page.locator(`task[data-task-id="${parentId}"]`)).toHaveCount(0);
 
     await page.keyboard.press('Shift+F');
-    await expect(page).toHaveURL(/\/#\/search$/);
+    await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
     await page.locator('search-page .search-field input').fill(subTaskName);
     const result = page
       .locator('search-page .search-result')

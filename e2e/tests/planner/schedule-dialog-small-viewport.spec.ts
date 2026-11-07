@@ -9,9 +9,7 @@ test.use({ viewport: { width: 372, height: 800 } });
 
 const SCHEDULE_DIALOG = 'dialog-schedule-task';
 const DETAIL_PANEL_SCHEDULE_ITEM =
-  'task-detail-item:has(mat-icon:text("alarm")), ' +
-  'task-detail-item:has(mat-icon:text("today")), ' +
-  'task-detail-item:has(mat-icon:text("schedule")), task-detail-item:has(mat-icon:text("calendar_month"))';
+  'task-detail-panel .st-planning-actions > button:first-child';
 
 test.describe('schedule dialog on a small viewport', () => {
   test('fits without horizontal scroll and keeps action buttons on one row', async ({
