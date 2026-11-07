@@ -3,13 +3,18 @@ import { AccountClient, SyncClient, randomKey, open } from '@ultra-tasks/account
 import { NativeSyncPlatformService } from './native-sync-platform.service';
 import { NativeSyncService } from './native-sync.service';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
+import { CertTrustService } from '../issue/cert-trust.service';
 
 describe('NativeSyncService', () => {
   let service: NativeSyncService;
+  let certTrust: jasmine.SpyObj<CertTrustService>;
   beforeEach(() => {
+    certTrust = jasmine.createSpyObj('CertTrustService', ['setPendingConfig']);
+    certTrust.setPendingConfig.and.resolveTo();
     TestBed.configureTestingModule({
       providers: [
         NativeSyncService,
+        { provide: CertTrustService, useValue: certTrust },
         {
           provide: NativeSyncPlatformService,
           useValue: {
@@ -37,6 +42,32 @@ describe('NativeSyncService', () => {
       service.login('http://remote.example.com', 'alice', 'password'),
     ).toBeRejectedWithError('NATIVE_SYNC.ERROR_URL');
     expect(service.account).toBeUndefined();
+    expect(certTrust.setPendingConfig).not.toHaveBeenCalled();
+  });
+  it('awaits certificate trust before sign-in and retains it through MFA until lock', async () => {
+    let acknowledge!: () => void;
+    certTrust.setPendingConfig.and.returnValue(
+      new Promise<void>((resolve) => (acknowledge = resolve)),
+    );
+    const login = spyOn(AccountClient.prototype, 'login').and.resolveTo({
+      mfaToken: 'pending-factor',
+    });
+    const done = service.login(' https://account.example.test/ ', 'alice', 'password');
+    expect(certTrust.setPendingConfig).toHaveBeenCalledWith(service, {
+      baseUrl: 'https://account.example.test',
+    });
+    expect(login).not.toHaveBeenCalled();
+    acknowledge();
+    expect(await done).toBe(false);
+    await service.lock();
+    expect(certTrust.setPendingConfig).toHaveBeenCalledWith(service, null);
+  });
+  it('revokes the unsaved endpoint when sign-in fails', async () => {
+    spyOn(AccountClient.prototype, 'login').and.rejectWith(new Error('Sign-in rejected'));
+    await expectAsync(
+      service.login('https://account.example.test', 'alice', 'password'),
+    ).toBeRejectedWithError('Sign-in rejected');
+    expect(certTrust.setPendingConfig.calls.mostRecent().args).toEqual([service, null]);
   });
   it('schedules personal sync every 60 seconds, resumes online, and stops when locked', async () => {
     spyOn(AccountClient.prototype, 'login').and.callFake(async function (

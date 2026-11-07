@@ -22,6 +22,7 @@ import { NativeSyncPlatformService } from './native-sync-platform.service';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { IS_ELECTRON } from '../../app.constants';
+import { CertTrustService } from '../issue/cert-trust.service';
 
 interface CachedAccount {
   capabilities: Capabilities;
@@ -34,6 +35,7 @@ const PERIOD = 60000;
 @Injectable({ providedIn: 'root' })
 export class NativeSyncService {
   private readonly bridge = inject(NativePersonalBridgeService);
+  private readonly certTrust = inject(CertTrustService);
   readonly platform = inject(NativeSyncPlatformService);
   readonly backgroundError = signal('');
   readonly status = signal('NATIVE_SYNC.LOCKED');
@@ -97,6 +99,15 @@ export class NativeSyncService {
     )
       throw new Error('NATIVE_SYNC.ERROR_URL');
     this.serverUrl = url.href.replace(/\/$/, '');
+    try {
+      await this.certTrust.setPendingConfig(this, { baseUrl: this.serverUrl });
+      return await this.authenticate(identifier, password);
+    } catch (error) {
+      await this.certTrust.setPendingConfig(this, null);
+      throw error;
+    }
+  }
+  private async authenticate(identifier: string, password: string): Promise<boolean> {
     this.account = new AccountClient(
       this.platform.transport(httpTransport(this.serverUrl)),
     );
@@ -435,6 +446,7 @@ export class NativeSyncService {
     this.unlocked.set(false);
     this.linked.set(false);
     this.status.set('NATIVE_SYNC.LOCKED');
+    await this.certTrust.setPendingConfig(this, null);
     this.closing = false;
   }
 }
