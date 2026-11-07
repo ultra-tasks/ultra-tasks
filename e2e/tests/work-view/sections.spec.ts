@@ -572,6 +572,7 @@ test.describe('Sections', () => {
       'Second task in section',
     ];
     await expect(section.locator('task task-title')).toContainText(expectedOrder);
+    await flushPendingWrites(page);
     await page.reload();
     await workViewPage.waitForTaskList();
     await expect(section.locator('task task-title')).toContainText(expectedOrder);
