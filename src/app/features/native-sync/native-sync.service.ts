@@ -16,13 +16,17 @@ import {
   type Invitation,
   type ScopeInfo,
   type OwnershipOffer,
-} from '@ultra-tasks/account-crypto';
+} from '@sp/sync-providers/ultra-tasks';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { IS_ELECTRON } from '../../app.constants';
 import { CertTrustService } from '../issue/cert-trust.service';
+import { auditTime, filter, type Subscription } from 'rxjs';
+import { LOCAL_ACTIONS } from '../../util/local-actions.token';
+import { isPersistentAction } from '../../op-log/core/persistent-action.interface';
+import { OperationWriteFlushService } from '../../op-log/sync/operation-write-flush.service';
 
 interface CachedAccount {
   capabilities: Capabilities;
@@ -36,6 +40,8 @@ const PERIOD = 60000;
 export class NativeSyncService {
   private readonly bridge = inject(NativePersonalBridgeService);
   private readonly certTrust = inject(CertTrustService);
+  private readonly localActions = inject(LOCAL_ACTIONS);
+  private readonly writeFlush = inject(OperationWriteFlushService);
   readonly platform = inject(NativeSyncPlatformService);
   readonly backgroundError = signal('');
   readonly status = signal('NATIVE_SYNC.LOCKED');
@@ -49,6 +55,15 @@ export class NativeSyncService {
   readonly projects = computed(() => this.scopes().filter((s) => s.kind === 'project'));
   readonly revision = signal(0);
   readonly live = signal(false);
+  readonly sharingEnabled = computed(
+    () =>
+      this.unlocked() && this.account?.capabilities?.features['sharedProjects'] === true,
+  );
+  readonly personalRealtimeEnabled = computed(
+    () =>
+      this.unlocked() &&
+      this.account?.capabilities?.features['personalRealtime'] === true,
+  );
   client?: SyncClient;
   account?: AccountClient;
   serverUrl = '';
@@ -58,6 +73,8 @@ export class NativeSyncService {
   private realtime?: RealtimeSync;
   private unsubscribePlatform?: () => void;
   private closing = false;
+  private localChanges?: Subscription;
+  private resyncRequested = false;
 
   private cacheKey(): string {
     return 'ultra-native-account:' + this.serverUrl;
@@ -83,8 +100,7 @@ export class NativeSyncService {
     );
     localStorage.setItem('ultra-native-server', this.serverUrl);
   }
-  async login(serverUrl: string, identifier: string, password: string): Promise<boolean> {
-    this.error.set('');
+  private normalizeServerUrl(serverUrl: string): string {
     const url = new URL(serverUrl);
     if (
       url.username ||
@@ -98,7 +114,17 @@ export class NativeSyncService {
         ))
     )
       throw new Error('NATIVE_SYNC.ERROR_URL');
-    this.serverUrl = url.href.replace(/\/$/, '');
+    return url.href.replace(/\/$/, '');
+  }
+  async openAccount(serverUrl: string): Promise<void> {
+    const url = this.normalizeServerUrl(serverUrl) + '/account';
+    if (Capacitor.isNativePlatform()) await Browser.open({ url });
+    else if (IS_ELECTRON) window.ea.openExternalUrl(url);
+    else window.open(url, '_blank', 'noopener,noreferrer');
+  }
+  async login(serverUrl: string, identifier: string, password: string): Promise<boolean> {
+    this.error.set('');
+    this.serverUrl = this.normalizeServerUrl(serverUrl);
     try {
       await this.certTrust.setPendingConfig(this, { baseUrl: this.serverUrl });
       return await this.authenticate(identifier, password);
@@ -245,9 +271,14 @@ export class NativeSyncService {
       );
       this.linked.set(await this.bridge.bind(this.client));
       this.unlocked.set(true);
+      this.localChanges = this.localActions
+        .pipe(filter(isPersistentAction), auditTime(500))
+        .subscribe(() => {
+          if (this.linked() && !this.closing) void this.syncNow();
+        });
       this.status.set('NATIVE_SYNC.READY');
       this.interval = setInterval(() => {
-        void this.syncNow();
+        if (!this.personalRealtimeEnabled()) void this.syncNow();
       }, PERIOD);
       window.addEventListener('online', this.resume);
       document.addEventListener('visibilitychange', this.resume);
@@ -264,8 +295,24 @@ export class NativeSyncService {
       void this.syncNow().then(() => this.realtime?.resume());
   };
   private startRealtime(): void {
-    if (!this.client || !this.account?.capabilities?.features['sharedRealtime']) return;
+    if (
+      !this.client ||
+      !(
+        this.account?.capabilities?.features['sharedRealtime'] ||
+        this.account?.capabilities?.features['personalRealtime']
+      )
+    )
+      return;
     this.realtime = new RealtimeSync(this.client, {
+      fallbackMs: PERIOD,
+      includePersonal: this.account?.capabilities?.features['personalRealtime'] === true,
+      includeShared: this.account?.capabilities?.features['sharedRealtime'] === true,
+      syncScope: async (scopeId) => {
+        if (this.client?.state.scopes[scopeId]?.info.kind === 'personal') {
+          await this.syncNow();
+          if (this.error()) throw new Error(this.error());
+        } else await this.client!.syncScope(scopeId);
+      },
       socket: (ticket) =>
         createRealtimeSocket(
           this.serverUrl.replace(/^http/, 'ws') +
@@ -325,19 +372,29 @@ export class NativeSyncService {
   async link(migrate: boolean): Promise<void> {
     this.busy.set(true);
     try {
+      await this.writeFlush.flushPendingWrites();
       if (migrate) await this.bridge.migrate();
       else await this.bridge.useExisting();
       this.linked.set(true);
       await this.refresh();
+      await this.syncNow();
       await this.updatePlatform();
     } finally {
       this.busy.set(false);
     }
   }
   syncNow(): Promise<void> {
-    if (this.inFlight) return this.inFlight;
+    if (this.inFlight) {
+      this.resyncRequested = true;
+      return this.inFlight;
+    }
     if (!this.client || !this.unlocked() || this.closing) return Promise.resolve();
-    this.inFlight = this.sync().finally(() => {
+    this.inFlight = (async () => {
+      do {
+        this.resyncRequested = false;
+        await this.sync();
+      } while (this.resyncRequested && !this.closing);
+    })().finally(() => {
       this.inFlight = undefined;
     });
     return this.inFlight;
@@ -347,7 +404,10 @@ export class NativeSyncService {
     this.error.set('');
     try {
       const reminderBarrier = await this.platform.reminderBarrier(this.account!);
-      if (this.linked()) await this.bridge.capture();
+      if (this.linked()) {
+        await this.writeFlush.flushPendingWrites();
+        await this.bridge.capture();
+      }
       await this.reconnect();
       const errors = await this.client!.syncAll();
       if (this.linked() && !errors[this.bridge.scopeId!]) await this.bridge.apply();
@@ -366,9 +426,10 @@ export class NativeSyncService {
   }
   async refresh(): Promise<void> {
     this.scopes.set(await this.client!.refreshScopes());
-    this.invitations.set(await this.client!.invitations());
+    const sharing = this.account?.capabilities?.features['sharedProjects'] === true;
+    this.invitations.set(sharing ? await this.client!.invitations() : []);
     this.ownershipOffers.set(
-      this.account?.capabilities?.features['scopeRecovery']
+      sharing && this.account?.capabilities?.features['scopeRecovery']
         ? await this.client!.ownershipOffers()
         : [],
     );
@@ -416,6 +477,8 @@ export class NativeSyncService {
   }
   async lock(): Promise<void> {
     this.closing = true;
+    this.localChanges?.unsubscribe();
+    this.localChanges = undefined;
     if (this.interval) clearInterval(this.interval);
     window.removeEventListener('online', this.resume);
     document.removeEventListener('visibilitychange', this.resume);

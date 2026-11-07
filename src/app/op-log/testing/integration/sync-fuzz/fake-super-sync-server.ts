@@ -20,13 +20,13 @@ import type {
 /**
  * In-memory SuperSync server for the sync fuzz harness.
  *
- * The decision logic is a PORT of packages/super-sync-server. It cannot be
+ * The decision logic is a PORT of ultra-tasks-server/apps/server. It cannot be
  * imported into the Karma bundle: those modules pull in Prisma and a node `fs`
  * logger. This file must stay free of Angular imports so the server's vitest
  * can load it.
  *
  * Checked against the real server code by the parity specs in
- * packages/super-sync-server/tests/: sync-fuzz-server-parity.pglite.spec.ts
+ * ultra-tasks-server/apps/server/tests/ (npm run ultra-legacy:parity): sync-fuzz-server-parity.pglite.spec.ts
  * for the first three, sync-fuzz-server-full-state-parity.pglite.spec.ts for
  * the last two:
  * - conflict.ts: detectConflict (the production SQL, on PGlite) and the pure

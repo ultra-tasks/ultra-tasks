@@ -131,6 +131,3 @@ data/
 
 # Generated App Store Connect "What's New" notes (see tools/prepare-appstore-release-notes.js)
 /fastlane/appstore_metadata
-
-# Generated encrypted-account portal bundle; built from packages/account-crypto.
-/packages/super-sync-server/public/ultra-account/

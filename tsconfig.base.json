@@ -24,7 +24,7 @@
     "lib": ["es2022", "dom"],
     "paths": {
       "src/*": ["./src/*"],
-      "@ultra-tasks/account-crypto": ["./packages/account-crypto/src/index.ts"],
+      "@sp/sync-providers/ultra-tasks": ["./packages/sync-providers/src/ultra-tasks.ts"],
       "@super-productivity/plugin-api": ["./packages/plugin-api/src/index.ts"],
       "@sp/shared-schema": ["./packages/shared-schema/src/index.ts"],
       "@sp/sync-core": ["./packages/sync-core/src/index.ts"],

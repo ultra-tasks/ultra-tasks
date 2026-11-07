@@ -68,7 +68,7 @@ deploy it. It does not test native Android background sync, Electron/SQLite,
 restoring an older browser profile, or every intermediate release. In particular,
 the direct browser downgrade never reaches a versionless sync request.
 Server-side coverage in
-[`device-touch-sql.pglite.spec.ts`](../../packages/super-sync-server/tests/device-touch-sql.pglite.spec.ts)
+[`device-touch-sql.pglite.spec.ts`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/tests/device-touch-sql.pglite.spec.ts)
 exercises the real download route and device SQL: a missing or invalid version
 clears the remembered version even inside the write throttle, while heartbeats
 preserve it. This fixes reporting for same-ID downgrades; it does not protect an

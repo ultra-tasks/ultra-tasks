@@ -18,15 +18,16 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
         config.urlCache = nil
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
-    private func failure() -> NSError { NSError(domain: service, code: 1, userInfo: [NSLocalizedDescriptionKey: "Native account storage or session unavailable. Sign in again."]) }
+    private func failure(_ status: OSStatus = 1) -> NSError { NSError(domain: service, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "Native account storage or session unavailable. Sign in again."]) }
     private func query() -> [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: "session"] }
     private func read() throws -> [String: Any] {
         var request = query()
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        guard SecItemCopyMatching(request as CFDictionary, &result) == errSecSuccess,
-              let bytes = result as? Data,
+        let status = SecItemCopyMatching(request as CFDictionary, &result)
+        guard status == errSecSuccess else { throw failure(status) }
+        guard let bytes = result as? Data,
               let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw failure() }
         return value
     }
@@ -34,19 +35,20 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
         let bytes = try JSONSerialization.data(withJSONObject: profile)
         let status = SecItemUpdate(query() as CFDictionary, [kSecValueData as String: bytes] as CFDictionary)
         if status == errSecSuccess { return }
-        guard status == errSecItemNotFound else { throw failure() }
+        guard status == errSecItemNotFound else { throw failure(status) }
         var item = query()
         item[kSecValueData as String] = bytes
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { throw failure() }
+        let added = SecItemAdd(item as CFDictionary, nil)
+        guard added == errSecSuccess else { throw failure(added) }
     }
     private func clear() throws {
         let status = SecItemDelete(query() as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else { throw failure() }
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw failure(status) }
     }
     public func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                            newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
-    private func tokens(_ input: [String: Any]) throws -> [String: Any] {
+    private func tokens(_ input: [String: Any]) throws -> JSObject {
         guard let access = input["accessToken"] as? String, let refresh = input["refreshToken"] as? String,
               let expires = input["expiresIn"] as? NSNumber, !access.isEmpty, !refresh.isEmpty else { throw failure() }
         return ["accessToken": access, "refreshToken": refresh, "expiresIn": expires]
@@ -103,7 +105,10 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
                 guard profile["serverId"] as? String == input["serverId"] as? String,
                       profile["accountId"] as? String == input["accountId"] as? String else { throw self.failure() }
                 if method == "detach" {
-                    guard var latest = profile["tokens"] as? JSObject else { throw self.failure() }
+                    guard let stored = profile["tokens"] as? [String: Any] else { throw self.failure() }
+                    // JSONSerialization returns Foundation objects. Convert the
+                    // validated fields to Swift JSValue types before bridging.
+                    var latest = try self.tokens(stored)
                     let expiry = (profile["expiresAt"] as? NSNumber)?.doubleValue ?? 0
                     latest["expiresIn"] = max(0, Int((expiry - Date().timeIntervalSince1970 * 1000) / 1000))
                     try self.clear(); call.resolve(latest); return
@@ -112,11 +117,18 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
                 guard method == "current" || method == "refresh" else { throw self.failure() }
                 let expires = (profile["expiresAt"] as? NSNumber)?.doubleValue ?? 0
                 if method == "refresh" || Date().timeIntervalSince1970 * 1000 >= expires - 60000 { profile = try self.refreshed(profile) }
-                guard var result = profile["tokens"] as? JSObject else { throw self.failure() }
+                guard let stored = profile["tokens"] as? [String: Any] else { throw self.failure() }
+                var result = try self.tokens(stored)
                 let validUntil = (profile["expiresAt"] as? NSNumber)?.doubleValue ?? 0
                 result["expiresIn"] = max(1, Int((validUntil - Date().timeIntervalSince1970 * 1000) / 1000))
                 call.resolve(result)
-            } catch { call.reject("Native account storage or session unavailable. Sign in again.") }
+            } catch {
+                // Only expose our numeric status, never the stored profile or a
+                // Foundation/network error description that might contain data.
+                let nativeError = error as NSError
+                let code = nativeError.domain == self.service ? String(nativeError.code) : "1"
+                call.reject("Native account storage or session unavailable. Sign in again.", code)
+            }
         }
     }
 }

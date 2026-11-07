@@ -13,7 +13,7 @@ import {
   type SyncClient,
   type Tokens,
   type Transport,
-} from '@ultra-tasks/account-crypto';
+} from '@sp/sync-providers/ultra-tasks';
 import { generateNotificationId } from '../android/android-notification-id.util';
 
 interface NativeAccountPlugin {

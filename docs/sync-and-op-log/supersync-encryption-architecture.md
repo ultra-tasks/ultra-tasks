@@ -319,7 +319,7 @@ instead of copying the private-config shape into new code.
 > fresh or incomplete client. If no verified complete client remains, preserve
 > the database and clients for incident recovery; do not skip the row or advance
 > a cursor past it. See
-> [`backup-and-recovery.md`](../../packages/super-sync-server/docs/backup-and-recovery.md#recovering-a-mixed-encryptedplaintext-history).
+> [`backup-and-recovery.md`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/docs/backup-and-recovery.md#recovering-a-mixed-encryptedplaintext-history).
 >
 > Full protection — binding the metadata (and the encryption flag) as GCM AAD
 > behind an envelope-version migration, with a monotonic "encryption floor" to

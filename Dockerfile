@@ -57,7 +57,7 @@ ENV APP_PORT=80
 RUN apt-get update && apt-get install -y --no-install-recommends jq curl && rm -rf /var/lib/apt/lists/*
 
 # Copy built app and configs
-COPY --from=build /app/dist/browser /usr/share/nginx/html
+COPY --from=build /app/.tmp/angular-dist/browser /usr/share/nginx/html
 COPY ./nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY ./docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 

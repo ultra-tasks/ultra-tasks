@@ -41,6 +41,7 @@ const OPTIONAL_ENV_KEYS = [
   'WEBDAV_URL',
   'WEBDAV_USERNAME',
   'WEBDAV_PASSWORD',
+  'ULTRA_ACCOUNT_URL',
 ];
 
 const ALL_KEYS = [...REQUIRED_ENV_KEYS, ...OPTIONAL_ENV_KEYS];
@@ -57,8 +58,11 @@ ALL_KEYS.forEach((key) => {
 const envPath = path.join(process.cwd(), '.env');
 const envConfig = dotenv.config({ path: envPath });
 if (envConfig.parsed) {
-  // Add all values from .env file, not just the predefined keys
-  Object.assign(env, envConfig.parsed);
+  // Only declared client settings may be compiled into a downloadable bundle.
+  // Operator secrets belong in the standalone server's deployment environment.
+  ALL_KEYS.forEach((key) => {
+    if (envConfig.parsed[key] !== undefined) env[key] = envConfig.parsed[key];
+  });
 }
 
 // Log what we found

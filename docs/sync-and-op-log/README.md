@@ -83,11 +83,11 @@ tests, or a focused contract.
 
 ## Related
 
-| Location                                                                                                 | Content                                      |
-| -------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| [packages/super-sync-server/docs/architecture.md](../../packages/super-sync-server/docs/architecture.md) | SuperSync server-only architecture reference |
-| [packages/super-sync-server/](../../packages/super-sync-server/)                                         | SuperSync server implementation              |
-| [ARCHITECTURE-DECISIONS.md](../../ARCHITECTURE-DECISIONS.md)                                             | Load-bearing product/data decisions          |
+| Location                                                                                                                                        | Content                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| [packages/super-sync-server/docs/architecture.md](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/docs/architecture.md) | SuperSync server-only architecture reference |
+| [packages/super-sync-server/](https://github.com/ultra-tasks/ultra-tasks-server/tree/main/apps/server/)                                         | SuperSync server implementation              |
+| [ARCHITECTURE-DECISIONS.md](../../ARCHITECTURE-DECISIONS.md)                                                                                    | Load-bearing product/data decisions          |
 
 Retired diagram filenames remain as small forwarding stubs so historical links
 continue to resolve. `operation-rules.md` is also a compatibility pointer; it is

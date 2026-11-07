@@ -9,6 +9,7 @@ export default defineConfig({
     'src/webdav.ts',
     'src/local-file.ts',
     'src/super-sync.ts',
+    'src/ultra-tasks.ts',
     'src/onedrive.ts',
     'src/http.ts',
     'src/errors.ts',

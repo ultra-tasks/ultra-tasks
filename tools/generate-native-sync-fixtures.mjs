@@ -8,7 +8,7 @@ import {
   grantKey,
   randomKey,
   sign,
-} from '../packages/account-crypto/dist/index.mjs';
+} from '@sp/sync-providers/ultra-tasks';
 
 const serverId = crypto.randomUUID();
 const accountId = crypto.randomUUID();

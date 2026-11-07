@@ -134,10 +134,21 @@
         "types": "./dist/log.d.ts",
         "default": "./dist/log.js"
       }
+    },
+    "./ultra-tasks": {
+      "import": {
+        "types": "./dist/ultra-tasks.d.mts",
+        "default": "./dist/ultra-tasks.mjs"
+      },
+      "require": {
+        "types": "./dist/ultra-tasks.d.ts",
+        "default": "./dist/ultra-tasks.js"
+      }
     }
   },
   "dependencies": {
-    "hash-wasm": "^4.12.0"
+    "hash-wasm": "^4.12.0",
+    "@ultra-tasks/account-crypto": "https://github.com/ultra-tasks/ultra-tasks-server/releases/download/sdk-v0.1.1/ultra-tasks-account-crypto-0.1.1.tgz"
   },
   "peerDependencies": {
     "@sp/sync-core": "*"

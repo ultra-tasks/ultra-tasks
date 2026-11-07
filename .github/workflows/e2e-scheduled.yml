@@ -58,7 +58,7 @@ on:
       - 'docker-compose.supersync.yaml'
       - 'packages/sync-providers/**'
       - 'packages/sync-core/**'
-      - 'packages/super-sync-server/**'
+      - 'tools/sync-server-source.json'
       - 'packages/shared-schema/**'
 
 permissions:
@@ -265,6 +265,7 @@ jobs:
           retry_wait_seconds: 60
           command: |
             set -eu
+            node tools/prepare-sync-server.js
             docker compose -f docker-compose.yaml -f docker-compose.supersync.yaml up -d --build supersync webdav-e2e
             echo "⏳ Waiting for SuperSync server..."
             timeout 180 sh -c 'until curl -s http://localhost:1901/health > /dev/null 2>&1; do sleep 1; done'
@@ -309,25 +310,6 @@ jobs:
           name: e2e-results-supersync-${{ matrix.shard }}-${{ github.run_id }}
           path: .tmp/e2e-test-results/**/*.*
           retention-days: 30
-
-  # Job 4: SuperSync Server Unit Tests (runs in parallel with build, no artifact needed)
-  supersync-server-tests:
-    name: SuperSync Server Unit Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          persist-credentials: false
-      - name: Reconfigure git to use HTTP authentication
-        run: >
-          git config --global url."https://github.com/".insteadOf
-          ssh://git@github.com/
-      - name: Setup Node Dependencies
-        uses: ./.github/actions/setup-deps
-      - name: Run SuperSync Server Tests
-        run: cd packages/super-sync-server && npm test
 
   # Job 5: Released-client compatibility. Desktop installs have no auto-updater,
   # so published releases stay in the fleet. These specs run the unmodified web
@@ -375,6 +357,7 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 20
           command: |
+            node tools/prepare-sync-server.js
             docker compose -f docker-compose.yaml -f docker-compose.supersync.yaml up -d --build supersync
             until curl -s http://localhost:1901/health > /dev/null 2>&1; do sleep 1; done
 

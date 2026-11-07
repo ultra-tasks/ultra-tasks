@@ -1,9 +1,9 @@
 # Ultra Tasks server extraction and version one launch plan
 
-Status: In progress; standalone server repository created, initial extraction under validation.
+Status: Server/client cutover, private sync, dashboard, and operator lifecycle implemented; final CI and external release gates remain.
 Owner: Ultra Tasks maintainer.
-Tracking: Maintainer request in this chat; create implementation issues for the phases below.
-Last verified against code: November 7, 2026, at extraction baseline `535576e7c9643c2763661a3660c946f69e1525e1`.
+Tracking: Maintainer request; maintained implementation and acceptance records live in the standalone server docs.
+Last verified against code: November 7, 2026. Extraction baseline `535576e7c9643c2763661a3660c946f69e1525e1`; current package and acceptance revisions are recorded in the server SOURCE.md and security-and-recovery.md.
 Completion condition: The server builds and releases from its own repository, a clean Docker installation passes acceptance, and the account service and dashboard run on the maintainer's server. Move enduring contracts into the two repositories' maintained guides and retire this plan after launch.
 
 Ultra Tasks will have a separately maintained server repository and Docker image. Users create an account with an email and password, sign in on their devices, and sync encrypted data automatically. A small account dashboard provides security, device management, and sync information; the full browser task application follows on the same hosting foundation.
@@ -12,7 +12,7 @@ This plan replaces the repository ownership, hosted onboarding, and personal syn
 
 Implementation has started in [ultra-tasks/ultra-tasks-server](https://github.com/ultra-tasks/ultra-tasks-server). The initial extraction preserves 765 relevant commits, separates `apps/server` and `apps/account`, and builds independently. Its new entry point exposes private accounts, personal sync, and the account dashboard, with sharing and legacy SuperSync routes disabled. Docker development uses PostgreSQL, a dedicated migration service, and isolated Mailpit delivery; the production bundle adds Caddy. The current [server status](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/docs/implementation-status.md) and [sync model](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/docs/v1-sync-model.md) track the implementation.
 
-The client repository retains its server/SDK snapshot until versioned package publication and consumer cutover are validated. Legacy `sync-core` and `shared-schema` copies in the new repository are temporary frozen bootstrap dependencies. Native contract extraction, package releases, faster personal scheduling, complete operator lifecycle tooling, and production acceptance remain open. Do not delete local source or claim the extraction and v1 launch complete yet. Oracle deployment remains the final phase.
+SDK 0.1.1 and contract 0.1.0 are published as exact-version artifacts; the client now consumes them through its provider/schema packages and its tracked server/SDK source has been removed. The server consumes frozen legacy compatibility tarballs instead of maintaining duplicate sync-core/shared-schema source. Private personal realtime, durable 500 ms foreground capture, capability-gated client UI, the account overview/security/device dashboard, conditional website sign-in, and paired Docker backup/restore/update tooling are implemented. Server-backed test tooling fetches a pinned independent checkout into an ignored directory. Production acceptance remains separate from source extraction. Oracle deployment remains the final phase.
 
 ## Version one scope
 
@@ -32,21 +32,19 @@ The maintainer confirmed private account sync and the account dashboard as the v
 
 Local-only use remains available. The account requirement applies to hosted sync, not to offline task management. Self-hosted installations use the same protocol, encryption, and account features as the official service.
 
-## Existing implementation and remaining gaps
+## Current implementation and remaining gaps
 
-| Area                       | Current code                                                                                                                                                                             | Work required                                                                                                                  |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Server                     | [Existing server package](../../packages/super-sync-server/) serves legacy SuperSync routes and native account/scope routes in one process                                               | Extract it without changing its behavior, then make native accounts the default product                                        |
-| Accounts                   | [Account routes](../../packages/super-sync-server/src/ultra-account/routes.ts) implement registration, verification, password login, MFA, recovery, and sessions                         | Branded onboarding, production mail delivery, enrollment policy, and dashboard integration                                     |
-| Encryption and client sync | [Account crypto package](../../packages/account-crypto/README.md) implements vaults, signed encrypted transactions, offline storage, retries, and conflicts                              | Publish an independently consumable SDK and retain browser/native interoperability                                             |
-| Personal delivery          | [App service](../../src/app/features/native-sync/native-sync.service.ts) syncs every 60 seconds plus resume/reconnect/manual triggers                                                    | Capture durable personal changes promptly and enable authenticated personal scope notifications                                |
-| Realtime transport         | [Client scheduler](../../packages/account-crypto/src/realtime.ts) and [server hub](../../packages/super-sync-server/src/ultra-account/realtime.ts) currently support project scopes only | Extend the existing transport to personal scopes; retain HTTP fallback and authorization checks                                |
-| Deployment                 | [Dockerfile](../../packages/super-sync-server/Dockerfile), [Compose](../../packages/super-sync-server/docker-compose.yml), and deployment scripts exist                                  | Own image namespace, complete native account configuration, independent build context, release bundle, and clean-machine tests |
-| Release validation         | Native API, crypto, browser, and platform tests exist                                                                                                                                    | PostgreSQL concurrency/load/restore acceptance, independent security review, and supported-device release checks               |
+| Area                | Implemented                                                                                                                | Remaining release evidence                                              |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Repository/packages | Independent server; SDK 0.1.1 and contract 0.1.0 released; client source removed; frozen legacy compatibility artifacts    | Final main-branch CI and immutable image digests                        |
+| Accounts/dashboard  | Signup/verification, security/profile/devices, private storage metadata, confirmed deletion, closed-by-default enrollment  | Final HTTPS origin, actual SMTP, operator documents, independent review |
+| Personal delivery   | Durable 500 ms local capture, authorized personal notifications, 60 second HTTP fallback, resume/reconnect                 | Representative large-account performance and physical mobile suspension |
+| Client integration  | Two real Angular clients, offline concurrent edits, restart recovery; sharing hidden by capabilities                       | Existing-data cutover/retired-device trial, native hardware acceptance  |
+| Docker operations   | Independent image, setup/install/update/backup/restore/diagnostics; paired identity/database/legal backups                 | Final AMD64/ARM64 CI, off-machine published-image restore               |
+| Website             | Configurable public account-origin sign-in link, hidden before configuration                                               | Configure only after Oracle staging                                     |
+| Security/capacity   | Native/API/SDK/browser tests, realPG concurrency/quota/recovery, fresh-context agent review; production dependency audit 0 | Independent crypto/security review, limited beta, host monitoring       |
 
-The inherited Compose stack still defaults to `ghcr.io/super-productivity/supersync:latest` and does not pass `ULTRA_*` account settings. The Docker publishing workflow still targets upstream naming and `master`, and its image inputs omit `packages/account-crypto`. The portal build writes into a sibling server directory, and a native browser test reads an Angular build from this repository. Each dependency needs an explicit replacement during extraction.
-
-Four iOS follow-up commits are present in the locally available feature reference but absent from the inspected `main`: `2d3b36ec49`, `a812caa36a`, `1ce9d2638d`, and `e14482843f`. Reconcile them against current code and validate the resulting build before release. Refresh remote references when network access is available.
+The four iOS follow-ups (2d3b36ec49,a812caa36a,1ce9d2638d,e14482843f) have been reconciled into the client. Platform CI and physical-device checks remain distinct gates. The [server acceptance record](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/docs/security-and-recovery.md) records measured full-head download costs and review findings. No stable 1.0.0 release is implied.
 
 ## Prior art
 
@@ -185,14 +183,14 @@ Disjoint field changes merge through the current base/local/remote merge. Overla
 
 | Trigger                     | Proposed personal sync                                                                             | Shared sync when released                                      |
 | --------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Local edit                  | Persist immediately, then batch uploads around the existing 150 ms default with a 1 s maximum wait | Same scheduler and durability rules                            |
+| Local edit                  | Flush operation writes and capture within a 500 ms batch; SDK retries persisted exact transactions | Same scheduler and durability rules                            |
 | Remote change               | Authorized metadata notification prompts catch-up                                                  | Same                                                           |
 | Login, reconnect, or resume | Catch up before reporting current state                                                            | Same, independently per scope                                  |
 | WebSocket unavailable       | HTTP catch-up every 60 s while active, plus immediate local uploads and manual sync                | Retain the existing tested fallback until deliberately changed |
 | Offline                     | Preserve local edits and exact uncertain writes across restart                                     | Same; inaccessible shared data remains isolated                |
 | Mobile suspension           | Best-effort flush and OS-permitted work; catch up on resume                                        | Same platform limits                                           |
 
-These are proposed behavior changes: today personal scopes are explicitly refused by the socket-ticket route and excluded by the client realtime scheduler. Extend both sides, advertise the new capability, and prove that only devices in the same account can subscribe to a personal scope. Upload triggers must follow a durable personal bridge capture, not merely a UI event.
+Personal support is implemented behind capability negotiation and explicit SDK opt-in. Real-socket tests prove owning-account isolation and device revocation. Upload triggers follow durable personal bridge capture; the wire format is unchanged.
 
 Use sequence/control stamps to avoid unnecessary content downloads. Existing changed-scope downloads contain full consistent heads; incremental pagination is not implemented. Benchmark that path with representative large accounts before enabling personal realtime in production. If it fails the budget, implement authenticated bounded catch-up or limit the launch envelope with clear quotas before calling the release ready. Never paginate an unauthenticated or mixed-generation snapshot.
 
@@ -202,7 +200,7 @@ Use a target of foreground convergence within two seconds for ordinary edits und
 
 Server `1.0.0`, SDK versions, app versions, and wire protocol `2` have independent meanings. Capability negotiation gates personal realtime and other optional behavior. New compatible clients retain periodic HTTP behavior against servers without the new feature. Unknown required semantics produce a whole-request refusal before data is changed; raising a schema number is not a compatibility strategy.
 
-Preserve current native bounds during extraction: 100 records and an 8 MiB request per transaction; 50,000 personal heads/tombstones and 32 MiB current personal ciphertext; 5,000 project heads/tombstones and 8 MiB project ciphertext; the existing 128 MiB manifest-history stop, 30-day unreferenced-history retention, two checkpoints, and 5,000 device receipts. Tombstones remain quota-accounted for the life of a scope. See the [native contract](../../packages/super-sync-server/docs/native-sync.md) for exact enforcement. Changes to retention or quota semantics require their own data-preservation and compatibility assessment.
+Preserve current native bounds during extraction: 100 records and an 8 MiB request per transaction; 50,000 personal heads/tombstones and 32 MiB current personal ciphertext; 5,000 project heads/tombstones and 8 MiB project ciphertext; the existing 128 MiB manifest-history stop, 30-day unreferenced-history retention, two checkpoints, and 5,000 device receipts. Tombstones remain quota-accounted for the life of a scope. See the [native contract](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/docs/native-sync.md) for exact enforcement. Changes to retention or quota semantics require their own data-preservation and compatibility assessment.
 
 ## Docker installation and management
 
@@ -253,16 +251,16 @@ Server accounts are installation-specific. Preserve server ID and operator secre
 
 ## Remaining gates before publishing server version one
 
-- [ ] Separate repository builds, tests, and publishes without a neighboring client checkout or private dependency credentials.
+- [x] Separate source builds and native tests without a neighboring client checkout or private dependency credentials. Public GHCR distribution remains subject to organization policy.
 - [ ] Own registry image, public installation bundle, source correspondence, retained notices, and an explicit client/SDK/server compatibility table are ready.
-- [ ] Native account configuration reaches the container; setup generates stable installation secrets and enforces the actual native enrollment policy.
+- [x] Native account configuration reaches the container; setup generates stable installation secrets and enforces native enrollment policy.
 - [ ] Website -> account creation -> saved recovery key -> verified email -> dashboard -> two signed-in clients works against the final HTTPS origin.
 - [ ] Password change, wrong-password handling, recovery with MFA, expired links, refresh rotation, session revocation, account isolation, and deletion pass with real browser/native paths.
 - [ ] Personal realtime authorization and fallback pass; interrupted writes retry exactly, offline devices reconnect, and concurrent content is preserved in both directions.
-- [ ] V1 exposes private account sync only: sharing capabilities and invitation/project-sharing UI are absent, and server routes refuse deferred sharing operations without deleting existing shared data.
+- [x] V1 exposes private account sync only: sharing capabilities and invitation/project-sharing UI are absent, and server routes refuse deferred sharing operations without deleting existing shared data.
 - [ ] First-client import, second-client download, interrupted migration, account switch, retired provider, and downgrade protection are reproduced through the real application.
 - [ ] Full personal inventory round-trips, including archive/plugin documents and device timer buckets; remote application produces no duplicate local operations or effects.
-- [ ] Real PostgreSQL exercises concurrent transactions and multiple connections. PGlite's serialized test harness alone is insufficient.
+- [x] Real PostgreSQL lifecycle and capacity drills exercise independent sessions, concurrent transactions, quota refusal, and recovery. PGlite alone is not used as production acceptance.
 - [ ] Production-shaped capacity tests document CPU, memory, disk growth, request/response volume, and latency, including large accounts and sustained timers. Quota errors preserve pending local edits.
 - [ ] AMD64/ARM64 clean install, restart, upgrade, migration failure, and restore tests pass against the published image, not only source builds.
 - [ ] Backups include all native account/scope tables and installation secrets. Restore into a different machine preserves login, recovery, and decrypted data; the legacy accounts-only dump is not used as the native recovery strategy.

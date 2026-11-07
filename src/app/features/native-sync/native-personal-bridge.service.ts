@@ -11,7 +11,7 @@ import {
   type Envelope,
   type PersonalBaseline,
   type SyncClient,
-} from '@ultra-tasks/account-crypto';
+} from '@sp/sync-providers/ultra-tasks';
 import { StateSnapshotService } from '../../op-log/backup/state-snapshot.service';
 import { OperationLogStoreService } from '../../op-log/persistence/operation-log-store.service';
 import { OperationLogSyncService } from '../../op-log/sync/operation-log-sync.service';

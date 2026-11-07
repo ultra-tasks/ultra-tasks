@@ -15,7 +15,7 @@ services:
     # block the next run. (The supersync port is still fixed at 1901, so only
     # one supersync suite runs at a time regardless.) Nothing on the host needs
     # the db — only the supersync container does, over the compose network. For
-    # host access (the packages/super-sync-server integration tests) use
+    # host access (the the standalone server repository integration tests) use
     # `npm run supersync:db`, which pins DB_PORT=55432 and applies the schema.
     # Flipping DB_PORT makes compose recreate the container, so a later
     # `npm run e2e:supersync` takes the db back to an ephemeral port.
@@ -50,7 +50,7 @@ services:
     # orphaned; with postgres as PID 1 the postmaster reaps it, and an exit
     # status of 2 is taken for a backend crash that restarts the whole
     # cluster. docker-init adopts the orphan instead. See #9695 and the
-    # production compose in packages/super-sync-server.
+    # production compose in the standalone server repository.
     init: true
 
   # SuperSync server for E2E testing
@@ -58,8 +58,9 @@ services:
   # Required for @supersync e2e tests
   supersync:
     build:
-      context: .
-      dockerfile: packages/super-sync-server/Dockerfile.test
+      context: ${ULTRA_SERVER_SOURCE:-.tmp/sync-server}
+      dockerfile: apps/server/Dockerfile
+      target: legacy-e2e
     # Optional: the E2E stack supplies every var it needs below, but a local
     # .env may override them. Compose resolves env_file for ALL services at
     # project load, so a required one breaks `docker compose up app webdav`
@@ -71,7 +72,7 @@ services:
     # routes (cleanup wipes every user and operation) with rate limiting off.
     # Docker's iptables rules bypass ufw/firewalld, so a bare '1900:1900' hands
     # that to the whole LAN. Mirrors the production compose in
-    # packages/super-sync-server, which binds 127.0.0.1 for the same reason.
+    # the standalone server repository, which binds 127.0.0.1 for the same reason.
     ports:
       - '127.0.0.1:1900:1900'
     cap_drop:

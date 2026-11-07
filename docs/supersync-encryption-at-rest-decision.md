@@ -19,7 +19,7 @@ were retired rather than leaving an untestable security mechanism in the active
 deployment path.
 
 The retirement summary and implementation-history pointers remain under
-[`packages/super-sync-server/archive/encryption-attempts-openvz-incompatible/`](../packages/super-sync-server/archive/encryption-attempts-openvz-incompatible/)
+[`packages/super-sync-server/archive/encryption-attempts-openvz-incompatible/`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/archive/encryption-attempts-openvz-incompatible/)
 as historical evidence. The executable files and runbooks were removed so they
 cannot be mistaken for a supported production path.
 
@@ -33,7 +33,7 @@ cannot be mistaken for a supported production path.
   metadata remain plaintext. It does not encrypt the PostgreSQL volume.
 - An encrypted database-backup stream is also separate from live database-file
   encryption. See the server's
-  [backup and recovery guide](../packages/super-sync-server/docs/backup-and-recovery.md)
+  [backup and recovery guide](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/docs/backup-and-recovery.md)
   for the maintained recovery procedure.
 - Do not describe the archived LUKS design as production-ready or as proof of
   regulatory compliance.

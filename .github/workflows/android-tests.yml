@@ -4,10 +4,12 @@ name: Android Native Tests
 # expensive setup and tests are skipped when no Android-affecting files changed.
 on:
   push:
-    branches: [feat/native-encrypted-accounts]
+    branches: [main, feat/native-encrypted-accounts]
     paths:
       - 'android/**'
-      - 'packages/account-crypto/**'
+      - 'packages/sync-providers/**'
+      - 'package.json'
+      - 'package-lock.json'
       - 'tools/generate-native-sync-fixtures.mjs'
       - '.github/workflows/android-tests.yml'
   pull_request:
@@ -56,7 +58,7 @@ jobs:
           # packages/sync-core is included because the Kotlin op-payload
           # decryptor must stay wire-compatible with its encrypt() — the live
           # round-trip test below is what catches drift on sync-core PRs.
-          ANDROID_PATTERN='^(android/|packages/sync-core/|packages/account-crypto/|tools/generate-android-crypto-fixtures\.mjs$|capacitor\.config\.ts$|package(-lock)?\.json$|\.github/workflows/android-tests\.yml$)'
+          ANDROID_PATTERN='^(android/|packages/sync-core/|packages/sync-providers/|tools/generate-android-crypto-fixtures\.mjs$|capacitor\.config\.ts$|package(-lock)?\.json$|\.github/workflows/android-tests\.yml$)'
           if grep -Eq "${ANDROID_PATTERN}" <<< "${CHANGED_FILES}"; then android=true; fi
 
           echo "→ android=${android}"

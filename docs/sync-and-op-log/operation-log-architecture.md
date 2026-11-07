@@ -1059,7 +1059,7 @@ reconstruct the call from this prose. Follow
 the public provider contract in
 [`provider-types.ts`](../../packages/sync-providers/src/provider-types.ts), and
 the server's
-[`snapshot handler`](../../packages/super-sync-server/src/sync/sync.routes.snapshot-handler.ts).
+[`snapshot handler`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/sync/sync.routes.snapshot-handler.ts).
 
 ### OpType to Reason Mapping
 
@@ -1613,7 +1613,7 @@ that data because archive storage is outside NgRx and the tasks may no longer
 exist in its active state.
 
 There is no archive-specific chunking. SuperSync's
-[`DEFAULT_SYNC_CONFIG`](../../packages/super-sync-server/src/sync/sync.types.ts)
+[`DEFAULT_SYNC_CONFIG`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/sync/sync.types.ts)
 limits each operation payload to `20 * 1024 * 1024` bytes (20 MiB) by default.
 A sufficiently large archive action can therefore exceed the per-operation
 limit; even below it, one very large payload is a known scalability and failure
@@ -1758,7 +1758,7 @@ a copied file tree here. The main implementation boundaries are
 [`packages/shared-schema/src/`](../../packages/shared-schema/src/),
 [`packages/sync-core/src/`](../../packages/sync-core/src/),
 [`packages/sync-providers/src/`](../../packages/sync-providers/src/), and
-[`packages/super-sync-server/src/`](../../packages/super-sync-server/src/).
+[`packages/super-sync-server/src/`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/).
 
 # References
 

@@ -39,13 +39,6 @@ async function getPlugins() {
 
   const plugins = [];
 
-  plugins.push({
-    name: 'account-crypto',
-    path: 'packages/account-crypto',
-    buildCommand: 'npm run build',
-    skipCopy: true,
-  });
-
   // Build sync-core before shared-schema. shared-schema re-exports generic
   // vector-clock algorithms from sync-core, while sync-core must not import
   // shared-schema; the sync core stays domain-agnostic.

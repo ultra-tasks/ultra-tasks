@@ -108,7 +108,7 @@ In `operation-log.effects.ts`:
 
 ### Step 2: Upload to Server
 
-In [`operation-upload.service.ts`](../../packages/super-sync-server/src/sync/services/operation-upload.service.ts) (`processOperation`):
+In [`operation-upload.service.ts`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/sync/services/operation-upload.service.ts) (`processOperation`):
 
 1. `ValidationService.validateOp()` sanitizes the clock (DoS cap at 2.5×MAX = 50 entries) but does **NOT** prune
 2. `detectConflict()` compares the **full unpruned** incoming clock against the existing entity clock

@@ -46,6 +46,13 @@
         </button>
       </form>
       <p>{{ T.NATIVE_SYNC.ACCOUNT_HELP | translate }}</p>
+      <button
+        type="button"
+        (click)="runOpenAccount()"
+        [disabled]="working() || !server"
+      >
+        {{ T.NATIVE_SYNC.MANAGE_ACCOUNT | translate }}
+      </button>
     } @else {
       <form (ngSubmit)="completeMfa()">
         <label
@@ -130,307 +137,314 @@
       </section>
     } @else {
       <p>{{ T.NATIVE_SYNC.PERIODIC | translate }}</p>
-      @if (native.projects().length) {
+      @if (native.personalRealtimeEnabled() || native.projects().length) {
         <p role="status">
           {{
             (native.live() ? T.NATIVE_SYNC.LIVE : T.NATIVE_SYNC.HTTP_FALLBACK) | translate
           }}
         </p>
       }
-      @for (offer of native.ownershipOffers(); track offer.id) {
-        <section>
-          <p>
-            {{ T.NATIVE_SYNC.OWNERSHIP_OFFER | translate }}: {{ title(offer.scopeId) }}
-          </p>
-          <button
-            type="button"
-            (click)="acceptOwnership(offer)"
-            [disabled]="working()"
-          >
-            {{ T.NATIVE_SYNC.ACCEPT_OWNERSHIP | translate }}
-          </button>
-        </section>
-      }
-      @for (invite of native.invitations(); track invite.id) {
-        <section>
-          <p>{{ T.NATIVE_SYNC.INVITATION | translate }}: {{ invite.role }}</p>
-          @if (invite.state === 'provisioning') {
-            <p>{{ T.NATIVE_SYNC.WAITING_OWNER | translate }}</p>
-          }
-          <button
-            type="button"
-            (click)="accept(invite)"
-            [disabled]="working() || !invite.membership"
-          >
-            {{ T.NATIVE_SYNC.ACCEPT | translate }}
-          </button>
-        </section>
-      }
-      <section>
-        <h2>{{ T.NATIVE_SYNC.PROJECTS | translate }}</h2>
-        <ul>
-          @for (project of native.projects(); track project.id) {
-            <li>
-              <button
-                type="button"
-                (click)="selected.set(project.id)"
-              >
-                {{ title(project.id) }}
-              </button>
-            </li>
-          }
-        </ul>
-        <form (ngSubmit)="createProject()">
-          <label
-            >{{ T.NATIVE_SYNC.PROJECT_TITLE | translate
-            }}<input
-              name="projectTitle"
-              [(ngModel)]="projectTitle"
-          /></label>
-          <label
-            >{{ T.NATIVE_SYNC.COPY_PROJECT | translate
-            }}<select
-              name="sourceProject"
-              [(ngModel)]="sourceProject"
+      @if (native.sharingEnabled()) {
+        @for (offer of native.ownershipOffers(); track offer.id) {
+          <section>
+            <p>
+              {{ T.NATIVE_SYNC.OWNERSHIP_OFFER | translate }}: {{ title(offer.scopeId) }}
+            </p>
+            <button
+              type="button"
+              (click)="acceptOwnership(offer)"
+              [disabled]="working()"
             >
-              <option value="">{{ T.NATIVE_SYNC.EMPTY_PROJECT | translate }}</option>
-              @for (project of personalProjects(); track project.id) {
-                <option [value]="project.id">{{ project.title }}</option>
-              }
-            </select></label
-          >
-          <label
-            ><input
-              type="checkbox"
-              name="includeDescription"
-              [(ngModel)]="includeDescription"
-            />{{ T.NATIVE_SYNC.INCLUDE_DESCRIPTIONS | translate }}</label
-          >
-          <p>{{ T.NATIVE_SYNC.SHARE_PREVIEW | translate }}</p>
-          <button [disabled]="working()">
-            {{ T.NATIVE_SYNC.CREATE_PROJECT | translate }}
-          </button>
-        </form>
-      </section>
-      @if (scope(); as project) {
+              {{ T.NATIVE_SYNC.ACCEPT_OWNERSHIP | translate }}
+            </button>
+          </section>
+        }
+        @for (invite of native.invitations(); track invite.id) {
+          <section>
+            <p>{{ T.NATIVE_SYNC.INVITATION | translate }}: {{ invite.role }}</p>
+            @if (invite.state === 'provisioning') {
+              <p>{{ T.NATIVE_SYNC.WAITING_OWNER | translate }}</p>
+            }
+            <button
+              type="button"
+              (click)="accept(invite)"
+              [disabled]="working() || !invite.membership"
+            >
+              {{ T.NATIVE_SYNC.ACCEPT | translate }}
+            </button>
+          </section>
+        }
         <section>
-          <h2>{{ title(project.id) }}</h2>
-          @if (project.state === 'rotating') {
-            <p>{{ T.NATIVE_SYNC.ROTATING | translate }}</p>
-          }
-          @if (isOwner()) {
-            <form (ngSubmit)="invite()">
-              <label
-                >{{ T.NATIVE_SYNC.INVITE_RECIPIENT | translate
-                }}<input
-                  name="recipient"
-                  [(ngModel)]="recipient"
-                  required
-              /></label>
-              <label
-                >{{ T.NATIVE_SYNC.ROLE | translate
-                }}<select
-                  name="role"
-                  [(ngModel)]="role"
-                >
-                  <option value="editor">{{ T.NATIVE_SYNC.EDITOR | translate }}</option>
-                  <option value="viewer">{{ T.NATIVE_SYNC.VIEWER | translate }}</option>
-                </select></label
-              >
-              <button [disabled]="working() || project.state !== 'active'">
-                {{ T.NATIVE_SYNC.INVITE | translate }}
-              </button>
-            </form>
-            <ul>
-              @for (member of project.members; track member.authorization.accountId) {
-                <li>
-                  {{ member.authorization.accountId }} · {{ member.authorization.role }}
-                  @if (member.authorization.role !== 'owner') {
-                    <button
-                      type="button"
-                      (click)="removeMember(member.authorization.accountId)"
-                      [disabled]="working()"
-                    >
-                      {{ T.NATIVE_SYNC.REMOVE | translate }}
-                    </button>
-                    <button
-                      type="button"
-                      (click)="offerOwnership(member.authorization.accountId)"
-                      [disabled]="working() || project.state !== 'active'"
-                    >
-                      {{ T.NATIVE_SYNC.TRANSFER_OWNERSHIP | translate }}
-                    </button>
-                  }
-                </li>
-              }
-            </ul>
-            <details>
-              <summary>{{ T.NATIVE_SYNC.PROJECT_RECOVERY | translate }}</summary>
-              <p>{{ T.NATIVE_SYNC.CHECKPOINT_HELP | translate }}</p>
-              <button
-                type="button"
-                (click)="saveCheckpoint()"
-                [disabled]="working() || project.state !== 'active'"
-              >
-                {{ T.NATIVE_SYNC.SAVE_CHECKPOINT | translate }}
-              </button>
-              <button
-                type="button"
-                (click)="loadCheckpoints()"
-                [disabled]="working()"
-              >
-                {{ T.NATIVE_SYNC.LOAD_CHECKPOINTS | translate }}
-              </button>
-              @for (checkpoint of checkpoints(); track checkpoint.sequence) {
-                @if (checkpoint.scopeId === project.id) {
-                  <button
-                    type="button"
-                    (click)="restore(checkpoint.sequence)"
-                    [disabled]="working() || project.state !== 'active'"
-                  >
-                    {{ T.NATIVE_SYNC.RESTORE_CHECKPOINT | translate }}
-                    {{ checkpoint.sequence }}
-                  </button>
-                }
-              }
-              <button
-                type="button"
-                (click)="deleteProject()"
-                [disabled]="working()"
-              >
-                {{ T.NATIVE_SYNC.DELETE_PROJECT | translate }}
-              </button>
-            </details>
-          }
-          @if (canEdit()) {
-            <form (ngSubmit)="addTask()">
-              <label
-                >{{ T.NATIVE_SYNC.NEW_TASK | translate
-                }}<input
-                  name="newTitle"
-                  [(ngModel)]="newTitle"
-                  required /></label
-              ><button [disabled]="working()">{{ T.NATIVE_SYNC.ADD | translate }}</button>
-            </form>
-          }
-          <ul class="tasks">
-            @for (item of tasks(); track item.id) {
+          <h2>{{ T.NATIVE_SYNC.PROJECTS | translate }}</h2>
+          <ul>
+            @for (project of native.projects(); track project.id) {
               <li>
-                <label
-                  ><input
-                    type="checkbox"
-                    #completion
-                    [checked]="item.task.isDone"
-                    (change)="complete(item.id, item.task, completion.checked)"
-                    [disabled]="!canEdit() || working()"
-                  />{{ item.task.title }}</label
+                <button
+                  type="button"
+                  (click)="selected.set(project.id)"
                 >
-                <details>
-                  <summary>{{ T.NATIVE_SYNC.DETAILS | translate }}</summary>
-                  <label
-                    >{{ T.NATIVE_SYNC.TASK_TITLE | translate
-                    }}<input
-                      [ngModel]="item.task.title"
-                      (ngModelChange)="rename(item.id, item.task, $event)"
-                      [ngModelOptions]="{ updateOn: 'blur' }"
-                      [disabled]="!canEdit() || working()"
-                  /></label>
-                  <label
-                    >{{ T.NATIVE_SYNC.SHARED_DESCRIPTION | translate
-                    }}<textarea
-                      [ngModel]="item.task.description || ''"
-                      (ngModelChange)="describe(item.id, item.task, $event)"
-                      [ngModelOptions]="{ updateOn: 'blur' }"
-                      [disabled]="!canEdit() || working()"
-                    ></textarea>
-                  </label>
-                  <label
-                    >{{ T.NATIVE_SYNC.DEADLINE | translate
-                    }}<input
-                      type="date"
-                      [ngModel]="item.task.deadlineDay || ''"
-                      (ngModelChange)="deadline(item.id, item.task, $event)"
-                      [disabled]="!canEdit() || working()"
-                  /></label>
-                  <label
-                    >{{ T.NATIVE_SYNC.ASSIGNEE | translate
-                    }}<select
-                      [ngModel]="item.task.assigneeId || ''"
-                      (ngModelChange)="assign(item.id, item.task, $event)"
-                      [disabled]="!canEdit() || working()"
-                    >
-                      <option value="">{{ T.NATIVE_SYNC.UNASSIGNED | translate }}</option>
-                      @for (
-                        member of project.members;
-                        track member.authorization.accountId
-                      ) {
-                        <option [value]="member.authorization.accountId">
-                          {{ member.authorization.accountId }}
-                        </option>
-                      }
-                    </select></label
-                  >
-                  @if (canEdit()) {
-                    <button
-                      type="button"
-                      (click)="deleteTask(item.id)"
-                      [disabled]="working()"
-                    >
-                      {{ T.NATIVE_SYNC.DELETE | translate }}
-                    </button>
-                  }
-                  <label
-                    >{{ T.NATIVE_SYNC.MY_DAY | translate
-                    }}<input
-                      type="date"
-                      [ngModel]="item.overlay.dueDay || ''"
-                      (ngModelChange)="plan(item.id, item.task.title, $event)"
-                      [disabled]="working()"
-                  /></label>
-                  <label
-                    >{{ T.NATIVE_SYNC.MY_NOTES | translate
-                    }}<textarea
-                      [ngModel]="item.overlay.personalNotes || ''"
-                      (ngModelChange)="scratch(item.id, item.task.title, $event)"
-                      [ngModelOptions]="{ updateOn: 'blur' }"
-                      [disabled]="working()"
-                    ></textarea>
-                  </label>
-                  <label
-                    >{{ T.NATIVE_SYNC.MY_REMINDER | translate }}
-                    <input
-                      type="datetime-local"
-                      [ngModel]="item.reminderLocal"
-                      (ngModelChange)="remind(item.id, item.task.title, $event)"
-                      [disabled]="working()"
-                    />
-                  </label>
-                  <p>
-                    {{ item.loggedMinutes }}
-                    {{ T.NATIVE_SYNC.MINUTES_TRACKED | translate }}
-                  </p>
-                  <form
-                    (ngSubmit)="
-                      logTime(item.id, item.task.title, minutes.value); minutes.value = ''
-                    "
-                  >
-                    <label
-                      >{{ T.NATIVE_SYNC.LOG_MINUTES | translate
-                      }}<input
-                        #minutes
-                        type="number"
-                        min="1"
-                        max="1440"
-                        required /></label
-                    ><button [disabled]="working()">
-                      {{ T.NATIVE_SYNC.LOG_TIME | translate }}
-                    </button>
-                  </form>
-                </details>
+                  {{ title(project.id) }}
+                </button>
               </li>
             }
           </ul>
+          <form (ngSubmit)="createProject()">
+            <label
+              >{{ T.NATIVE_SYNC.PROJECT_TITLE | translate
+              }}<input
+                name="projectTitle"
+                [(ngModel)]="projectTitle"
+            /></label>
+            <label
+              >{{ T.NATIVE_SYNC.COPY_PROJECT | translate
+              }}<select
+                name="sourceProject"
+                [(ngModel)]="sourceProject"
+              >
+                <option value="">{{ T.NATIVE_SYNC.EMPTY_PROJECT | translate }}</option>
+                @for (project of personalProjects(); track project.id) {
+                  <option [value]="project.id">{{ project.title }}</option>
+                }
+              </select></label
+            >
+            <label
+              ><input
+                type="checkbox"
+                name="includeDescription"
+                [(ngModel)]="includeDescription"
+              />{{ T.NATIVE_SYNC.INCLUDE_DESCRIPTIONS | translate }}</label
+            >
+            <p>{{ T.NATIVE_SYNC.SHARE_PREVIEW | translate }}</p>
+            <button [disabled]="working()">
+              {{ T.NATIVE_SYNC.CREATE_PROJECT | translate }}
+            </button>
+          </form>
         </section>
+        @if (scope(); as project) {
+          <section>
+            <h2>{{ title(project.id) }}</h2>
+            @if (project.state === 'rotating') {
+              <p>{{ T.NATIVE_SYNC.ROTATING | translate }}</p>
+            }
+            @if (isOwner()) {
+              <form (ngSubmit)="invite()">
+                <label
+                  >{{ T.NATIVE_SYNC.INVITE_RECIPIENT | translate
+                  }}<input
+                    name="recipient"
+                    [(ngModel)]="recipient"
+                    required
+                /></label>
+                <label
+                  >{{ T.NATIVE_SYNC.ROLE | translate
+                  }}<select
+                    name="role"
+                    [(ngModel)]="role"
+                  >
+                    <option value="editor">{{ T.NATIVE_SYNC.EDITOR | translate }}</option>
+                    <option value="viewer">{{ T.NATIVE_SYNC.VIEWER | translate }}</option>
+                  </select></label
+                >
+                <button [disabled]="working() || project.state !== 'active'">
+                  {{ T.NATIVE_SYNC.INVITE | translate }}
+                </button>
+              </form>
+              <ul>
+                @for (member of project.members; track member.authorization.accountId) {
+                  <li>
+                    {{ member.authorization.accountId }} · {{ member.authorization.role }}
+                    @if (member.authorization.role !== 'owner') {
+                      <button
+                        type="button"
+                        (click)="removeMember(member.authorization.accountId)"
+                        [disabled]="working()"
+                      >
+                        {{ T.NATIVE_SYNC.REMOVE | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        (click)="offerOwnership(member.authorization.accountId)"
+                        [disabled]="working() || project.state !== 'active'"
+                      >
+                        {{ T.NATIVE_SYNC.TRANSFER_OWNERSHIP | translate }}
+                      </button>
+                    }
+                  </li>
+                }
+              </ul>
+              <details>
+                <summary>{{ T.NATIVE_SYNC.PROJECT_RECOVERY | translate }}</summary>
+                <p>{{ T.NATIVE_SYNC.CHECKPOINT_HELP | translate }}</p>
+                <button
+                  type="button"
+                  (click)="saveCheckpoint()"
+                  [disabled]="working() || project.state !== 'active'"
+                >
+                  {{ T.NATIVE_SYNC.SAVE_CHECKPOINT | translate }}
+                </button>
+                <button
+                  type="button"
+                  (click)="loadCheckpoints()"
+                  [disabled]="working()"
+                >
+                  {{ T.NATIVE_SYNC.LOAD_CHECKPOINTS | translate }}
+                </button>
+                @for (checkpoint of checkpoints(); track checkpoint.sequence) {
+                  @if (checkpoint.scopeId === project.id) {
+                    <button
+                      type="button"
+                      (click)="restore(checkpoint.sequence)"
+                      [disabled]="working() || project.state !== 'active'"
+                    >
+                      {{ T.NATIVE_SYNC.RESTORE_CHECKPOINT | translate }}
+                      {{ checkpoint.sequence }}
+                    </button>
+                  }
+                }
+                <button
+                  type="button"
+                  (click)="deleteProject()"
+                  [disabled]="working()"
+                >
+                  {{ T.NATIVE_SYNC.DELETE_PROJECT | translate }}
+                </button>
+              </details>
+            }
+            @if (canEdit()) {
+              <form (ngSubmit)="addTask()">
+                <label
+                  >{{ T.NATIVE_SYNC.NEW_TASK | translate
+                  }}<input
+                    name="newTitle"
+                    [(ngModel)]="newTitle"
+                    required /></label
+                ><button [disabled]="working()">
+                  {{ T.NATIVE_SYNC.ADD | translate }}
+                </button>
+              </form>
+            }
+            <ul class="tasks">
+              @for (item of tasks(); track item.id) {
+                <li>
+                  <label
+                    ><input
+                      type="checkbox"
+                      #completion
+                      [checked]="item.task.isDone"
+                      (change)="complete(item.id, item.task, completion.checked)"
+                      [disabled]="!canEdit() || working()"
+                    />{{ item.task.title }}</label
+                  >
+                  <details>
+                    <summary>{{ T.NATIVE_SYNC.DETAILS | translate }}</summary>
+                    <label
+                      >{{ T.NATIVE_SYNC.TASK_TITLE | translate
+                      }}<input
+                        [ngModel]="item.task.title"
+                        (ngModelChange)="rename(item.id, item.task, $event)"
+                        [ngModelOptions]="{ updateOn: 'blur' }"
+                        [disabled]="!canEdit() || working()"
+                    /></label>
+                    <label
+                      >{{ T.NATIVE_SYNC.SHARED_DESCRIPTION | translate
+                      }}<textarea
+                        [ngModel]="item.task.description || ''"
+                        (ngModelChange)="describe(item.id, item.task, $event)"
+                        [ngModelOptions]="{ updateOn: 'blur' }"
+                        [disabled]="!canEdit() || working()"
+                      ></textarea>
+                    </label>
+                    <label
+                      >{{ T.NATIVE_SYNC.DEADLINE | translate
+                      }}<input
+                        type="date"
+                        [ngModel]="item.task.deadlineDay || ''"
+                        (ngModelChange)="deadline(item.id, item.task, $event)"
+                        [disabled]="!canEdit() || working()"
+                    /></label>
+                    <label
+                      >{{ T.NATIVE_SYNC.ASSIGNEE | translate
+                      }}<select
+                        [ngModel]="item.task.assigneeId || ''"
+                        (ngModelChange)="assign(item.id, item.task, $event)"
+                        [disabled]="!canEdit() || working()"
+                      >
+                        <option value="">
+                          {{ T.NATIVE_SYNC.UNASSIGNED | translate }}
+                        </option>
+                        @for (
+                          member of project.members;
+                          track member.authorization.accountId
+                        ) {
+                          <option [value]="member.authorization.accountId">
+                            {{ member.authorization.accountId }}
+                          </option>
+                        }
+                      </select></label
+                    >
+                    @if (canEdit()) {
+                      <button
+                        type="button"
+                        (click)="deleteTask(item.id)"
+                        [disabled]="working()"
+                      >
+                        {{ T.NATIVE_SYNC.DELETE | translate }}
+                      </button>
+                    }
+                    <label
+                      >{{ T.NATIVE_SYNC.MY_DAY | translate
+                      }}<input
+                        type="date"
+                        [ngModel]="item.overlay.dueDay || ''"
+                        (ngModelChange)="plan(item.id, item.task.title, $event)"
+                        [disabled]="working()"
+                    /></label>
+                    <label
+                      >{{ T.NATIVE_SYNC.MY_NOTES | translate
+                      }}<textarea
+                        [ngModel]="item.overlay.personalNotes || ''"
+                        (ngModelChange)="scratch(item.id, item.task.title, $event)"
+                        [ngModelOptions]="{ updateOn: 'blur' }"
+                        [disabled]="working()"
+                      ></textarea>
+                    </label>
+                    <label
+                      >{{ T.NATIVE_SYNC.MY_REMINDER | translate }}
+                      <input
+                        type="datetime-local"
+                        [ngModel]="item.reminderLocal"
+                        (ngModelChange)="remind(item.id, item.task.title, $event)"
+                        [disabled]="working()"
+                      />
+                    </label>
+                    <p>
+                      {{ item.loggedMinutes }}
+                      {{ T.NATIVE_SYNC.MINUTES_TRACKED | translate }}
+                    </p>
+                    <form
+                      (ngSubmit)="
+                        logTime(item.id, item.task.title, minutes.value);
+                        minutes.value = ''
+                      "
+                    >
+                      <label
+                        >{{ T.NATIVE_SYNC.LOG_MINUTES | translate
+                        }}<input
+                          #minutes
+                          type="number"
+                          min="1"
+                          max="1440"
+                          required /></label
+                      ><button [disabled]="working()">
+                        {{ T.NATIVE_SYNC.LOG_TIME | translate }}
+                      </button>
+                    </form>
+                  </details>
+                </li>
+              }
+            </ul>
+          </section>
+        }
       }
       @if (drafts().length) {
         <p>{{ T.NATIVE_SYNC.CONFLICT_DRAFTS | translate }}</p>

@@ -4,7 +4,7 @@ import {
   AccountClient,
   type SyncClient,
   type SyncState,
-} from '@ultra-tasks/account-crypto';
+} from '@sp/sync-providers/ultra-tasks';
 import { GlobalConfigService } from '../config/global-config.service';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
 

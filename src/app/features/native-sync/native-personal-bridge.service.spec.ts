@@ -7,7 +7,7 @@ import {
   seal,
   personalRecords,
   type SyncClient,
-} from '@ultra-tasks/account-crypto';
+} from '@sp/sync-providers/ultra-tasks';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
 import { StateSnapshotService } from '../../op-log/backup/state-snapshot.service';
 import { OperationLogStoreService } from '../../op-log/persistence/operation-log-store.service';

@@ -13,10 +13,18 @@
     <script>
       // Test-only asset installed into a fresh simulator by native-sync-ios.yml.
       // No network requests, real credentials, or distributed app assets.
-      const command = (method, input = {}) =>
-        window.Capacitor.nativePromise('NativeAccount', 'command', { method, input });
+      let stage = 'BRIDGE';
+      let commandNumber = 0;
+      const command = (method, input = {}) => {
+        stage = `${++commandNumber} ${method.toUpperCase()}`;
+        return window.Capacitor.nativePromise('NativeAccount', 'command', {
+          method,
+          input,
+        });
+      };
       const assert = (condition) => {
-        if (!condition) throw new Error('Unexpected session state');
+        if (!condition)
+          throw Object.assign(new Error('Unexpected session state'), { code: 'STATE' });
       };
       const absent = async (identity) => {
         let rejected = false;
@@ -40,7 +48,16 @@
             expiresIn: 600,
           },
         });
-        assert((await command('current', identity)).refreshToken === 'test-refresh');
+        const current = await command('current', identity);
+        assert(
+          current.accessToken === 'test-access' &&
+            current.refreshToken === 'test-refresh',
+        );
+        assert(
+          Number.isInteger(current.expiresIn) &&
+            current.expiresIn > 0 &&
+            current.expiresIn <= 600,
+        );
         await command('bootstrap', {
           ...identity,
           baseUrl,
@@ -64,9 +81,14 @@
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
         try {
+          assert(window.Capacitor?.isPluginAvailable('NativeAccount'));
           await run();
-        } catch {
-          document.getElementById('result').textContent = 'ULTRA NATIVE KEYCHAIN FAILED';
+        } catch (error) {
+          const code = /^[A-Z_0-9-]{1,32}$/.test(String(error?.code))
+            ? error.code
+            : 'COMMAND';
+          document.getElementById('result').textContent =
+            `ULTRA NATIVE KEYCHAIN FAILED. STAGE ${stage}. CODE ${code}`;
         }
       };
       void start();

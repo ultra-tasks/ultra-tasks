@@ -5,18 +5,16 @@ Ultra Tasks is distributed under [AGPL-3.0-only](../LICENSE), while inherited MI
 Use the package that owns the behavior. The Angular app composes these packages;
 package code must respect the [sync dependency boundaries](../docs/sync-and-op-log/package-boundaries.md).
 
-Server and account dashboard development is moving to [ultra-tasks/ultra-tasks-server](https://github.com/ultra-tasks/ultra-tasks-server). The local server/SDK source remains a compatibility snapshot until released packages replace client workspace dependencies. See the [extraction and v1 launch plan](../docs/plans/2026-11-07-server-extraction-and-v1-launch.md) before changing those packages.
+Server, native SDK, protocol contracts, and account dashboard development belong to [ultra-tasks/ultra-tasks-server](https://github.com/ultra-tasks/ultra-tasks-server). The client consumes exact-version release artifacts through sync-providers and shared-schema; server code is no longer kept here. See the [extraction and v1 launch plan](../docs/plans/2026-11-07-server-extraction-and-v1-launch.md) before changing those packages.
 
-| Package                                          | Responsibility / starting point                                                                        |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| [account-crypto](account-crypto/README.md)       | Encrypted account vaults, password authentication client, recipient keys, and account portal           |
-| [sync-core](sync-core/README.md)                 | Framework-independent sync primitives, conflicts, clocks, compression, encryption                      |
-| [sync-providers](sync-providers/src/)            | Provider contracts, transports, credential storage, and platform adapters                              |
-| [shared-schema](shared-schema/src/)              | Shared schema versions, validation, and migrations                                                     |
-| [super-sync-server](super-sync-server/README.md) | Hosted sync API, accounts, and database; [server architecture](super-sync-server/docs/architecture.md) |
-| [plugin-api](plugin-api/README.md)               | Public types consumed by third-party plugins                                                           |
-| [plugin-dev](plugin-dev/)                        | Plugin implementations and examples; [development guide](../docs/plugin-development.md)                |
-| [vite-plugin](vite-plugin/src/)                  | Build tooling for plugins                                                                              |
+| Package                               | Responsibility / starting point                                                         |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| [sync-core](sync-core/README.md)      | Framework-independent sync primitives, conflicts, clocks, compression, encryption       |
+| [sync-providers](sync-providers/src/) | Provider contracts, transports, credential storage, and platform adapters               |
+| [shared-schema](shared-schema/src/)   | Shared schema versions, validation, and migrations                                      |
+| [plugin-api](plugin-api/README.md)    | Public types consumed by third-party plugins                                            |
+| [plugin-dev](plugin-dev/)             | Plugin implementations and examples; [development guide](../docs/plugin-development.md) |
+| [vite-plugin](vite-plugin/src/)       | Build tooling for plugins                                                               |
 
 ## Validation
 
@@ -26,21 +24,20 @@ are separate checks; one does not imply the others ran.
 - Format changed files with `npm run prettier:file -- <path>`.
 - Run `npm run checkFile <path>` for root-ESLint-covered TypeScript (including
   sync-core and sync-providers). Root ESLint intentionally ignores plugin-api,
-  plugin-dev, shared-schema, super-sync-server, and vite-plugin; use their checks
+  plugin-dev, shared-schema, and vite-plugin; use their checks
   below instead. Do not override those ignores to force Angular lint onto them.
 - Run relevant package checks below, including focused tests for changed behavior.
   For Vitest packages, append `-- <test-path>` to `npm test` for a focused run.
   Paths are relative to the package. Read the server guide before database tests.
 
-| Package           | Commands (repository root)                                                                                                                                                              |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| sync-core         | `npm run sync-core:build` and `npm run sync-core:test` (includes test type checking)                                                                                                    |
-| sync-providers    | `npm run sync-providers:build` and `npm run sync-providers:test` (includes test type checking)                                                                                          |
-| shared-schema     | `npm run shared-schema:build` and `npm run shared-schema:test`                                                                                                                          |
-| super-sync-server | `npm --prefix packages/super-sync-server run build` and `npm --prefix packages/super-sync-server test` (pretest generates Prisma client; see [setup](super-sync-server/README.md))      |
-| plugin-api        | `npm --prefix packages/plugin-api run typecheck`; `npm run plugin-api:build` when consumers need updated declarations                                                                   |
-| vite-plugin       | `npm run vite-plugin:build`                                                                                                                                                             |
-| plugin-dev        | `npm --prefix packages/plugin-dev ci` once (its own workspace and lockfile), then the affected plugin's scripts via `npm --prefix packages/plugin-dev/<name> run <script>`; checks vary |
+| Package        | Commands (repository root)                                                                                                                                                              |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| sync-core      | `npm run sync-core:build` and `npm run sync-core:test` (includes test type checking)                                                                                                    |
+| sync-providers | `npm run sync-providers:build` and `npm run sync-providers:test` (includes test type checking)                                                                                          |
+| shared-schema  | `npm run shared-schema:build` and `npm run shared-schema:test`                                                                                                                          |
+| plugin-api     | `npm --prefix packages/plugin-api run typecheck`; `npm run plugin-api:build` when consumers need updated declarations                                                                   |
+| vite-plugin    | `npm run vite-plugin:build`                                                                                                                                                             |
+| plugin-dev     | `npm --prefix packages/plugin-dev ci` once (its own workspace and lockfile), then the affected plugin's scripts via `npm --prefix packages/plugin-dev/<name> run <script>`; checks vary |
 
 Root `npm test` covers sync-core, shared-schema, and sync-providers, release
 tooling, and Angular specs. It does **not** run the server, Electron, every

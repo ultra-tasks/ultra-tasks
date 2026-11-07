@@ -18,7 +18,7 @@ import {
   type SharedTask,
   type TaskOverlay,
   type OwnershipOffer,
-} from '@ultra-tasks/account-crypto';
+} from '@sp/sync-providers/ultra-tasks';
 import { T } from '../../t.const';
 import { DateService } from '../../core/date/date.service';
 import { download } from '../../util/download';
@@ -28,6 +28,7 @@ import { DialogConfirmComponent } from '../../ui/dialog-confirm/dialog-confirm.c
 import { formatDate } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { getEnvOptional } from '../../util/env';
 import { selectAllProjects } from '../project/store/project.selectors';
 
 @Component({
@@ -46,7 +47,10 @@ export class NativeSyncComponent implements OnInit {
   private readonly dialogs = inject(MatDialog);
   readonly checkpoints = signal<{ scopeId: string; sequence: number }[]>([]);
   readonly T = T;
-  server = localStorage.getItem('ultra-native-server') ?? '';
+  server =
+    localStorage.getItem('ultra-native-server') ??
+    getEnvOptional('ULTRA_ACCOUNT_URL') ??
+    '';
   identifier = '';
   password = '';
   mfa = '';
@@ -181,6 +185,9 @@ export class NativeSyncComponent implements OnInit {
         this.password = '';
       }
     });
+  }
+  async runOpenAccount(): Promise<void> {
+    await this.run(() => this.native.openAccount(this.server));
   }
   async completeMfa(): Promise<void> {
     await this.run(async () => {

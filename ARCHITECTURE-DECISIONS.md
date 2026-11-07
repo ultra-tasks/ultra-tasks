@@ -193,14 +193,14 @@ latency or transaction lock-hold time becomes a measured production problem.
   mechanism with an equivalent per-user serialization primitive
 
 **Documentation**:
-[`packages/super-sync-server/docs/architecture.md`](packages/super-sync-server/docs/architecture.md),
+[`packages/super-sync-server/docs/architecture.md`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/docs/architecture.md),
 [`docs/sync-and-op-log/sync-architecture.html#transport`](docs/sync-and-op-log/sync-architecture.html#transport)
 
 **Key Files**:
 
-- [`packages/super-sync-server/src/sync/sync.service.ts`](packages/super-sync-server/src/sync/sync.service.ts) - Upload transaction and sequencing primitive
-- [`packages/super-sync-server/prisma/schema.prisma`](packages/super-sync-server/prisma/schema.prisma) - `user_sync_state.last_seq`
-- [`packages/super-sync-server/tests/integration/repair-causality.integration.spec.ts`](packages/super-sync-server/tests/integration/repair-causality.integration.spec.ts) - Real-PostgreSQL race coverage
+- [`packages/super-sync-server/src/sync/sync.service.ts`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/sync/sync.service.ts) - Upload transaction and sequencing primitive
+- [`packages/super-sync-server/prisma/schema.prisma`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/prisma/schema.prisma) - `user_sync_state.last_seq`
+- [`packages/super-sync-server/tests/integration/repair-causality.integration.spec.ts`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/tests/integration/repair-causality.integration.spec.ts) - Real-PostgreSQL race coverage
 
 **When to Update This Pattern**:
 
@@ -286,9 +286,9 @@ promoted to the user's active `Passkey` set only when that token is consumed.
 
 **Key Files**:
 
-- [`auth.ts`](packages/super-sync-server/src/auth.ts)
-- [`passkey.ts`](packages/super-sync-server/src/passkey.ts)
-- [`schema.prisma`](packages/super-sync-server/prisma/schema.prisma)
+- [`auth.ts`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/auth.ts)
+- [`passkey.ts`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/src/passkey.ts)
+- [`schema.prisma`](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/prisma/schema.prisma)
 
 **When to Update This Pattern**:
 
@@ -607,7 +607,7 @@ These carry the same authority as the numbered records above. They live outside 
 
 | Decision                                                                                                                                                                                                                     | Where it lives                                                                                                                                                                                                                                                   |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Native encrypted collaboration (Ultra Tasks fork, 2026-11)** — separate scoped v2 records, password vaults, automatic rekey/dual-signed ownership, single native refresh owner; retain SuperSync v1 personal compatibility | [Native sync contract](packages/super-sync-server/docs/native-sync.md)                                                                                                                                                                                           |
+| **Native encrypted collaboration (Ultra Tasks fork, 2026-11)** — separate scoped v2 records, password vaults, automatic rekey/dual-signed ownership, single native refresh owner; retain SuperSync v1 personal compatibility | [Native sync contract](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/docs/native-sync.md)                                                                                                                                              |
 | **SuperSync database encryption at rest** — no project-managed volume encryption; the LUKS and PostgreSQL-TDE attempts are retired as OpenVZ-incompatible                                                                    | [`docs/supersync-encryption-at-rest-decision.md`](docs/supersync-encryption-at-rest-decision.md)                                                                                                                                                                 |
 | **Schema-version bump policy** — default to NOT bumping `CURRENT_SCHEMA_VERSION`; a bump never protects the released fleet and cannot be reverted                                                                            | [`operation-log-architecture.md` §A.7.11 Bump Policy](docs/sync-and-op-log/operation-log-architecture.md#bump-policy--a-bump-does-not-protect-the-released-fleet), [`schema-version.ts`](packages/shared-schema/src/schema-version.ts), `AGENTS.md` sync rule 10 |
 | **Required fields on persisted models** — a new field on a persisted model is optional (`?`) plus a runtime default, never required                                                                                          | [`docs/sync-and-op-log/persisted-model-fields.md`](docs/sync-and-op-log/persisted-model-fields.md), `AGENTS.md` sync rule 11                                                                                                                                     |
