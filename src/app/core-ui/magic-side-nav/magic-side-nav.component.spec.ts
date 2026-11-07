@@ -15,7 +15,7 @@ import { LayoutService } from '../layout/layout.service';
 import { TaskService } from '../../features/tasks/task.service';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import { TaskExternalDragService } from '../../features/tasks/task-external-drag.service';
-import { NavActionItem, NavConfig, NavPluginItem } from './magic-side-nav.model';
+import { NavActionItem, NavConfig, NavItem, NavPluginItem } from './magic-side-nav.model';
 
 describe('MagicSideNavComponent', () => {
   let fixture: ComponentFixture<MagicSideNavComponent>;
@@ -145,6 +145,105 @@ describe('MagicSideNavComponent', () => {
     fixture.componentInstance.toggleMobileNav();
     fixture.detectChanges();
     expect(isMobileSideNavOpen()).toBe(false);
+  });
+
+  describe('phone-only items', () => {
+    const items: NavConfig['items'] = [
+      { type: 'action', id: 'always', label: 'a', icon: 'a', action: () => undefined },
+      {
+        type: 'action',
+        id: 'panel-notes',
+        label: 'n',
+        icon: 'n',
+        mobileOnly: true,
+        action: () => undefined,
+      },
+    ];
+
+    it('lists the right-panel toggles in the phone drawer', () => {
+      isXs.set(true);
+      navConfigServiceMock.navConfig.set({ ...navConfig, items });
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+
+      expect(fixture.componentInstance.navigationItems().map((i) => i.id)).toEqual([
+        'always',
+        'panel-notes',
+      ]);
+    });
+
+    it('leaves desktop-only rows out of the phone drawer and drops the separators they leave', () => {
+      const route = (id: string, over: Partial<NavItem> = {}): NavItem =>
+        ({
+          type: 'route',
+          id,
+          label: id,
+          icon: id,
+          route: `/${id}`,
+          ...over,
+        }) as NavItem;
+      const separator = (id: string, over: Partial<NavItem> = {}): NavItem =>
+        ({ type: 'separator', id, ...over }) as NavItem;
+      const menu: NavItem = {
+        type: 'menu',
+        id: 'help',
+        label: 'Help',
+        icon: 'help',
+        children: [
+          route('help-a'),
+          { ...route('help-donate'), mobileOnly: true } as NavItem,
+        ],
+      };
+      navConfigServiceMock.navConfig.set({
+        ...navConfig,
+        items: [
+          route('today', { desktopOnly: true }),
+          route('inbox', { desktopOnly: true }),
+          separator('sep-2'),
+          route('projects'),
+          separator('sep-3', { mtAuto: true }),
+          route('plugins', { desktopOnly: true }),
+          menu,
+          route('account', { desktopOnly: true }),
+        ],
+      });
+
+      isXs.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      const phone = fixture.componentInstance.navigationItems();
+      expect(phone.map((i) => i.id)).toEqual(['projects', 'sep-3', 'help']);
+      const phoneHelp = phone.find((i) => i.id === 'help');
+      expect(phoneHelp?.type === 'menu' && phoneHelp.children.map((c) => c.id)).toEqual([
+        'help-a',
+        'help-donate',
+      ]);
+
+      isXs.set(false);
+      const desktop = fixture.componentInstance.navigationItems();
+      expect(desktop.map((i) => i.id)).toEqual([
+        'today',
+        'inbox',
+        'sep-2',
+        'projects',
+        'sep-3',
+        'plugins',
+        'help',
+        'account',
+      ]);
+      const desktopHelp = desktop.find((i) => i.id === 'help');
+      expect(
+        desktopHelp?.type === 'menu' && desktopHelp.children.map((c) => c.id),
+      ).toEqual(['help-a']);
+    });
+
+    it('leaves them out of the desktop side nav, where the header has the toggles', () => {
+      isXs.set(false);
+      navConfigServiceMock.navConfig.set({ ...navConfig, items });
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+
+      expect(fixture.componentInstance.navigationItems().map((i) => i.id)).toEqual([
+        'always',
+      ]);
+    });
   });
 
   it('renders the window drag strip above the desktop nav', () => {

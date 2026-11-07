@@ -37,6 +37,7 @@ import { Project } from '../../../features/project/project.model';
 import { isSingleEmoji } from '../../../util/extract-first-emoji';
 import { expandCollapseAni } from '../../../ui/tree-dnd/tree.animations';
 import { NAV_SECTION_ICON } from '../nav-section-icons.const';
+import { LayoutService } from '../../layout/layout.service';
 
 const TREE_INDENT = 16;
 
@@ -97,6 +98,19 @@ export class NavListTreeComponent {
 
   // Access to service methods and data for visibility menu (includes Inbox for unhiding)
   readonly allUnarchivedProjects = this._navConfigService.allUnarchivedProjects;
+
+  readonly isPhone = inject(LayoutService).isXs;
+  private readonly _visibleButtons = computed(() =>
+    (this.item().additionalButtons ?? []).filter((btn) => !btn.hidden),
+  );
+  // The one header tool a phone keeps in the row: "+" (new project, new tag).
+  readonly primaryButton = computed(() =>
+    this._visibleButtons().find((btn) => btn.icon === 'add'),
+  );
+  // Everything else sits behind the ⋯ menu on a phone.
+  readonly overflowButtons = computed(() =>
+    this._visibleButtons().filter((btn) => btn !== this.primaryButton()),
+  );
 
   // ViewChild for visibility menu trigger to close menu after toggling
   visibilityMenuTrigger = viewChild('visibilityBtn', { read: MatMenuTrigger });

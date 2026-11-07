@@ -2,9 +2,14 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  box-sizing: border-box;
+  // Phone: the calendar strip rests below the floating header, and the day list
+  // below it scrolls behind the floating nav (both insets are 0 from 600px up).
+  padding-top: var(--shell-inset-top);
 
   planner-plan-view {
     flex: 1;
     min-height: 0;
+    padding-bottom: var(--shell-inset-bottom);
   }
 }

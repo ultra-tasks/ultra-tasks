@@ -95,7 +95,7 @@ done-toggle {
 
   // Same hit box as the task list on touch; the glyph keeps its size.
   @include touchOnlyDevice {
-    --done-toggle-size: 40px;
+    --done-toggle-size: var(--task-icon-size);
   }
 
   margin-left: var(--s-half);

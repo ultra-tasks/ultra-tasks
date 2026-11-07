@@ -8,6 +8,18 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  box-sizing: border-box;
+
+  // The routed page on a phone: the field rests below the floating header and
+  // the results scroll behind the floating nav. The popup is a dialog, which
+  // sits above the shell, so it takes no insets.
+  &:not(.is-popup) {
+    padding-top: calc(var(--shell-inset-top) + var(--s));
+
+    .search-results {
+      padding-bottom: var(--shell-inset-bottom);
+    }
+  }
 
   .search-header {
     margin-bottom: var(--s2);

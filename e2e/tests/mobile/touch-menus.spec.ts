@@ -90,20 +90,17 @@ test.describe('Phone menus (touch)', () => {
     await switchToTouch(page);
     const url = page.url();
 
-    await page.locator('mobile-bottom-nav .tour-navMenuBtn').tap();
-    const plannerRow = page.locator('magic-side-nav nav-item', {
-      has: page.locator('a.nav-link', { hasText: 'Upcoming' }),
+    await page.locator('mobile-bottom-nav .e2e-bottom-nav-browse').tap();
+    // A project row sits in the drag tree: holding still must open its menu
+    // rather than start a drag.
+    const projectRow = page.locator('magic-side-nav nav-list-tree nav-item .nav-link', {
+      hasText: projectName,
     });
-    await expect(plannerRow).toBeVisible();
-    // Out of sight and untappable, but still in the DOM for keyboard and
-    // screen-reader users.
-    const moreBtn = plannerRow.locator('.additional-btn');
-    await expect(moreBtn).toHaveCSS('opacity', '0');
-    await expect(moreBtn).toHaveCSS('pointer-events', 'none');
-
-    await longPress(page, plannerRow.locator('a.nav-link'));
+    await expect(projectRow).toBeVisible();
+    await longPress(page, projectRow);
     await waitForMenuSettled(page);
-    await expect(page.getByRole('menuitem', { name: 'Disable feature' })).toBeVisible();
+    await expect(page.locator('.mat-mdc-menu-content work-context-menu')).toBeVisible();
+    await expect(page.locator('.cdk-drag-preview')).toHaveCount(0);
     // Releasing the press neither followed the link nor let the following
     // click land on the backdrop and close the menu again.
     expect(page.url()).toBe(url);
@@ -115,16 +112,6 @@ test.describe('Phone menus (touch)', () => {
     // Tap a corner far from the menu, which opens next to the row.
     await backdrop.tap({ position: { x: 10, y: 780 } });
     await expect(page.locator('.mat-mdc-menu-panel')).toHaveCount(0);
-
-    // A project row sits in the drag tree: holding still must still open its
-    // menu rather than start a drag.
-    const projectRow = page.locator('magic-side-nav nav-list-tree nav-item .nav-link', {
-      hasText: projectName,
-    });
-    await longPress(page, projectRow);
-    await waitForMenuSettled(page);
-    await expect(page.locator('.mat-mdc-menu-content work-context-menu')).toBeVisible();
-    await expect(page.locator('.cdk-drag-preview')).toHaveCount(0);
     expect(page.url()).toBe(url);
   });
 

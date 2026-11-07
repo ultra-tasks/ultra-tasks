@@ -85,7 +85,7 @@
   // title does not zoom the page (#9556); this selector outranks that rule.
   .task-title {
     font-weight: var(--font-weight-medium);
-    line-height: 20px;
+    line-height: var(--task-title-line-height);
   }
 
   // Tags, then the description on the same line. The tags keep their own width
@@ -354,7 +354,7 @@ progress-bar {
 }
 
 done-toggle {
-  --done-toggle-size: 40px;
+  --done-toggle-size: var(--task-icon-size);
 
   margin-left: var(--s);
   margin-right: 0;

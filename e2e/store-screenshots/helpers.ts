@@ -13,7 +13,7 @@ import { waitForAppReady } from '../utils/waits';
 /**
  * Toggle the right-hand notes panel. Selector from
  * `desktop-panel-buttons.component.ts` (`.e2e-toggle-notes-btn`) — desktop
- * only, since mobile uses a different bottom-nav flow.
+ * only: on phones the panels are rows in the Browse drawer.
  */
 export const openNotesPanel = async (page: Page): Promise<void> => {
   const btn = page.locator('.e2e-toggle-notes-btn').first();

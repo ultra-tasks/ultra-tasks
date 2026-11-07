@@ -13,7 +13,8 @@ import {
   OnInit,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { LayoutService } from '../../core-ui/layout/layout.service';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { getChangedAppFeatures } from '../../features/config/get-changed-app-features.util';
 import { TaskWidgetSettingsService } from '../../features/config/task-widget-settings.service';
@@ -211,6 +212,13 @@ export class ConfigPageComponent implements OnInit {
     { index: 5, label: T.PS.REFINEMENT.DATA, icon: 'import_export' },
   ];
   readonly isAccount = this._dialogData?.['account'] === 'true';
+  readonly isPhone = inject(LayoutService).isXs;
+  private readonly _router = inject(Router);
+  /** Windows of their own that Settings points to on a phone (no drawer rows). */
+  readonly windowLinks = [
+    { path: '/plugins', label: T.PS.REDESIGN.PLUGINS, icon: 'extension' },
+    { path: '/account', label: T.PS.REFINEMENT.ACCOUNT, icon: 'account_circle' },
+  ];
   private readonly _dateFormat = inject(DateTimeFormatService);
   get dateExamples(): { regional: string; task: string } {
     const sample = new Date(2026, 10, 18, 14, 30);
@@ -512,6 +520,11 @@ export class ConfigPageComponent implements OnInit {
     this.mobileCategoryVisible = true;
     this._content()?.nativeElement.scrollTo({ top: 0 });
     this._layout()?.nativeElement.scrollTo({ top: 0 });
+  }
+
+  openWindow(path: string): void {
+    this._matDialog.getDialogById('settings-window')?.close();
+    void this._router.navigateByUrl(path);
   }
 
   clearBackups(): void {

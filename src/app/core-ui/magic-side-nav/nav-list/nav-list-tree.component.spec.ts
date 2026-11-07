@@ -14,6 +14,7 @@ import { MenuTreeKind } from '../../../features/menu-tree/store/menu-tree.model'
 import { MenuTreeService } from '../../../features/menu-tree/menu-tree.service';
 import { selectAllDoneIds } from '../../../features/tasks/store/task.selectors';
 import { TreeDndComponent } from '../../../ui/tree-dnd/tree.component';
+import { LayoutService } from '../../layout/layout.service';
 import { MagicNavConfigService } from '../magic-nav-config.service';
 import { NavItem, NavTreeItem } from '../magic-side-nav.model';
 import { NavItemComponent } from '../nav-item/nav-item.component';
@@ -134,6 +135,7 @@ describe('NavListTreeComponent expand/collapse animation', () => {
       providers: [
         provideAnimations(),
         provideRouter([]),
+        { provide: LayoutService, useValue: { isXs: signal(false) } },
         {
           provide: MagicNavConfigService,
           useValue: {
@@ -252,6 +254,7 @@ describe('NavListTreeComponent row indent', () => {
       providers: [
         provideAnimations(),
         provideRouter([]),
+        { provide: LayoutService, useValue: { isXs: signal(false) } },
         {
           provide: MagicNavConfigService,
           useValue: {
@@ -337,6 +340,7 @@ describe('NavListTreeComponent archived projects link (#10473)', () => {
         provideRouter([{ path: 'archived-projects', children: [] }]),
         provideMockStore({ selectors: [{ selector: selectAllDoneIds, value: [] }] }),
         { provide: GlobalThemeService, useValue: {} },
+        { provide: LayoutService, useValue: { isXs: signal(false) } },
         {
           provide: MagicNavConfigService,
           useValue: { allUnarchivedProjects: signal([]), archivedProjectsCount },
@@ -426,5 +430,100 @@ describe('NavListTreeComponent archived projects link (#10473)', () => {
     expect(fixture.componentInstance.clickedItems).toEqual([
       jasmine.objectContaining({ type: 'route', route: '/archived-projects' }),
     ]);
+  });
+});
+
+@Component({
+  standalone: true,
+  imports: [NavListTreeComponent],
+  template: `<nav-list-tree
+    [item]="item"
+    [isExpanded]="false"
+  ></nav-list-tree>`,
+})
+class NavListTreeToolsHostComponent {
+  readonly add = jasmine.createSpy('add');
+  readonly folder = jasmine.createSpy('folder');
+  readonly item: NavTreeItem = {
+    type: 'tree',
+    id: 'projects',
+    label: 'Projects',
+    icon: 'list',
+    treeKind: MenuTreeKind.PROJECT,
+    tree: [],
+    additionalButtons: [
+      { id: 'project-visibility', icon: 'visibility', tooltip: 'Show/hide' },
+      { id: 'add-project-folder', icon: 'create_new_folder', action: this.folder },
+      { id: 'add-project', icon: 'add', tooltip: 'Create project', action: this.add },
+    ],
+  };
+}
+
+/**
+ * The header's small icon buttons: all three on a desktop, but on a phone only
+ * the "+" stays and the others sit behind a ⋯ menu.
+ */
+describe('NavListTreeComponent header tools', () => {
+  let fixture: ComponentFixture<NavListTreeToolsHostComponent>;
+  const isXs = signal(false);
+
+  const buttons = (): HTMLElement[] =>
+    Array.from(fixture.nativeElement.querySelectorAll('.additional-btns > button'));
+  const create = (): void => {
+    fixture = TestBed.createComponent(NavListTreeToolsHostComponent);
+    fixture.detectChanges();
+  };
+
+  beforeEach(async () => {
+    isXs.set(false);
+    await TestBed.configureTestingModule({
+      imports: [NavListTreeToolsHostComponent, TranslateModule.forRoot()],
+      providers: [
+        provideNoopAnimations(),
+        provideRouter([]),
+        { provide: LayoutService, useValue: { isXs } },
+        {
+          provide: MagicNavConfigService,
+          useValue: {
+            allUnarchivedProjects: signal([]),
+            archivedProjectsCount: signal(0),
+          },
+        },
+        { provide: MenuTreeService, useValue: {} },
+      ],
+    })
+      .overrideComponent(NavListTreeComponent, {
+        remove: { imports: [NavItemComponent, TreeDndComponent] },
+        add: { schemas: [NO_ERRORS_SCHEMA] },
+      })
+      .compileComponents();
+  });
+
+  it('shows every tool in the row on a desktop', () => {
+    create();
+
+    expect(buttons().length).toBe(3);
+    expect(fixture.nativeElement.querySelector('.more-btn')).toBeNull();
+  });
+
+  it('keeps only the "+" in the row on a phone, with a ⋯ menu for the rest', () => {
+    isXs.set(true);
+    create();
+
+    expect(buttons().map((b) => b.getAttribute('data-nav-btn'))).toEqual([
+      null,
+      'add-project',
+    ]);
+    expect(buttons()[0].classList).toContain('more-btn');
+    expect(buttons()[0].getAttribute('aria-label')).toBe('PS.REDESIGN.MORE');
+  });
+
+  it('still creates a project from the phone "+"', () => {
+    isXs.set(true);
+    create();
+
+    buttons()[1].click();
+
+    expect(fixture.componentInstance.add).toHaveBeenCalledTimes(1);
   });
 });

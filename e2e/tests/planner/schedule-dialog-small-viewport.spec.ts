@@ -21,8 +21,8 @@ test.describe('schedule dialog on a small viewport', () => {
   }) => {
     await workViewPage.waitForTaskList();
     const title = `${testPrefix}-small-screen`;
-    // Mobile layout: use the bottom-nav FAB to open the add task bar
-    await page.locator('mobile-bottom-nav .add-task-button').click();
+    // Mobile layout: the bottom nav has no add button, so use the list's inline row
+    await page.locator('.task-list-add-action').first().click();
     const input = page.locator('add-task-bar .main-input').first();
     await input.waitFor({ state: 'visible' });
     await input.fill(title);

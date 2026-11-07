@@ -9,8 +9,8 @@ import { DEFAULT_GLOBAL_CONFIG } from '../../../features/config/default-global-c
 import { AppFeaturesConfig } from '../../../features/config/global-config.model';
 
 /**
- * Each panel toggle is gated on its own app feature, and the mobile bottom
- * nav's panels menu mirrors these toggles exactly (`mobile-bottom-nav.component`).
+ * Each panel toggle is gated on its own app feature, and the phone
+ * drawer lists these toggles exactly (`magic-nav-config.service`).
  * A button added here without a matching entry there is how a panel ends up
  * with no home below 600px.
  */

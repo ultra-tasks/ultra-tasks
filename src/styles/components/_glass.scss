@@ -11,11 +11,12 @@
 //   st-glass-bitmap  <glass-backdrop> draws a blurred image or palette gradient
 //                    once into a tiny fixed canvas behind the app.
 //
-// Surfaces: the shell frame (side nav, header, side-by-side right panel,
-// mobile bottom nav) is the most see-through glass; the content sheet behind
-// the task list is the same frosted glass one step denser; task cards, dialogs
-// and menus stay opaque. Only static strips, side panels and the content sheet
-// blur. The phone drawer, which slides over the task list, is solid; the
+// Surfaces: the shell frame (side nav, header, side-by-side right panel, the
+// phone's floating nav pill) is the most see-through glass. On a phone the header
+// and the pill hover over the page, so what scrolls behind them is blurred. The
+// content sheet behind the task list is the same frosted glass one step denser;
+// task cards, dialogs and menus stay opaque. Only static strips, side panels,
+// the pill and the content sheet blur. The phone drawer, which slides over the task list, is solid; the
 // full-width phone right panel gets a stronger tint without blur.
 //
 // Tokens come from palette roles: PaletteThemeService writes the normalised
@@ -110,8 +111,12 @@ body.ultra-tasks.st-glass {
   .right-panel {
     box-shadow: inset 0 var(--st-line-width) 0 var(--glass-edge-highlight);
   }
+  // The phone's floating nav pill: the same frosted frame, with the elevation
+  // ring of a floating surface plus the light rim on top.
   .mobile-bottom-nav {
-    border-top-color: var(--glass-edge-line);
+    box-shadow:
+      var(--elev-2),
+      inset 0 var(--st-line-width) 0 var(--glass-edge-highlight);
   }
 
   // The phone drawer slides over the task list: a translucent surface would

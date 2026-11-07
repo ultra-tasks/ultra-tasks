@@ -85,6 +85,21 @@
               >{{ category.label | translate }}
             </button>
           }
+          <!-- Phones only: the drawer has no Plugins or Account row, so they
+               are reached from here. They open their own windows. -->
+          @if (isPhone() && !isAccount) {
+            @for (link of windowLinks; track link.path; let first = $first) {
+              <button
+                type="button"
+                class="window-link"
+                [class.group-start]="first"
+                (click)="openWindow(link.path)"
+              >
+                <mat-icon aria-hidden="true">{{ link.icon }}</mat-icon
+                >{{ link.label | translate }}
+              </button>
+            }
+          }
         </nav>
         <main
           #settingsContent

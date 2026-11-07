@@ -28,9 +28,10 @@ export const safeIsVisible = async (
  * @returns Promise<Locator> - The add task input locator, ready for interaction
  */
 /**
- * Opens the global add-task bar with its shortcut. The header "+" is gone, so
- * the shortcut (and the phone bottom nav's FAB) is the way in; focus leaves
- * any field first, because shortcuts do not fire while one is focused.
+ * Opens the global add-task bar with its shortcut. The header "+" is gone and
+ * the phone bottom nav has no add button either, so the shortcut is the way in
+ * (phone-style flows can use a list's inline Add task row instead); focus
+ * leaves any field first, because shortcuts do not fire while one is focused.
  */
 export const openGlobalAddTaskBar = async (page: Page): Promise<void> => {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

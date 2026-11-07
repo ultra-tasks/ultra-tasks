@@ -102,7 +102,9 @@
           }
         </div>
 
-        @if (isSyncIconEnabled()) {
+        <!-- On a phone the icon appears once sync is set up, so a sync error
+             stays visible; setting it up is under Account, a row at the end of Settings. -->
+        @if (isSyncIconEnabled() && (!isXs() || syncIsEnabledAndReady())) {
           <button
             class="sync-btn secondary-header-action"
             [class.is-error]="syncIsEnabledAndReady() && syncState() === 'ERROR'"
@@ -134,10 +136,9 @@
 
         <project-view-menu class="secondary-header-action"></project-view-menu>
 
-        <!-- One action, one home: below 600px the bottom nav's panels menu
-             lists these (or shows a lone one as a nav button), so the header
-             must not render them as well. Rendering
-             both put the same plugin button in two places on a phone at once. -->
+        <!-- One action, one home: below 600px the Browse drawer lists these,
+             so the header must not render them as well. Rendering both put
+             the same plugin button in two places on a phone at once. -->
         @if (!hasBottomNav()) {
           <plugin-side-panel-btns
             class="secondary-header-action"

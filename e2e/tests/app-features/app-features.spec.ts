@@ -87,7 +87,7 @@ test.describe('App Features', () => {
     });
   });
 
-  test('Issues panel app feature hides the mobile bottom-nav panel option', async ({
+  test('Issues panel app feature hides the mobile drawer panel option', async ({
     page,
     settingsPage,
   }) => {
@@ -96,17 +96,18 @@ test.describe('App Features', () => {
       name: 'Issues panel',
       exact: true,
     });
-    const issuePanelButton = page.locator('.e2e-toggle-issue-provider-panel');
-    const notesButton = page.locator('.e2e-toggle-notes-btn');
-    const sidePanelMenuButton = page.getByRole('button', {
-      name: 'Side Panel Menu',
-    });
+    // On phones the right-panel toggles are action rows in the Browse drawer.
+    const drawer = page.locator('.nav-sidenav.mobile');
+    const issuePanelRow = drawer.getByRole('menuitem', { name: /Issue Provider Panel/ });
+    const notesRow = drawer.getByRole('menuitem', { name: /Project Notes/ });
+    const browseButton = page.locator('mobile-bottom-nav .e2e-bottom-nav-browse');
 
     await goToMainView(page);
     await expect(page.locator('mobile-bottom-nav')).toBeVisible();
-    await sidePanelMenuButton.click();
-    await expect(issuePanelButton).toBeVisible();
-    await page.keyboard.press('Escape');
+    await browseButton.click();
+    await expect(issuePanelRow).toBeVisible();
+    await page.locator('.mobile-menu-close').click();
+    await expect(drawer).toBeHidden();
 
     await goToAppFeatures(settingsPage);
     await expect(featureSwitch).toBeVisible();
@@ -116,8 +117,8 @@ test.describe('App Features', () => {
 
     await goToMainView(page);
     await expect(page.locator('mobile-bottom-nav')).toBeVisible();
-    await sidePanelMenuButton.click();
-    await expect(notesButton).toBeVisible();
-    await expect(issuePanelButton).not.toBeAttached();
+    await browseButton.click();
+    await expect(notesRow).toBeVisible();
+    await expect(issuePanelRow).not.toBeAttached();
   });
 });

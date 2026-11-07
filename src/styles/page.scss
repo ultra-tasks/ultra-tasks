@@ -235,6 +235,12 @@ body {
 // 16px above, 72px below for the FAB and the bottom nav.
 .page-wrapper {
   padding: var(--s2) var(--page-gutter) var(--s9);
+
+  // Phone: the routed page's scroller already pads itself clear of the floating
+  // header and nav (--shell-inset-*), so the wrapper only needs normal air.
+  @media (max-width: 599px) {
+    padding-bottom: var(--s2);
+  }
 }
 
 .component-wrapper {

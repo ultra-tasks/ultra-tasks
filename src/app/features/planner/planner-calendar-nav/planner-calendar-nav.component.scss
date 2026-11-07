@@ -87,6 +87,22 @@
   }
 }
 
+// Touch: month, weekday and day numbers step up with the rest of the type scale
+// (they were 15 / 11 / 14).
+@media (pointer: coarse) {
+  .month-label {
+    font-size: var(--font-size-lg);
+  }
+
+  .day-labels {
+    font-size: var(--font-size-sm);
+  }
+
+  .week button {
+    font-size: var(--font-size-md);
+  }
+}
+
 .task-dot {
   position: absolute;
   bottom: 2px;

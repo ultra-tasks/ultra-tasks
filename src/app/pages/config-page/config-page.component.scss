@@ -40,6 +40,11 @@
   text-align: start;
   padding: 0 var(--s1-5);
   margin-bottom: var(--s-quarter);
+
+  // Touch: the 48px nav row, like the side nav's drawer rows.
+  @media (pointer: coarse) {
+    min-height: var(--ctl-lg);
+  }
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
@@ -56,6 +61,11 @@
   background: var(--palette-selected);
   color: var(--palette-selected-ink);
   font: var(--type-body-strong);
+}
+// The first window link opens a gap under the categories, so the rows that
+// leave Settings read as a separate group.
+.settings-categories .window-link.group-start {
+  margin-top: var(--s2);
 }
 .settings-categories button:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);

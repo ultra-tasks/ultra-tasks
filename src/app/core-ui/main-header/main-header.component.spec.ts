@@ -644,12 +644,12 @@ describe('MainHeaderComponent action placement', () => {
   });
 
   it('leaves the bottom nav its own actions, below 600px', async () => {
-    // One action, one home. The nav's panels menu lists the plugin side-panel
+    // One action, one home. The phone drawer lists the plugin side-panel
     // buttons and the three desktop panel toggles, so the header must not
     // render them as well -- rendering both put the same plugin button in two
     // places on a phone at once. The other end of the rule (a header slot
     // hidden without the menu listing it) is pinned by
-    // `mobile-bottom-nav.component.spec`.
+    // `magic-nav-config.service.panels.spec`.
     const btn = { label: 'x', icon: 'x', onClick: () => {} };
     isXs = signal(true);
     pluginSidePanelButtons = signal<unknown[]>([btn]);
@@ -968,6 +968,29 @@ describe('MainHeaderComponent action placement', () => {
       // as a plain property on the element.
       expect(icons[0].svgIcon).toBe('sync_done');
       expect(icons[0].textContent?.trim()).toBe('');
+    });
+
+    it('hides the sync icon on a phone until sync is set up', async () => {
+      isXs = signal(true);
+
+      const host = await mountAtWidth(404);
+
+      expect(host.querySelector('button.sync-btn')).toBeFalsy();
+    });
+
+    it('shows the sync icon on a phone once sync is set up, so errors stay visible', async () => {
+      readySync({ syncState: 'ERROR' });
+      isXs = signal(true);
+
+      const host = await mountAtWidth(404);
+
+      expect(host.querySelector('button.sync-btn')).toBeTruthy();
+    });
+
+    it('keeps the sync icon on a desktop before sync is set up', async () => {
+      const host = await mountAtWidth(1200);
+
+      expect(host.querySelector('button.sync-btn')).toBeTruthy();
     });
 
     it('shows the plain sync ring while local changes wait for upload', () => {

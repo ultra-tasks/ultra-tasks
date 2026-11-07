@@ -1,13 +1,18 @@
-// Shared creation row for task lists and nested subtask lists: a 40px row with
-// its "+" in the 24px leading slot (the same column as the cards' done toggles)
-// and the label on the 56px text column.
+// Shared creation row for task lists and nested subtask lists: a 40px row (48 on
+// touch) with its "+" in the 24px leading slot (the same column as the cards'
+// done toggles) and the label on the 56px text column. On touch the done toggle
+// slot is wider (--task-icon-size 48 vs 40), so the "+" and the label move out by
+// the same 4px and 8px to stay on the cards' columns.
 .task-list-add-action {
   display: flex;
   align-items: center;
-  gap: calc(var(--s2) - var(--st-line-width));
+  gap: calc(
+    var(--s2) - var(--st-line-width) + (var(--task-icon-size) - var(--ctl-md)) / 2
+  );
   width: 100%;
-  min-height: var(--ctl-md);
-  padding: 0 var(--s) 0 calc(var(--s2) + var(--st-line-width));
+  min-height: var(--task-first-line-min-height);
+  padding: 0 var(--s) 0
+    calc(var(--s2) + var(--st-line-width) + (var(--task-icon-size) - var(--ctl-md)) / 2);
   border: 0;
   border-radius: var(--r-md);
   background: transparent;

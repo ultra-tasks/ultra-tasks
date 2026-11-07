@@ -30,9 +30,12 @@ test.describe('Fullscreen note editor toolbar on a phone', () => {
     await workViewPage.waitForTaskList();
 
     // The notes page object drives the desktop side panel; on the phone layout
-    // Project Notes is only reachable through the side panel menu.
-    await page.locator('button[aria-label="Side Panel Menu"]').first().tap();
-    await page.locator('.mat-mdc-menu-item', { hasText: 'Project Notes' }).first().tap();
+    // Project Notes is a row in the Browse drawer.
+    await page.locator('mobile-bottom-nav .e2e-bottom-nav-browse').tap();
+    await page
+      .locator('.nav-sidenav.mobile')
+      .getByRole('menuitem', { name: /Project Notes/ })
+      .tap();
 
     const noteText = `${testPrefix}-toolbar-note`;
     await page.locator('#add-note-btn, button:has-text("Add note")').first().tap();

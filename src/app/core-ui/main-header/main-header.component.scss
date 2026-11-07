@@ -67,6 +67,11 @@
     --header-title-padding-inline-end: var(--s);
     --header-title-text-min: 6ch;
   }
+
+  // Touch: header buttons are the 48px touch size inside the 56px band.
+  @media (pointer: coarse) {
+    --header-button-size: var(--ctl-lg);
+  }
 }
 
 .wrapper {
@@ -351,14 +356,14 @@ button {
   // Material's icon-button token, so an SVG icon (the sync states) gets a
   // 20px box too instead of 24px.
   ::ng-deep button {
-    --mat-icon-button-icon-size: 20px;
+    --mat-icon-button-icon-size: var(--icon-md);
   }
 
   ::ng-deep button .mat-icon {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
-    line-height: 20px;
+    font-size: var(--icon-md);
+    width: var(--icon-md);
+    height: var(--icon-md);
+    line-height: var(--icon-md);
   }
 
   ::ng-deep button.sync-btn .mat-icon {

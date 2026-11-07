@@ -83,10 +83,7 @@ test.describe('Sections', () => {
       testPrefix,
     }) => {
       await workViewPage.waitForTaskList();
-      await page
-        .locator('mobile-bottom-nav button')
-        .filter({ has: page.locator('mat-icon', { hasText: /^menu$/ }) })
-        .click();
+      await page.locator('mobile-bottom-nav .e2e-bottom-nav-browse').click();
       await expect(page.locator('magic-side-nav .nav-sidenav')).toBeVisible();
       const projectName = `${testPrefix} Touch Sections`;
       await projectPage.createProject(projectName);

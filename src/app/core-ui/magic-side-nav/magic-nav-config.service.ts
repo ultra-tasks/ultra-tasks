@@ -40,6 +40,8 @@ import { AppFeaturesConfig } from '../../features/config/global-config.model';
 import { SnackService } from '../../core/snack/snack.service';
 import { IS_DONATION_UI_RESTRICTED } from '../../app.constants';
 import { resolveTagIcon } from '../../features/tag/resolve-tag-icon.util';
+import { LayoutService } from '../layout/layout.service';
+import { togglePluginPanel } from '../layout/store/layout.actions';
 
 @Injectable({
   providedIn: 'root',
@@ -58,6 +60,7 @@ export class MagicNavConfigService {
   private readonly _configService = inject(GlobalConfigService);
   private readonly _snackService = inject(SnackService);
   private readonly _router = inject(Router);
+  private readonly _layoutService = inject(LayoutService);
 
   // Simple state signals
   private readonly _isProjectsExpanded = signal(
@@ -160,6 +163,9 @@ export class MagicNavConfigService {
 
       // Plugin entries
       ...this._buildPluginItems(),
+
+      // Right-panel toggles (phone only)
+      ...this._buildPanelItems(),
 
       // Separator
       { type: 'separator', id: 'sep-2' },
@@ -264,6 +270,7 @@ export class MagicNavConfigService {
               icon: NAV_SECTION_ICON.DONATE,
               route: '/donate',
               featureConfigKey: 'isDonatePageEnabled',
+              desktopOnly: true,
             } as NavItem,
           ]
         : []),
@@ -307,6 +314,20 @@ export class MagicNavConfigService {
                 },
               ]
             : []),
+          // The phone drawer has no top-level Support us row; it lives here.
+          ...(this.isDonatePageEnabled() && !IS_DONATION_UI_RESTRICTED
+            ? [
+                {
+                  type: 'action' as const,
+                  id: 'help-donate',
+                  label: T.MH.DONATE,
+                  // Not the donate icon: "Contribute" above already uses it.
+                  icon: 'favorite',
+                  mobileOnly: true as const,
+                  action: () => void this._router.navigateByUrl('/donate'),
+                },
+              ]
+            : []),
           {
             type: 'action',
             id: 'help-quick-tour',
@@ -337,6 +358,8 @@ export class MagicNavConfigService {
         label: T.PS.REDESIGN.PLUGINS,
         icon: 'extension',
         route: '/plugins',
+        // Settings lists Plugins as a category on a phone.
+        desktopOnly: true,
       },
       {
         type: 'route',
@@ -352,6 +375,8 @@ export class MagicNavConfigService {
         label: T.PS.REFINEMENT.ACCOUNT,
         icon: 'account_circle',
         route: '/account',
+        // Settings lists Account as a category on a phone.
+        desktopOnly: true,
       },
     ],
     fullModeByDefault: true,
@@ -396,6 +421,7 @@ export class MagicNavConfigService {
         workContext: mainContext,
         workContextType: WorkContextType.TAG,
         defaultIcon: 'today',
+        desktopOnly: true,
       });
     }
 
@@ -409,6 +435,7 @@ export class MagicNavConfigService {
         workContext: inboxContext,
         workContextType: WorkContextType.PROJECT,
         defaultIcon: 'inbox',
+        desktopOnly: true,
       });
     }
 
@@ -427,6 +454,7 @@ export class MagicNavConfigService {
         route: '/planner',
         featureConfigKey: 'isPlannerEnabled',
         tourClass: 'tour-planner',
+        desktopOnly: true,
       });
     }
 
@@ -472,17 +500,11 @@ export class MagicNavConfigService {
     const pluginIcons = this._pluginService.getPluginIconsSignal()();
 
     return pluginEntries.map((entry) => {
-      // Prefer custom SVG icon if available, otherwise check if entry.icon is SVG path
-      const hasCustomSvgIcon = pluginIcons.has(entry.pluginId);
-      const isIconSvgPath = /\.svg$/i.test(entry.icon || '');
-      const isUploadedPlugin = pluginStates.get(entry.pluginId)?.type === 'uploaded';
-
-      let svgIcon: string | undefined;
-      if (hasCustomSvgIcon) {
-        svgIcon = `plugin-${entry.pluginId}-icon`;
-      } else if (isIconSvgPath && !isUploadedPlugin) {
-        svgIcon = `assets/bundled-plugins/${entry.pluginId}/${entry.icon}`;
-      }
+      const svgIcon = this._resolvePluginSvgIcon(
+        entry,
+        pluginIcons,
+        pluginStates.get(entry.pluginId)?.type === 'uploaded',
+      );
 
       return {
         type: 'plugin' as const,
@@ -494,6 +516,79 @@ export class MagicNavConfigService {
         action: entry.onClick,
       };
     });
+  }
+
+  // Prefer a custom SVG icon if available, otherwise check if entry.icon is an SVG path.
+  private _resolvePluginSvgIcon(
+    entry: { pluginId: string; icon?: string },
+    pluginIcons: ReadonlyMap<string, unknown>,
+    isUploadedPlugin: boolean,
+  ): string | undefined {
+    if (pluginIcons.has(entry.pluginId)) {
+      return `plugin-${entry.pluginId}-icon`;
+    }
+    if (/\.svg$/i.test(entry.icon || '') && !isUploadedPlugin) {
+      return `assets/bundled-plugins/${entry.pluginId}/${entry.icon}`;
+    }
+    return undefined;
+  }
+
+  /**
+   * The right-panel toggles: plugin side panels, the issue provider panel and the
+   * project notes. From 600px up they are header buttons; below that nothing
+   * renders those, so the phone drawer lists them (opened from Browse).
+   */
+  private _buildPanelItems(): NavItem[] {
+    const features = this._configService.appFeatures();
+    const pluginStates = this._pluginService.getAllPluginStates();
+    const pluginIcons = this._pluginService.getPluginIconsSignal()();
+    const items: NavItem[] = [];
+
+    for (const button of this._pluginBridge.sidePanelButtons()) {
+      const svgIcon = this._resolvePluginSvgIcon(
+        button,
+        pluginIcons,
+        pluginStates.get(button.pluginId)?.type === 'uploaded',
+      );
+      items.push({
+        type: 'action',
+        id: `panel-plugin-${button.pluginId}`,
+        label: button.label || button.pluginId,
+        icon: button.icon || 'extension',
+        ...(svgIcon && { svgIcon }),
+        mobileOnly: true,
+        action: () => {
+          this._store.dispatch(togglePluginPanel(button.pluginId));
+          button.onClick?.();
+        },
+      });
+    }
+
+    if (features.isIssuesPanelEnabled) {
+      items.push({
+        type: 'action',
+        id: 'panel-issues',
+        label: T.BN.SHOW_ISSUE_PANEL,
+        icon: 'assignment',
+        mobileOnly: true,
+        action: () => this._layoutService.toggleAddTaskPanel(),
+      });
+    }
+
+    if (features.isProjectNotesEnabled) {
+      items.push({
+        type: 'action',
+        id: 'panel-notes',
+        label: T.BN.SHOW_NOTES,
+        icon: 'description',
+        mobileOnly: true,
+        action: () => this._layoutService.toggleNotes(),
+      });
+    }
+
+    return items.length
+      ? [{ type: 'separator', id: 'sep-panels', mobileOnly: true }, ...items]
+      : [];
   }
 
   // Public computed signals for expansion state (for component to check)

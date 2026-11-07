@@ -9,7 +9,7 @@ import {
   AppFeaturesConfig,
   ConfigFormSection,
 } from '../../features/config/global-config.model';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
 import { EMPTY, of } from 'rxjs';
 import { signal } from '@angular/core';
@@ -25,6 +25,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ConfigSectionComponent } from '../../features/config/config-section/config-section.component';
 import { CollapsibleComponent } from '../../ui/collapsible/collapsible.component';
 import { WorkContextService } from '../../features/work-context/work-context.service';
+import { LayoutService } from '../../core-ui/layout/layout.service';
 
 describe('ConfigPageComponent', () => {
   let component: ConfigPageComponent;
@@ -47,7 +48,7 @@ describe('ConfigPageComponent', () => {
     mockSyncConfigService.updateSettingsFromForm.and.returnValue(Promise.resolve());
 
     mockSyncWrapperService = jasmine.createSpyObj('SyncWrapperService', ['sync']);
-    mockMatDialog = jasmine.createSpyObj('MatDialog', ['open']);
+    mockMatDialog = jasmine.createSpyObj('MatDialog', ['open', 'getDialogById']);
     mockProviderManager = jasmine.createSpyObj(
       'SyncProviderManager',
       ['getProviderById'],
@@ -72,6 +73,7 @@ describe('ConfigPageComponent', () => {
     await TestBed.configureTestingModule({
       imports: [NoopAnimationsModule],
       providers: [
+        { provide: LayoutService, useValue: { isXs: signal(false) } },
         {
           provide: DateTimeFormatService,
           useValue: {
@@ -173,6 +175,27 @@ describe('ConfigPageComponent', () => {
   it('triggerSync() should call SyncWrapperService.sync()', () => {
     component.triggerSync();
     expect(mockSyncWrapperService.sync).toHaveBeenCalled();
+  });
+
+  it('lists Plugins and Account as the windows Settings points to on a phone', () => {
+    expect(component.windowLinks.map((link) => link.path)).toEqual([
+      '/plugins',
+      '/account',
+    ]);
+  });
+
+  it('openWindow() closes Settings and opens the other window', () => {
+    const close = jasmine.createSpy('close');
+    mockMatDialog.getDialogById.and.returnValue({ close } as never);
+    const navigateByUrl = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(
+      true,
+    );
+
+    component.openWindow('/account');
+
+    expect(mockMatDialog.getDialogById).toHaveBeenCalledWith('settings-window');
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(navigateByUrl).toHaveBeenCalledWith('/account');
   });
 
   it('openSyncCfgDialog() should open DialogSyncCfgComponent', async () => {

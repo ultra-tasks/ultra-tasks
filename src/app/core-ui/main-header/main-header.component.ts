@@ -255,19 +255,17 @@ export class MainHeaderComponent implements OnDestroy {
     () => this.globalConfigService.appFeatures().isSyncIconEnabled,
   );
   /**
-   * Add-task, the desktop panel buttons and the plugin side-panel buttons are
-   * absent below 600px rather than squeezed: the bottom nav owns all three
-   * there, via its FAB and its panels menu. That is a placement rule, not a
-   * question of width, so it keys off the same signal that decides whether the
-   * bottom nav renders at all.
+   * The desktop panel buttons and the plugin side-panel buttons are absent below
+   * 600px rather than squeezed: the phone drawer (Browse in the bottom nav) lists
+   * them. That is a placement rule, not a question of width, so it keys off the
+   * same signal that decides whether the bottom nav renders at all.
    *
    * One action, one home. Both ends of getting this wrong are bugs, and both
-   * have been shipped: hiding a header slot the nav does NOT list drops the
-   * action with no trigger to say where it went (the panels menu was missing
-   * Schedule), while keeping one the nav DOES list renders the same plugin
-   * button in the header and the menu at once. `mobile-bottom-nav.component.spec`
-   * pins every panel the menu must list, which is the half that is easy to
-   * forget.
+   * have been shipped: hiding a header slot the drawer does NOT list drops the
+   * action with no trigger to say where it went, while keeping one the drawer
+   * DOES list renders the same plugin button in the header and the drawer at
+   * once. `magic-nav-config.service.panels.spec` pins every panel the drawer
+   * must list, which is the half that is easy to forget.
    */
   readonly hasBottomNav = this.layoutService.isShowMobileBottomNav;
 

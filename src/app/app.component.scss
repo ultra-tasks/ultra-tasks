@@ -113,15 +113,35 @@
   }
 }
 
-// Mobile bottom nav spacing
-.has-mobile-bottom-nav {
-  @include mq(xs, max) {
-    .main-content {
-      padding-bottom: calc(
-        var(--bottom-nav-height) + var(--bottom-nav-safe-area) +
-          var(--bottom-nav-extra-offset)
-      );
-    }
+// Phone shell: the header and the floating bottom nav hover over the page, so
+// content scrolls behind both and shows through their glass. The routed page
+// therefore fills the whole content area and pads its own scroller by
+// --shell-inset-top / --shell-inset-bottom (see _css-variables.scss). The
+// header's banner row stays inside the header and covers the first rows while
+// it is shown.
+@include mq(xs, max) {
+  // `.main-content` ahead of the class so this outranks the in-flow
+  // `.header-wrapper` rule further down.
+  .main-content .header-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+
+  // A routed page that is itself the scroller (secondary pages, Schedule,
+  // Boards...) pads its own scroll area. Pages that scroll an inner element
+  // pad that element instead, so the list passes behind the glass:
+  // `tag-task-page` / `work-view-page` (the project page; work-view.component.scss),
+  // `planner` (planner.component.scss) and `search-page`
+  // (search-page.component.scss).
+  .route-wrapper
+    > ::ng-deep
+    router-outlet
+    + *:not(tag-task-page, work-view-page, planner, search-page) {
+    box-sizing: border-box;
+    padding-top: var(--shell-inset-top);
+    padding-bottom: var(--shell-inset-bottom);
   }
 }
 

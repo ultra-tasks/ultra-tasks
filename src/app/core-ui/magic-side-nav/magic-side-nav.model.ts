@@ -25,6 +25,13 @@ export interface NavBaseItem {
   svgIcon?: string;
   tourClass?: string;
   featureConfigKey?: keyof AppFeaturesConfig;
+  // Only listed in the phone drawer. The right-panel toggles live in the header
+  // from 600px up; on a phone the drawer is their one home.
+  mobileOnly?: true;
+  // Left out of the phone drawer: the bottom nav or another screen already
+  // reaches it there (Today, Inbox, Upcoming), or it has a closer home (Support
+  // us under Help, Plugins and Account under Settings).
+  desktopOnly?: true;
 }
 
 export interface NavSeparatorItem extends NavBaseItem {

@@ -47,7 +47,7 @@ The accent is scarce on purpose.
 2. **A new page** uses the page wrappers and gutter ([Page layout](#page-layout)); **a new list** uses the task-row or flat-row pattern; **a new setting** uses the settings row; **a new empty state** uses `.empty-state`.
 3. **A new token or pattern is added once**, in `_css-variables.scss` or the shared layer, and documented in this file in the same change. Do not add a one-off value "for now".
 4. **Check the matrix** before calling a UI change done: light and dark, glass on and off (and reduced transparency), a window under 600px, a touch pointer (`(pointer: coarse)`), reduced motion, and a long title or a large list.
-5. **Task rows are a hot path.** Row heights are exactly 48px (title only) and 56px (with a meta line); no template function calls in `task.component.*`.
+5. **Task rows are a hot path.** Row heights are exactly 48px (title only) and 56px (with a meta line), and 56 and 60 on touch ([Touch scale](#touch-scale)); no template function calls in `task.component.*`.
 6. **Copy matters as much as spacing.** Labels are sentence case, buttons name their action ("Save", "Discard"), and every user-facing string goes through `en.json`.
 
 ### What is enforced and what is not
@@ -131,7 +131,7 @@ Radius follows the role of a shape, not its height.
 | `--r-sm`   | 6px    | Inline: tooltip, kbd, checkbox, inline edit field, hover-control group, select options |
 | `--r-md`   | 10px   | Controls and list items: buttons, fields, nav rows, task and note cards, menu items    |
 | `--r-lg`   | 14px   | Floating surfaces: dialogs, menus, snackbars, date picker, add-task bar, sheets        |
-| `--r-full` | 9999px | Icon buttons, FAB, chips, badges, counts, toggles                                      |
+| `--r-full` | 9999px | Icon buttons, the phone's floating nav pill, chips, badges, counts, toggles            |
 
 A nested shape is never rounder than its parent. An inner shape inset by _p_
 inside radius _R_ uses _R − p_: a menu (14) with 4px inner padding has 10px
@@ -190,7 +190,7 @@ on an inline icon) are the one exception.
 | ------------- | ----- | ----------------------------------------------------------- |
 | `--icon-sm`   | 16px  | Inline with 12–14px text: meta rows, chips, compact buttons |
 | `--icon-md`   | 20px  | Every control: buttons, menus, nav, header, field rows      |
-| `--icon-lg`   | 24px  | Touch-first surfaces: bottom nav, FAB, empty state          |
+| `--icon-lg`   | 24px  | Touch-first surfaces: bottom nav, empty state               |
 | `--icon-slot` | 24px  | Leading icons centre in this slot                           |
 
 - The glyph equals its box: set `font-size`, `width` and `height` together, or the glyph decentres. Icon boxes that are deliberately off this scale (a 48px empty-state illustration) keep a matched set.
@@ -206,19 +206,48 @@ on an inline icon) are the one exception.
 | `--ctl-lg` | 48px  | Touch surfaces: bottom nav, drawer rows, sheet rows, touch menus |
 
 Under `(pointer: coarse)` `--ctl-sm` becomes 40px, so no hit area on a touch
-device is below 40px.
+device is below 40px. See [Touch scale](#touch-scale) for everything else that
+steps up on a phone or tablet.
+
+### Touch scale
+
+One `(pointer: coarse)` block in `_css-variables.scss` (plus the button and field
+tokens in `_overwrite-material.scss`) re-points the scale for touch devices, so
+components inherit it without their own media queries. Pointer devices keep the
+values in the tables above.
+
+| Token                                                   | Pointer       | Touch                                                |
+| ------------------------------------------------------- | ------------- | ---------------------------------------------------- |
+| `--font-size-md` (body, body-strong, task text, labels) | 14/20         | 16/24                                                |
+| `--font-size-sm` (meta, label)                          | 12/16         | 13/16                                                |
+| `--icon-md` (every control glyph)                       | 20            | 24                                                   |
+| `--icon-btn-size` (round icon buttons)                  | 40 (`ctl-md`) | 48 (`ctl-lg`)                                        |
+| Material buttons and button toggles                     | 40, 14px      | 48, 16px (`mat-button-compact` stays 40)             |
+| `--task-first-line-min-height`, `--task-icon-size`      | 40            | 48 (a title-only row is 56, one with a meta line 60) |
+| `--task-title-line-height`, `--done-toggle-glyph-size`  | 20, 22        | 24, 24                                               |
+| `--planner-*` (Upcoming rows, chips, icons)             | 14/11, 20, 42 | 16/13, 24, 48                                        |
+
+Rules that follow from this:
+
+- A hit area on touch is at least 40px, and 48px for anything the thumb reaches often: header actions, task rows and their done toggle, bottom nav, field rows in the task detail sheet, settings categories.
+- Write row heights, icon sizes and text through the tokens above. A literal `40px` or `20px` in component SCSS does not scale; it silently keeps the pointer size on a phone.
+- Rows that sit in the task column (the add-task row, repeat rows) derive their indent from `--task-icon-size`, so the "+" and the label stay on the cards' columns when the slot grows.
+- Text-entry fields were already 16/24 on touch; the rest of the UI now matches them, so a focused field no longer looks larger than the text around it.
+- The planner's week strip keeps its 40px row (`ROW_HEIGHT` is shared with the drag-to-expand math), but its month, weekday and day labels use the touch type sizes.
 
 ### Layout
 
-| Token                   | Value                       | Notes                                              |
-| ----------------------- | --------------------------- | -------------------------------------------------- |
-| `--page-gutter`         | 8px, 16px ≥ 600, 24px ≥ 960 | Page content's one left edge                       |
-| `--component-max-width` | `clamp(800px, 65vw, 960px)` | 900–1000px on iPad (`body.isIPad`)                 |
-| `--bar-height-large`    | 56px                        | Header band and brand row                          |
-| `--side-nav-width`      | 260px                       | Side nav panel, expanded                           |
-| `--bottom-nav-height`   | 56px                        | Phone bottom nav (48px pills, 4px above and below) |
-| `--dialog-gutter`       | 16px, 24px ≥ 600            | Dialog title, content and actions inset            |
-| `--dialog-w-s/m/l`      | 440 / 560 / 720px           | Dialog widths, see [Dialogs](#dialogs)             |
+| Token                                       | Value                                | Notes                                                                      |
+| ------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| `--page-gutter`                             | 8px, 16px ≥ 600, 24px ≥ 960          | Page content's one left edge                                               |
+| `--component-max-width`                     | `clamp(800px, 65vw, 960px)`          | 900–1000px on iPad (`body.isIPad`)                                         |
+| `--bar-height-large`                        | 56px                                 | Header band and brand row                                                  |
+| `--side-nav-width`                          | 260px                                | Side nav panel, expanded                                                   |
+| `--bottom-nav-pill-height`                  | 64px                                 | The phone's floating nav pill (four 56px destinations, 4px inside it)      |
+| `--bottom-nav-height`                       | 80px                                 | The strip the pill occupies: pill plus 8px above and below                 |
+| `--shell-inset-top`, `--shell-inset-bottom` | 0; 56 and 80 + safe area below 600px | How far a page's scroller pads itself clear of the floating header and nav |
+| `--dialog-gutter`                           | 16px, 24px ≥ 600                     | Dialog title, content and actions inset                                    |
+| `--dialog-w-s/m/l`                          | 440 / 560 / 720px                    | Dialog widths, see [Dialogs](#dialogs)                                     |
 
 ### Legacy aliases
 
@@ -322,11 +351,26 @@ Rules:
 - **View switchers** (Plugins Installed/Discover, Appearance Dark mode) are a `mat-button-toggle-group`: 40px, `--r-md`, the chosen segment is the tonal "selected" role. A toggle button's role is `radio`.
 - **Selection** is one role: the active side-nav row, the open settings category, a pressed segment, the chosen customizer entry and the task open in the detail panel share `--palette-selected` / `--palette-selected-ink`. Filled accent (`--palette-accent` with `--palette-accent-ink`) is for the single primary action of a surface.
 
+## Phone shell
+
+Below 600px the shell is two floating glass surfaces over a full-height page, as
+on iOS: the header and the bottom nav hover over the content, and what scrolls
+behind them is blurred.
+
+- **Header:** an overlay (`position: absolute` in `app.component.scss`), the same frosted frame as on desktop (`--glass-panel-bg`, `--glass-blur`), 56px tall.
+- **Bottom nav:** a floating pill, `--r-full`, `--elev-2`, `--s` above the safe area and `--s2` from each side (at most 576px wide, centred). Exactly four labelled destinations: **Today, Upcoming, Inbox, Browse**. Each is a 24px icon over a one-line meta label in a 56px pill-shaped hit area; the open destination is the tonal "selected" role with a filled glyph. It has no add button and no per-user slot: **Browse** opens the side nav as the drawer, which also lists the right-panel toggles (Project Notes, Issue Provider Panel, plugin panels) that the header carries from 600px up. Upcoming is hidden when the Planner is switched off. Glass off gives the same pill with an opaque `--bottom-nav-bg`.
+- **Content:** a page's scroller pads itself by `--shell-inset-top` and `--shell-inset-bottom` so its first and last rows rest clear of both surfaces while the rest scrolls behind them. A page that is the scroller (secondary pages) gets this from `.route-wrapper > router-outlet + *` in `app.component.scss`; a page that scrolls an inner element pads that element and is excluded there (the work-view `.today`, the planner's `planner-plan-view`, the search page's results). A new page either is its own scroller or pads its inner one; it never adds its own bottom space for the nav.
+- **Browse drawer:** the destinations the bar and Settings already reach are not repeated in it. It leaves out Today, Inbox and Upcoming (bar), Plugins & integrations and Account (rows at the end of Settings' category list) and Support us (an entry in Help); it adds the right-panel toggles. A nav item flagged `desktopOnly` is skipped on a phone, one flagged `mobileOnly` is skipped above it; `MagicSideNavComponent.navigationItems` applies both, also to a menu's children, and drops any separator the hiding leaves first, last or doubled. The Projects and Tags headers keep only their "+" on a phone and put the other tools (show/hide, new folder) behind a ⋯ menu.
+- **Header:** the sync icon shows on a phone once sync is set up (so an error stays visible); setting it up lives under Account (a row at the end of Settings on a phone).
+- **Today:** the time summary row appears only when time has been worked or tasks are planned for today, never for overdue tasks' estimates alone.
+- Both insets are 0 from 600px up, so the same rules are inert on desktop.
+- The header's banner row stays inside the header, so a banner covers the first rows while it is shown.
+
 ## Page layout
 
 Secondary pages (Habits, Recurring tasks, Archived projects, Metrics, Worklog and History, Daily summary, Support us) are one column:
 
-- **Secondary-page column:** `.page-wrapper` puts the content at the page gutter (`--page-gutter`, the header title's left edge), 16px from the top and 72px from the bottom (FAB and bottom nav). `.component-wrapper` caps it at `--component-max-width` and stays aligned to the page gutter.
+- **Secondary-page column:** `.page-wrapper` puts the content at the page gutter (`--page-gutter`, the header title's left edge), 16px from the top and 72px from the bottom (16px on a phone, where the scroller already pads clear of the floating nav). `.component-wrapper` caps it at `--component-max-width` and stays aligned to the page gutter.
 - **Task lists:** `.task-list-wrapper` centres the bounded task column within its available pane, with equal inline margins. The summary, sections, task cards, add row and Finish Day align inside that column. Opening a side panel recentres the column within the remaining workspace; narrow screens keep the normal page gutters. Subtasks retain their indentation.
 - **Canvas pages** (Planner, Schedule, Boards) span the width and use the same gutter: day columns, the schedule toolbar and the board tabs and panels start at `--page-gutter`.
 - **No second page title.** The shell header names the page. Sections inside a report use the title role (`--type-title`), then the heading role (`--type-heading`); no centred headings. Report tables are `--r-md` hairline cards (`.material-table`), never shadowed.
@@ -428,7 +472,7 @@ normaliser, never from component SCSS.
 
 | Tier    | Surfaces                                                  | Tint alpha (design) | Blur                      |
 | ------- | --------------------------------------------------------- | ------------------- | ------------------------- |
-| Frame   | Side nav, header, right panels, mobile bottom nav         | 75%                 | `--glass-blur` (20px)     |
+| Frame   | Side nav, header, right panels, the phone's floating nav  | 75%                 | `--glass-blur` (20px)     |
 | Canvas  | The content sheet behind the task list (`.route-wrapper`) | 84%                 | same, on the wrapper only |
 | Overlay | Full-width phone right panel (the phone drawer is solid)  | 95%                 | none                      |
 
@@ -483,7 +527,7 @@ Mixins are in `src/styles/mixins/_theming.scss`.
 - **Popups over the page** (global search, the description editor) are Material dialogs: opaque surface, `--r-lg`, `--elev-2`, one of the dialog sizes. The search popup uses the Settings window's surface (`.search-popup`, `settings-backdrop`), `dialogSize('l')` and sits near the top; Escape closes it and so does picking a result. The search page is shared with the phone route, so it takes an `isPopup` input rather than a second copy.
 - **Save / Discard dialogs** write nothing until Save. Discard, Escape and the backdrop leave the data as it was; Save is the single filled button, disabled until something changed.
 - **Task description** is the task's `notes` field. On the row it is one muted `--type-meta` line after the last tag, cut with an ellipsis where the row runs out; the full text is in a multi-line tooltip (`matTooltipClass="task-description-tooltip"`, defined once in `_overwrite-material.scss`). It adds no height: the row stays 56px.
-- **Add actions** live where the thing is added: the inline "Add task" row in each list or section. The header has no global "+"; quick capture is Shift+A and the phone's bottom-nav "+".
+- **Add actions** live where the thing is added: the inline "Add task" row in each list or section. The header has no global "+" and neither has the phone's bottom nav; quick capture is Shift+A.
 - **One list, many destinations:** a picker that can target a project or a section lists projects in tree order with their sections indented beneath, led by a dash. The current location is shown and disabled.
 
 ## Task rows (cards vs flat)
@@ -611,19 +655,19 @@ utility class from `util.scss`, which applies an `outline` on `:focus-visible` o
 
 ## Z-Index Layers
 
-| Variable                | Value | Purpose                  |
-| ----------------------- | ----- | ------------------------ |
-| `--z-check-done`        | 11    | Task done checkbox       |
-| `--z-main-header`       | 12    | Main header              |
-| `--z-task-title-focus`  | 32    | Focused task title       |
-| `--z-multi-select-bar`  | 45    | Multi-select action bar  |
-| `--z-mobile-bottom-nav` | 50    | Mobile bottom navigation |
-| `--z-side-nav`          | 60    | Side navigation          |
-| `--z-backdrop`          | 222   | Backdrop overlay         |
-| `--z-onboarding-hint`   | 998   | First-run hints          |
-| `--z-add-task-bar`      | 999   | Add task bar             |
-| `--z-search-bar`        | 999   | Search bar               |
-| `--z-tour`              | 1001  | Tour overlay             |
+| Variable                | Value | Purpose                   |
+| ----------------------- | ----- | ------------------------- |
+| `--z-check-done`        | 11    | Task done checkbox        |
+| `--z-main-header`       | 12    | Main header               |
+| `--z-task-title-focus`  | 32    | Focused task title        |
+| `--z-multi-select-bar`  | 45    | Multi-select action bar   |
+| `--z-mobile-bottom-nav` | 50    | Phone floating navigation |
+| `--z-side-nav`          | 60    | Side navigation           |
+| `--z-backdrop`          | 222   | Backdrop overlay          |
+| `--z-onboarding-hint`   | 998   | First-run hints           |
+| `--z-add-task-bar`      | 999   | Add task bar              |
+| `--z-search-bar`        | 999   | Search bar                |
+| `--z-tour`              | 1001  | Tour overlay              |
 
 Menus and dialogs (the CDK overlay container, 1000) cover the onboarding hint and
 the add-task bar.

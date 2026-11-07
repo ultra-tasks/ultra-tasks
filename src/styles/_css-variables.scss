@@ -210,6 +210,7 @@
   --ctl-sm: 32px; // compact: add-bar chips, in-row buttons, section headers
   --ctl-md: 40px; // default: buttons, icon buttons, nav rows, fields, menu items
   --ctl-lg: 48px; // touch surfaces: bottom nav, drawer rows, sheet rows
+  --icon-btn-size: var(--ctl-md); // round icon buttons; 48 on touch
 
   --s1-5: 12px; // 1.5 * 8px: icon-to-label gap in rows, menu item insets
   --s2: 16px; // 2 * 8px
@@ -448,6 +449,7 @@
   // Task Component
   // -----------------------------
   --task-first-line-min-height: var(--ctl-md);
+  --task-title-line-height: 20px; // 24 on touch
   // Width of a row's leading control slot (done-toggle, select ring, the repeat
   // icon on recurring-config rows) — shared so those rows' titles line up.
   --task-icon-size: var(--ctl-md);
@@ -494,6 +496,26 @@
   --focus-ring-color: var(--focus-ring, var(--palette-primary-500));
 }
 
+// The phone shell (below 600px) floats the header and the bottom nav over the
+// page, so content scrolls behind both. A page's scroller pads itself by these
+// two insets so its first and last rows rest clear of them; at 600px and up
+// the header and the side nav are in the layout flow and both are 0.
+:root {
+  --shell-inset-top: 0px;
+  --shell-inset-bottom: 0px;
+}
+// Declared on `body`, not `:root`: --bottom-nav-height lives in the body-scoped
+// block below, which `:root` cannot read.
+@media (max-width: 599px) {
+  body {
+    --shell-inset-top: var(--bar-height-large);
+    --shell-inset-bottom: calc(
+      var(--bottom-nav-height) + var(--bottom-nav-safe-area) +
+        var(--bottom-nav-extra-offset)
+    );
+  }
+}
+
 // Scale steps that follow the viewport or the input device.
 @media (min-width: 600px) {
   :root {
@@ -506,10 +528,40 @@
     --page-gutter: var(--s3);
   }
 }
-// Touch hit areas stay at least 40px: compact controls grow to the default.
+// Touch: hit areas stay at least 40px (compact controls grow to the default),
+// and text, icons and task rows step up one size so the app reads and taps
+// comfortably at arm's length. Fields are already 16/24 here (see
+// _overwrite-material.scss); this brings the rest of the UI to the same size.
 @media (pointer: coarse) {
   :root {
     --ctl-sm: var(--ctl-md);
+
+    // Body and task text 16/24 (14/20 on pointer devices), meta and labels 13/16.
+    --font-size-md: 16px;
+    --font-size-sm: 13px;
+    --type-body: 400 var(--font-size-md) / 24px var(--font-primary-stack);
+    --type-body-strong: var(--font-weight-medium) var(--font-size-md) / 24px
+      var(--font-primary-stack);
+
+    // Control glyphs 24 (20 on pointer devices): the glyph still equals its box.
+    --icon-md: 24px;
+    --icon-btn-size: var(--ctl-lg);
+
+    // Task rows and their done toggle grow to the touch row height (48), so a
+    // title-only row is 56 and one with a meta line 64.
+    --task-first-line-min-height: var(--ctl-lg);
+    --task-icon-size: var(--ctl-lg);
+    --task-title-line-height: 24px;
+    --done-toggle-glyph-size: 24px;
+
+    // Planner and Upcoming rows follow the same touch sizes (they were 13px
+    // text with 10px chips on phones).
+    --planner-item-height: var(--ctl-lg);
+    --planner-item-ico-size: var(--icon-md);
+    --planner-font-size: var(--font-size-md);
+    --planner-font-size-mobile: var(--font-size-md);
+    --planner-font-size-smaller: var(--font-size-sm);
+    --planner-font-size-smaller-mobile: var(--font-size-sm);
   }
 }
 
@@ -640,9 +692,12 @@ body.isDarkTheme {
   --button-warn-label: var(--ink-strong);
 
   --right-panel-bg: transparent;
-  --bottom-nav-height: var(
-    --s7
-  ); // 56px: icon pills are 48px (--ctl-lg) with 4px above and below
+  // The phone's floating nav: a 64px pill (four 56px labelled destinations with
+  // 4px inside it) that hovers --s above the bottom edge. --bottom-nav-height is
+  // the whole strip it occupies (pill plus --s above and below), which is what
+  // lists reserve so their last row can scroll clear of it.
+  --bottom-nav-pill-height: var(--s8);
+  --bottom-nav-height: calc(var(--bottom-nav-pill-height) + 2 * var(--s));
   --bottom-nav-extra-offset: 0px;
   --bottom-nav-bg: var(--sidenav-bg-mobile);
   --bottom-nav-shadow: var(--whiteframe-shadow-2dp);

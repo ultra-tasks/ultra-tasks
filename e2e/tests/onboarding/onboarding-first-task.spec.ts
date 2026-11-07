@@ -19,6 +19,12 @@ const INBOX_NAV_ITEM =
   'magic-side-nav nav-item[data-project-id="INBOX_PROJECT"] .nav-link';
 const TODAY_NAV_ITEM = 'magic-side-nav nav-item[data-tag-id="TODAY"] .nav-link';
 const MORE_FALLBACK = "There's more already switched on";
+const CREATE_TASK_HINT = 'Click Add task to add your first task';
+const CREATE_TASK_TOUCH_HINT = 'Tap Add task to add your first task';
+// The list's inline "Add task" row at every width: the phone bottom nav has no add button.
+const ADD_TASK_ROW = '.task-list-add-action';
+// The pulse glow around the target is 8px; the hint must stay clear of it.
+const MIN_HINT_GAP_PX = 8;
 
 /** First run; `withExamples: false` skips seeding the Inbox example tasks. */
 const openFreshApp = async (
@@ -62,6 +68,19 @@ const expectHintOnInboxChip = async (page: Page, taskTitle: string): Promise<voi
     .toBe(true);
 };
 
+/** Vertical gap between the Add task row and the hint (chip and arrow), above or below. */
+const gapBetweenAddRowAndHint = async (page: Page): Promise<number> => {
+  const row = await page.locator(ADD_TASK_ROW).first().boundingBox();
+  const chip = await page.locator('onboarding-hint .hint-chip').boundingBox();
+  const arrow = await page.locator('onboarding-hint .hint-arrow').boundingBox();
+  if (!row || !chip || !arrow) {
+    return -1;
+  }
+  const hintTop = Math.min(chip.y, arrow.y);
+  const hintBottom = Math.max(chip.y + chip.height, arrow.y + arrow.height);
+  return Math.max(hintTop - (row.y + row.height), row.y - hintBottom);
+};
+
 const addTaskViaComposer = async (page: Page, title: string): Promise<void> => {
   await openGlobalAddTaskBar(page);
   const composer = page.locator('add-task-bar.global');
@@ -79,9 +98,7 @@ test.describe('First-run onboarding', () => {
     const runtimeErrors = attachPageErrorCollector(page, 'onboarding defaults');
     installDevErrorDialogHandler(page, 'onboarding defaults');
     await openFreshApp(page, { withExamples: false });
-    await expect(page.locator('onboarding-hint')).toContainText(
-      'Click + to add your first task',
-    );
+    await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_HINT);
 
     const sideNav = page.locator('magic-side-nav');
     await expect(sideNav.getByText('Upcoming', { exact: true })).toBeVisible();
@@ -100,9 +117,7 @@ test.describe('First-run onboarding', () => {
     const runtimeErrors = attachPageErrorCollector(page, 'onboarding inbox');
     installDevErrorDialogHandler(page, 'onboarding inbox');
     await openFreshApp(page, { withExamples: true });
-    await expect(page.locator('onboarding-hint')).toContainText(
-      'Click + to add your first task',
-    );
+    await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_HINT);
 
     const title = `Inbox tip task ${Date.now()}`;
     await addTaskViaComposer(page, title);
@@ -185,37 +200,28 @@ test.describe('First-run onboarding', () => {
     await page.close();
   });
 
-  test('points at the bottom-nav + in a narrow window used with a mouse', async ({
+  test('points at the inline Add task row in a narrow window used with a mouse', async ({
     isolatedContext,
   }) => {
     const page = await isolatedContext.newPage();
     const runtimeErrors = attachPageErrorCollector(page, 'narrow mouse onboarding');
     installDevErrorDialogHandler(page, 'narrow mouse onboarding');
-    // Phone-width layout (bottom nav, no header +) with a fine pointer.
+    // Phone-width layout (bottom nav without an add button) with a fine pointer.
     await page.setViewportSize({ width: 400, height: 800 });
     await openFreshApp(page, { withExamples: false });
     await expect(page.locator('body')).toHaveClass(/isMousePrimary/);
 
     const hint = page.locator('onboarding-hint');
-    await expect(hint).toContainText('Click + to add your first task');
-    const addBtn = page.getByRole('button', { name: 'Add new task' });
-    // The hint, arrow included, sits fully above + once the bottom nav has settled.
+    await expect(hint).toContainText(CREATE_TASK_HINT);
+    const addRow = page.getByRole('button', { name: 'Add task', exact: true }).first();
+    await expect(addRow).toHaveClass(/task-list-add-action/);
+    // The hint, arrow included, sits clear of the Add task row's pulse glow.
     await expect
-      .poll(async () => {
-        const btn = await addBtn.boundingBox();
-        const chip = await hint.locator('.hint-chip').boundingBox();
-        const arrow = await hint.locator('.hint-arrow').boundingBox();
-        return (
-          !!btn &&
-          !!chip &&
-          !!arrow &&
-          Math.max(chip.y + chip.height, arrow.y + arrow.height) <= btn.y
-        );
-      })
-      .toBe(true);
+      .poll(() => gapBetweenAddRowAndHint(page))
+      .toBeGreaterThanOrEqual(MIN_HINT_GAP_PX);
 
-    await addBtn.click();
-    await expect(page.locator('add-task-bar.global')).toBeVisible();
+    await addRow.click();
+    await expect(page.locator('add-task-bar')).toBeVisible();
     assertNoRuntimeBrowserErrors(runtimeErrors, 'narrow mouse onboarding');
     await page.close();
   });
@@ -308,7 +314,7 @@ test.describe('First-run onboarding', () => {
     installDevErrorDialogHandler(page, 'onboarding tour');
     await openFreshApp(page, { withExamples: true });
     const hint = page.locator('onboarding-hint');
-    await expect(hint).toContainText('Click + to add your first task');
+    await expect(hint).toContainText(CREATE_TASK_HINT);
 
     await page.locator('magic-side-nav').getByText('Help', { exact: true }).click();
     await page.getByText('How to: Create a task', { exact: true }).click();
@@ -328,7 +334,7 @@ test.describe('First-run onboarding', () => {
   test.describe('mobile', () => {
     test.use(pixel5TestOptions);
 
-    test('keeps + uncovered, then teaches swiping and the Inbox', async ({
+    test('keeps Add task uncovered, then teaches swiping and the Inbox', async ({
       isolatedContext,
     }) => {
       const page = await isolatedContext.newPage();
@@ -340,24 +346,24 @@ test.describe('First-run onboarding', () => {
       expect(userAgent).toContain('Pixel 5');
       expect(userAgent).toContain('PLAYWRIGHT-WORKER-');
 
-      await expect(page.locator('onboarding-hint')).toContainText(
-        'Tap + to add your first task',
-      );
-      // The hint sits above the + button, clear of its pulse glow and the arrow.
-      const addBtn = await page.locator('.add-task-button').boundingBox();
+      await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_TOUCH_HINT);
+      // The hint sits clear of the Add task row's pulse glow and the arrow.
       await expect
-        .poll(async () => {
-          const chip = await page.locator('onboarding-hint .hint-chip').boundingBox();
-          return chip ? addBtn!.y - (chip.y + chip.height) : -1;
-        })
-        .toBeGreaterThanOrEqual(16);
+        .poll(() => gapBetweenAddRowAndHint(page))
+        .toBeGreaterThanOrEqual(MIN_HINT_GAP_PX);
 
-      await page.getByRole('button', { name: 'Add new task' }).tap();
-      const input = page.locator('add-task-bar.global .main-input');
+      await page.locator(ADD_TASK_ROW).first().tap();
+      const input = page.locator('add-task-bar .main-input');
       await input.fill('My first mobile task');
       await input.press('Enter');
+      // The inline composer stays open after a task; close it so the swipe tip,
+      // placed next to the task, is not covered.
+      await expect(
+        page.locator('task').filter({ hasText: 'My first mobile task' }),
+      ).toHaveCount(1);
+      await input.press('Escape');
 
-      await expect(page.locator('add-task-bar.global')).toBeHidden();
+      await expect(page.locator('add-task-bar')).toBeHidden();
       const hint = page.locator('onboarding-hint');
       await expect(hint).toContainText('Swipe task left for more actions');
       const task = page
@@ -373,19 +379,19 @@ test.describe('First-run onboarding', () => {
         .toBe(true);
 
       // Marking the task done (swipe right or checkbox) leads to the last tip,
-      // on the task's "Inbox" chip, saying where the Inbox is on phones.
+      // on the task's "Inbox" chip.
       await task.locator('done-toggle').tap();
       await expect(hint).toContainText(MODEL_TIP);
-      await expect(hint).toContainText('Inbox, under ☰');
+      await expect(hint).toContainText(INBOX_TIP);
       await expectHintOnInboxChip(page, 'My first mobile task');
       // The tip would sit above the opened menu: it steps aside until it closes.
-      await page.locator('mobile-bottom-nav nav > button:last-of-type').tap();
-      await expect(page.locator(INBOX_NAV_ITEM)).toBeVisible();
+      await page.locator('mobile-bottom-nav .e2e-bottom-nav-browse').tap();
+      // The drawer no longer lists Inbox (the bar has it), so it is the drawer itself.
+      await expect(page.locator('.nav-sidenav.mobile')).toBeVisible();
       await expect(hint).toHaveCount(0);
       await page.locator('.mobile-menu-close').tap();
-      await expect(page.locator(INBOX_NAV_ITEM)).toBeHidden();
+      await expect(page.locator('.nav-sidenav.mobile')).toBeHidden();
       await expect(hint).toContainText(INBOX_TIP);
-      await expect(hint).toContainText('Inbox, under ☰');
       await hint.getByRole('button', { name: 'Close tip' }).tap();
       await expect(hint).toHaveCount(0);
       assertNoRuntimeBrowserErrors(runtimeErrors, 'mobile onboarding');
@@ -400,14 +406,17 @@ test.describe('First-run onboarding', () => {
       installDevErrorDialogHandler(page, 'onboarding delete');
 
       await openFreshApp(page, { withExamples: false });
-      await expect(page.locator('onboarding-hint')).toContainText(
-        'Tap + to add your first task',
-      );
-      await page.getByRole('button', { name: 'Add new task' }).tap();
-      const input = page.locator('add-task-bar.global .main-input');
+      await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_TOUCH_HINT);
+      await page.locator(ADD_TASK_ROW).first().tap();
+      const input = page.locator('add-task-bar .main-input');
       await input.fill('Task to delete');
       await input.press('Enter');
-      await expect(page.locator('add-task-bar.global')).toBeHidden();
+      await expect(
+        page.locator('task').filter({ hasText: 'Task to delete' }),
+      ).toHaveCount(1);
+      // The inline composer stays open after a task.
+      await input.press('Escape');
+      await expect(page.locator('add-task-bar')).toBeHidden();
 
       const hint = page.locator('onboarding-hint');
       await expect(hint).toContainText('Swipe task left for more actions');
@@ -447,33 +456,24 @@ test.describe('First-run onboarding', () => {
         });
       });
       await openFreshApp(page, { withExamples: false });
-      await expect(page.locator('onboarding-hint')).toContainText(
-        'Tap + to add your first task',
-      );
+      await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_TOUCH_HINT);
 
-      const addBtn = page.locator('.add-task-button');
-      const expectHintClearOfAddBtn = (): Promise<void> =>
+      const addRow = page.locator(ADD_TASK_ROW).first();
+      const expectHintClearOfAddRow = (): Promise<void> =>
         expect
-          .poll(
-            async () => {
-              const btn = await addBtn.boundingBox();
-              const chip = await page.locator('onboarding-hint .hint-chip').boundingBox();
-              return btn && chip ? btn.y - (chip.y + chip.height) : -1;
-            },
-            { timeout: 6000 },
-          )
-          .toBeGreaterThanOrEqual(16);
+          .poll(() => gapBetweenAddRowAndHint(page), { timeout: 6000 })
+          .toBeGreaterThanOrEqual(MIN_HINT_GAP_PX);
       // AppComponent drops the entrance class after 1.5s, cutting the stretched
       // slide short (animationcancel, no animationend); the hint must follow.
       await expect(page.locator('.mobile-bottom-nav')).not.toHaveClass(/entrance/);
-      await expectHintClearOfAddBtn();
+      await expectHintClearOfAddRow();
 
       await page.mouse.move(10, 10);
       await expect(page.locator('body')).toHaveClass(/isMousePrimary/);
-      // Once the nav has settled, the hint must sit clear above the + button again.
-      await expectHintClearOfAddBtn();
-      await addBtn.click();
-      await expect(page.locator('add-task-bar.global')).toBeVisible();
+      // Once the nav has settled, the hint must sit clear of the Add task row again.
+      await expectHintClearOfAddRow();
+      await addRow.click();
+      await expect(page.locator('add-task-bar')).toBeVisible();
       await page.close();
     });
 
@@ -485,15 +485,13 @@ test.describe('First-run onboarding', () => {
       installDevErrorDialogHandler(page, 'hybrid onboarding');
 
       await openFreshApp(page, { withExamples: false });
-      await expect(page.locator('onboarding-hint')).toContainText(
-        'Tap + to add your first task',
-      );
+      await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_TOUCH_HINT);
 
       await page.mouse.move(10, 10);
       await expect(page.locator('body')).toHaveClass(/isMousePrimary/);
-      await page.getByRole('button', { name: 'Add new task' }).click();
+      await page.locator(ADD_TASK_ROW).first().click();
 
-      const composer = page.locator('add-task-bar.global');
+      const composer = page.locator('add-task-bar');
       const input = composer.locator('.main-input');
       await input.fill('First hybrid task');
       await input.press('Enter');

@@ -13,9 +13,10 @@ test.describe('Mobile WebKit smoke', () => {
     await expect(page).toHaveURL(/\/#\/tag\/TODAY\/tasks/);
     await expect(page.locator('task-list').first()).toBeVisible();
 
-    await mobileNav.getByRole('button', { name: 'Add new task', exact: true }).tap();
+    // The bottom nav has no add button: phones add through the list's inline row.
+    await page.locator('.task-list-add-action').first().tap();
     const taskTitle = `${testPrefix}-MobileWebKit`;
-    const addTaskInput = page.locator('add-task-bar.global .main-input');
+    const addTaskInput = page.locator('add-task-bar .main-input');
     await expect(addTaskInput).toBeVisible();
     await addTaskInput.fill(taskTitle);
     await page.locator('.e2e-add-task-submit').tap();

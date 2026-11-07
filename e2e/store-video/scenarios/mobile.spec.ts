@@ -7,7 +7,7 @@
  *
  *   Lead-in       Black fades to SP work-view (mobile layout).
  *   1  "On the go." tagline overlay.
- *   2  Tap "+"   → quick add task, type, confirm.
+ *   2  Tap "Add task" → inline quick add, type, confirm.
  *   3  Tap focus → select the captured task and start a focus session.
  *   4  End card  "Mobile · iOS · Android" with stat counter.
  *
@@ -56,28 +56,29 @@ test.describe('@video mobile reel', () => {
     void b1.hide();
     await page.waitForTimeout(220);
 
-    // ── Beat 2 — Tap + → quick capture ───────────────────────────────────
+    // ── Beat 2 — Tap Add task → quick capture ────────────────────────────
     markScene(page, 'Tap to capture.');
     const b2 = await showOverlay(page, 'Tap to capture.');
     await page.waitForTimeout(600);
     await b2.hide();
-    const fab = page.locator('mobile-bottom-nav button.add-task-button');
-    await tapCenter(page, fab);
-    const globalInput = page.locator('add-task-bar.global .main-input').first();
-    await expect(globalInput).toBeVisible({ timeout: 5_000 });
+    // The bottom nav has no add button; phones add through the list's inline row.
+    const addRow = page.locator('.task-list-add-action').first();
+    await expect(addRow).toBeVisible();
+    // Centre it so the floating bottom nav does not cover the tap target.
+    await addRow.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await tapCenter(page, addRow);
+    const composerInput = page.locator('add-task-bar .main-input').first();
+    await expect(composerInput).toBeVisible({ timeout: 5_000 });
     await page.waitForTimeout(220);
-    await globalInput.pressSequentially(NEW_TASK_TITLE, { delay: 55 });
+    await composerInput.pressSequentially(NEW_TASK_TITLE, { delay: 55 });
     await page.waitForTimeout(360);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(500);
     const newTask = page.locator('task').filter({ hasText: NEW_TASK_DISPLAY }).first();
     await expect(newTask).toBeVisible({ timeout: 5_000 });
-    const backdrop = page.locator('.backdrop').first();
-    if (await backdrop.isVisible().catch(() => false)) {
-      await backdrop.click({ force: true });
-      await expect(backdrop).toBeHidden({ timeout: 2_000 });
-    }
-    await expect(page.locator('add-task-bar.global').first()).toBeHidden({
+    // The inline composer stays open after a task; close it.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('add-task-bar').first()).toBeHidden({
       timeout: 3_000,
     });
     await page.waitForTimeout(220);

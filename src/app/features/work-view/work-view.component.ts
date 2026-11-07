@@ -297,6 +297,20 @@ export class WorkViewComponent implements OnInit, OnDestroy {
     initialValue: 0,
   });
   workingToday = toSignal(this.workContextService.workingToday$, { initialValue: 0 });
+  private readonly _isHasTasksToWorkOn = toSignal(
+    this.workContextService.isHasTasksToWorkOn$,
+    { initialValue: false },
+  );
+  /**
+   * The time summary needs something to summarise: time already worked, or an
+   * estimate for tasks that are planned. With nothing planned (overdue tasks
+   * alone still carry an estimate) the row only repeats the empty state under it.
+   */
+  readonly isShowStatusBar = computed(
+    () =>
+      this.workingToday() > 0 ||
+      (this._isHasTasksToWorkOn() && this.estimateRemainingToday() > 0),
+  );
   breakTimeToday = toSignal(this.workContextService.breakTimeToday$, {
     initialValue: 0,
   });

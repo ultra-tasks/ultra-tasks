@@ -2,9 +2,11 @@
 
 :host {
   display: block;
-  // Field rows are one control height; Material reads these for the panels.
-  --mat-expansion-header-collapsed-state-height: var(--ctl-md);
-  --mat-expansion-header-expanded-state-height: var(--ctl-md);
+  // Field rows are one control height (the 48px sheet-row height on touch);
+  // Material reads these for the panels.
+  --detail-row-height: var(--ctl-md);
+  --mat-expansion-header-collapsed-state-height: var(--detail-row-height);
+  --mat-expansion-header-expanded-state-height: var(--detail-row-height);
 
   &:focus {
     outline: none;
@@ -13,6 +15,10 @@
   &.color-warn .input-item__value {
     color: var(--text-color) !important;
     font-weight: bold;
+  }
+
+  @media (pointer: coarse) {
+    --detail-row-height: var(--ctl-lg);
   }
 }
 
@@ -154,13 +160,13 @@
   position: relative;
   display: flex;
   align-items: center;
-  height: var(--ctl-md);
+  height: var(--detail-row-height);
   cursor: pointer;
   color: var(--text-color);
 
   &.full-size {
     height: auto;
-    min-height: var(--ctl-md);
+    min-height: var(--detail-row-height);
     align-items: flex-start;
     cursor: default;
   }
@@ -195,7 +201,7 @@
 
   .full-size & {
     min-width: 40px;
-    min-height: var(--ctl-md);
+    min-height: var(--detail-row-height);
     flex-grow: 0;
     margin-right: 0;
   }
@@ -224,7 +230,7 @@
     min-width: 40px;
     flex: 1;
     padding: var(--s-half) 0;
-    min-height: var(--ctl-md);
+    min-height: var(--detail-row-height);
 
     > * {
       display: block;

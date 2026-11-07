@@ -3,8 +3,8 @@
 
 // TODO rename to task title component
 
-// Touch keeps the 14px base (docs/styling-guide.md: "Task text stays at the
-// 14px base"). .display-value, the edit textarea and .height-measure all take
+// Touch follows the body role, 16/24 under `(pointer: coarse)` (docs/styling-guide.md,
+// "Touch scale"; 14/20 elsewhere). .display-value, the edit textarea and .height-measure all take
 // `font-size: inherit`, so setting it on the host moves all three at once —
 // raising only the textarea would desync that pair and mis-size the box
 // (#9641). Written out rather than via noIosFocusZoomOnTouch() because that

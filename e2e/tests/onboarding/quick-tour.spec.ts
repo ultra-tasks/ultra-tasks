@@ -268,32 +268,38 @@ test.describe('Quick tour', () => {
   test.describe('phone', () => {
     test.use(pixel5TestOptions);
 
-    test('organizes via ☰, then teaches the task menu on a new run', async ({
+    test('organizes via Browse, then teaches the task menu on a new run', async ({
       isolatedContext,
     }) => {
       const page = await isolatedContext.newPage();
       const runtimeErrors = attachPageErrorCollector(page, 'quick tour phone');
       installDevErrorDialogHandler(page, 'quick tour phone');
       await openFreshApp(page);
-      await page.getByRole('button', { name: 'Add new task' }).tap();
-      const input = page.locator('add-task-bar.global .main-input');
+      // The bottom nav has no add button: phones add through the list's inline row.
+      await page.locator('.task-list-add-action').first().tap();
+      const input = page.locator('add-task-bar .main-input');
       await input.fill('Phone tour task');
       await input.press('Enter');
-      await expect(page.locator('add-task-bar.global')).toBeHidden();
+      await expect(
+        page.locator('task').filter({ hasText: 'Phone tour task' }),
+      ).toHaveCount(1);
+      // The inline composer stays open after a task.
+      await input.press('Escape');
+      await expect(page.locator('add-task-bar')).toBeHidden();
       const hint = page.locator('onboarding-hint');
       await expect(hint).toContainText('Swipe task left');
 
       // Part 1 on phones often ends with the task done: no task steps follow.
       await page.locator('task').first().locator('done-toggle').tap();
-      await expect(hint).toContainText('under ☰');
+      await expect(hint).toContainText(INBOX_TIP);
       // The chip slides after the done task; a tap mid-slide can miss (run 39889225439).
       await expect(hint.locator('.hint-container')).not.toHaveClass(/is-sliding/);
       await hint.getByRole('button', { name: 'Show me more ›' }).tap();
-      await expect(hint).toContainText('Projects and tags live under ☰');
+      await expect(hint).toContainText('Projects and tags live under Browse');
       await expect(hint).toContainText('1 of 3');
 
-      // ☰ opens the drawer; the tip moves to its Tags +.
-      await page.locator('.tour-navMenuBtn').tap();
+      // Browse opens the drawer; the tip moves to its Tags +.
+      await page.locator('mobile-bottom-nav .e2e-bottom-nav-browse').tap();
       const addTagBtn = page.locator('.nav-sidenav.mobile [data-nav-btn="add-tag"]');
       await expect(addTagBtn).toHaveClass(/onboarding-pulse/);
       await expect(hint).toContainText('Create one with +');
@@ -317,13 +323,13 @@ test.describe('Quick tour', () => {
       await expect(page).toHaveURL(/\/planner/);
       const card = page.locator('quick-tour-card');
       await expect(card).toContainText('3 of 3');
-      await expect(card).toContainText('Search everything from ☰');
+      await expect(card).toContainText('Search everything from Browse');
       await card.getByRole('button', { name: 'Done' }).tap();
       await expect(card).toHaveCount(0);
 
       // A new run with an undone task starts on its swipe menu.
       await page.goto('/#/tag/TODAY/tasks');
-      await page.getByRole('button', { name: 'Add new task' }).tap();
+      await page.locator('.task-list-add-action').first().tap();
       await input.fill('Second phone task');
       await input.press('Enter');
       // Past part 1 the composer stays open for the next task.
@@ -331,8 +337,8 @@ test.describe('Quick tour', () => {
         page.locator('task').filter({ hasText: 'Second phone task' }),
       ).toHaveCount(1);
       await input.press('Escape');
-      await expect(page.locator('add-task-bar.global')).toBeHidden();
-      await page.locator('.tour-navMenuBtn').tap();
+      await expect(page.locator('add-task-bar')).toBeHidden();
+      await page.locator('mobile-bottom-nav .e2e-bottom-nav-browse').tap();
       await page.getByText('Help', { exact: true }).first().tap();
       await page.getByText('Quick tour', { exact: true }).tap();
       await expect(hint).toContainText('Swipe a task left for its menu');

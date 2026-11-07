@@ -230,6 +230,24 @@
     flex-grow: 1;
     min-width: 0;
   }
+
+  // Touch: the time bubble matches the 48px row and its stacked time and
+  // meridiem read at the meta size (they were 9px in a 40px bubble).
+  @media (pointer: coarse) {
+    .time {
+      width: var(--ctl-lg);
+      height: var(--ctl-lg);
+      min-width: var(--ctl-lg);
+    }
+
+    .time-time {
+      max-width: none;
+
+      ::ng-deep span {
+        font-size: var(--font-size-sm);
+      }
+    }
+  }
 }
 
 .empty {

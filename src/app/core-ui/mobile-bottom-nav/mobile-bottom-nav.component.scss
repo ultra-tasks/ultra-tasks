@@ -4,51 +4,69 @@
   display: contents;
 }
 
+// The phone's navigation is a floating "widget": a pill that hovers over the
+// content with --s of air on every side (so the page scrolls behind it, see
+// app.component.scss), four labelled destinations, nothing else. Glass on makes
+// it frosted like the header (_glass.scss); glass off makes it an opaque
+// floating surface (--bottom-nav-bg, --elev-2).
 .mobile-bottom-nav {
   position: fixed;
-  bottom: var(--bottom-nav-extra-offset);
-  left: 0;
-  right: 0;
-  // Background fills the full height incl. the reserved system-bar area; the
-  // padding-bottom below keeps the buttons above it (see --bottom-nav-safe-area).
-  height: calc(var(--bottom-nav-height) + var(--bottom-nav-safe-area));
+  bottom: calc(var(--bottom-nav-safe-area) + var(--bottom-nav-extra-offset) + var(--s));
+  left: var(--s2);
+  right: var(--s2);
+  // Wide phones and small tablets keep a compact pill instead of a long bar.
+  max-width: calc(var(--s9) * 6);
+  margin-inline: auto;
+  height: var(--bottom-nav-pill-height);
   box-sizing: border-box;
-  background: var(--bottom-nav-bg);
-  border-top: 1px solid var(--separator-color);
-  // Flat nav bar: the top divider separates it from content; a resting shadow on
-  // top of it just reads as a floating bar.
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--s);
-  padding-bottom: var(--bottom-nav-safe-area);
-  z-index: var(--z-mobile-bottom-nav);
   display: flex;
+  align-items: stretch;
+  gap: var(--s-half);
+  padding: var(--s-half);
+  border-radius: var(--r-full);
+  background: var(--bottom-nav-bg);
+  box-shadow: var(--elev-2);
+  z-index: var(--z-mobile-bottom-nav);
 
-  // Items are icon-only 48px pills (touch height), 4px above and below in the
-  // 56px bar.
+  // Each destination: a 24px icon over a one-line label, in a pill-shaped hit
+  // area that fills the bar's height (56px) and a quarter of its width.
   .nav-button {
     flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: var(--ctl-lg);
-    min-width: 0;
-    margin: 0 var(--s-half);
+    gap: var(--s-quarter);
+    margin: 0;
+    padding: 0 var(--s-half);
+    border: 0;
     border-radius: var(--r-full);
+    background: transparent;
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+    cursor: pointer;
     transition: var(--transition-standard);
+    transition-property: background-color, color;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 
-    // No `:active` here: as a `mat-button` it already has Material's
-    // pressed state layer and ripple.
     @include hoverWithPointer {
       background-color: var(--state-hover);
+      color: var(--text-color);
+    }
+
+    &:active {
+      background-color: var(--state-pressed);
     }
 
     &:focus-visible {
-      background-color: var(--state-focus);
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: calc(var(--focus-ring-offset) * -1);
     }
 
     mat-icon {
+      flex: none;
       font-size: var(--icon-lg);
       width: var(--icon-lg);
       height: var(--icon-lg);
@@ -56,97 +74,31 @@
       margin: 0;
     }
 
+    .nav-label {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     // Active is the one "selected" role (tonal fill, its paired ink, a filled
-    // glyph); the accent fill is reserved for the add button.
+    // glyph); the accent fill is reserved for a surface's primary action, and
+    // this bar has none.
     &.active {
       background: var(--palette-selected);
       color: var(--palette-selected-ink);
-      box-shadow: none;
-      margin-bottom: 0;
+      font-weight: var(--font-weight-semibold);
 
       mat-icon {
-        color: var(--palette-selected-ink);
         font-variation-settings: 'FILL' 1;
       }
-
-      // Maintain active state on hover/focus
-      &:hover,
-      &:focus {
-        background: var(--palette-selected);
-        color: var(--palette-selected-ink);
-      }
     }
-  }
-
-  // Zero-size anchor at the slot's top centre, so the destination menu opens
-  // above the bar instead of under the finger.
-  .slot-menu-anchor {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: 0;
-    height: 0;
-    pointer-events: none;
-  }
-
-  // The add button sits in the bar (no longer floating 24px above it, where it
-  // covered list content): a 48px accent circle, the bar's one filled control,
-  // with no shadow at rest.
-  .add-task-button {
-    flex: 0 0 var(--ctl-lg);
-    width: var(--ctl-lg);
-    height: var(--ctl-lg);
-    margin-left: var(--s);
-    margin-right: var(--s);
-    margin-bottom: 0;
-    box-shadow: none;
-    transition: var(--transition-standard);
-
-    @include hoverWithPointer {
-      transform: scale(1.05);
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
-
-    &.smaller {
-      flex-basis: var(--ctl-lg);
-      width: var(--ctl-lg);
-      height: var(--ctl-lg);
-    }
-
-    mat-icon {
-      font-size: var(--icon-lg);
-      width: var(--icon-lg);
-      height: var(--icon-lg);
-    }
-  }
-}
-
-// The multi-select bar takes the FAB's place while tasks are being selected
-// (class set on .app-container by the app shell; CSS only, so this core-ui
-// component stays independent of the tasks feature).
-:host-context(.is-multi-selecting) .add-task-button {
-  visibility: hidden;
-}
-
-// Material Design touch target improvements
-.nav-button,
-.add-task-button {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-
-  &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    // Keep the ring visible when the bar sits flush with the viewport edge.
-    outline-offset: calc(var(--focus-ring-offset) * -1);
   }
 }
 
 @keyframes slide-up-from-bottom {
   from {
-    transform: translateY(100%);
+    transform: translateY(calc(100% + var(--s3)));
   }
 
   to {

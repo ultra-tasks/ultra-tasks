@@ -84,11 +84,38 @@ const SIDENAV_WIDTH_ANIMATION_DURATION_MS = 370;
 })
 export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
   readonly navigationItems = computed(() => {
-    const items = this.config().items;
-    return [
+    const isMobile = this.isMobile();
+    const isListed = (item: NavItem): boolean =>
+      isMobile ? !item.desktopOnly : !item.mobileOnly;
+    const items = this.config()
+      .items.filter(isListed)
+      .map((item) =>
+        item.type === 'menu'
+          ? { ...item, children: item.children.filter(isListed) }
+          : item,
+      );
+    const ordered = [
       ...items.filter((item) => item.id === 'search'),
       ...items.filter((item) => item.id !== 'search'),
     ];
+    // Hiding rows can leave a separator first or beside another one.
+    const tidy: NavItem[] = [];
+    for (const item of ordered) {
+      const previous = tidy[tidy.length - 1];
+      if (item.type === 'separator') {
+        if (!previous) {
+          continue;
+        }
+        if (previous.type === 'separator') {
+          tidy.pop();
+        }
+      }
+      tidy.push(item);
+    }
+    while (tidy[tidy.length - 1]?.type === 'separator') {
+      tidy.pop();
+    }
+    return tidy;
   });
 
   private readonly _destroyRef = inject(DestroyRef);

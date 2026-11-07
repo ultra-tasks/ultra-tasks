@@ -13,30 +13,79 @@
 
   @if (showLabels()) {
     <div class="additional-btns">
-      @for (btn of item().additionalButtons; track btn.id) {
-        @if (!btn.hidden) {
-          @if (btn.id === 'project-visibility') {
-            <button
-              #visibilityBtn
-              class="additional-btn"
-              mat-icon-button
-              [matTooltip]="btn.tooltip | translate"
-              [attr.aria-label]="btn.tooltip | translate"
-              [matMenuTriggerFor]="visibilityMenu"
-            >
-              <mat-icon>{{ btn.icon }}</mat-icon>
-            </button>
-          } @else {
-            <button
-              class="additional-btn"
-              mat-icon-button
-              [attr.data-nav-btn]="btn.id"
-              [matTooltip]="btn.tooltip | translate"
-              [attr.aria-label]="btn.tooltip | translate"
-              (click)="btn.action?.()"
-            >
-              <mat-icon>{{ btn.icon }}</mat-icon>
-            </button>
+      <!-- Phone: the "+" stays, the rest (visibility, new folder) sit behind
+           a ⋯ menu, so the header row is not a row of small icons. -->
+      @if (isPhone() && primaryButton(); as primary) {
+        <button
+          class="additional-btn more-btn"
+          mat-icon-button
+          type="button"
+          [matMenuTriggerFor]="moreMenu"
+          [attr.aria-label]="T.PS.REDESIGN.MORE | translate"
+        >
+          <mat-icon>more_horiz</mat-icon>
+        </button>
+        <button
+          class="additional-btn"
+          mat-icon-button
+          type="button"
+          [attr.data-nav-btn]="primary.id"
+          [attr.aria-label]="primary.tooltip | translate"
+          (click)="primary.action?.()"
+        >
+          <mat-icon>{{ primary.icon }}</mat-icon>
+        </button>
+        <mat-menu #moreMenu="matMenu">
+          @for (btn of overflowButtons(); track btn.id) {
+            @if (btn.id === 'project-visibility') {
+              <button
+                #visibilityBtn
+                mat-menu-item
+                type="button"
+                [matMenuTriggerFor]="visibilityMenu"
+              >
+                <mat-icon>{{ btn.icon }}</mat-icon>
+                <span>{{ btn.tooltip | translate }}</span>
+              </button>
+            } @else {
+              <button
+                mat-menu-item
+                type="button"
+                [attr.data-nav-btn]="btn.id"
+                (click)="btn.action?.()"
+              >
+                <mat-icon>{{ btn.icon }}</mat-icon>
+                <span>{{ btn.tooltip | translate }}</span>
+              </button>
+            }
+          }
+        </mat-menu>
+      } @else {
+        @for (btn of item().additionalButtons; track btn.id) {
+          @if (!btn.hidden) {
+            @if (btn.id === 'project-visibility') {
+              <button
+                #visibilityBtn
+                class="additional-btn"
+                mat-icon-button
+                [matTooltip]="btn.tooltip | translate"
+                [attr.aria-label]="btn.tooltip | translate"
+                [matMenuTriggerFor]="visibilityMenu"
+              >
+                <mat-icon>{{ btn.icon }}</mat-icon>
+              </button>
+            } @else {
+              <button
+                class="additional-btn"
+                mat-icon-button
+                [attr.data-nav-btn]="btn.id"
+                [matTooltip]="btn.tooltip | translate"
+                [attr.aria-label]="btn.tooltip | translate"
+                (click)="btn.action?.()"
+              >
+                <mat-icon>{{ btn.icon }}</mat-icon>
+              </button>
+            }
           }
         }
       }

@@ -46,9 +46,7 @@
   },
   "BN": {
     "SHOW_ISSUE_PANEL": "Issue Provider Panel",
-    "SHOW_NOTES": "Project Notes",
-    "SLOT_CHANGE_HINT": "Long-press to change this button",
-    "SLOT_MENU_LABEL": "Choose this button's destination"
+    "SHOW_NOTES": "Project Notes"
   },
   "CONFIRM": {
     "DELETE_SECTION": "Are you sure you want to delete this section? Tasks in it will be moved to the task list.",
@@ -3190,6 +3188,7 @@
     "ADD_NEW_TASK": "Add new task",
     "ADD_SECTION": "Add section",
     "BOARDS": "Boards",
+    "BROWSE": "Browse",
     "COPY_TASK_LIST_MARKDOWN": "Copy task list",
     "CREATE_PROJECT": "Create project",
     "CREATE_TAG": "Create tag",
@@ -3278,14 +3277,13 @@
   "ONBOARDING": {
     "HINTS": {
       "CREATE_TASK": "Click Add task to add your first task",
-      "CREATE_TASK_TOUCH": "Tap + to add your first task",
+      "CREATE_TASK_TOUCH": "Tap Add task to add your first task",
       "DECLINED": "No problem. It's under Help → Quick tour whenever you like.",
       "MORE_FALLBACK": "There's more already switched on: projects, time tracking, Upcoming…",
       "NO_THANKS": "No thanks",
       "SHOW_ME_MORE": "Show me more ›",
       "TASK_SWIPE_LEFT_TOUCH": "Swipe task left for more actions",
       "TODAY_AND_INBOX": "This task is planned for today, so it shows in {{todayIcon}} <b>Today</b>. Tasks without a project of your own stay in {{inboxIcon}} <b>Inbox</b>.",
-      "TODAY_AND_INBOX_PHONE": "This task is planned for today, so it shows in {{todayIcon}} <b>Today</b>. Tasks without a project of your own stay in {{inboxIcon}} <b>Inbox</b>, under ☰.",
       "OR_PRESS": "or press",
       "SKIP_ARIA": "Close tip"
     },
@@ -3295,7 +3293,7 @@
       "NEXT": "Next ›",
       "ORGANIZE": "Make a <b>project</b> of your own to group tasks, or a <b>tag</b> to label them. Create one with +",
       "ORGANIZE_COLLAPSED": "Make a <b>project</b> of your own to group tasks, or a <b>tag</b> to label them. Expand the side nav with {{expandIcon}} to create one",
-      "ORGANIZE_PHONE": "Projects and tags live under ☰. Make a <b>project</b> of your own to group tasks, or a <b>tag</b> to label them",
+      "ORGANIZE_PHONE": "Projects and tags live under <b>Browse</b>. Make a <b>project</b> of your own to group tasks, or a <b>tag</b> to label them",
       "PLANNER": "Plan the next days in {{plannerIcon}} <b>Upcoming</b>",
       "TASK_MENU_TOUCH": "Swipe a task left for its menu: {{playIcon}} <b>Start tracking time</b>, {{subtaskIcon}} <b>Add subtask</b>",
       "TASK_MENU_TOUCH_NO_TRACKING": "Swipe a task left for its menu, e.g. {{subtaskIcon}} <b>Add subtask</b>",
@@ -3315,7 +3313,7 @@
       "PLUGINS": "<b>Plugins & integrations</b> · Jira, GitHub, CalDAV and more",
       "SCHEDULE": "<b>Calendar</b> · Your day on a timeline",
       "SEARCH": "Search everything with <kbd>{{key}}</kbd>.",
-      "SEARCH_PHONE": "Search everything from ☰.",
+      "SEARCH_PHONE": "Search everything from Browse.",
       "SHORT_SYNTAX": "Type <code>#tag</code>, <code>+project</code> or <code>@tomorrow</code> while adding a task. Help → How to shows more.",
       "SYNC": "Your data stays on this device. Sync and backups are in Settings.",
       "TITLE": "Want more?"

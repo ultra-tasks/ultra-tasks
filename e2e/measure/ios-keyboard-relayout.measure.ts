@@ -28,7 +28,7 @@
  *   same element. Identical invalidation scope, so this is the pair that isolates
  *   "custom property"; root-vs-leaf alone only isolates "inheritance scope".
  * - `leaf-custom-property` — the same custom-property write aimed at a small
- *   subtree (the FAB, ~6 elements) instead of the root.
+ *   subtree (the inline Add task button, a couple of elements) instead of the root.
  * - `plain-property` — a non-inherited property (`padding-top`) on the root.
  * - `shell-height-write` — the `height` + `min-height` that `IosKeyboardService`
  *   drives onto `.app-container` while the keyboard animates.
@@ -342,9 +342,9 @@ const measureCssVarWrites = async (
   page.evaluate(
     ({ keyboardHeightVar, propertyKind, writeCount }) => {
       const root = document.documentElement;
-      const leaf = document.querySelector('.add-task-button') as HTMLElement | null;
+      const leaf = document.querySelector('.task-list-add-action') as HTMLElement | null;
       if (propertyKind === 'leaf-custom-property' && !leaf) {
-        throw new Error('.add-task-button missing — no leaf to write to');
+        throw new Error('.task-list-add-action missing — no leaf to write to');
       }
       const lastRow = (): Element | null => {
         const rows = document.querySelectorAll('task');
