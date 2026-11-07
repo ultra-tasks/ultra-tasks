@@ -251,7 +251,7 @@ Server accounts are installation-specific. Preserve server ID and operator secre
 
 ## Remaining gates before publishing server version one
 
-- [x] Separate source builds and native tests without a neighboring client checkout or private dependency credentials. Public GHCR distribution remains subject to organization policy.
+- [x] Separate source builds and native tests without a neighboring client checkout or private dependency credentials. The server container package is public; final published-image acceptance remains required.
 - [ ] Own registry image, public installation bundle, source correspondence, retained notices, and an explicit client/SDK/server compatibility table are ready.
 - [x] Native account configuration reaches the container; setup generates stable installation secrets and enforces native enrollment policy.
 - [ ] Website -> account creation -> saved recovery key -> verified email -> dashboard -> two signed-in clients works against the final HTTPS origin.
