@@ -4,6 +4,9 @@ Status: In progress for the Ultra Tasks fork.
 Owner: Ultra Tasks maintainer.
 Tracking: feat/native-encrypted-accounts.
 Last verified against code: November 6, 2026, on the feature branch.
+Repository extraction, hosted onboarding, and personal sync scheduling are updated
+by the [server extraction and version one launch plan](2026-11-07-server-extraction-and-v1-launch.md).
+The native protocol and implemented security behavior below remain the starting point.
 Completion condition: Ship the milestones and their migration and acceptance
 checks; move the resulting contracts into maintained architecture, API,
 self-hosting, and user documentation, then retire this plan.

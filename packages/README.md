@@ -5,6 +5,8 @@ Ultra Tasks is distributed under [AGPL-3.0-only](../LICENSE), while inherited MI
 Use the package that owns the behavior. The Angular app composes these packages;
 package code must respect the [sync dependency boundaries](../docs/sync-and-op-log/package-boundaries.md).
 
+Server and account dashboard development is moving to [ultra-tasks/ultra-tasks-server](https://github.com/ultra-tasks/ultra-tasks-server). The local server/SDK source remains a compatibility snapshot until released packages replace client workspace dependencies. See the [extraction and v1 launch plan](../docs/plans/2026-11-07-server-extraction-and-v1-launch.md) before changing those packages.
+
 | Package                                          | Responsibility / starting point                                                                        |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | [account-crypto](account-crypto/README.md)       | Encrypted account vaults, password authentication client, recipient keys, and account portal           |

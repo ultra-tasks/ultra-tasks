@@ -49,6 +49,9 @@ must link to their replacement, and keep their original number.
 
 ## Active plans
 
+- [Server extraction and version one launch](plans/2026-11-07-server-extraction-and-v1-launch.md)
+  — separate server and Docker repository, native account sync, account dashboard,
+  Oracle deployment, and production release gates
 - [Native encrypted collaboration](plans/2026-11-05-native-encrypted-collaboration.md)
   — proposed Ultra Tasks fork direction: password accounts and 2FA, encrypted
   project sharing, periodic personal sync, near real-time shared sync, and one
