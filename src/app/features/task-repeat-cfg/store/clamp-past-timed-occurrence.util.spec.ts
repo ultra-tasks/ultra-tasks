@@ -8,7 +8,15 @@ describe('clampPastTimedOccurrence', () => {
     d.setHours(12, 0, 0, 0);
     return d;
   };
-  const todayStr = getDbDateStr();
+  let todayStr: string;
+
+  beforeEach(() => {
+    jasmine.clock().install();
+    jasmine.clock().mockDate(new Date(2026, 0, 15, 12));
+    todayStr = getDbDateStr();
+  });
+
+  afterEach(() => jasmine.clock().uninstall());
 
   it('returns the occurrence unchanged for non-timed cfgs (#7344 preservation)', () => {
     const pastDay = addDays(-20);

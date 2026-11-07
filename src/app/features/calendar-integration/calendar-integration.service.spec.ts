@@ -73,9 +73,14 @@ describe('CalendarIntegrationService', () => {
       ...overrides,
     }) as IssueProviderCalendar;
 
-  const todayIcalDate = getDbDateStr().replace(/-/g, '');
+  let MOCK_ICAL_DATA: string;
+  let MOCK_ICAL_DATA_2: string;
 
-  const MOCK_ICAL_DATA = `BEGIN:VCALENDAR
+  beforeEach(() => {
+    // Refresh per case so a suite that crosses midnight keeps today's events.
+    const todayIcalDate = getDbDateStr().replace(/-/g, '');
+
+    MOCK_ICAL_DATA = `BEGIN:VCALENDAR
 VERSION:2.0
 BEGIN:VEVENT
 DTSTART:${todayIcalDate}T100000Z
@@ -85,7 +90,7 @@ UID:test-event-1
 END:VEVENT
 END:VCALENDAR`;
 
-  const MOCK_ICAL_DATA_2 = `BEGIN:VCALENDAR
+    MOCK_ICAL_DATA_2 = `BEGIN:VCALENDAR
 VERSION:2.0
 BEGIN:VEVENT
 DTSTART:${todayIcalDate}T140000Z
@@ -95,7 +100,6 @@ UID:test-event-2
 END:VEVENT
 END:VCALENDAR`;
 
-  beforeEach(() => {
     // Clear localStorage before each test
     localStorage.clear();
     subscriptions = [];
