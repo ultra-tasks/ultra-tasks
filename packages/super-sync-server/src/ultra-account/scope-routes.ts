@@ -11,7 +11,12 @@ import {
 } from '@ultra-tasks/account-crypto';
 import { registerScopeRecovery } from './scope-recovery-routes';
 import { UltraMembershipSchema, UltraMutationSchema } from '@sp/shared-schema';
-import { AccountError, authenticateAccount, type UltraConfig } from './security';
+import {
+  AccountError,
+  authenticateAccount,
+  verifyAccessToken,
+  type UltraConfig,
+} from './security';
 import {
   accountById,
   accountByIdentifier,
@@ -71,6 +76,20 @@ export const ultraScopeRoutes = async (
       method,
       url,
       bodyLimit: 8 * 1024 * 1024,
+      // Runs before Fastify reads the body: every scope route needs a signed access
+      // token, so an anonymous caller is rejected without an 8 MB parse. The handler
+      // still does the full database-backed session check.
+      onRequest: async (req, reply) => {
+        try {
+          verifyAccessToken(config, req.headers.authorization);
+        } catch {
+          reply
+            .header('Cache-Control', 'no-store')
+            .code(401)
+            .send({ error: 'Invalid or expired credentials' });
+          return reply;
+        }
+      },
       config: {
         rateLimit: {
           max: 2000,

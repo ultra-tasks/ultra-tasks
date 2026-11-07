@@ -216,8 +216,7 @@ export class AccountClient {
     const unlocked = await unlockBundle(result.bundle, this.identity(result.account.id), {
       password,
     });
-    this.tokens = tokens;
-    this.refreshAt = Date.now() + 540000;
+    this.adoptTokens(tokens);
     this.account = result.account;
     this.bundle = result.bundle;
     this.unlocked = unlocked;
@@ -328,15 +327,18 @@ export class AccountClient {
       registrationRecord: registration.registrationRecord,
       bundle,
     };
-    this.tokens = await this.request<Tokens>('/password/finish', {
+    const tokens = await this.request<Tokens>('/password/finish', {
       changeToken: response.changeToken,
       registrationRecord: registration.registrationRecord,
       bundle,
       signature: await sign(this.unlocked.secrets.signingPrivateKey, proof),
     });
     this.bundle = bundle;
-    this.refreshAt = Date.now() + 540000;
     if (this.account) this.account.vaultVersion += 1;
+    // The server issued a fresh session: use its expiry and let the owner persist it,
+    // exactly as a refresh does, so a cached copy never holds the revoked tokens.
+    this.adoptTokens(tokens);
+    await this.onTokensChanged?.();
   }
   async recover(
     mailToken: string,

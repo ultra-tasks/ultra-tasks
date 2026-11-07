@@ -17,14 +17,30 @@ import java.io.ByteArrayInputStream
 class WebViewRequestHandler(private val activity: Activity, private val serviceHost: String) {
     private val CORS_SKIP_HEADER = "sp_cors_skip"
 
+    /**
+     * True only when the URL's parsed host is one the in-app WebView may stay on.
+     *
+     * This replaces a substring test on the whole URL, which let any page keep the
+     * JavaScript bridge attached just by putting "localhost" in its path or query
+     * (https://evil.example/?localhost).
+     */
+    private fun isInAppHost(url: String): Boolean {
+        val uri = Uri.parse(url)
+        val host = uri.host?.lowercase() ?: return false
+        if (host == "localhost" || host == "super-productivity.com" || host.endsWith(".super-productivity.com")) {
+            return true
+        }
+        val service = serviceHost.lowercase()
+        if (host != service.substringBefore(':')) return false
+        val servicePort = service.substringAfter(':', "").toIntOrNull()
+        return servicePort == null || uri.port == servicePort
+    }
+
     @Deprecated("Deprecated in Java")
     fun handleUrlLoading(view: WebView, url: String): Boolean {
         Log.v("TW", url)
         return if (url.startsWith("http://") || url.startsWith("https://")) {
-            if (url.contains("super-productivity.com") || url.contains("localhost") || url.contains(
-                    serviceHost
-                )
-            ) {
+            if (isInAppHost(url)) {
                 false
             } else {
                 activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))

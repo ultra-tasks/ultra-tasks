@@ -123,11 +123,16 @@ export const issueTokens = async (
   });
   return { accessToken, refreshToken, expiresIn: 600 };
 };
-export const authenticateAccount = async (
-  db: UltraDb,
+/**
+ * Checks only the bearer token's signature, audience, issuer and expiry, with no
+ * database access. Cheap enough to run before a request body is read, so anonymous
+ * callers cannot make the server parse large payloads. It does NOT prove the session
+ * is still live: `authenticateAccount` does that.
+ */
+export const verifyAccessToken = (
   config: UltraConfig,
   authorization?: string,
-): Promise<SessionRow> => {
+): { sid: string; sub: string } => {
   try {
     if (!authorization?.startsWith('Bearer ')) throw new Error();
     const decoded = jwt.verify(authorization.slice(7), config.authSecret, {
@@ -141,6 +146,18 @@ export const authenticateAccount = async (
       typeof decoded.sub !== 'string'
     )
       throw new Error();
+    return { sid: decoded.sid, sub: decoded.sub };
+  } catch {
+    throw new AccountError(401);
+  }
+};
+export const authenticateAccount = async (
+  db: UltraDb,
+  config: UltraConfig,
+  authorization?: string,
+): Promise<SessionRow> => {
+  try {
+    const decoded = verifyAccessToken(config, authorization);
     const row = await one<SessionRow>(
       db,
       Prisma.sql`SELECT * FROM ultra_sessions WHERE id=${decoded.sid} AND account_id=${decoded.sub} AND revoked=false AND expires_at>${BigInt(Date.now())} AND idle_expires_at>${BigInt(Date.now())}`,
