@@ -133,6 +133,25 @@ describe('TaskDetailPanelComponent', () => {
     fixture.detectChanges();
   });
 
+  it('reuses the panel history entry retained by reload', () => {
+    spyOnProperty(window.history, 'state', 'get').and.returnValue({
+      [HISTORY_STATE.TASK_DETAIL_PANEL]: true,
+    });
+    const push = spyOn(window.history, 'pushState');
+    component.ngOnInit();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('preserves router state when opening a new panel history entry', () => {
+    spyOnProperty(window.history, 'state', 'get').and.returnValue({ navigationId: 7 });
+    const push = spyOn(window.history, 'pushState');
+    component.ngOnInit();
+    expect(push).toHaveBeenCalledOnceWith(
+      { navigationId: 7, [HISTORY_STATE.TASK_DETAIL_PANEL]: true },
+      '',
+    );
+  });
+
   it('does not go back over a route that is replacing the panel', () => {
     spyOnProperty(window.history, 'state', 'get').and.returnValue({
       [HISTORY_STATE.TASK_DETAIL_PANEL]: true,

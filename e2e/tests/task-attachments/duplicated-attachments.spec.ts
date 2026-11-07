@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import type { RootState } from '../../../src/app/root-store/root-state';
 import { expect, test } from '../../fixtures/test.fixture';
 import { flushPendingWrites } from '../../utils/waits';
+import { closeDetailPanelIfOpen } from '../../utils/schedule-task-helper';
 
 const saveAttachment = async (page: Page, path: string): Promise<void> => {
   const dialog = page.locator('dialog-edit-task-attachment');
@@ -39,8 +40,7 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   await workViewPage.addTask('attachment-original');
   const original = taskPage.getTaskByText('attachment-original');
   const originalId = await original.getAttribute('id');
-  await original.focus();
-  await page.keyboard.press('i');
+  await taskPage.openTaskDetail(original);
   const panel = page.locator('task-detail-panel');
   await panel.locator('task-detail-item').filter({ hasText: 'Links & Files' }).click();
   await page
@@ -50,8 +50,7 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   await expect
     .poll(() => attachmentPath(page, originalId))
     .toBe('https://attachment.example.test/original');
-  await original.locator('.show-additional-info-btn').click();
-  await expect(panel).toBeHidden();
+  await closeDetailPanelIfOpen(page);
   await page.locator(`[id="${originalId}"]`).focus();
   await page.keyboard.press('Control+d');
   const copy = page.locator('task').filter({ hasText: '(copy)' });
@@ -60,8 +59,7 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   await expect
     .poll(() => attachmentPath(page, copyId))
     .toBe('https://attachment.example.test/original');
-  await copy.focus();
-  if (!(await panel.isVisible())) await page.keyboard.press('i');
+  await taskPage.openTaskDetail(copy);
   await panel.locator('.attachment').hover();
   await panel.locator('.edit-btn').click();
   await saveAttachment(page, 'https://attachment.example.test/copied');
@@ -71,15 +69,12 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   await flushPendingWrites(page);
   await page.reload();
   await workViewPage.waitForTaskList();
-  await page.locator(`[id="${originalId}"]`).focus();
-  if (!(await panel.isVisible())) await page.keyboard.press('i');
+  await taskPage.openTaskDetail(page.locator(`[id="${originalId}"]`));
   await expect
     .poll(() => attachmentPath(page, originalId))
     .toBe('https://attachment.example.test/original');
-  await page.locator(`[id="${originalId}"] .show-additional-info-btn`).click();
-  await expect(panel).toBeHidden();
-  await page.locator(`[id="${copyId}"]`).focus();
-  if (!(await panel.isVisible())) await page.keyboard.press('i');
+  await closeDetailPanelIfOpen(page);
+  await taskPage.openTaskDetail(page.locator(`[id="${copyId}"]`));
   await expect
     .poll(() => attachmentPath(page, copyId))
     .toBe('https://attachment.example.test/copied');
@@ -91,8 +86,7 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   await flushPendingWrites(page);
   await page.reload();
   await workViewPage.waitForTaskList();
-  await page.locator(`[id="${originalId}"]`).focus();
-  if (!(await panel.isVisible())) await page.keyboard.press('i');
+  await taskPage.openTaskDetail(page.locator(`[id="${originalId}"]`));
   await expect
     .poll(() => attachmentPath(page, originalId))
     .toBe('https://attachment.example.test/original');

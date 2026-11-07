@@ -537,7 +537,14 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   ngOnInit(): void {
-    window.history.pushState({ [HISTORY_STATE.TASK_DETAIL_PANEL]: true }, '');
+    // Reload retains the panel's history entry. Reuse it so closing the new
+    // panel returns to the page rather than another stale panel marker.
+    if (!window.history.state?.[HISTORY_STATE.TASK_DETAIL_PANEL]) {
+      window.history.pushState(
+        { ...window.history.state, [HISTORY_STATE.TASK_DETAIL_PANEL]: true },
+        '',
+      );
+    }
   }
 
   ngAfterViewInit(): void {
