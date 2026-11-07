@@ -1,4 +1,5 @@
 import { getDbDateStr } from '../../../util/get-db-date-str';
+import { localDateStrAt } from '../../../util/local-date-str.test-helper';
 
 describe('DialogEditTaskRepeatCfgComponent timezone test', () => {
   describe('startDate calculation from dueWithTime', () => {
@@ -44,17 +45,10 @@ describe('DialogEditTaskRepeatCfgComponent timezone test', () => {
         expectedInBerlin: '2025-01-17',
       });
 
-      // This creates a repeat config based on local interpretation of the timestamp
-      // In LA: starts on 2025-01-16
-      // In Berlin: starts on 2025-01-17
-      const tzOffset = new Date().getTimezoneOffset();
-      if (tzOffset > 0) {
-        // LA
-        expect(startDate).toBe('2025-01-16');
-      } else {
-        // Berlin
-        expect(startDate).toBe('2025-01-17');
-      }
+      // This creates a repeat config based on local interpretation of the
+      // timestamp: 2025-01-16 in LA, 2025-01-17 in Berlin, and in any other zone
+      // the local date of that instant.
+      expect(startDate).toBe(localDateStrAt(taskDueWithTime));
     });
   });
 });

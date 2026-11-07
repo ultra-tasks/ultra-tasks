@@ -2,6 +2,7 @@ import { mapSimpleMetrics } from './metric.util';
 import { Worklog } from '../worklog/worklog.model';
 import { Task } from '../tasks/task.model';
 import { BreakNr, BreakTime } from '../work-context/work-context.model';
+import { localDateStrAt } from '../../util/local-date-str.test-helper';
 
 describe('metric.util timezone test', () => {
   describe('mapSimpleMetrics', () => {
@@ -46,16 +47,9 @@ describe('metric.util timezone test', () => {
       });
 
       // The start should be the local date when the task was created
-      // In LA (UTC-8): 2025-01-16 at 10 PM local -> '2025-01-16'
-      // In Berlin (UTC+1): 2025-01-17 at 7 AM local -> '2025-01-17'
-      const tzOffset = new Date().getTimezoneOffset();
-      if (tzOffset > 0) {
-        // LA
-        expect(result.start).toBe('2025-01-16');
-      } else {
-        // Berlin
-        expect(result.start).toBe('2025-01-17');
-      }
+      // The local date in whatever zone this runs in: the 16th in LA (UTC-8,
+      // 10 PM), the 17th in Berlin (UTC+1, 7 AM).
+      expect(result.start).toBe(localDateStrAt(taskCreatedTime));
     });
 
     it('should find earliest task creation time', () => {

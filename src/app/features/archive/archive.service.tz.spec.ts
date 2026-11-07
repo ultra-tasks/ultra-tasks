@@ -1,4 +1,5 @@
 import { getDbDateStr } from '../../util/get-db-date-str';
+import { localDateStrAt } from '../../util/local-date-str.test-helper';
 
 describe('ArchiveService timezone test', () => {
   describe('todayStr calculation', () => {
@@ -39,16 +40,9 @@ describe('ArchiveService timezone test', () => {
         expectedInBerlin: '2025-01-17', // 8 AM same day
       });
 
-      // In LA (UTC-8): 2025-01-16 at 11 PM -> '2025-01-16'
-      // In Berlin (UTC+1): 2025-01-17 at 8 AM -> '2025-01-17'
-      const tzOffset = new Date().getTimezoneOffset();
-      if (tzOffset > 0) {
-        // LA
-        expect(todayStr).toBe('2025-01-16');
-      } else {
-        // Berlin
-        expect(todayStr).toBe('2025-01-17');
-      }
+      // The local date in whatever zone this runs in: the 16th in LA (UTC-8,
+      // 11 PM), the 17th in Berlin (UTC+1, 8 AM).
+      expect(todayStr).toBe(localDateStrAt(testTime));
     });
 
     it('should be used for sorting time tracking data', () => {

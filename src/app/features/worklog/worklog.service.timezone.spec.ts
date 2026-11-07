@@ -95,7 +95,10 @@ describe('WorklogService timezone fix', () => {
     // new Date('2024-01-15') creates Jan 15 00:00 UTC = Jan 14 16:00 PST
     // rangeStart is Jan 15 00:00 PST = Jan 15 08:00 UTC
     // So taskDate < rangeStart, and the task is excluded
-    if (currentTimezone === 'America/Los_Angeles') {
+    // Any zone behind UTC (a positive offset in minutes), not just LA: the UTC
+    // midnight of the first day falls before the local midnight that starts the
+    // range.
+    if (rangeStart.getTimezoneOffset() > 0) {
       // The bug would cause the first task to be excluded
       expect(buggyFilteredTasks.length).toBe(2);
       expect(buggyFilteredTasks.some((t) => t.dateStr === '2024-01-15')).toBe(

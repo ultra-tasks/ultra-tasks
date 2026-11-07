@@ -2,6 +2,7 @@ import { mapArchiveToWorklog } from './map-archive-to-worklog';
 import { EntityState } from '@ngrx/entity';
 import { Task } from '../../tasks/task.model';
 import { taskAdapter } from '../../tasks/store/task.adapter';
+import { localDateStrAt } from '../../../util/local-date-str.test-helper';
 
 describe('mapArchiveToWorklog timezone test', () => {
   describe('_getTimeSpentOnDay function behavior', () => {
@@ -46,22 +47,12 @@ describe('mapArchiveToWorklog timezone test', () => {
       // The task should be placed on the local date when it was done
       // In LA (UTC-8): 2025-01-16 at 10 PM local -> worklog for Jan 16
       // In Berlin (UTC+1): 2025-01-17 at 7 AM local -> worklog for Jan 17
-      const tzOffset = new Date().getTimezoneOffset();
-      const year2025 = result.worklog['2025'];
+      const expectedDateStr = localDateStrAt(taskDoneTime);
+      const [year, month, day] = expectedDateStr.split('-').map(Number);
+      const foundEntry = result.worklog[String(year)]?.ent[month]?.ent[day];
 
-      if (tzOffset > 0) {
-        // LA
-        // Should have entry for Jan 16
-        const foundEntry = year2025?.ent[1]?.ent[16];
-        expect(foundEntry).toBeDefined();
-        expect(foundEntry?.dateStr).toBe('2025-01-16');
-      } else {
-        // Berlin
-        // Should have entry for Jan 17
-        const foundEntry = year2025?.ent[1]?.ent[17];
-        expect(foundEntry).toBeDefined();
-        expect(foundEntry?.dateStr).toBe('2025-01-17');
-      }
+      expect(foundEntry).toBeDefined();
+      expect(foundEntry?.dateStr).toBe(expectedDateStr);
     });
 
     it('should fall back to created date when doneOn is not set', () => {
