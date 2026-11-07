@@ -24,7 +24,7 @@ const openActions = async (page: Page): Promise<void> => {
 
 /** Opens a submenu of the bulk menu (Estimate / Toggle tags / Move to project). */
 const openSubmenu = async (page: Page, text: string | RegExp): Promise<void> => {
-  await menuItem(page, text).click();
+  await menuItem(page, text).hover();
   await page.locator('.mat-mdc-menu-panel').nth(1).waitFor({ state: 'visible' });
   await waitForMenuSettled(page);
 };

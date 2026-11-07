@@ -18,9 +18,13 @@ test.describe.serial('Reminders View Task 4', () => {
   }) => {
     test.setTimeout(SCHEDULE_MAX_WAIT_TIME + 60000);
 
+    // Install the test clock before app timers are created. Installing it over
+    // live RxJS timers can leave callbacks referring to cancelled native IDs.
+    await page.clock.setSystemTime(new Date());
+    await page.reload();
     await workViewPage.waitForTaskList();
 
-    const start = Date.now() + 10000;
+    const start = Date.now() + 60000;
 
     // Add three tasks with reminders using test prefix
     const task1Name = `${testPrefix}-0 D task xyz`;
@@ -30,7 +34,9 @@ test.describe.serial('Reminders View Task 4', () => {
     // Add tasks - the helper now handles all the complexity
     await addTaskWithReminder(page, workViewPage, task1Name, start);
     await addTaskWithReminder(page, workViewPage, task2Name, start);
-    await addTaskWithReminder(page, workViewPage, task3Name, Date.now() + 5000);
+    await addTaskWithReminder(page, workViewPage, task3Name, start);
+    // Trigger all three only once setup is complete, independent of CI speed.
+    await page.clock.setSystemTime(new Date(start + 1000));
 
     // Wait for reminder dialog
     await page.waitForSelector(DIALOG, {

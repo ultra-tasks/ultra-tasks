@@ -29,6 +29,7 @@ import {
 } from 'rxjs/operators';
 import { T } from '../../../t.const';
 import { TaskService } from '../task.service';
+import { Router } from '@angular/router';
 import {
   expandAnimation,
   expandFadeAnimation,
@@ -149,6 +150,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   private readonly _issueSyncState = inject(IssueSyncStateService);
   private _translateService = inject(TranslateService);
   private _destroyRef = inject(DestroyRef);
+  private _router = inject(Router);
   private readonly _taskFocusService = inject(TaskFocusService);
   private _dateTimeFormatService = inject(DateTimeFormatService);
 
@@ -586,7 +588,10 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
         .clearImgHeaders()
         .catch(() => IssueLog.err('Jira image authentication cleanup failed'));
     }
-    if (window.history.state?.[HISTORY_STATE.TASK_DETAIL_PANEL]) {
+    if (
+      window.history.state?.[HISTORY_STATE.TASK_DETAIL_PANEL] &&
+      !this._router.currentNavigation()
+    ) {
       window.history.back();
     }
     window.clearTimeout(this._focusTimeout);

@@ -256,6 +256,9 @@ export const waitForMenuSettled = async (page: Page, timeout = 5000): Promise<vo
           const openTime = Number(panel.getAttribute('data-menu-open-time') ?? 0);
           return (
             (transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)') &&
+            !panel
+              .getAnimations()
+              .some((animation) => animation.playState === 'running') &&
             Date.now() - openTime >= 300
           );
         })

@@ -401,7 +401,7 @@ describe('InlineMarkdownComponent', () => {
     // outside the editor: it has to see a checklist while it is still being
     // typed, not only after the blur that commits it.
     it('offers the checklist actions for a checklist that is still being typed', async () => {
-      fixture.componentRef.setInput('isShowChecklistToggle', true);
+      fixture.componentRef.setInput('isShowChecklistToggle', false);
       await mountLiveEditor('not a checklist yet');
       expect(component.isCurrentlyChecklist()).toBe(false);
 

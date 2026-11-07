@@ -1,6 +1,5 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { ImportPage } from '../../pages/import.page';
-import { waitForPluginAssets } from '../../helpers/plugin-test.helpers';
 
 const HEADER =
   '"Folder Name","List Name","Title","Kind","Tags","Content","Is Check list",' +
@@ -46,7 +45,7 @@ const row = (cells: {
     .map((v) => `"${v.replace(/"/g, '""')}"`)
     .join(',');
 
-test.describe('TickTick import plugin', () => {
+test.describe('TickTick import', () => {
   test('imports a TickTick CSV backup into a new project', async ({
     page,
     workViewPage,
@@ -56,9 +55,6 @@ test.describe('TickTick import plugin', () => {
   }) => {
     test.setTimeout(90000);
     await workViewPage.waitForTaskList();
-    if (!(await waitForPluginAssets(page))) {
-      throw new Error('Plugin assets not available — run `npm run plugins:build`');
-    }
 
     const list = `${testPrefix}-Groceries`;
     const csv = [
@@ -79,24 +75,28 @@ test.describe('TickTick import plugin', () => {
 
     const importPage = new ImportPage(page);
     await importPage.navigateToImportPage();
-    await page.locator('file-imex button', { hasText: 'Import from TickTick' }).click();
-
-    const frame = page.frameLocator('plugin-index iframe');
-    await frame.locator('input[type="file"]').setInputFiles({
+    const importer = page.locator('file-imex');
+    await importer.getByRole('combobox').click();
+    await page.getByRole('option', { name: 'TickTick', exact: true }).click();
+    await importer.locator('input[type="file"]').setInputFiles({
       name: 'ticktick-backup.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from(csv, 'utf8'),
     });
-    await frame.getByRole('button', { name: 'Load preview' }).click();
-    await expect(frame.getByText(`${list} — tasks: 1, sub-tasks: 3`)).toBeVisible();
-    await frame.getByRole('button', { name: 'Import' }).click();
-    await expect(frame.getByRole('heading', { name: 'Import finished' })).toBeVisible({
+    await expect(importer.locator('.import-preview')).toContainText(list);
+    await importer.getByRole('button', { name: 'Import tasks', exact: true }).click();
+    await expect(
+      importer.getByRole('heading', { name: 'Imported projects' }),
+    ).toBeVisible({
       timeout: 30000,
     });
     await expect(
-      frame.getByText(`${list}: 1 of 1 tasks, 3 of 3 sub-tasks`),
+      importer.locator('.import-preview').getByText(`${list} · 4`, { exact: true }),
     ).toBeVisible();
-
+    await page
+      .getByRole('dialog', { name: 'Settings' })
+      .getByRole('button', { name: 'Close', exact: true })
+      .click();
     await projectPage.navigateToProjectByName(list);
     const root = taskPage.getTaskByText('Weekly shop').first();
     await expect(root).toBeVisible();

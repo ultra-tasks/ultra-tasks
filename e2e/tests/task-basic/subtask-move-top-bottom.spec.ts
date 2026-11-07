@@ -2,6 +2,7 @@ import { Locator, Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import { WorkViewPage } from '../../pages/work-view.page';
 import { TaskPage } from '../../pages/task.page';
+import { waitForMenuSettled } from '../../utils/waits';
 
 // Move to top/bottom for subtasks via keyboard and context menu (#9460, #6650),
 // and via context menu for top-level tasks in the project backlog.
@@ -29,8 +30,10 @@ const seedParentWithSubTasks = async (
 const clickReorderItem = async (page: Page, name: RegExp): Promise<void> => {
   const panels = page.locator('.mat-mdc-menu-panel');
   await expect(panels).toHaveCount(1);
-  await panels.getByRole('menuitem', { name: /reorder/i }).click();
+  await waitForMenuSettled(page);
+  await panels.getByRole('menuitem', { name: /reorder/i }).hover();
   await expect(panels).toHaveCount(2);
+  await waitForMenuSettled(page);
   await panels.last().getByRole('menuitem', { name }).click();
 };
 

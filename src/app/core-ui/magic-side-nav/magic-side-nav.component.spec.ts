@@ -2,12 +2,13 @@ import { TaskMultiDragService } from '../../features/tasks/task-multi-drag.servi
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { NavigationStart, provideRouter, Router } from '@angular/router';
 import { DragDropRegistry } from '@angular/cdk/drag-drop';
 import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { By } from '@angular/platform-browser';
 import { TranslateModule } from '@ngx-translate/core';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, of, Subject } from 'rxjs';
+import { HISTORY_STATE } from '../../app.constants';
 
 import { MagicSideNavComponent } from './magic-side-nav.component';
 import { MagicNavConfigService } from './magic-nav-config.service';
@@ -29,6 +30,29 @@ describe('MagicSideNavComponent', () => {
     isTagsExpanded: ReturnType<typeof signal<boolean>>;
     onNavItemClick: jasmine.Spy;
   };
+
+  it('closes the mobile drawer on navigation without going back over the new route', () => {
+    isXs.set(true);
+    let state: Record<string, unknown> = {
+      [HISTORY_STATE.MOBILE_NAVIGATION]: true,
+      navigationId: 42,
+    };
+    spyOnProperty(window.history, 'state', 'get').and.callFake(() => state);
+    (window.history.replaceState as jasmine.Spy).and.callFake((next) => (state = next));
+    fixture = TestBed.createComponent(MagicSideNavComponent);
+    fixture.componentInstance.showMobileMenuOverlay.set(true);
+    fixture.detectChanges();
+    state.navigationId = 42;
+
+    (TestBed.inject(Router).events as Subject<unknown>).next(
+      new NavigationStart(43, '/schedule'),
+    );
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.showMobileMenuOverlay()).toBe(false);
+    expect(state).toEqual({ navigationId: 42 });
+    expect(window.history.back).not.toHaveBeenCalled();
+  });
 
   const navConfig: NavConfig = {
     items: [],

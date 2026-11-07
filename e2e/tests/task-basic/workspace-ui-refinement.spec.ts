@@ -179,7 +179,9 @@ test('desktop chrome, selected tags and long move menus follow the workspace lay
   await expect(page.locator('.mat-mdc-menu-panel')).toHaveCount(0);
   await task.click({ button: 'right' });
   await waitForMenuSettled(page);
-  await page.getByRole('menuitem', { name: /Move to project or section/ }).click();
+  // Keyboard-open the submenu with the pointer parked away from moving rows.
+  await page.mouse.move(5, 5);
+  await page.getByRole('menuitem', { name: /Move to project or section/ }).press('Enter');
   await waitForMenuSettled(page);
   const menu = page.locator('.mat-menu-scrollable').last();
   await expect(menu).toBeVisible();

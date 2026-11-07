@@ -395,9 +395,11 @@ test.describe('Sections', () => {
     await page.mouse.down();
     // Initial nudge past CDK's drag threshold (5px by default).
     await page.mouse.move(sx + 10, sy + 10, { steps: 5 });
+    await expect(page.locator('.cdk-drag-preview')).toBeVisible();
     // Smooth move to target so each `mousemove` re-evaluates drop target.
     await page.mouse.move(tx, ty, { steps: 20 });
     await page.mouse.up();
+    await expect(page.locator('.cdk-drag-preview')).toHaveCount(0);
   };
 
   /**
@@ -531,6 +533,7 @@ test.describe('Sections', () => {
         'Second appended task',
       ];
       await expect(titles).toContainText(expectedOrder);
+      await flushPendingWrites(page);
       await page.reload();
       await workViewPage.waitForTaskList();
       await expect(titles).toContainText(expectedOrder);

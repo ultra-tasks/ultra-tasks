@@ -140,7 +140,9 @@ test.describe('Recurring task occurrence and series removal persistence', () => 
     await gotoHashRoute(page, '/#/tag/TODAY/tasks', task);
     await taskPage.openTaskDetail(task);
 
-    const repeatValue = page.locator('task-detail-item .schedule-value__repeat');
+    const repeatValue = page
+      .locator('task-detail-panel .st-planning-actions > button:first-child')
+      .getByText('Every day', { exact: true });
     await expect(repeatValue).toContainText('Every day');
 
     const repeatDialog = await openRecurDialog(page);

@@ -158,7 +158,6 @@ export class InlineMarkdownComponent implements OnChanges, OnInit, OnDestroy {
   // you were actually typing the checklist.
   isCurrentlyChecklist = computed(
     () =>
-      this.isShowChecklistToggle() &&
       this.isMarkdownFormattingEnabled() &&
       isMarkdownChecklist(this._liveDoc() ?? this.modelCopy() ?? ''),
   );

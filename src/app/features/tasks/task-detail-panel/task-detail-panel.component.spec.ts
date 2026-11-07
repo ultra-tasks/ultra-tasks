@@ -19,6 +19,8 @@ import { MarkdownModule } from 'ngx-markdown';
 import { DEFAULT_TASK, TaskDetailTargetPanel, TaskWithSubTasks } from '../task.model';
 import { TaskDetailItemComponent } from './task-additional-info-item/task-detail-item.component';
 import { TaskContextMenuComponent } from '../task-context-menu/task-context-menu.component';
+import { Navigation, provideRouter, Router } from '@angular/router';
+import { HISTORY_STATE } from '../../../app.constants';
 
 const MOCK_TASK: TaskWithSubTasks = {
   ...(DEFAULT_TASK as TaskWithSubTasks),
@@ -105,6 +107,7 @@ describe('TaskDetailPanelComponent', () => {
       ],
       schemas: [NO_ERRORS_SCHEMA],
       providers: [
+        provideRouter([]),
         { provide: ClipboardImageService, useValue: mockClipboardImageService },
         { provide: TaskAttachmentService, useValue: mockAttachmentService },
         { provide: TaskService, useValue: mockTaskService },
@@ -128,6 +131,16 @@ describe('TaskDetailPanelComponent', () => {
     component = fixture.componentInstance;
     componentRef.setInput('task', MOCK_TASK);
     fixture.detectChanges();
+  });
+
+  it('does not go back over a route that is replacing the panel', () => {
+    spyOnProperty(window.history, 'state', 'get').and.returnValue({
+      [HISTORY_STATE.TASK_DETAIL_PANEL]: true,
+    });
+    spyOn(TestBed.inject(Router), 'currentNavigation').and.returnValue({} as Navigation);
+    const back = spyOn(window.history, 'back');
+    fixture.destroy();
+    expect(back).not.toHaveBeenCalled();
   });
 
   const createPasteEvent = (

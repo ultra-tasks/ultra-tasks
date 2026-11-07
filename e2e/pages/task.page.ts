@@ -126,7 +126,7 @@ export class TaskPage extends BasePage {
    */
   async openTaskDetail(task: Locator): Promise<void> {
     await task.waitFor({ state: 'visible' });
-    const showDetailBtn = this.page.getByRole('button', {
+    const showDetailBtn = task.getByRole('button', {
       name: 'Show/hide task panel',
     });
     // The button only renders while the row is hovered. Right after a reload
@@ -134,10 +134,15 @@ export class TaskPage extends BasePage {
     // row out from under the pointer so the button disappears mid-click —
     // re-hover and retry instead of waiting on a detached button.
     await expect(async () => {
+      if ((await task.getAttribute('class'))?.split(' ').includes('isSelected')) {
+        return;
+      }
       await task.hover();
       await showDetailBtn.click({ timeout: 2000 });
     }).toPass({ timeout: 15000 });
-    await this.page.waitForTimeout(300);
+    await expect(task).toHaveClass(/\bisSelected\b/);
+    await expect(this.page.locator('task-detail-panel')).toBeVisible();
+    await expect(this.page.locator('right-panel.isPanelAnimating')).toHaveCount(0);
   }
 
   /**

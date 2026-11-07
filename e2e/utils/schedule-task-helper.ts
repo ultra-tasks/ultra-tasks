@@ -3,13 +3,12 @@ import type { WorkViewPage } from '../pages/work-view.page';
 import { cssSelectors } from '../constants/selectors';
 import { calendarNextMonthBtn } from './element-helpers';
 import { fillTimeInput } from './time-input-helper';
+import { TaskPage } from '../pages/task.page';
 
 // Selectors for scheduling
-const DETAIL_PANEL_BTN = '.show-additional-info-btn';
 const DETAIL_PANEL_SELECTOR = 'task-detail-panel';
 const DETAIL_PANEL_SCHEDULE_ITEM =
   'task-detail-panel .st-planning-actions > button:first-child';
-const RIGHT_PANEL = '.right-panel';
 const DIALOG_CONTAINER = 'mat-dialog-container';
 const DIALOG_SUBMIT = 'mat-dialog-actions button[color="primary"]';
 
@@ -18,11 +17,21 @@ const DIALOG_SUBMIT = 'mat-dialog-actions button[color="primary"]';
  */
 export const closeDetailPanelIfOpen = async (page: Page): Promise<void> => {
   const detailPanel = page.locator(DETAIL_PANEL_SELECTOR).first();
-  const isVisible = await detailPanel.isVisible().catch(() => false);
+  const isVisible = await detailPanel.isVisible();
   if (isVisible) {
-    await page.keyboard.press('Escape');
-    await detailPanel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    const close = page.getByRole('button', {
+      name: 'Close right panel or drag to resize',
+    });
+    if (await close.isVisible()) {
+      await close.press('Enter');
+    } else {
+      await page.keyboard.press('Escape');
+    }
   }
+  // Hidden can precede destruction and its asynchronous history.back(). A new
+  // panel opened in that gap is immediately collapsed by the old popstate.
+  await detailPanel.waitFor({ state: 'detached', timeout: 5000 });
+  await page.waitForFunction(() => !window.history.state?.taskDetailPanel);
 };
 
 /**
@@ -32,20 +41,7 @@ export const closeDetailPanelIfOpen = async (page: Page): Promise<void> => {
  * @param task - Locator for the task element
  */
 export const openTaskDetailPanel = async (page: Page, task: Locator): Promise<void> => {
-  await task.waitFor({ state: 'visible' });
-  await task.scrollIntoViewIfNeeded();
-  await task.hover();
-
-  const detailBtn = task.locator(DETAIL_PANEL_BTN).first();
-  await detailBtn.waitFor({ state: 'visible', timeout: 5000 });
-  await detailBtn.click();
-
-  // Wait for detail panel to be visible
-  await page
-    .locator(RIGHT_PANEL)
-    .or(page.locator(DETAIL_PANEL_SELECTOR))
-    .first()
-    .waitFor({ state: 'visible', timeout: 10000 });
+  await new TaskPage(page).openTaskDetail(task);
 };
 
 /**

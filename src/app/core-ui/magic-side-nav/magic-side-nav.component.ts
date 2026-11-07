@@ -317,6 +317,10 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
       )
       .subscribe(() => {
         if (this.isMobile() && this.showMobileMenuOverlay()) {
+          // Closing for a route change must not call history.back() and cancel it.
+          const state = { ...window.history.state };
+          delete state[HISTORY_STATE.MOBILE_NAVIGATION];
+          window.history.replaceState(state, '');
           this.showMobileMenuOverlay.set(false);
         }
       });
