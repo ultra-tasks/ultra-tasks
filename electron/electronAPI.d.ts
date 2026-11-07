@@ -32,6 +32,7 @@ import {
   AssistantAccessScope,
   AssistantAccessState,
 } from './shared-with-frontend/assistant-access.model';
+import { CertTrustElectronApi } from './shared-with-frontend/cert-trust-hosts';
 import { JiraElectronApi } from './shared-with-frontend/jira-request.model';
 
 export interface ElectronAPI {
@@ -295,6 +296,8 @@ export interface ElectronAPI {
   onSwitchTask(listener: (taskId: string) => void): void;
 
   consumeJiraApi(): JiraElectronApi | null;
+
+  consumeCertTrustApi(): CertTrustElectronApi | null;
 
   consumePluginNodeExecutionApi(): PluginNodeExecutionElectronApi | null;
 

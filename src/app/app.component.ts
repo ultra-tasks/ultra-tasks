@@ -79,6 +79,7 @@ import { isInputElement } from './util/dom-element';
 import { getDroppedUrl } from './core/drop-paste-input/drop-paste-input';
 import { readableUrl } from './util/readable-url';
 import { MobileBottomNavComponent } from './core-ui/mobile-bottom-nav/mobile-bottom-nav.component';
+import { CertTrustService } from './features/issue/cert-trust.service';
 import { StartupService } from './core/startup/startup.service';
 import { DataInitStateService } from './core/data-init/data-init-state.service';
 import { AppUriTaskActionsService } from './features/tasks/app-uri-actions/app-uri-task-actions.service';
@@ -162,6 +163,7 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   );
   private _ngZone = inject(NgZone);
   private _document = inject(DOCUMENT, { optional: true });
+  private _certTrustService = inject(CertTrustService);
   private _startupService = inject(StartupService);
   // Injected for side-effect: creates example tasks on first run
   private _exampleTasksService = inject(ExampleTasksService);
@@ -238,6 +240,8 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   private _subs: Subscription = new Subscription();
 
   constructor() {
+    // Claim the one-shot certificate-trust API before plugins load (#11097).
+    this._certTrustService.init();
     this._startupService.init();
     this._iosShareService.start();
     this._agentCaptureService.start();
