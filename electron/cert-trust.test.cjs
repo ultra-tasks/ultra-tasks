@@ -11,7 +11,9 @@ const messages = [];
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'electron') {
-    return { ipcMain: { on: (channel, handler) => ipcHandlers.set(channel, handler) } };
+    return {
+      ipcMain: { handle: (channel, handler) => ipcHandlers.set(channel, handler) },
+    };
   }
   if (request === 'electron-log/main') {
     return { warn: (message) => messages.push(message) };
