@@ -103,6 +103,16 @@ signed, without notarization, on macOS. Signing status must appear in the notes.
 The package name (`ultra-tasks`) supplies the independent default data directory;
 existing Super Productivity data is imported explicitly from a backup.
 
+For signed Android downloads without a Play Console submission, manually dispatch
+`build-android.yml` on the same reviewed commit. Manual runs use the package's
+release version/code and skip Play distribution, including when dispatched on a
+release tag. Automatic main pushes retain their development codes; automatic
+stable-tag runs retain the inherited Play submission path. The workflow verifies
+each APK's signature, `app.ultratasks` identity and package version before saving
+the `sup-android-release` artifact. Attach the signed APKs to the matching GitHub
+release and refresh its checksums. The Android release key remains in GitHub
+secrets; desktop signing still requires separate Windows/Apple credentials.
+
 The publish job deliberately uses `GITHUB_TOKEN`: GitHub does not trigger other
 tag/release workflows for these events, so inherited store/deployment workflows
 do not run. Do not push the tag manually or publish through a personal token for

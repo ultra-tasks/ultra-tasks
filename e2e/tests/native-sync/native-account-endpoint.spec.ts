@@ -16,11 +16,15 @@ test('native account setup checks the entered HTTPS server before sending creden
   await page.goto('/#/native-sync');
   const account = page.locator('native-sync');
   await expect(account).toBeVisible();
+  const customServer = account.getByRole('radio', { name: 'Custom server', exact: true });
+  if (await customServer.count()) await customServer.check();
   await account.locator('input[name="server"]').fill('https://account.example.test/');
   await account.locator('input[name="identifier"]').fill('test-user');
   await account.locator('input[name="password"]').fill('test-password');
   await account.locator('button[type="submit"]').click();
-  await expect(account.getByRole('alert')).toHaveText('Unsupported account server');
+  await expect(account.getByRole('alert').locator('p')).toHaveText(
+    'Unsupported account server',
+  );
   expect(requests).toEqual([
     {
       url: 'https://account.example.test/api/v2/accounts/capabilities',

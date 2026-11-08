@@ -71,7 +71,7 @@ jobs:
             ${{ runner.os }}-node22-
       - name: Install npm Packages
         #  if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npm i
+        run: npm ci
 
       - name: Decode Keystore
         env:
@@ -99,7 +99,7 @@ jobs:
         # Dev distribution must never redden the release-critical build; on any
         # failure the downstream gates read '' and simply skip.
         continue-on-error: true
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch'
         run: node tools/android-dev-version-code.js
 
       - name: Build
@@ -178,6 +178,25 @@ jobs:
             "${zipalign}" -c -P 16 4 "${apk}"
           done
 
+      - name: Verify release APK signatures and application version
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          candidates=("$ANDROID_HOME"/build-tools/*/apksigner)
+          test ${#candidates[@]} -gt 0
+          signer=$(printf '%s\n' "${candidates[@]}" | sort -V | tail -1)
+          aapt="$(dirname "$signer")/aapt"
+          version=$(node -p "require('./package.json').version")
+          apks=(android/app/build/outputs/apk/*/release/*.apk)
+          test ${#apks[@]} -gt 0
+          for apk in "${apks[@]}"; do
+            "$signer" verify --verbose --print-certs "$apk"
+            package_line=$("$aapt" dump badging "$apk" | sed -n '1p')
+            [[ "$package_line" == "package: name='app.ultratasks' "* ]]
+            [[ "$package_line" == *"versionName='$version'"* ]]
+          done
+
       # `sync:android` deletes the service-worker files (nothing on Android
       # registers a service worker, and ngsw.json carries a build timestamp that
       # breaks F-Droid's reproducible-build verification, #4155). That strip
@@ -237,7 +256,7 @@ jobs:
         # step — closed by `git push --follow-tags`), and transient Play API
         # errors must not fail the release-critical workflow.
         continue-on-error: true
-        if: github.ref == 'refs/heads/main' && steps.devvc.outputs.skip == 'false'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch' && steps.devvc.outputs.skip == 'false'
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -294,11 +313,11 @@ jobs:
           REPO: ${{ github.repository }}
 
       - name: Prepare Google Play release notes
-        if: steps.release-version.outputs.stable == 'true'
+        if: steps.release-version.outputs.stable == 'true' && github.event_name != 'workflow_dispatch'
         run: npm run release-notes:prepare-play-store
 
       - name: Upload to Google Play Console
-        if: steps.release-version.outputs.stable == 'true'
+        if: steps.release-version.outputs.stable == 'true' && github.event_name != 'workflow_dispatch'
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}

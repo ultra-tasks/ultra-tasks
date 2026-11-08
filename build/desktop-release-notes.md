@@ -8,6 +8,7 @@ This beta introduces **UltraSync**: private, end-to-end encrypted account sync a
 - Sign in directly in the app or continue in your browser, complete two-factor authentication, and return to the requesting app. The encrypted handoff supports cold starts and a polling fallback when return links are blocked.
 - The account dashboard supports TOTP, passkeys/security keys as second factors, recovery keys, device-session management, and encrypted-storage usage.
 - Private changes sync automatically while unlocked, with live notifications and a 60-second HTTP fallback. Mobile suspension, network conditions and account size affect delivery time.
+- New registrations on the official server remain closed while outgoing account email and the operator privacy notice are finalized. Self-hosted servers can enable registration after their own setup.
 - OneDrive and WebDAV are the basic personal-only alternatives. Saved SuperSync, Dropbox, Nextcloud and local-file configurations remain usable as deprecated connections. Export/backup remains available.
 - Switching providers requires disconnecting first. It does not migrate or delete the previous remote dataset. Choose explicitly between this device's tasks and existing account data.
 - A unified integrations workspace groups connected services with guided setup, project links and field policies.
@@ -26,7 +27,7 @@ The official dashboard is at [app.ultratasks.app/account](https://app.ultratasks
 - **Linux x64:** AppImage, DEB and RPM packages.
 - `SHA256SUMS.txt` provides download checksums.
 
-Windows downloads are unsigned. macOS downloads are ad-hoc signed without Apple notarization, matching the previous beta's packaging. This GitHub desktop release does not publish to app stores; Android/iOS source includes the sync implementation, with platform CI coverage.
+Windows downloads are unsigned. macOS downloads are ad-hoc signed without Apple notarization, matching the previous beta's packaging. Android APKs are signed with the project's release key and provided as direct downloads. This GitHub release does not publish to app stores; iOS source includes the sync implementation, with platform CI coverage.
 
 Ultra Tasks remains [AGPL-3.0-only](https://github.com/ultra-tasks/ultra-tasks/blob/ultra-tasks-v0.3.0/LICENSING.md), with preserved upstream and third-party rights.
 
