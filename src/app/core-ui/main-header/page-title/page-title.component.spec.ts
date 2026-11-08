@@ -153,6 +153,7 @@ describe('PageTitleComponent', () => {
       ['/scheduled-list', T.WW.RECURRING_TASKS],
       ['/donate', T.MH.DONATE],
       ['/config', T.PS.GLOBAL_SETTINGS],
+      ['/native-sync', T.NATIVE_SYNC.TITLE],
     ];
 
     cases.forEach(([url, expectedKey]) => {

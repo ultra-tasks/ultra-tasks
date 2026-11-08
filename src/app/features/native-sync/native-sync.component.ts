@@ -8,6 +8,11 @@ import {
   DestroyRef,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Store } from '@ngrx/store';
 import { TranslatePipe } from '@ngx-translate/core';
 import { NativeSyncService } from './native-sync.service';
@@ -33,7 +38,15 @@ import { selectAllProjects } from '../project/store/project.selectors';
 
 @Component({
   selector: 'native-sync',
-  imports: [FormsModule, TranslatePipe],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatIconModule,
+    MatCheckboxModule,
+  ],
   templateUrl: './native-sync.component.html',
   styleUrl: './native-sync.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -188,6 +201,13 @@ export class NativeSyncComponent implements OnInit {
   }
   async runOpenAccount(): Promise<void> {
     await this.run(() => this.native.openAccount(this.server));
+  }
+  async cancelMfa(): Promise<void> {
+    await this.run(async () => {
+      await this.native.lock();
+      this.mfa = '';
+      this.needsMfa = false;
+    });
   }
   async completeMfa(): Promise<void> {
     await this.run(async () => {

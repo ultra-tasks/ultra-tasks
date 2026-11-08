@@ -425,6 +425,7 @@ export class PageTitleComponent {
     [/scheduled-list$/, T.WW.RECURRING_TASKS, NAV_SECTION_ICON.RECURRING_TASKS],
     [/donate$/, T.MH.DONATE, NAV_SECTION_ICON.DONATE],
     [/config$/, T.PS.GLOBAL_SETTINGS, NAV_SECTION_ICON.SETTINGS],
+    [/native-sync$/, T.NATIVE_SYNC.TITLE, 'account_circle'],
     [/archived-projects$/, T.MH.ARCHIVED_PROJECTS, NAV_SECTION_ICON.ARCHIVED_PROJECTS],
   ];
 

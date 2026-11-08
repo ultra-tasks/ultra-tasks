@@ -55,6 +55,7 @@ export class NativeSyncService {
   readonly projects = computed(() => this.scopes().filter((s) => s.kind === 'project'));
   readonly revision = signal(0);
   readonly live = signal(false);
+  readonly mfaMethods = signal<string[]>([]);
   readonly sharingEnabled = computed(
     () =>
       this.unlocked() && this.account?.capabilities?.features['sharedProjects'] === true,
@@ -124,6 +125,7 @@ export class NativeSyncService {
   }
   async login(serverUrl: string, identifier: string, password: string): Promise<boolean> {
     this.error.set('');
+    this.mfaMethods.set([]);
     this.serverUrl = this.normalizeServerUrl(serverUrl);
     try {
       await this.certTrust.setPendingConfig(this, { baseUrl: this.serverUrl });
@@ -140,6 +142,7 @@ export class NativeSyncService {
     try {
       const result = await this.account.login(identifier, password);
       if (result.mfaToken) {
+        this.mfaMethods.set(result.factors ?? []);
         this.status.set('NATIVE_SYNC.MFA');
         return false;
       }
@@ -507,6 +510,7 @@ export class NativeSyncService {
     this.invitations.set([]);
     this.ownershipOffers.set([]);
     this.unlocked.set(false);
+    this.mfaMethods.set([]);
     this.linked.set(false);
     this.status.set('NATIVE_SYNC.LOCKED');
     await this.certTrust.setPendingConfig(this, null);

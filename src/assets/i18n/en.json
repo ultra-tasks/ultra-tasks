@@ -3892,7 +3892,7 @@
   },
   "NATIVE_SYNC": {
     "TITLE": "Account sync",
-    "INTRO": "Unlock your Ultra Tasks account to sync personal data and collaborate on shared projects.",
+    "INTRO": "Sign in to sync your private tasks across your devices.",
     "LOCKED": "Account locked.",
     "READY": "Account unlocked.",
     "SYNCED": "Sync complete.",
@@ -3900,7 +3900,7 @@
     "IDENTIFIER": "Email or username",
     "PASSWORD": "Password",
     "UNLOCK": "Sign in and unlock",
-    "ACCOUNT_HELP": "Create an account, verify your email, or manage your password and devices in the account dashboard for this server.",
+    "ACCOUNT_HELP": "New account or password help? Open the dashboard for the server above.",
     "MFA": "Authenticator or 2FA recovery code",
     "VERIFY": "Verify",
     "PASSKEY": "Use security key or passkey",
@@ -3959,8 +3959,8 @@
     "PRIVATE_HISTORY": "Private shared-task history",
     "EXPORT_HISTORY": "Export my private plans and time (including unavailable projects)",
     "MINUTES_TRACKED": "minutes tracked (private)",
-    "LIVE": "Shared projects are connected for live updates.",
-    "HTTP_FALLBACK": "Reconnecting live updates. Shared projects use periodic checks until connected.",
+    "LIVE": "Connected for live sync updates.",
+    "HTTP_FALLBACK": "Reconnecting live updates. Sync checks continue every minute.",
     "OWNERSHIP_OFFER": "You have been offered ownership of this project",
     "ACCEPT_OWNERSHIP": "Accept project ownership",
     "TRANSFER_OWNERSHIP": "Offer ownership",
@@ -3982,6 +3982,13 @@
     "SHARED_REMINDER": "Shared task reminder",
     "ERROR_NATIVE": "Secure native session storage or background sync is unavailable. Reopen the app and sign in again. Local changes are retained.",
     "ERROR_SERVER_UPDATE": "Update your Ultra Tasks server to use browser passkey approval from this app. TOTP and MFA recovery codes remain available.",
-    "SIGN_OUT": "Sign out of this device"
+    "SIGN_OUT": "Sign out of this device",
+    "SIGN_IN": "Sign in",
+    "TWO_FACTOR": "Two-factor authentication",
+    "MFA_HELP": "Enter a code from your authenticator app or use a 2FA recovery code.",
+    "BACK_SIGN_IN": "Back to sign in",
+    "PRIVACY": "End-to-end encrypted. Your password and vault keys stay on this device.",
+    "PRIVATE_SYNC": "Private sync",
+    "SESSION_OPTIONS": "Account & session options"
   }
 }

@@ -78,6 +78,7 @@ describe('NativeSyncService', () => {
     );
     const login = spyOn(AccountClient.prototype, 'login').and.resolveTo({
       mfaToken: 'pending-factor',
+      factors: ['totp'],
     });
     const done = service.login(' https://account.example.test/ ', 'alice', 'password');
     expect(certTrust.setPendingConfig).toHaveBeenCalledWith(service, {
@@ -86,7 +87,9 @@ describe('NativeSyncService', () => {
     expect(login).not.toHaveBeenCalled();
     acknowledge();
     expect(await done).toBe(false);
+    expect(service.mfaMethods()).toEqual(['totp']);
     await service.lock();
+    expect(service.mfaMethods()).toEqual([]);
     expect(certTrust.setPendingConfig).toHaveBeenCalledWith(service, null);
   });
   it('revokes the unsaved endpoint when sign-in fails', async () => {

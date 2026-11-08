@@ -1,27 +1,84 @@
 :host {
   display: block;
 }
-main {
-  max-width: 60em;
-  margin: auto;
-  padding: var(--s2);
+.component-wrapper {
+  max-width: 760px;
 }
-section {
-  margin-block: var(--s2);
+.account-card {
+  margin-block-end: var(--s3);
+  padding: var(--s3);
+  border: 1px solid var(--palette-border);
+  border-radius: var(--r-md);
+  background: var(--card-bg);
 }
-label {
-  display: block;
-  margin-block: var(--s);
+.sign-in-card {
+  max-width: 448px;
 }
-input:not([type='checkbox']),
+.account-context {
+  display: flex;
+  align-items: center;
+  gap: var(--s);
+  color: var(--text-color-muted);
+  font: var(--type-label);
+  margin-block-end: var(--s2);
+}
+.account-card h2 {
+  font: var(--type-title);
+  margin: 0;
+}
+.intro {
+  margin-block: var(--s1-5) var(--s3);
+  color: var(--text-color-muted);
+}
+.sign-in-card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s);
+}
+.sign-in-card > button {
+  margin-block-start: var(--s);
+}
+.account-help,
+.server-address {
+  color: var(--text-color-muted);
+  margin-block: var(--s2) var(--s);
+}
+.server-address,
+.account-email {
+  overflow-wrap: anywhere;
+}
+.privacy-note {
+  border-block-start: 1px solid var(--palette-separator);
+  padding-block-start: var(--s2);
+  margin-block: var(--s3) 0;
+  color: var(--text-color-muted);
+  font: var(--type-meta);
+}
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s);
+  margin-block-start: var(--s2);
+}
+.sync-status {
+  font: var(--type-body-strong);
+}
+.account-options {
+  border-block-start: 1px solid var(--palette-separator);
+  margin-block-start: var(--s3);
+  padding-block-start: var(--s2);
+}
+summary {
+  cursor: pointer;
+  min-height: var(--ctl-md);
+  align-content: center;
+}
+// Future shared-project fields retain their layout without touching Material internals.
+input:not([matInput], [type='checkbox']),
 textarea,
 select {
   display: block;
   width: min(100%, 35em);
-}
-button,
-a {
-  margin-inline-end: var(--s);
 }
 li {
   margin-block: var(--s);
