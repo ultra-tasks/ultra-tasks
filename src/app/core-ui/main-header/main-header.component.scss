@@ -95,6 +95,17 @@
   // box, so its width comes from its parent and never from its contents.
   container-type: inline-size;
   container-name: main-header;
+
+  // Phone: the glass runs to the top edge, behind the status bar, notch or
+  // Dynamic Island. The band's 56px stays below that inset, so the title and
+  // actions never sit under the cutout while content still scrolls through the
+  // blurred strip above them. The height is --shell-inset-top (band + inset),
+  // the same number the pages pad their scrollers by.
+  @include mq(xs, max) {
+    box-sizing: border-box;
+    height: var(--shell-inset-top);
+    padding-top: var(--safe-area-top);
+  }
 }
 
 // Below a row that cannot seat both, identity yields entirely.

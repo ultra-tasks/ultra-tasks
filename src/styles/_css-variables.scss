@@ -500,15 +500,27 @@
 // page, so content scrolls behind both. A page's scroller pads itself by these
 // two insets so its first and last rows rest clear of them; at 600px and up
 // the header and the side nav are in the layout flow and both are 0.
+//
+// The header's glass reaches the very top of the screen on a phone, behind the
+// status bar, notch or Dynamic Island, so --shell-inset-top is the 56px band
+// PLUS the top safe area: the content passes under the whole glass, and the
+// first row rests below all of it.
 :root {
   --shell-inset-top: 0px;
   --shell-inset-bottom: 0px;
+  // The top padding `body` carries on a native app. It is the safe area from
+  // 600px up, where the header is in the layout flow below it. On a phone the
+  // header owns that inset instead (it is padded inside its glass), so the body
+  // reserves nothing and the page starts at the screen edge. Everything that
+  // sizes the shell against that padding reads this, never --safe-area-top.
+  --body-inset-top: var(--safe-area-top);
 }
 // Declared on `body`, not `:root`: --bottom-nav-height lives in the body-scoped
 // block below, which `:root` cannot read.
 @media (max-width: 599px) {
   body {
-    --shell-inset-top: var(--bar-height-large);
+    --body-inset-top: 0px;
+    --shell-inset-top: calc(var(--bar-height-large) + var(--safe-area-top));
     --shell-inset-bottom: calc(
       var(--bottom-nav-height) + var(--bottom-nav-safe-area) +
         var(--bottom-nav-extra-offset)

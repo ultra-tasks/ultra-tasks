@@ -335,9 +335,8 @@ describe('MagicSideNavComponent', () => {
     expect(fixture.componentInstance.showMobileMenuOverlay()).toBe(false);
   });
 
-  it('keeps the close button below the top safe area without doubling native spacing', () => {
+  it('clears the top safe area once, from the screen edge, native or not', () => {
     const wasNativeMobile = document.body.classList.contains('isNativeMobile');
-    document.body.classList.remove('isNativeMobile');
     isXs.set(true);
     fixture = TestBed.createComponent(MagicSideNavComponent);
     (fixture.nativeElement as HTMLElement).style.setProperty('--safe-area-top', '24px');
@@ -350,12 +349,15 @@ describe('MagicSideNavComponent', () => {
         '.mobile-menu-close',
       ) as HTMLButtonElement;
 
-      expect(getComputedStyle(closeButton).marginTop).toBe('24px');
+      for (const isNative of [false, true]) {
+        document.body.classList.toggle('isNativeMobile', isNative);
 
-      document.body.classList.add('isNativeMobile');
-
-      expect(getComputedStyle(drawer).top).toBe('24px');
-      expect(getComputedStyle(closeButton).marginTop).toBe('0px');
+        // The drawer is full screen and owns the inset: its brand row, Close
+        // and list all sit below it, and nothing adds the inset a second time.
+        expect(getComputedStyle(drawer).top).toBe('0px');
+        expect(getComputedStyle(drawer).paddingTop).toBe('24px');
+        expect(getComputedStyle(closeButton).marginTop).toBe('0px');
+      }
     } finally {
       document.body.classList.toggle('isNativeMobile', wasNativeMobile);
     }

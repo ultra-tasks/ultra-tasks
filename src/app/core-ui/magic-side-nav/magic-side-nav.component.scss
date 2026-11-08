@@ -131,10 +131,6 @@
   }
 }
 
-:host-context(body:not(.isNativeMobile)) .mobile-menu-close {
-  margin-top: var(--safe-area-top);
-}
-
 // Mobile overlay
 .nav-backdrop-mobile {
   position: fixed;
@@ -216,14 +212,14 @@
   &.mobile {
     width: 100%;
     max-width: none;
+    // Starts at the screen edge; the brand row, Close and the list all sit
+    // below the status bar / notch / island, so the inset is the drawer's own.
+    box-sizing: border-box;
+    padding-top: var(--safe-area-top);
     background: var(--sidenav-bg-mobile);
     box-shadow: var(--elev-2);
     // Remove CSS transitions - let Angular animations handle it
     transition: none !important;
-  }
-
-  :host-context(body.isNativeMobile) &.mobile {
-    top: var(--safe-area-top);
   }
 
   // Position right
@@ -318,17 +314,12 @@
   justify-content: flex-start;
 
   @include mq(xs, max) {
-    padding-top: var(--safe-area-top);
+    // The drawer carries the top inset itself (`.nav-sidenav.mobile`).
+    padding-top: 0;
     padding-bottom: calc(
       var(--safe-area-bottom) + var(--bottom-nav-height) + var(--bottom-nav-extra-offset)
     );
     min-height: calc(100% - var(--s6));
-
-    // .nav-sidenav.mobile already shifts down by --safe-area-top on native,
-    // so applying it again here would double the inset.
-    :host-context(body.isNativeMobile) & {
-      padding-top: 0;
-    }
   }
 }
 

@@ -214,7 +214,7 @@ describe('IosKeyboardService sequencing', () => {
     expect(overlayVar('--keyboard-overlay-offset')).toBe('0px');
     expect(overlayVar('--visual-viewport-height')).toBe(`${BASE_HEIGHT}px`);
     expect(harness.keyboardOverlayOffset()).toBe('0px');
-    expect(harness.shellHeight()).toBe(`calc(${BASE_HEIGHT}px - var(--safe-area-top))`);
+    expect(harness.shellHeight()).toBe(`calc(${BASE_HEIGHT}px - var(--body-inset-top))`);
   });
 
   it('follows the web view once it shrinks around the keyboard', () => {
@@ -226,7 +226,7 @@ describe('IosKeyboardService sequencing', () => {
       `${BASE_HEIGHT - KEYBOARD_HEIGHT}px`,
     );
     expect(harness.shellHeight()).toBe(
-      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--safe-area-top))`,
+      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--body-inset-top))`,
     );
     // The shrunken web view already ends above the keyboard; offsetting the
     // fixed bar again would move it twice (#8778).
@@ -262,7 +262,7 @@ describe('IosKeyboardService sequencing', () => {
 
     expect(overlayVar('--keyboard-overlay-offset')).toBe('0px');
     expect(harness.keyboardOverlayOffset()).toBe('0px');
-    expect(harness.shellHeight()).toBe(`calc(${BASE_HEIGHT}px - var(--safe-area-top))`);
+    expect(harness.shellHeight()).toBe(`calc(${BASE_HEIGHT}px - var(--body-inset-top))`);
 
     tick(RESIZE_GRACE_MS / 2);
     shrinkViewport(BASE_HEIGHT - KEYBOARD_HEIGHT);
@@ -272,7 +272,7 @@ describe('IosKeyboardService sequencing', () => {
     expect(overlayVar('--keyboard-overlay-offset')).toBe('0px');
     expect(varWrites(overlaySetPropertySpy, '--keyboard-overlay-offset')).toBe(0);
     expect(harness.shellHeight()).toBe(
-      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--safe-area-top))`,
+      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--body-inset-top))`,
     );
     // Settled by the resize itself, not the grace timer: one scroll, once the
     // shell has the final size.
@@ -472,7 +472,7 @@ describe('IosKeyboardService sequencing', () => {
     // already-shrunken 464px and shrink the shell to 185.6px.
     expect(overlayVar('--keyboard-height')).toBe(`${KEYBOARD_HEIGHT}px`);
     expect(harness.shellHeight()).toBe(
-      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--safe-area-top))`,
+      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--body-inset-top))`,
     );
   });
 
@@ -490,7 +490,7 @@ describe('IosKeyboardService sequencing', () => {
     flushRender();
 
     expect(harness.shellHeight()).toBe(
-      `calc(${600 - KEYBOARD_HEIGHT}px - var(--safe-area-top))`,
+      `calc(${600 - KEYBOARD_HEIGHT}px - var(--body-inset-top))`,
     );
   }));
 
@@ -519,7 +519,7 @@ describe('IosKeyboardService sequencing', () => {
 
     expect(overlayVar('--keyboard-height')).toBe(`${KEYBOARD_HEIGHT}px`);
     expect(harness.shellHeight()).toBe(
-      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--safe-area-top))`,
+      `calc(${BASE_HEIGHT - KEYBOARD_HEIGHT}px - var(--body-inset-top))`,
     );
   }));
 
@@ -535,7 +535,7 @@ describe('IosKeyboardService sequencing', () => {
     didShow();
 
     expect(harness.shellHeight()).toBe(
-      `calc(${600 - KEYBOARD_HEIGHT}px - var(--safe-area-top))`,
+      `calc(${600 - KEYBOARD_HEIGHT}px - var(--body-inset-top))`,
     );
   });
 

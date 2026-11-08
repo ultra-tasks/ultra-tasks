@@ -119,6 +119,14 @@
   flex-direction: column;
   position: relative;
 
+  // Phone: the panel replaces the page and the page now starts at the screen
+  // edge, so the panel clears the status bar / notch / island itself. The
+  // padding is on this box, not `.side`, so the panel's own background fills it.
+  @include mq(xs, max) {
+    box-sizing: border-box;
+    padding-top: var(--safe-area-top);
+  }
+
   plugin-panel-container {
     flex: 1;
     height: 100%;

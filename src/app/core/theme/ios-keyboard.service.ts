@@ -342,7 +342,7 @@ export class IosKeyboardService {
     const isKeyboardVisible = this._keyboardHeight > 0;
     this.shellHeight.set(
       isKeyboardVisible
-        ? `calc(${vars.visualViewportHeightPx}px - var(--safe-area-top))`
+        ? `calc(${vars.visualViewportHeightPx}px - var(--body-inset-top))`
         : null,
     );
     this.keyboardOverlayOffset.set(
