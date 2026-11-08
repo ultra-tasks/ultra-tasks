@@ -6,6 +6,8 @@ Tracking: Maintainer request; maintained implementation and acceptance records l
 Last verified against code: November 7, 2026. Extraction baseline `535576e7c9643c2763661a3660c946f69e1525e1`; current package and acceptance revisions are recorded in the server SOURCE.md and security-and-recovery.md.
 Completion condition: The server builds and releases from its own repository, a clean Docker installation passes acceptance, and the account service and dashboard run on the maintainer's server. Move enduring contracts into the two repositories' maintained guides and retire this plan after launch.
 
+The [app 0.3.0 release plan](2026-11-07-ultrasync-0.3.0-release.md) now defines the confirmed UltraSync name/default, official/custom sign-in, MFA/storage parity, and provider deprecation direction. App 0.3.0 remains private-sync first; Google Drive and collaboration follow later. Server 1.0.0 and SDK versions remain separate release targets.
+
 Ultra Tasks will have a separately maintained server repository and Docker image. Users create an account with an email and password, sign in on their devices, and sync encrypted data automatically. A small account dashboard provides security, device management, and sync information; the full browser task application follows on the same hosting foundation.
 
 This plan replaces the repository ownership, hosted onboarding, and personal sync scheduling proposals in the [native collaboration plan](2026-11-05-native-encrypted-collaboration.md). It reuses the implemented native account and encrypted record protocol. Repository extraction must preserve existing cryptographic formats, database identities, retry semantics, and supported data.

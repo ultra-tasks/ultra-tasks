@@ -49,6 +49,9 @@ must link to their replacement, and keep their original number.
 
 ## Active plans
 
+- [UltraSync and account sign-in for app 0.3.0](plans/2026-11-07-ultrasync-0.3.0-release.md)
+  — official/custom account setup, browser-to-app sign-in, MFA/storage parity,
+  private-sync delivery, and personal-only provider migration; Google Drive follows later
 - [Server extraction and version one launch](plans/2026-11-07-server-extraction-and-v1-launch.md)
   — separate server and Docker repository, native account sync, account dashboard,
   Oracle deployment, and production release gates
