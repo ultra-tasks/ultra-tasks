@@ -27,7 +27,7 @@ import { MatFormField, MatPrefix, MatSuffix } from '@angular/material/form-field
 import { MatInput } from '@angular/material/input';
 import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { T } from '../../../t.const';
 import { PluginIconComponent } from '../plugin-icon/plugin-icon.component';
@@ -183,9 +183,12 @@ export class PluginManagementComponent {
     });
   });
 
-  readonly view = signal<'installed' | 'discover'>('installed');
+  private readonly _initialState = getInitialPluginBrowserState(
+    inject(MAT_DIALOG_DATA, { optional: true }),
+  );
+  readonly view = signal<'installed' | 'discover'>(this._initialState.view);
   readonly searchQuery = signal('');
-  readonly typeFilter = signal<'all' | 'integration' | 'plugin'>('all');
+  readonly typeFilter = signal<'all' | 'integration' | 'plugin'>(this._initialState.type);
   private readonly _searchTerms = computed(() =>
     this.searchQuery().trim().toLocaleLowerCase().split(/\s+/),
   );
@@ -879,6 +882,21 @@ export class PluginManagementComponent {
     return languages.includes(currentLang);
   }
 }
+
+/**
+ * Starting tab and type filter, taken from the Marketplace route's query params
+ * (the Integrations page links to `?view=discover&type=integration`). Unknown
+ * values fall back to the default view.
+ */
+export const getInitialPluginBrowserState = (
+  data: unknown,
+): { view: 'installed' | 'discover'; type: 'all' | 'integration' | 'plugin' } => {
+  const { view, type } = (data ?? {}) as { view?: unknown; type?: unknown };
+  return {
+    view: view === 'discover' ? 'discover' : 'installed',
+    type: type === 'integration' || type === 'plugin' ? type : 'all',
+  };
+};
 
 /**
  * Whether the plugins page lists `plugin`. Dev-only bundled plugins are listed only when

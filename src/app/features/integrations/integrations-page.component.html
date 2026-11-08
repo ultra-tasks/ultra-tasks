@@ -3,6 +3,7 @@
     <integration-setup
       (done)="connected($event)"
       (setupCanceled)="setup.set(false)"
+      (marketplace)="openMarketplace()"
     />
   } @else {
     <header class="heading">
@@ -11,12 +12,20 @@
         <h1>{{ I.CONNECTED_WORK | translate }}</h1>
         <p class="muted">{{ I.INTRO | translate }}</p>
       </div>
-      <button
-        mat-flat-button
-        (click)="setup.set(true)"
-      >
-        <mat-icon>add</mat-icon>{{ I.CONNECT | translate }}
-      </button>
+      <div class="actions">
+        <button
+          mat-button
+          (click)="openMarketplace()"
+        >
+          <mat-icon>storefront</mat-icon>{{ I.BROWSE_MARKETPLACE | translate }}
+        </button>
+        <button
+          mat-flat-button
+          (click)="setup.set(true)"
+        >
+          <mat-icon>add</mat-icon>{{ I.CONNECT | translate }}
+        </button>
+      </div>
     </header>
     @if (error()) {
       <p

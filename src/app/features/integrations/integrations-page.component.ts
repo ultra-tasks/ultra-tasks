@@ -11,6 +11,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Store } from '@ngrx/store';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { IntegrationService } from './integration.service';
 import { IntegrationCapabilityService } from './integration-capability.service';
@@ -58,6 +59,7 @@ export class IntegrationsPageComponent {
   private readonly _issues = inject(IssueService);
   private readonly _dialog = inject(MatDialog);
   private readonly _projects = inject(Store).selectSignal(selectProjectFeatureState);
+  private readonly _router = inject(Router);
   readonly setup = signal(false);
   readonly filter = signal<IntegrationFilter>('all');
   readonly search = signal('');
@@ -248,6 +250,12 @@ export class IntegrationsPageComponent {
     this._dialog.open(DialogEditIssueProviderComponent, {
       data: { issueProvider: provider },
       restoreFocus: true,
+    });
+  }
+  /** The catalog is the Marketplace; Integrations only links into its integration listings. */
+  openMarketplace(): Promise<boolean> {
+    return this._router.navigate(['/plugins'], {
+      queryParams: { view: 'discover', type: 'integration' },
     });
   }
   connected(provider: IssueProvider): void {

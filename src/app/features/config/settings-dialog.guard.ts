@@ -34,7 +34,7 @@ export const settingsDialogGuard: CanActivateFn = async (route) => {
       restoreFocus: true,
       ariaLabel: translate.instant(
         isPlugins
-          ? T.PS.REDESIGN.PLUGINS
+          ? T.PLUGINS.MARKETPLACE
           : isAccount
             ? T.PS.REFINEMENT.ACCOUNT
             : T.PS.GLOBAL_SETTINGS,

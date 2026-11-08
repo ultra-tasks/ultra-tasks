@@ -47,6 +47,7 @@ export class IntegrationSetupComponent implements OnDestroy {
   readonly I = T.F.INTEGRATIONS;
   readonly done = output<IssueProvider>();
   readonly setupCanceled = output<void>();
+  readonly marketplace = output<void>();
   readonly capabilities = inject(IntegrationCapabilityService);
   private readonly _registry = inject(PluginIssueProviderRegistryService);
   private readonly _plugins = inject(PluginService);

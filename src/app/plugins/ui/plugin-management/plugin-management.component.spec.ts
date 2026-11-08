@@ -15,7 +15,11 @@ import { PluginMetaPersistenceService } from '../../plugin-meta-persistence.serv
 import { PluginInstance, PluginManifest, PluginHooks } from '../../plugin-api.model';
 import { PluginService } from '../../plugin.service';
 import { PluginState } from '../../plugin-state.model';
-import { isPluginListed, PluginManagementComponent } from './plugin-management.component';
+import {
+  getInitialPluginBrowserState,
+  isPluginListed,
+  PluginManagementComponent,
+} from './plugin-management.component';
 import { T } from '../../../t.const';
 import { DialogConfirmComponent } from '../../../ui/dialog-confirm/dialog-confirm.component';
 import { CommunityPlugin } from '../../util/community-plugin.util';
@@ -94,6 +98,28 @@ describe('PluginManagementComponent', () => {
 
     fixture = TestBed.createComponent(PluginManagementComponent);
     component = fixture.componentInstance;
+  });
+
+  it('starts on Installed with all types when opened without route data', () => {
+    expect(component.view()).toBe('installed');
+    expect(component.typeFilter()).toBe('all');
+    expect(getInitialPluginBrowserState(null)).toEqual({
+      view: 'installed',
+      type: 'all',
+    });
+  });
+
+  it('opens Discover filtered to integrations from the Integrations page link', () => {
+    expect(
+      getInitialPluginBrowserState({ view: 'discover', type: 'integration' }),
+    ).toEqual({ view: 'discover', type: 'integration' });
+  });
+
+  it('ignores unknown view and type values', () => {
+    expect(getInitialPluginBrowserState({ view: 'x', type: 'theme' })).toEqual({
+      view: 'installed',
+      type: 'all',
+    });
   });
 
   it('returns trimmed plugin author from the manifest', () => {

@@ -26,7 +26,7 @@ import { T } from '../../t.const';
   ],
   template: `
     <header class="settings-window-header">
-      <h1>{{ T.PS.REDESIGN.PLUGINS | translate }}</h1>
+      <h1>{{ T.PLUGINS.MARKETPLACE | translate }}</h1>
       <button
         mat-icon-button
         mat-dialog-close

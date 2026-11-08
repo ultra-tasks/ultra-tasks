@@ -355,8 +355,8 @@ export class MagicNavConfigService {
       {
         type: 'route',
         id: 'plugins',
-        label: T.PS.REDESIGN.PLUGINS,
-        icon: 'extension',
+        label: T.PLUGINS.MARKETPLACE,
+        icon: 'storefront',
         route: '/plugins',
         // Settings lists Plugins as a category on a phone.
         desktopOnly: true,

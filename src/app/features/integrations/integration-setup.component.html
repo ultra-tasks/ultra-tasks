@@ -64,6 +64,13 @@
       <h3>{{ I.CONNECT | translate }}</h3>
       <p>{{ I.AUTH_NOTE | translate }}</p>
       <p class="muted">{{ I.PREVIEW_NOTE | translate }}</p>
+      <p class="muted">{{ I.MARKETPLACE_HELP | translate }}</p>
+      <button
+        mat-button
+        (click)="marketplace.emit()"
+      >
+        <mat-icon>storefront</mat-icon>{{ I.BROWSE_MARKETPLACE | translate }}
+      </button>
     </aside>
   </div>
 } @else if (draft(); as provider) {
