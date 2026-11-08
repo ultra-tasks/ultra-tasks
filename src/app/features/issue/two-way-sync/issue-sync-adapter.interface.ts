@@ -7,6 +7,8 @@ export interface IssueSyncAdapter<TCfg> {
    * them for that item (e.g. a repeating item's time is pull only).
    */
   getSyncConfig(cfg: TCfg, issue?: Record<string, unknown>): FieldSyncConfig;
+  /** Hard provider/item limits that connection and task preferences cannot widen. */
+  getSyncConfigLimits?(cfg: TCfg, issue?: Record<string, unknown>): FieldSyncConfig;
   fetchIssue(issueId: string, cfg: TCfg): Promise<Record<string, unknown>>;
   /**
    * May resolve to the item as the write left it (the write's own answer).

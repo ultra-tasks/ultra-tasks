@@ -4,6 +4,7 @@ import type {
   FieldSyncConfig,
   SyncDirection,
 } from '../issue/two-way-sync/issue-sync.model';
+import type { IssueSyncAdapter } from '../issue/two-way-sync/issue-sync-adapter.interface';
 
 export type IntegrationMode = 'import' | 'sync';
 
@@ -42,7 +43,41 @@ export const taskSyncPolicy = (
   task: Task,
   policy: FieldSyncConfig,
   connection: FieldSyncConfig = {},
-): FieldSyncConfig => ({ ...policy, ...connection, ...task.integration?.fieldPolicy });
+  limits: FieldSyncConfig = {},
+): FieldSyncConfig => {
+  const resolved = { ...policy, ...connection, ...task.integration?.fieldPolicy };
+  for (const [field, limit] of Object.entries(limits)) {
+    const requested = resolved[field as keyof Task];
+    if (!requested || !limit) continue;
+    const pull = canReceiveField(requested) && canReceiveField(limit);
+    const push =
+      (requested === 'both' || requested === 'pushOnly') &&
+      (limit === 'both' || limit === 'pushOnly');
+    resolved[field as keyof Task] = pull
+      ? push
+        ? 'both'
+        : 'pullOnly'
+      : push
+        ? 'pushOnly'
+        : 'off';
+  }
+  return resolved;
+};
+
+export const integrationSyncPolicy = <
+  TCfg extends { integrationFieldPolicy?: FieldSyncConfig },
+>(
+  task: Task,
+  adapter: Pick<IssueSyncAdapter<TCfg>, 'getSyncConfig' | 'getSyncConfigLimits'>,
+  cfg: TCfg,
+  issue?: Record<string, unknown>,
+): FieldSyncConfig =>
+  taskSyncPolicy(
+    task,
+    adapter.getSyncConfig(cfg, issue),
+    cfg.integrationFieldPolicy,
+    adapter.getSyncConfigLimits?.(cfg, issue),
+  );
 
 export const canReceiveField = (direction: SyncDirection | undefined): boolean =>
   direction !== 'off' && direction !== 'pushOnly';

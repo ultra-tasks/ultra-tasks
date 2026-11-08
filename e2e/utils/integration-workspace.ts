@@ -30,9 +30,7 @@ export const finishIntegrationSetup = async (page: Page): Promise<void> => {
       (await select.inputValue()) !== 'off' &&
       (await select.locator('option[value="both"]').count())
     )
-      await select.selectOption(
-        (await select.getAttribute('aria-label')) === 'Date' ? 'pushOnly' : 'both',
-      );
+      await select.selectOption('both');
   }
   await setup.getByRole('button', { name: 'Save connection', exact: true }).click();
   await expect(setup).toBeHidden();

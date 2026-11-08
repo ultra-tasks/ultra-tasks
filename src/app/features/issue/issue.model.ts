@@ -28,6 +28,7 @@ import {
 } from '../../plugins/issue-provider/plugin-issue-provider.model';
 
 export interface BaseIssueProviderCfg {
+  integrationFieldPolicy?: FieldSyncConfig;
   isEnabled: boolean;
 }
 
@@ -186,7 +187,6 @@ export type IssueProviderPollingMode = 'whenProjectOpen' | 'always';
 export interface IssueProviderBase extends BaseIssueProviderCfg {
   /** New imports inherit this mode; existing linked tasks keep their own policy. */
   integrationMode?: 'import' | 'sync';
-  integrationFieldPolicy?: FieldSyncConfig;
   id: string;
   isEnabled: boolean;
   issueProviderKey: IssueProviderKey;

@@ -1,6 +1,6 @@
 import {
   sameIntegrationLink,
-  taskSyncPolicy,
+  integrationSyncPolicy,
 } from '../../integrations/integration.model';
 import { Injectable, inject } from '@angular/core';
 import { Store } from '@ngrx/store';
@@ -752,11 +752,7 @@ export class IssueTwoWaySyncEffects {
     // (e.g. dueWithTime from short syntax parsing like @2pm)
     const currentTask = await firstValueFrom(this._taskService.getByIdOnce$(task.id));
     const fieldMappings = adapter.getFieldMappings();
-    const syncConfig = taskSyncPolicy(
-      task,
-      adapter.getSyncConfig(cfg),
-      cfg.integrationFieldPolicy,
-    );
+    const syncConfig = integrationSyncPolicy(task, adapter, cfg);
     const ctx = { issueId };
     const toPush: Record<string, unknown> = {};
 
@@ -947,11 +943,7 @@ export class IssueTwoWaySyncEffects {
     return this._issueProviderService.getCfgOnce$(issueProviderId, issueType).pipe(
       concatMap(async (cfg) => {
         const fieldMappings = adapter.getFieldMappings();
-        const syncConfig = taskSyncPolicy(
-          task,
-          adapter.getSyncConfig(cfg),
-          cfg.integrationFieldPolicy,
-        );
+        const syncConfig = integrationSyncPolicy(task, adapter, cfg);
 
         // Early exit: check if any changed field is pushable before fetching
         const hasPushableField = fieldMappings.some((m) => {
@@ -971,10 +963,11 @@ export class IssueTwoWaySyncEffects {
         // The read and write have no asynchronous gap after this identity check.
         const currentTask = await firstValueFrom(this._taskService.getByIdOnce$(task.id));
         if (!sameIntegrationLink(currentTask, task)) return;
-        const issueSyncConfig = taskSyncPolicy(
+        const issueSyncConfig = integrationSyncPolicy(
           currentTask,
-          adapter.getSyncConfig(cfg, freshIssue),
-          cfg.integrationFieldPolicy,
+          adapter,
+          cfg,
+          freshIssue,
         );
         // the snapshot predates pushes queued before it; their baseline is newer
         const syncState = currentTask ?? task;
@@ -1128,11 +1121,7 @@ export class IssueTwoWaySyncEffects {
               const pending = computePendingLocalChanges(
                 current,
                 adapter.getFieldMappings(),
-                taskSyncPolicy(
-                  current,
-                  adapter.getSyncConfig(cfg),
-                  cfg.integrationFieldPolicy,
-                ),
+                integrationSyncPolicy(current, adapter, cfg),
                 { issueId: current.issueId! },
               );
               return Object.keys(pending).length

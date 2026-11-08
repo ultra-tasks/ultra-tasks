@@ -64,6 +64,25 @@ describe('Integration relationships', () => {
     expect(visibleIntegrationTask(child, { local: parent })).toBeFalse();
     expect(parent.dueDay).toBe('2026-11-08');
   });
+  it('connection and item preferences cannot enable provider-owned writes', () => {
+    const local = task({
+      integration: {
+        providerId: 'connection',
+        providerKey: 'PLAINSPACE',
+        remoteId: '142',
+        mode: 'sync',
+        fieldPolicy: { dueWithTime: 'both', title: 'off' },
+      },
+    });
+    expect(
+      taskSyncPolicy(
+        local,
+        { dueWithTime: 'pullOnly', dueDay: 'off', title: 'both' },
+        { dueWithTime: 'both', dueDay: 'both' },
+        { dueWithTime: 'pullOnly', dueDay: 'off', title: 'both' },
+      ),
+    ).toEqual({ dueWithTime: 'pullOnly', dueDay: 'off', title: 'off' });
+  });
   it('item policy overrides connection policy and leaves unrelated fields alone', () => {
     const local = task({
       integration: {
