@@ -9,6 +9,7 @@ import {
   LocalFileSyncPicker,
 } from '../../../op-log/sync-providers/sync-providers.factory';
 import { FormlyFieldConfig, FormlyFieldProps } from '@ngx-formly/core';
+import { basicSyncSetupOptions } from '../../../imex/sync/sync-setup-options';
 
 /**
  * Stable structural marker on the "Advanced" collapsibles so the dialog
@@ -194,31 +195,14 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
       templateOptions: {
         label: T.F.SYNC.FORM.L_SYNC_PROVIDER,
         required: true,
-        options: [
-          { label: 'SuperSync (Beta)', value: SyncProviderId.SuperSync },
-          { label: SyncProviderId.Dropbox, value: SyncProviderId.Dropbox },
-          { label: 'Nextcloud', value: SyncProviderId.Nextcloud },
-          ...(IS_ONEDRIVE_SUPPORTED
-            ? [
-                {
-                  label: 'Microsoft 365 / OneDrive (experimental)',
-                  value: SyncProviderId.OneDrive,
-                },
-              ]
-            : []),
-          {
-            label: 'WebDAV (not recommended / no support)',
-            value: SyncProviderId.WebDAV,
-          },
-          ...(IS_ELECTRON || IS_ANDROID_WEB_VIEW
-            ? [
-                {
-                  label: 'Local file (experimental)',
-                  value: SyncProviderId.LocalFile,
-                },
-              ]
-            : []),
-        ],
+        options: basicSyncSetupOptions(IS_ONEDRIVE_SUPPORTED, null),
+      },
+      expressions: {
+        'props.options': (field: FormlyFieldConfig) =>
+          basicSyncSetupOptions(
+            IS_ONEDRIVE_SUPPORTED,
+            field.model?._activeProviderId ?? field.model?.syncProvider ?? null,
+          ),
       },
     },
     {

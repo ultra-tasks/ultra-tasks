@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatRadioModule } from '@angular/material/radio';
 import { Store } from '@ngrx/store';
 import { TranslatePipe } from '@ngx-translate/core';
 import { NativeSyncService } from './native-sync.service';
@@ -35,6 +36,7 @@ import { formatDate } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { getEnvOptional } from '../../util/env';
+import { environment } from '../../../environments/environment';
 import { selectAllProjects } from '../project/store/project.selectors';
 
 @Component({
@@ -47,6 +49,7 @@ import { selectAllProjects } from '../project/store/project.selectors';
     MatInputModule,
     MatIconModule,
     MatCheckboxModule,
+    MatRadioModule,
   ],
   templateUrl: './native-sync.component.html',
   styleUrl: './native-sync.component.scss',
@@ -62,10 +65,15 @@ export class NativeSyncComponent implements OnInit {
   private readonly dialogs = inject(MatDialog);
   readonly checkpoints = signal<{ scopeId: string; sequence: number }[]>([]);
   readonly T = T;
-  server =
-    localStorage.getItem('ultra-native-server') ??
+  readonly officialServer =
     getEnvOptional('ULTRA_ACCOUNT_URL') ??
-    '';
+    (environment.production ? 'https://app.ultratasks.app' : '');
+  server = localStorage.getItem('ultra-native-server') ?? this.officialServer;
+  serverMode: 'official' | 'custom' =
+    this.officialServer && (!this.server || this.server === this.officialServer)
+      ? 'official'
+      : 'custom';
+  private customServer = this.serverMode === 'custom' ? this.server : '';
   identifier = '';
   password = '';
   mfa = '';
@@ -155,6 +163,15 @@ export class NativeSyncComponent implements OnInit {
         if (scope) this.selected.set(scope);
       });
   }
+  selectServerMode(mode: 'official' | 'custom'): void {
+    this.serverMode = mode;
+    if (mode === 'official') {
+      this.customServer = this.server;
+      this.server = this.officialServer;
+    } else {
+      this.server = this.customServer;
+    }
+  }
   title(scopeId: string): string {
     this.native.revision();
     return (
@@ -212,6 +229,12 @@ export class NativeSyncComponent implements OnInit {
   }
   async cancelBrowserLogin(): Promise<void> {
     await this.run(() => this.accountLogin.cancel());
+  }
+  async disconnect(): Promise<void> {
+    await this.run(async () => {
+      await this.accountLogin.cancel();
+      await this.native.disconnect();
+    });
   }
   async reopenBrowserLogin(): Promise<void> {
     await this.run(() => this.accountLogin.open());

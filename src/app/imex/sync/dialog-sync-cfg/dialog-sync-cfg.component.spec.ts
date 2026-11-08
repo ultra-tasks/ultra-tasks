@@ -22,6 +22,8 @@ import { SnackService } from '../../../core/snack/snack.service';
 import { T } from '../../../t.const';
 import { SyncLocalStateService } from '../../../op-log/sync/sync-local-state.service';
 import { CertTrustService } from '../../../features/issue/cert-trust.service';
+import { NativeSyncService } from '../../../features/native-sync/native-sync.service';
+import { ULTRA_SYNC_SETUP } from '../sync-setup-options';
 
 describe('DialogSyncCfgComponent', () => {
   let component: DialogSyncCfgComponent;
@@ -72,8 +74,10 @@ describe('DialogSyncCfgComponent', () => {
 
     mockProviderManager = jasmine.createSpyObj('SyncProviderManager', [
       'getProviderById',
+      'getAllProviders',
       'notifyProviderTargetChanged',
     ]);
+    mockProviderManager.getAllProviders.and.resolveTo([]);
 
     mockGlobalConfigService = jasmine.createSpyObj('GlobalConfigService', [], {
       sync$: of(baseSyncConfig),
@@ -82,7 +86,7 @@ describe('DialogSyncCfgComponent', () => {
     mockSnackService = jasmine.createSpyObj('SnackService', ['open']);
     mockCertTrustService = jasmine.createSpyObj('CertTrustService', ['setPendingConfig']);
     mockCertTrustService.setPendingConfig.and.resolveTo();
-    mockMatDialog = jasmine.createSpyObj('MatDialog', ['open']);
+    mockMatDialog = jasmine.createSpyObj('MatDialog', ['open', 'closeAll']);
     // Default: the file-based setup encryption dialog is dismissed/skipped.
     mockMatDialog.open.and.returnValue({
       afterClosed: () => of(undefined),
@@ -105,6 +109,7 @@ describe('DialogSyncCfgComponent', () => {
         { provide: MatDialog, useValue: mockMatDialog },
         { provide: SyncLocalStateService, useValue: mockSyncLocalStateService },
         { provide: CertTrustService, useValue: mockCertTrustService },
+        { provide: NativeSyncService, useValue: { configured: () => false } },
       ],
     });
     // Replace the Formly-based template with a minimal placeholder so we can
@@ -116,6 +121,75 @@ describe('DialogSyncCfgComponent', () => {
 
     fixture = TestBed.createComponent(DialogSyncCfgComponent);
     component = fixture.componentInstance;
+  });
+
+  describe('UltraSync setup', () => {
+    it('retains dormant configured providers while excluding providers with no stored configuration', fakeAsync(() => {
+      mockProviderManager.getAllProviders.and.resolveTo([
+        {
+          id: SyncProviderId.Dropbox,
+          privateCfg: { load: async () => ({ encryptKey: 'saved-key-fixture' }) },
+        },
+        { id: SyncProviderId.Nextcloud, privateCfg: { load: async () => null } },
+      ] as unknown as Awaited<ReturnType<SyncProviderManager['getAllProviders']>>);
+      (
+        mockSyncConfigService as unknown as {
+          syncSettingsForm$: typeof mockGlobalConfigService.sync$;
+        }
+      ).syncSettingsForm$ = of({
+        ...baseSyncConfig,
+        syncProvider: SyncProviderId.OneDrive,
+      });
+      const saved = TestBed.createComponent(DialogSyncCfgComponent).componentInstance;
+      flushMicrotasks();
+      expect(
+        saved.setupOptions().some((option) => option.value === SyncProviderId.Dropbox),
+      ).toBeTrue();
+      expect(
+        saved.setupOptions().some((option) => option.value === SyncProviderId.Nextcloud),
+      ).toBeFalse();
+      expect(saved.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+    }));
+    it('closes the underlying Account window when continuing to UltraSync', () => {
+      component.openUltraSync();
+      expect(mockMatDialog.closeAll).toHaveBeenCalled();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+    });
+    it('defaults new setup to UltraSync without persisting a legacy target', () => {
+      expect(component.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+      expect(
+        component.fields().some((field) => field.key === 'syncProvider'),
+      ).toBeFalse();
+    });
+
+    it('loads the selected basic provider without saving until confirmed', fakeAsync(() => {
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      expect(component.setupProvider()).toBe(SyncProviderId.WebDAV);
+      expect(component.form.get('syncProvider')?.value).toBe(SyncProviderId.WebDAV);
+      expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+    }));
+
+    it('keeps a saved enabled deprecated connection selected', () => {
+      (
+        mockSyncConfigService as unknown as {
+          syncSettingsForm$: typeof mockGlobalConfigService.sync$;
+        }
+      ).syncSettingsForm$ = of({
+        ...baseSyncConfig,
+        isEnabled: true,
+        syncProvider: SyncProviderId.Dropbox,
+      });
+      const saved = TestBed.createComponent(DialogSyncCfgComponent).componentInstance;
+      expect(saved.setupProvider()).toBe(SyncProviderId.Dropbox);
+      expect(saved.legacyProvider()).toBeTrue();
+      expect(
+        saved.setupOptions().some((option) => option.value === SyncProviderId.Dropbox),
+      ).toBeTrue();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+    });
   });
 
   describe('save() — LocalFile pending folder commit (#9075)', () => {

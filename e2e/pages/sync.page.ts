@@ -8,6 +8,7 @@ import {
 import { BasePage } from './base.page';
 import { WEBDAV_SYNC_FORMAT } from '../utils/sync-helpers';
 import { cssSelectors } from '../constants/selectors';
+import { disconnectBeforeProviderSwitch } from '../utils/legacy-sync-setup';
 
 type SyncCycleIntent = 'any' | 'read' | 'write';
 
@@ -32,7 +33,7 @@ export class SyncPage extends BasePage {
   constructor(page: Page) {
     super(page);
     this.syncBtn = page.locator('button.sync-btn');
-    this.providerSelect = page.locator('formly-field-mat-select mat-select');
+    this.providerSelect = page.locator('dialog-sync-cfg mat-select').first();
     this.baseUrlInput = page.locator('.e2e-baseUrl input');
     this.userNameInput = page.locator('.e2e-userName input');
     this.passwordInput = page.locator('.e2e-password input');
@@ -152,15 +153,15 @@ export class SyncPage extends BasePage {
       await this.page.waitForLoadState('networkidle');
       await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
 
+      await disconnectBeforeProviderSwitch(this.page, 'WebDAV');
+
       // Wait a moment for Angular animations
       await this.page.waitForTimeout(500);
 
       // Click on provider select to open dropdown with retry
       const webdavOption = this.page.locator('mat-option').filter({ hasText: 'WebDAV' });
       const selectElement = this.providerSelect;
-      const selectValueText = this.page.locator(
-        'formly-field-mat-select .mat-mdc-select-value-text',
-      );
+      const selectValueText = this.providerSelect.locator('.mat-mdc-select-value-text');
 
       let selectionSucceeded = false;
 

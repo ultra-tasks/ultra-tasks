@@ -172,6 +172,10 @@ export class NativePersonalBridgeService {
     });
     this.baseline = committed;
   }
+  async unlink(): Promise<void> {
+    await this.opStore.clearNativeSyncBaseline('native-sync-active');
+    this.clear();
+  }
   clear(): void {
     this.client = undefined;
     this.baseline = undefined;

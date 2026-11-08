@@ -1,14 +1,42 @@
 <h2 mat-dialog-title>{{ T.F.SYNC.D_INITIAL_CFG.TITLE | translate }}</h2>
 
 <mat-dialog-content>
-  <p>
-    <a
-      routerLink="/native-sync"
-      (click)="close()"
-      >{{ T.NATIVE_SYNC.OPEN | translate }}</a
+  <mat-form-field>
+    <mat-label>{{ T.F.SYNC.FORM.L_SYNC_PROVIDER | translate }}</mat-label>
+    <mat-select
+      [value]="setupProvider()"
+      (selectionChange)="selectSetupProvider($event.value)"
     >
-  </p>
-  @if (_tmpUpdatedCfg) {
+      <mat-option
+        [value]="ultraSync"
+        [disabled]="isWasEnabled()"
+        >UltraSync</mat-option
+      >
+      @for (option of setupOptions(); track option.value) {
+        <mat-option
+          [value]="option.value"
+          [disabled]="
+            native.configured() || (isWasEnabled() && option.value !== savedProvider())
+          "
+        >
+          {{ option.label | translate }}
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  @if (isWasEnabled() || native.configured()) {
+    <p>{{ T.SYNC_SETUP.SWITCH_HELP | translate }}</p>
+  }
+  @if (setupProvider() === ultraSync) {
+    <p>{{ T.SYNC_SETUP.ULTRA_DESCRIPTION | translate }}</p>
+    <p>{{ T.SYNC_SETUP.PRIVATE_BETA | translate }}</p>
+  } @else {
+    <p>{{ T.SYNC_SETUP.BASIC_DESCRIPTION | translate }}</p>
+    @if (legacyProvider()) {
+      <p>{{ T.SYNC_SETUP.LEGACY_NOTICE | translate }}</p>
+    }
+  }
+  @if (_tmpUpdatedCfg && setupProvider() !== ultraSync) {
     <form [formGroup]="form">
       <formly-form
         (modelChange)="updateTmpCfg($event)"
@@ -29,16 +57,27 @@
     >
       {{ T.G.CANCEL | translate }}
     </button>
-    <button
-      [disabled]="!form.valid"
-      (click)="save()"
-      color="primary"
-      mat-flat-button
-    >
-      {{
-        (this.isWasEnabled() ? T.G.SAVE : T.F.SYNC.D_INITIAL_CFG.SAVE_AND_ENABLE)
-          | translate
-      }}
-    </button>
+    @if (setupProvider() === ultraSync) {
+      <button
+        mat-flat-button
+        color="primary"
+        routerLink="/native-sync"
+        (click)="openUltraSync()"
+      >
+        {{ T.SYNC_SETUP.CONTINUE_ULTRA | translate }}
+      </button>
+    } @else {
+      <button
+        [disabled]="!form.valid"
+        (click)="save()"
+        color="primary"
+        mat-flat-button
+      >
+        {{
+          (this.isWasEnabled() ? T.G.SAVE : T.F.SYNC.D_INITIAL_CFG.SAVE_AND_ENABLE)
+            | translate
+        }}
+      </button>
+    }
   </div>
 </mat-dialog-actions>

@@ -52,6 +52,20 @@
         } @else if (!needsMfa) {
           <h2>{{ T.NATIVE_SYNC.SIGN_IN | translate }}</h2>
           <p class="intro">{{ T.NATIVE_SYNC.INTRO | translate }}</p>
+          @if (officialServer) {
+            <mat-radio-group
+              [(ngModel)]="serverMode"
+              (ngModelChange)="selectServerMode($event)"
+              [attr.aria-label]="T.SYNC_SETUP.SERVER_CHOICE | translate"
+            >
+              <mat-radio-button value="official">{{
+                T.SYNC_SETUP.OFFICIAL_SERVER | translate
+              }}</mat-radio-button>
+              <mat-radio-button value="custom">{{
+                T.SYNC_SETUP.CUSTOM_SERVER | translate
+              }}</mat-radio-button>
+            </mat-radio-group>
+          }
           <form (ngSubmit)="login()">
             <mat-form-field
               ><mat-label>{{ T.NATIVE_SYNC.SERVER | translate }}</mat-label
@@ -60,6 +74,7 @@
                 name="server"
                 type="url"
                 [(ngModel)]="server"
+                [readonly]="serverMode === 'official'"
                 required
                 placeholder="https://sync.example.com"
                 autocapitalize="none"
@@ -112,6 +127,17 @@
           >
             {{ T.NATIVE_SYNC.MANAGE_ACCOUNT | translate }}
           </button>
+          @if (native.configured()) {
+            <button
+              mat-button
+              type="button"
+              (click)="disconnect()"
+              [disabled]="working()"
+            >
+              {{ T.SYNC_SETUP.DISCONNECT_ULTRA | translate }}
+            </button>
+            <p class="account-help">{{ T.SYNC_SETUP.DISCONNECT_HELP | translate }}</p>
+          }
         } @else {
           <h2>{{ T.NATIVE_SYNC.TWO_FACTOR | translate }}</h2>
           <p class="intro">{{ T.NATIVE_SYNC.MFA_HELP | translate }}</p>
@@ -222,7 +248,7 @@
               (click)="runSignOut()"
               [disabled]="native.busy() || working()"
             >
-              {{ T.NATIVE_SYNC.SIGN_OUT | translate }}
+              {{ T.SYNC_SETUP.DISCONNECT_ULTRA | translate }}
             </button>
             <button
               mat-button

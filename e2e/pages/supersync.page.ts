@@ -10,6 +10,10 @@ import { BasePage } from './base.page';
 import { normalizeDialogMessage, translationRegex } from '../utils/i18n-strings';
 import { confirmSyncConflictOverwriteIfShown } from '../utils/sync-helpers';
 import { cssSelectors } from '../constants/selectors';
+import {
+  disconnectBeforeProviderSwitch,
+  restoreSavedSuperSyncConnection,
+} from '../utils/legacy-sync-setup';
 
 export interface SuperSyncConfig {
   baseUrl: string;
@@ -206,7 +210,7 @@ export class SuperSyncPage extends BasePage {
       }
     });
     this.syncBtn = page.locator('button.sync-btn');
-    this.providerSelect = page.locator('formly-field-mat-select mat-select');
+    this.providerSelect = page.locator('dialog-sync-cfg mat-select').first();
     this.baseUrlInput = page.locator('.e2e-baseUrl input');
     // Current clients render an input (#10784); released clients a textarea.
     this.accessTokenInput = page.locator(
@@ -430,6 +434,19 @@ export class SuperSyncPage extends BasePage {
 
     // Wait for the provider select (indicates dialog is open)
     await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
+
+    await disconnectBeforeProviderSwitch(this.page, 'SuperSync');
+    // Model an existing connection, rather than exposing a retired provider in
+    // first-time setup. Close/reopen so the dialog reads the durable fixture.
+    const configRestored = await restoreSavedSuperSyncConnection(this.page);
+    if (configRestored) {
+      await this.page
+        .locator('dialog-sync-cfg')
+        .getByRole('button', { name: 'Cancel', exact: true })
+        .click();
+      await this.clickSyncBtn({ button: 'right', noWaitAfter: true });
+      await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
+    }
 
     // Select "SuperSync" from provider dropdown with retry logic
     await this.selectSuperSyncProviderWithRetry();
@@ -2603,15 +2620,15 @@ export class SuperSyncPage extends BasePage {
     await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
 
     // Look for "Enable Syncing" toggle (appears when editing existing config)
-    const enableToggle = this.page.locator('.e2e-isEnabled input[type="checkbox"]');
+    const enableToggle = this.page
+      .locator('dialog-sync-cfg')
+      .getByRole('checkbox', { name: /^Enable syncing$/i });
     const toggleExists = await enableToggle.isVisible().catch(() => false);
 
     if (toggleExists) {
       const isChecked = await enableToggle.isChecked();
       if (isChecked) {
-        // Click the label to toggle off
-        const toggleLabel = this.page.locator('.e2e-isEnabled label');
-        await toggleLabel.click();
+        await enableToggle.uncheck();
         await this.page.waitForTimeout(200);
       }
     }

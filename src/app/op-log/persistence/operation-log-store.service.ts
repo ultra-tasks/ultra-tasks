@@ -847,18 +847,10 @@ export class OperationLogStoreService implements RemoteOperationApplyStorePort<O
   }
 
   /**
-   * Appends operations to the store, silently skipping any that already exist.
-   *
-   * Unlike appendBatch(), this method does NOT throw on duplicate operations.
-   * It checks each op's ID against the IndexedDB `byId` unique index within
-   * the same readwrite transaction before inserting. This eliminates the
-   * TOCTOU race between a separate getAppliedOpIds() filter and appendBatch()
-   * that caused persistent "Duplicate operation detected" errors (issue #6343).
-   *
-   * @param ops Operations to append
-   * @param source Whether these are local or remote operations
-   * @param options Additional options (e.g., pendingApply for remote ops)
-   * @returns Object with seqs of written ops, the written ops, and skipped count
+   * Append operations, skipping existing IDs under the same readwrite transaction.
+   * Unlike appendBatch(), duplicates do not throw. Checking `byId` and inserting
+   * atomically avoids the getAppliedOpIds()/appendBatch() TOCTOU race (#6343).
+   * @returns Written seqs and operations, and the skipped count.
    */
   async appendBatchSkipDuplicates(
     ops: Operation[],
@@ -886,6 +878,12 @@ export class OperationLogStoreService implements RemoteOperationApplyStorePort<O
   async loadNativeSyncBaseline(id: string): Promise<unknown> {
     await this._ensureInit();
     return this._adapter.get(STORE_NAMES.META, id);
+  }
+
+  /** Retire only the device-local link, preserving tasks, operations and queues. */
+  async clearNativeSyncBaseline(id: string): Promise<void> {
+    await this._ensureInit();
+    await this._adapter.delete(STORE_NAMES.META, id);
   }
 
   async commitFileSnapshotBaseline(opts: {

@@ -23,7 +23,22 @@ import {
   SYNC_FORM,
   SyncCollapsibleProps,
 } from '../../../features/config/form-cfgs/sync-form.const';
-import { AbstractControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+} from '@angular/forms';
+import { MatFormField, MatLabel } from '@angular/material/form-field';
+import { MatSelect, MatOption } from '@angular/material/select';
+import { NativeSyncService } from '../../../features/native-sync/native-sync.service';
+import { IS_ONEDRIVE_SUPPORTED } from '../onedrive-auth-mode.const';
+import {
+  basicSyncSetupOptions,
+  isLegacySyncSetupProvider,
+  ULTRA_SYNC_SETUP,
+  type SyncSetupProvider,
+} from '../sync-setup-options';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { SyncConfig } from '../../../features/config/global-config.model';
 import {
@@ -82,6 +97,10 @@ type SyncFormModel = SyncConfig & {
     TranslatePipe,
     ReactiveFormsModule,
     FormlyModule,
+    MatFormField,
+    MatLabel,
+    MatSelect,
+    MatOption,
   ],
 })
 export class DialogSyncCfgComponent implements AfterViewInit {
@@ -98,16 +117,42 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   private _certTrustService = inject(CertTrustService);
 
   T = T;
+  readonly native = inject(NativeSyncService);
+  readonly ultraSync = ULTRA_SYNC_SETUP;
+  readonly setupProvider = signal<SyncSetupProvider>(ULTRA_SYNC_SETUP);
+  readonly savedProvider = signal<SyncProviderId | null>(null);
+  private readonly otherSavedProviders = signal<SyncProviderId[]>([]);
+  readonly setupOptions = computed(() =>
+    basicSyncSetupOptions(
+      IS_ONEDRIVE_SUPPORTED,
+      this.savedProvider(),
+      this.otherSavedProviders(),
+    ),
+  );
+  readonly legacyProvider = computed(() =>
+    isLegacySyncSetupProvider(this.setupProvider()),
+  );
   isWasEnabled = signal(false);
   // Single source of truth — buttons appear/disappear automatically when
   // edit mode flips, no manual fields.set() required.
   fields = computed<FormlyFieldConfig[]>(() => {
     const includeEnabledToggle = this.isWasEnabled();
     return SYNC_FORM.items!.filter(
-      (f) => includeEnabledToggle || f.key !== 'isEnabled',
+      (f) => f.key !== 'syncProvider' && (includeEnabledToggle || f.key !== 'isEnabled'),
     ).map((item) => this._injectProviderHelpers(item));
   });
-  form = new FormGroup({});
+  form: FormGroup = new FormGroup({});
+
+  selectSetupProvider(provider: SyncSetupProvider): void {
+    this.setupProvider.set(provider);
+    if (provider !== ULTRA_SYNC_SETUP) {
+      if (!this.form.get('syncProvider')) {
+        this.form.addControl('syncProvider', new FormControl(provider));
+      }
+      this.form.get('syncProvider')?.setValue(provider, { emitEvent: false });
+      this._providerConfigLoad = this._loadProviderConfig(provider);
+    }
+  }
 
   /**
    * Adds helpers into the formly field tree:
@@ -457,9 +502,15 @@ export class DialogSyncCfgComponent implements AfterViewInit {
       .pipe(first(), takeUntilDestroyed(this._destroyRef))
       .subscribe((v) => {
         this._initialProviderId = toSyncProviderId(v.syncProvider);
+        this.savedProvider.set(this._initialProviderId);
+        if (this._initialProviderId) void this._loadSavedProviders();
+        this.form
+          .get('syncProvider')
+          ?.setValue(this._initialProviderId, { emitEvent: false });
         this._selectedProviderWasConfigured = v.isEnabled;
         if (v.isEnabled) {
           this.isWasEnabled.set(true);
+          if (this._initialProviderId) this.setupProvider.set(this._initialProviderId);
         }
         // First-time setup ⇔ sync was previously disabled. Encryption-warning
         // hideExpressions in sync-form.const.ts read this flag to suppress
@@ -474,6 +525,12 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    if (!this.form.get('syncProvider')) {
+      this.form.addControl(
+        'syncProvider',
+        new FormControl(this._tmpUpdatedCfg.syncProvider),
+      );
+    }
     // Setup provider change listener after the form is initialized by Formly
     // Using setTimeout to ensure the form control exists
     setTimeout(() => {
@@ -500,6 +557,27 @@ export class DialogSyncCfgComponent implements AfterViewInit {
           this._providerConfigLoad = this._loadProviderConfig(providerId);
         });
     }, 0);
+  }
+
+  private async _loadSavedProviders(): Promise<void> {
+    try {
+      const providers = await this._providerManager.getAllProviders();
+      const saved = await Promise.all(
+        providers
+          .filter((provider) => isLegacySyncSetupProvider(provider.id))
+          .map(async (provider) =>
+            (await provider.privateCfg.load()) ? provider.id : null,
+          ),
+      );
+      this.otherSavedProviders.set(
+        saved.filter((provider): provider is SyncProviderId => provider !== null),
+      );
+    } catch {
+      this._snackService.open({
+        type: 'ERROR',
+        msg: T.SYNC_SETUP.SAVED_CONNECTIONS_ERROR,
+      });
+    }
   }
 
   private async _loadProviderConfig(providerId: SyncProviderId): Promise<void> {
@@ -588,6 +666,12 @@ export class DialogSyncCfgComponent implements AfterViewInit {
 
   close(): void {
     this._matDialogRef.close();
+  }
+
+  openUltraSync(): void {
+    // Account settings is itself a window on phones. Close that window too
+    // so it cannot cover the destination after RouterLink navigates.
+    this._matDialog.closeAll();
   }
 
   private async _persistOneDriveFormCfgBeforeAuth(

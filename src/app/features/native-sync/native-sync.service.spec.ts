@@ -48,6 +48,7 @@ describe('NativeSyncService', () => {
           useValue: {
             bind: async () => true,
             clear: () => undefined,
+            unlink: jasmine.createSpy('unlink').and.resolveTo(),
             capture: async () => undefined,
             apply: async () => undefined,
             scopeId: 'personal',
@@ -149,6 +150,8 @@ describe('NativeSyncService', () => {
         expiresIn: 500,
       });
       await service.lock();
+      expect(service.configured()).toBeTrue();
+      expect(TestBed.inject(NativePersonalBridgeService).unlink).not.toHaveBeenCalled();
       const cached = JSON.parse(
         localStorage.getItem('ultra-native-account:http://localhost:1900')!,
       );
@@ -172,6 +175,12 @@ describe('NativeSyncService', () => {
     const saved = localStorage.getItem('ultra-native-account:http://localhost:1900')!;
     expect(saved).not.toContain('"refreshToken"');
     expect(saved).not.toContain('"masterKey"');
+    const reopened = TestBed.runInInjectionContext(() => new NativeSyncService());
+    expect(reopened.configured()).toBeTrue();
+    await reopened.disconnect();
+    expect(reopened.configured()).toBeFalse();
+    expect(TestBed.inject(NativePersonalBridgeService).unlink).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('ultra-native-account:http://localhost:1900')).toBeNull();
   });
   const preparePrivateClient = (): SyncClient => {
     const account = new AccountClient(async () => ({}));
@@ -192,6 +201,50 @@ describe('NativeSyncService', () => {
     spyOn(client, 'refreshScopes').and.resolveTo([]);
     return client;
   };
+  it('stops the writer before retiring the explicit disconnect baseline', async () => {
+    let release!: () => void;
+    spyOn(service, 'lock').and.returnValue(
+      new Promise<void>((resolve) => (release = resolve)),
+    );
+    const unlink = TestBed.inject(NativePersonalBridgeService).unlink;
+    const disconnect = service.disconnect();
+    expect(unlink).not.toHaveBeenCalled();
+    release();
+    await disconnect;
+    expect(unlink).toHaveBeenCalledTimes(1);
+  });
+  it('retires the baseline when an unlocked account is explicitly disconnected', async () => {
+    const client = preparePrivateClient();
+    spyOn(client.account, 'request').and.resolveTo([]);
+    await service.disconnect();
+    expect(TestBed.inject(NativePersonalBridgeService).unlink).toHaveBeenCalledTimes(1);
+    expect(service.configured()).toBeFalse();
+  });
+  it('does not restore a deleted account when native credential detachment returns tokens', async () => {
+    const client = preparePrivateClient();
+    const account = client.account;
+    service.serverUrl = 'http://localhost:1900';
+    account.account = {
+      id: 'delete-account-fixture',
+      email: 'delete@example.test',
+      username: 'delete-test',
+      displayName: '',
+      vaultVersion: 1,
+    };
+    account.unlocked = {
+      masterKey: randomKey(),
+      secrets: {} as NonNullable<AccountClient['unlocked']>['secrets'],
+    };
+    spyOn(account, 'deleteAccount').and.resolveTo();
+    spyOn(TestBed.inject(NativeSyncPlatformService), 'clear').and.resolveTo({
+      accessToken: 'detached',
+      refreshToken: 'detached-refresh',
+      expiresIn: 600,
+    });
+    await service.deleteAccount();
+    expect(service.configured()).toBeFalse();
+    expect(localStorage.getItem('ultra-native-account:http://localhost:1900')).toBeNull();
+  });
   it('does not call sharing endpoints on a private server', async () => {
     const client = preparePrivateClient();
     const invitations = spyOn(client, 'invitations');

@@ -49,6 +49,11 @@ export class NativeSyncService {
   readonly busy = signal(false);
   readonly unlocked = signal(false);
   readonly linked = signal(false);
+  readonly configured = signal(
+    !!localStorage.getItem(
+      'ultra-native-account:' + (localStorage.getItem('ultra-native-server') ?? ''),
+    ),
+  );
   readonly scopes = signal<ScopeInfo[]>([]);
   readonly invitations = signal<Invitation[]>([]);
   readonly ownershipOffers = signal<OwnershipOffer[]>([]);
@@ -100,6 +105,7 @@ export class NativeSyncService {
       }),
     );
     localStorage.setItem('ultra-native-server', this.serverUrl);
+    this.configured.set(true);
   }
   private normalizeServerUrl(serverUrl: string): string {
     const url = new URL(serverUrl);
@@ -463,6 +469,7 @@ export class NativeSyncService {
     await this.realtime?.stop();
     if (this.inFlight) await this.inFlight;
     const account = this.account!;
+    const cacheKey = this.cacheKey();
     const storage = new EncryptedSyncStorage(
       account.unlocked!.masterKey,
       account.identity(),
@@ -471,14 +478,20 @@ export class NativeSyncService {
     try {
       await account.deleteAccount();
       deleted = true;
-      localStorage.removeItem(this.cacheKey());
       await storage.clear();
     } catch (error) {
       if (!deleted) this.startRealtime();
       throw error;
     } finally {
-      if (deleted) await this.lock();
-      this.closing = false;
+      try {
+        if (deleted) await this.lock();
+      } finally {
+        if (deleted) {
+          localStorage.removeItem(cacheKey);
+          this.configured.set(false);
+        }
+        this.closing = false;
+      }
     }
   }
   async logout(): Promise<void> {
@@ -494,8 +507,19 @@ export class NativeSyncService {
         await this.account!.request('/sessions/revoke', { sessionId: session.id });
     } finally {
       await this.lock();
+      await this.bridge.unlink();
       localStorage.removeItem(key);
+      this.configured.set(false);
     }
+  }
+  async disconnect(): Promise<void> {
+    if (this.unlocked()) return this.logout();
+    const key =
+      'ultra-native-account:' + (localStorage.getItem('ultra-native-server') ?? '');
+    await this.lock();
+    await this.bridge.unlink();
+    localStorage.removeItem(key);
+    this.configured.set(false);
   }
   async lock(): Promise<void> {
     this.closing = true;

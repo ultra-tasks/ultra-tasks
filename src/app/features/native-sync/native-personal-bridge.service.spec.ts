@@ -47,7 +47,12 @@ describe('NativePersonalBridgeService', () => {
         },
         {
           provide: OperationLogStoreService,
-          useValue: { loadNativeSyncBaseline: () => Promise.resolve(saved) },
+          useValue: {
+            loadNativeSyncBaseline: () => Promise.resolve(saved),
+            clearNativeSyncBaseline: async () => {
+              saved = undefined;
+            },
+          },
         },
         { provide: OperationLogSyncService, useValue: {} },
         { provide: BackupService, useValue: {} },
@@ -82,6 +87,15 @@ describe('NativePersonalBridgeService', () => {
     await service.capture();
     expect(snapshot).toHaveBeenCalledTimes(1);
     expect(client.edit).toHaveBeenCalled();
+  });
+  it('requires an explicit connection after unlinking the same account', async () => {
+    await baseline();
+    expect(await service.bind(client)).toBeTrue();
+    await service.unlink();
+    expect(await service.bind(client)).toBeFalse();
+    await service.capture();
+    expect(client.edit).not.toHaveBeenCalled();
+    expect(snapshot).not.toHaveBeenCalled();
   });
   it('retains local changes and refuses to dual-write while a legacy provider is enabled', async () => {
     await baseline();
