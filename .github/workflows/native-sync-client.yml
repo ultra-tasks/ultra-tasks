@@ -57,6 +57,8 @@ jobs:
       - run: npx playwright install chromium
       - run: npm run quiet -- buildFrontend:dev
       - run: npm run quiet -- electron:build
+      - name: Install the Windows Electron runtime
+        run: node node_modules/electron/install.js
       - name: Real Windows app cold/warm browser return and protected pending storage
         shell: pwsh
         run: |
