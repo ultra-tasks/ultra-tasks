@@ -31,11 +31,13 @@ class NativeAccountInstrumentedTest {
     private fun identity(): JSONObject = vectors.getJSONArray("fixtures").getJSONObject(0).getJSONObject("trusted")
     @Before fun setup() {
         NativeAccountRuntime.clear(context)
+        NativeAccountRuntime.call(context, "login-clear", JSONObject())
         BackgroundReminderSettingsStore.save(context, true, false)
         server = MockWebServer(); server.start()
     }
     @After fun cleanup() {
         NativeAccountRuntime.clear(context); server.shutdown()
+        NativeAccountRuntime.call(context, "login-clear", JSONObject())
         BackgroundReminderSettingsStore.save(context, false, false)
     }
     private fun configure(): JSONObject {
@@ -45,6 +47,21 @@ class NativeAccountInstrumentedTest {
             .put("tokens", JSONObject().put("accessToken", "native-access-test").put("refreshToken", "refresh-secret-0").put("expiresIn", 600))
         NativeAccountRuntime.call(context, "configure", input)
         return input
+    }
+    @Test fun pendingBrowserLoginSurvivesSessionCleanupUntilExplicitCancellation() {
+        configure()
+        val pending = JSONObject().put("request", JSONObject().put("expiresAt", System.currentTimeMillis() + 240000))
+            .put("proof", "pending-browser-login-secret").toString()
+        NativeAccountRuntime.call(context, "login-save", JSONObject().put("value", pending))
+        repeat(2) {
+            NativeAccountRuntime.clear(context)
+            assertFalse(NativeAccountRuntime.available(context))
+            assertEquals(pending, NativeAccountRuntime.call(context, "login-load", JSONObject()).getString("value"))
+        }
+        val xml = File(context.applicationInfo.dataDir, "shared_prefs/UltraNativeAccountV2.xml").readText()
+        assertFalse(xml.contains("pending-browser-login-secret"))
+        NativeAccountRuntime.call(context, "login-clear", JSONObject())
+        assertTrue(NativeAccountRuntime.call(context, "login-load", JSONObject()).isNull("value"))
     }
     @Test fun sessionOnlyRebindRemovesPreviouslyManagedReminders() {
         val input = configure()

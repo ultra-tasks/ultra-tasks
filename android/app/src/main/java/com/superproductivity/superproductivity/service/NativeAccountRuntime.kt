@@ -82,18 +82,18 @@ object NativeAccountRuntime {
             require(value.length <= 16384)
             val expiry = JSONObject(value).getJSONObject("request").getLong("expiresAt")
             require(expiry > System.currentTimeMillis() && expiry <= System.currentTimeMillis() + 300000)
-            check(prefs(context).edit().putString("pending_browser_login", value).commit())
+            check(prefs(context).edit().putString(BROWSER_LOGIN_SLOT, value).commit())
             return JSONObject().put("saved", true)
         }
         if (method == "login-clear") {
-            check(prefs(context).edit().remove("pending_browser_login").commit())
+            check(prefs(context).edit().remove(BROWSER_LOGIN_SLOT).commit())
             return JSONObject().put("cleared", true)
         }
         if (method == "login-load") {
-            val value = prefs(context).getString("pending_browser_login", null)
+            val value = prefs(context).getString(BROWSER_LOGIN_SLOT, null)
             if (value != null && JSONObject(value).getJSONObject("request").getLong("expiresAt") > System.currentTimeMillis())
                 return JSONObject().put("value", value)
-            check(prefs(context).edit().remove("pending_browser_login").commit())
+            check(prefs(context).edit().remove(BROWSER_LOGIN_SLOT).commit())
             return JSONObject().put("value", JSONObject.NULL)
         }
         when (method) {
@@ -207,7 +207,7 @@ object NativeAccountRuntime {
     @Synchronized fun clear(context: Context) {
         val stored = managed(context)
         for (taskId in stored.keys()) cancelRemindersForTask(context, taskId)
-        check(prefs(context).edit().clear().commit())
+        clearNativeAccountSessionStorage(prefs(context))
         NativeAccountScheduler.cancel(context)
     }
 }
