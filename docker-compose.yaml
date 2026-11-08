@@ -89,7 +89,7 @@ services:
       - TEST_MODE_CONFIRM=yes-i-understand-the-risks
       - JWT_SECRET=e2e-test-secret-minimum-32-chars-long-for-security
       - CORS_ORIGINS=*
-      - DATA_DIR=/data
+      - DATA_DIR=/repo/apps/server/data
       # Prisma connection string
       - DATABASE_URL=postgresql://supersync:superpassword@db:5432/supersync_db
     healthcheck:
