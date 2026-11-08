@@ -36,6 +36,9 @@ const longPress = async (page: Page, target: Locator): Promise<void> => {
 };
 
 const swipeLeft = async (page: Page, target: Locator): Promise<void> => {
+  // Shrinking the viewport and switching input intent can still move the row.
+  // CDP uses absolute coordinates, so wait for the same actionability as a tap.
+  await target.tap({ trial: true });
   const box = await target.boundingBox();
   if (!box) throw new Error('Swipe target has no bounding box');
   const startOffset = box.width * 0.8;
@@ -129,8 +132,9 @@ test.describe('Phone menus (touch)', () => {
     await switchToTouch(page);
 
     await swipeLeft(page, task);
-    await waitForMenuSettled(page);
     const menu = page.locator('.mat-mdc-menu-panel').first();
+    await expect(menu).toBeVisible();
+    await waitForMenuSettled(page);
 
     // The date shortcuts carry visible labels: tooltips never show on touch.
     await expect(menu.locator('.quick-access-label')).toHaveText([
