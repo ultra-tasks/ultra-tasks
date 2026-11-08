@@ -1,6 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { openRecurDialog, saveRecurDialog } from '../../utils/recurring-task-helpers';
-import { flushPendingWrites } from '../../utils/waits';
+import { flushPendingWrites, waitForMenuSettled } from '../../utils/waits';
 
 test('keeps the priority when creating the next recurring occurrence', async ({
   page,
@@ -13,7 +13,9 @@ test('keeps the priority when creating the next recurring occurrence', async ({
   await workViewPage.addTask('Recurring priority');
   const task = taskPage.getTaskByText('Recurring priority').first();
   await task.click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Priority', exact: true }).click();
+  await waitForMenuSettled(page);
+  await page.getByRole('menuitem', { name: 'Priority', exact: true }).hover();
+  await waitForMenuSettled(page);
   await page.getByRole('menuitemradio', { name: 'High', exact: true }).click();
   await expect(task.locator('task-priority-indicator')).toHaveAttribute(
     'data-priority',
