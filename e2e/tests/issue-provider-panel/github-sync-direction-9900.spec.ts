@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import { expect, test } from '../../fixtures/test.fixture';
 
 // #9900: refreshing a plugin issue used the import mapping and then raw issue
@@ -31,8 +36,7 @@ test('GitHub refresh respects disabled title sync while still pulling status', a
     });
   });
 
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
-  await page.locator('issue-panel .mat-mdc-tab').last().click();
+  await openIntegrationSetup(page);
   await page.getByRole('button', { name: 'GitHub Issues', exact: true }).click();
   const dialog = page.locator('dialog-edit-issue-provider');
   await dialog.locator('input[id*="repo"]').fill('e2e/repro');
@@ -42,14 +46,17 @@ test('GitHub refresh respects disabled title sync while still pulling status', a
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).toBeHidden();
 
-  await page.locator('issue-panel .mat-mdc-tab').first().click();
-  await page.locator('issue-provider-tab input[name="search"]').fill('Original issue');
-  await page
-    .locator('issue-preview-item', { hasText: 'Original issue' })
-    .getByRole('button')
-    .first()
-    .click();
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
+  await finishIntegrationSetup(page);
+  const source = page.locator('.source-browser');
+  await source.locator('input').first().fill('Original issue');
+  await source.getByRole('button', { name: 'Search source', exact: true }).click();
+  await source
+    .locator('.integration-task')
+    .filter({ hasText: 'Original issue' })
+    .locator('input')
+    .check();
+  await source.getByRole('button', { name: /Add selected items/ }).click();
+  await leaveIntegrations(page);
   const task = taskPage.getTaskByText('#9900 Original issue');
   await expect(task).toBeVisible();
   await expect(task).not.toHaveClass(/isDone/);

@@ -13,7 +13,7 @@ describe('getInitialBottomPanelHeightRatio', () => {
   });
 
   it('uses the expanded height for other panels', () => {
-    expect(getInitialBottomPanelHeightRatio('ISSUE_PANEL')).toBe(0.9);
+    expect(getInitialBottomPanelHeightRatio('PLUGIN')).toBe(0.9);
     expect(getInitialBottomPanelHeightRatio(null)).toBe(0.9);
   });
 });

@@ -1,3 +1,9 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+  openIntegrations,
+} from '../../utils/integration-workspace';
 import { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import {
@@ -185,12 +191,12 @@ test.describe('Plainspace Release 0', () => {
     await expect
       .poll(() => server.abortedTaskRequests, { timeout: 30000 })
       .toBeGreaterThan(0);
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
-    await expect(page.locator('issue-panel')).toBeVisible();
+    await openIntegrations(page);
+    await expect(page.locator('integrations-page')).toBeVisible();
+    await openProviderTab(page, SPACE.id);
     const reconnectNotice = activeTab(page).locator(
       'plainspace-reconnect-notice .callout',
     );
-    await openProviderTab(page, SPACE.id);
     await expect(reconnectNotice).toHaveCount(0);
     await expect(
       page.locator('mat-snack-bar-container', { hasText: /Failed to poll/ }),
@@ -202,7 +208,10 @@ test.describe('Plainspace Release 0', () => {
     server.tokens.delete(`${HOST} pat_old`);
     server.tokens.set(`${HOST} pat_new`, 'me@e2e.test');
     server.isTasksOffline = false;
-    await page.locator('issue-panel .mat-mdc-tab').last().click();
+    await page
+      .locator('integrations-page')
+      .getByRole('button', { name: 'Connect account', exact: true })
+      .click();
     await page.getByRole('button', { name: 'Plainspace', exact: true }).click();
     const editDialog = page.locator('dialog-edit-issue-provider');
     await editDialog.locator('input[id*="host"]').fill(OTHER_HOST);
@@ -213,6 +222,7 @@ test.describe('Plainspace Release 0', () => {
     await page.getByRole('option', { name: 'Inbox' }).click();
     await editDialog.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(editDialog).toBeHidden();
+    await finishIntegrationSetup(page);
 
     // Item 2: the 401 shows "reconnect" on the shared project's provider only;
     // the other host's provider polls fine and shows nothing.
@@ -223,7 +233,7 @@ test.describe('Plainspace Release 0', () => {
       .poll(() => lastTaskRequest(server, OTHER_HOST)?.status, { timeout: 30000 })
       .toBe(200);
     await openProviderTab(page, SPACE_B.id);
-    await expect(activeTab(page).locator('header .title')).toHaveText(SPACE_B.id);
+    await expect(activeTab(page).locator('p.muted')).toHaveText(SPACE_B.id);
     await expect(reconnectNotice).toHaveCount(0);
     await openProviderTab(page, SPACE.id);
     await expect(reconnectNotice).toBeVisible();
@@ -291,9 +301,7 @@ test.describe('Plainspace Release 0', () => {
 
     // An integration still on the revoked token, bound to the Inbox so it polls
     // (addressed by the space slug, so its tab reads "alpha").
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
-    await expect(page.locator('issue-panel')).toBeVisible();
-    await page.locator('issue-panel .mat-mdc-tab').last().click();
+    await openIntegrationSetup(page);
     await page.getByRole('button', { name: 'Plainspace', exact: true }).click();
     const editDialog = page.locator('dialog-edit-issue-provider');
     await editDialog.locator('input[id*="host"]').fill(HOST);
@@ -304,7 +312,8 @@ test.describe('Plainspace Release 0', () => {
     await page.getByRole('option', { name: 'Inbox' }).click();
     await editDialog.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(editDialog).toBeHidden();
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
+    await finishIntegrationSetup(page);
+    await leaveIntegrations(page);
 
     // Share a project with the current token: saved account and provider hold it.
     await projectPage.createProject('Shared');
@@ -323,12 +332,12 @@ test.describe('Plainspace Release 0', () => {
         { timeout: 30000 },
       )
       .toBe(true);
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
-    await expect(page.locator('issue-panel')).toBeVisible();
+    await openIntegrations(page);
+    await expect(page.locator('integrations-page')).toBeVisible();
+    await openProviderTab(page, SPACE.slug);
     const reconnectNotice = activeTab(page).locator(
       'plainspace-reconnect-notice .callout',
     );
-    await openProviderTab(page, SPACE.slug);
     await expect(reconnectNotice).toBeVisible();
 
     // Reconnecting mints pat_new, which revokes pat_mid as well.

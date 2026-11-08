@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import { expect, test } from '../../fixtures/test.fixture';
 
 /**
@@ -32,8 +37,6 @@ import { expect, test } from '../../fixtures/test.fixture';
 const ICAL_URL = 'https://example.com/sp-10047.ics';
 const EVENT_TITLE = 'E2E-10047 Standup';
 const UID = 'e2e-10047-event';
-
-const PANEL_BTN = '.e2e-toggle-issue-provider-panel';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -140,13 +143,9 @@ test.describe('Calendar #10047', () => {
     await workViewPage.waitForTaskList();
 
     // --- Configure a calendar provider with auto-import enabled ---
-    await page.waitForSelector(PANEL_BTN, { state: 'visible' });
-    await page.click(PANEL_BTN);
-    await page.waitForSelector('mat-tab-group', { state: 'visible' });
-    await page.click('mat-tab-group .mat-mdc-tab:last-child');
-    await page.waitForSelector('issue-provider-setup-overview', { state: 'visible' });
+    await openIntegrationSetup(page);
 
-    await page.getByRole('button', { name: 'Other (iCal)' }).click();
+    await page.getByRole('button', { name: 'Calendar (iCal / Outlook)' }).click();
     const dialog = page.locator('mat-dialog-container');
     await expect(dialog).toBeVisible({ timeout: 5000 });
 
@@ -155,6 +154,8 @@ test.describe('Calendar #10047', () => {
 
     await dialog.locator('button[type="submit"]').click();
     await expect(dialog).toBeHidden({ timeout: 5000 });
+    await finishIntegrationSetup(page);
+    await leaveIntegrations(page);
 
     await page.keyboard.press('Escape');
 

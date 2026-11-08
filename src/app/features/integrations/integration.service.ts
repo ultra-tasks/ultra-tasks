@@ -132,6 +132,14 @@ export class IntegrationService {
     if (link) this._tasks.updateUi(id, { integration: { ...link, fieldPolicy } });
   }
 
+  setPinnedSearch(id: string, pinnedSearch: string): void {
+    this._store.dispatch(
+      IssueProviderActions.updateIssueProvider({
+        issueProvider: { id, changes: { pinnedSearch } },
+      }),
+    );
+  }
+
   async addItem(
     item: SearchResultItem,
     provider: IssueProvider,

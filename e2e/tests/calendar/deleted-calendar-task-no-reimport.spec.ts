@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import { expect, test } from '../../fixtures/test.fixture';
 
 /**
@@ -24,8 +29,6 @@ const EVENT_TITLE = 'E2E-5162 Sprint Planning';
 // always renders as a calendar chip, giving a positive "calendar finished
 // rendering" anchor that is independent of the event under test.
 const CONTROL_TITLE = 'E2E-5162 Control Tomorrow';
-
-const PANEL_BTN = '.e2e-toggle-issue-provider-panel';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -75,13 +78,9 @@ test.describe('Calendar #5162', () => {
     await workViewPage.waitForTaskList();
 
     // --- Configure a calendar provider with auto-import enabled ---
-    await page.waitForSelector(PANEL_BTN, { state: 'visible' });
-    await page.click(PANEL_BTN);
-    await page.waitForSelector('mat-tab-group', { state: 'visible' });
-    await page.click('mat-tab-group .mat-mdc-tab:last-child');
-    await page.waitForSelector('issue-provider-setup-overview', { state: 'visible' });
+    await openIntegrationSetup(page);
 
-    await page.getByRole('button', { name: 'Other (iCal)' }).click();
+    await page.getByRole('button', { name: 'Calendar (iCal / Outlook)' }).click();
     const dialog = page.locator('mat-dialog-container');
     await expect(dialog).toBeVisible({ timeout: 5000 });
 
@@ -90,6 +89,8 @@ test.describe('Calendar #5162', () => {
 
     await dialog.locator('button[type="submit"]').click();
     await expect(dialog).toBeHidden({ timeout: 5000 });
+    await finishIntegrationSetup(page);
+    await leaveIntegrations(page);
 
     await page.keyboard.press('Escape');
 

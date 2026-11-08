@@ -1,8 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { createEffect, ofType } from '@ngrx/effects';
 import { LOCAL_ACTIONS } from '../../../util/local-actions.token';
-import { hideNonTaskSidePanelContent } from './layout.actions';
-import { filter, mapTo } from 'rxjs/operators';
+import { hideNonTaskSidePanelContent, toggleIssuePanel } from './layout.actions';
+import { filter, mapTo, tap } from 'rxjs/operators';
 import { setSelectedTask } from '../../../features/tasks/store/task.actions';
 import { TaskDetailTargetPanel } from '../../../features/tasks/task.model';
 import { LayoutService } from '../layout.service';
@@ -21,6 +21,18 @@ export class LayoutEffects {
   private actions$ = inject(LOCAL_ACTIONS);
   private layoutService = inject(LayoutService);
   private router = inject(Router);
+
+  // Keep the old shortcut/plugin action working without reopening a retired pane.
+  openIntegrations$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        ofType(toggleIssuePanel),
+        tap(() => {
+          void this.router.navigate(['/integrations']);
+        }),
+      ),
+    { dispatch: false },
+  );
 
   hideNotesWhenTaskIsSelected$ = createEffect(() =>
     this.actions$.pipe(

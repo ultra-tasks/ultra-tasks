@@ -8,7 +8,6 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { GlobalConfigService } from '../../../features/config/global-config.service';
 import { SnackService } from '../../../core/snack/snack.service';
-import { LayoutService } from '../../../core-ui/layout/layout.service';
 import { PluginBridgeService } from '../../plugin-bridge.service';
 import { PluginCacheService } from '../../plugin-cache.service';
 import { PluginConfigService } from '../../plugin-config.service';
@@ -28,11 +27,9 @@ describe('PluginManagementComponent', () => {
   let fixture: ComponentFixture<PluginManagementComponent>;
   let component: PluginManagementComponent;
   let routerNavigateSpy: jasmine.Spy;
-  let layoutToggleSpy: jasmine.Spy;
   let pluginsWindowRef: { close: jasmine.Spy };
   let loadPluginFromZipSpy: jasmine.Spy;
   let snackOpenSpy: jasmine.Spy;
-  let isShowIssuePanel: ReturnType<typeof signal<boolean>>;
 
   beforeEach(() => {
     loadPluginFromZipSpy = jasmine.createSpy('loadPluginFromZip');
@@ -40,9 +37,7 @@ describe('PluginManagementComponent', () => {
     routerNavigateSpy = jasmine
       .createSpy('navigate')
       .and.returnValue(Promise.resolve(true));
-    layoutToggleSpy = jasmine.createSpy('toggleAddTaskPanel');
     pluginsWindowRef = { close: jasmine.createSpy('close') };
-    isShowIssuePanel = signal(false);
     TestBed.configureTestingModule({
       imports: [PluginManagementComponent, TranslateModule.forRoot()],
       providers: [
@@ -81,10 +76,6 @@ describe('PluginManagementComponent', () => {
         {
           provide: Router,
           useValue: { navigate: routerNavigateSpy },
-        },
-        {
-          provide: LayoutService,
-          useValue: { isShowIssuePanel, toggleAddTaskPanel: layoutToggleSpy },
         },
         {
           provide: Store,
@@ -467,28 +458,18 @@ describe('PluginManagementComponent', () => {
     });
   });
 
-  it('navigates to the work view and opens the issue panel', async () => {
-    await component.goToIssuePanel();
+  it('navigates directly to the integrations workspace', async () => {
+    await component.goToIntegrations();
 
-    expect(routerNavigateSpy).toHaveBeenCalledWith(['/active/tasks']);
-    expect(layoutToggleSpy).toHaveBeenCalledTimes(1);
+    expect(routerNavigateSpy).toHaveBeenCalledWith(['/integrations']);
   });
 
   // From a work view /active/tasks redirects back to the current URL, so no
   // NavigationEnd fires and the window would not close itself.
-  it('closes the plugins window when going to the issue panel', async () => {
-    await component.goToIssuePanel();
+  it('closes the plugins window when going to integrations', async () => {
+    await component.goToIntegrations();
 
     expect(pluginsWindowRef.close).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not re-toggle the panel when it is already open', async () => {
-    isShowIssuePanel.set(true);
-
-    await component.goToIssuePanel();
-
-    expect(routerNavigateSpy).toHaveBeenCalledWith(['/active/tasks']);
-    expect(layoutToggleSpy).not.toHaveBeenCalled();
   });
 
   describe('getPluginLanguages', () => {

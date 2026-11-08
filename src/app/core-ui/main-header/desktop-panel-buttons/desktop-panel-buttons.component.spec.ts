@@ -33,7 +33,6 @@ describe('DesktopPanelButtonsComponent', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(DesktopPanelButtonsComponent);
-    fixture.componentRef.setInput('isShowIssuePanel', false);
     fixture.componentRef.setInput('isShowNotes', false);
     fixture.detectChanges();
     return fixture;
@@ -46,14 +45,10 @@ describe('DesktopPanelButtonsComponent', () => {
   };
 
   const cases: Array<[string, Partial<AppFeaturesConfig>, string[]]> = [
-    ['both enabled', {}, ['e2e-toggle-issue-provider-panel', 'e2e-toggle-notes-btn']],
+    ['notes enabled', {}, ['e2e-toggle-notes-btn']],
     ['none enabled', NONE, []],
     ['only schedule', { ...NONE, isSchedulerEnabled: true }, []],
-    [
-      'only issues',
-      { ...NONE, isIssuesPanelEnabled: true },
-      ['e2e-toggle-issue-provider-panel'],
-    ],
+    ['only issues', { ...NONE, isIssuesPanelEnabled: true }, []],
     ['only notes', { ...NONE, isProjectNotesEnabled: true }, ['e2e-toggle-notes-btn']],
     [
       'notes with Calendar enabled',

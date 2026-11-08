@@ -1,9 +1,15 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { expectNoGlobalError } from '../../utils/assertions';
 
-const PANEL_BTN = '.e2e-toggle-issue-provider-panel';
+const openSetup = async (page: import('@playwright/test').Page): Promise<void> => {
+  await page.goto('/#/integrations');
+  await page
+    .locator('integrations-page')
+    .getByRole('button', { name: 'Connect account', exact: true })
+    .click();
+};
 
-test.describe('Issue Provider Panel', () => {
+test.describe('Integration setup', () => {
   test('should render after reload without waiting for browser idle', async ({
     page,
     workViewPage,
@@ -17,27 +23,25 @@ test.describe('Issue Provider Panel', () => {
     });
     await page.reload();
     await workViewPage.waitForTaskList();
-    await page.locator(`${PANEL_BTN}:visible`).click();
-    await expect(page.locator('issue-panel')).toBeVisible();
-    await expect(page.locator('issue-provider-setup-overview')).toBeVisible();
+    await expect(page.locator('.e2e-toggle-issue-provider-panel')).not.toBeAttached();
+    await page.keyboard.press('p');
+    await expect(page.locator('integrations-page')).toBeVisible();
+    await expect(page.locator('issue-panel')).not.toBeAttached();
+    await page
+      .locator('integrations-page')
+      .getByRole('button', { name: 'Connect account', exact: true })
+      .click();
+    await expect(
+      page.locator('integration-setup .provider-choice').first(),
+    ).toBeVisible();
   });
 
   test('should open all dialogs without error', async ({ page, workViewPage }) => {
     // Wait for work view to be ready
     await workViewPage.waitForTaskList();
 
-    await page.waitForSelector(PANEL_BTN, { state: 'visible' });
-    await page.click(PANEL_BTN);
-    await page.waitForSelector('mat-tab-group', { state: 'visible' });
-    // Click on the last tab (add tab) which contains the issue-provider-setup-overview
-    await page.click('mat-tab-group .mat-mdc-tab:last-child');
-    await page.waitForSelector('issue-provider-setup-overview', { state: 'visible' });
-
-    // Wait for buttons to be ready
-    await page
-      .locator('issue-provider-setup-overview button')
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
+    await openSetup(page);
+    await page.locator('integration-setup .provider-choice').first().waitFor();
 
     // Start capturing page errors only after the panel is settled so we don't
     // pick up unrelated startup noise (vite overlay, lazy-chunk warnings, etc.)
@@ -49,14 +53,15 @@ test.describe('Issue Provider Panel', () => {
     page.on('pageerror', onPageError);
 
     // Get all buttons in the issue provider setup overview
-    const setupButtons = page.locator('issue-provider-setup-overview button');
+    const setupButtons = page.locator('integration-setup .provider-choice');
     const buttonCount = await setupButtons.count();
     expect(buttonCount).toBeGreaterThan(0);
 
     // Click each button and close the dialog
+    const providerNames = await setupButtons.locator('span').allTextContents();
     let openedDialogCount = 0;
-    for (let i = 0; i < buttonCount; i++) {
-      const button = setupButtons.nth(i);
+    for (const name of providerNames) {
+      const button = setupButtons.filter({ hasText: name.trim() });
 
       await expect(button).toBeVisible();
       await expect(button).toBeEnabled();
@@ -80,7 +85,7 @@ test.describe('Issue Provider Panel', () => {
       await expect(dialogContainer).toBeHidden({ timeout: 5000 });
 
       // Ensure we're back on the issue provider panel
-      await expect(page.locator('issue-provider-setup-overview')).toBeVisible({
+      await expect(page.locator('integration-setup')).toBeVisible({
         timeout: 3000,
       });
     }

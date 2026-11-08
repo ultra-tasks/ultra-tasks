@@ -203,8 +203,15 @@
         <section class="surface">
           <h3>{{ I.SOURCE | translate }}</h3>
           @for (provider of data.providers(); track provider.id) {
-            <div class="connection">
+            <div
+              class="connection"
+              [attr.data-provider-id]="provider.id"
+            >
               <strong>{{ capabilities.name(provider.issueProviderKey) }}</strong>
+              <p class="muted">{{ providerScope(provider) }}</p>
+              @if (provider.isEnabled && provider.issueProviderKey === 'PLAINSPACE') {
+                <plainspace-reconnect-notice [issueProvider]="provider" />
+              }
               <div class="actions">
                 <button
                   mat-button
@@ -258,6 +265,17 @@
             (click)="searchSource()"
           >
             {{ I.SEARCH_SOURCE | translate }}
+          </button>
+          <button
+            mat-button
+            [disabled]="!provider.pinnedSearch && !sourceSearch().trim()"
+            (click)="pinSearch()"
+          >
+            <mat-icon>{{ provider.pinnedSearch ? 'bookmark' : 'bookmark_add' }}</mat-icon>
+            {{
+              (provider.pinnedSearch ? T.F.ISSUE.UNPIN_SEARCH : T.F.ISSUE.PIN_SEARCH)
+                | translate
+            }}
           </button>
         </div>
         <div class="mode-grid">

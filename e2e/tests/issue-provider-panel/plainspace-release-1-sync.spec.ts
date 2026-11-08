@@ -1,3 +1,4 @@
+import { openIntegrations } from '../../utils/integration-workspace';
 import { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import { ProjectPage } from '../../pages/project.page';
@@ -417,7 +418,7 @@ test.describe('Plainspace Release 1 sync', () => {
     expect(server.patches.slice(1).map((p) => p.body)).toEqual([{ done: true }]);
     expect(server.tasks.get(TASK_ID)!.title).toBe('Buy tent');
 
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
+    await openIntegrations(page);
     const tooOld = page.locator('plainspace-reconnect-notice .callout', {
       hasText: 'too old to sync titles and times',
     });

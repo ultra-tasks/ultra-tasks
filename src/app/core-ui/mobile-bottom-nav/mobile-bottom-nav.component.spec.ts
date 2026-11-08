@@ -33,21 +33,13 @@ describe('MobileBottomNavComponent', () => {
     onClick?: () => void;
   }
 
-  type LayoutToggle = 'toggleAddTaskPanel' | 'toggleNotes';
-  type LayoutShowSignal = 'isShowIssuePanel' | 'isShowNotes';
+  type LayoutToggle = 'toggleNotes';
+  type LayoutShowSignal = 'isShowNotes';
 
   /** Feature flag → the item it must produce, what it toggles, and its state. */
   const PANEL_ITEMS: ReadonlyArray<
     [keyof AppFeaturesConfig, string, LayoutToggle, LayoutShowSignal]
-  > = [
-    [
-      'isIssuesPanelEnabled',
-      '.e2e-toggle-issue-provider-panel',
-      'toggleAddTaskPanel',
-      'isShowIssuePanel',
-    ],
-    ['isProjectNotesEnabled', '.e2e-toggle-notes-btn', 'toggleNotes', 'isShowNotes'],
-  ];
+  > = [['isProjectNotesEnabled', '.e2e-toggle-notes-btn', 'toggleNotes', 'isShowNotes']];
 
   const ALL_OFF: Partial<AppFeaturesConfig> = {
     isSchedulerEnabled: false,
@@ -166,20 +158,12 @@ describe('MobileBottomNavComponent', () => {
       .forEach((el) => (el.innerHTML = ''));
   });
 
-  const cases: Array<[string, Partial<AppFeaturesConfig>]> = [
-    ['both enabled', {}],
-    ['issues and notes with Calendar disabled', { isSchedulerEnabled: false }],
-  ];
-
-  cases.forEach(([name, over]) => {
-    it(`lists every enabled panel — ${name}`, async () => {
-      const cmp = await render(over);
-      const af = { ...DEFAULT_GLOBAL_CONFIG.appFeatures, ...over };
-
-      const expected = PANEL_ITEMS.filter(([flag]) => af[flag]).map(([, sel]) => sel);
-      expect(cmp.sidePanelItemCount()).toBe(expected.length);
-      expect(openPanelsMenu()).toEqual(expected);
-    });
+  it('ignores the retired issue-panel flag and keeps notes directly reachable', async () => {
+    const cmp = await render({ isIssuesPanelEnabled: true, isProjectNotesEnabled: true });
+    expect(cmp.sidePanelItemCount()).toBe(1);
+    expect(menuTrigger()).toBeFalsy();
+    expect(nav().querySelector('.e2e-toggle-notes-btn')).toBeTruthy();
+    expect(nav().querySelector('.e2e-toggle-issue-provider-panel')).toBeFalsy();
   });
 
   it('lists a plugin side panel next to a built-in panel', async () => {

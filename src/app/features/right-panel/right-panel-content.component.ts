@@ -14,7 +14,6 @@ import { TaskService } from '../tasks/task.service';
 import { LayoutService } from '../../core-ui/layout/layout.service';
 import { slideInFromRightAni } from '../../ui/animations/slide-in-from-right.ani';
 import { taskDetailPanelTaskChangeAnimation } from '../tasks/task-detail-panel/task-detail-panel.ani';
-import { IssuePanelComponent } from '../issue-panel/issue-panel.component';
 import { NotesComponent } from '../note/notes/notes.component';
 import { TaskDetailPanelComponent } from '../tasks/task-detail-panel/task-detail-panel.component';
 import { PluginService } from '../../plugins/plugin.service';
@@ -45,12 +44,7 @@ export type RightPanelContentPanelType = PanelContentType;
   styleUrls: ['./right-panel-content.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [taskDetailPanelTaskChangeAnimation, slideInFromRightAni],
-  imports: [
-    IssuePanelComponent,
-    NotesComponent,
-    TaskDetailPanelComponent,
-    PluginPanelContainerComponent,
-  ],
+  imports: [NotesComponent, TaskDetailPanelComponent, PluginPanelContainerComponent],
 })
 export class RightPanelContentComponent implements OnDestroy {
   taskService = inject(TaskService);
@@ -157,12 +151,7 @@ export class RightPanelContentComponent implements OnDestroy {
       return false;
     }
 
-    const {
-      isShowNotes,
-      isShowIssuePanel: isShowAddTaskPanel,
-      isShowTaskViewCustomizerPanel,
-      isShowPluginPanel,
-    } = layoutState;
+    const { isShowNotes, isShowTaskViewCustomizerPanel, isShowPluginPanel } = layoutState;
 
     const isWorkView = this._isWorkViewUrl(currentRoute);
 
@@ -177,7 +166,6 @@ export class RightPanelContentComponent implements OnDestroy {
       !!(
         selectedTask ||
         isShowNotes ||
-        isShowAddTaskPanel ||
         isShowTaskViewCustomizerPanel ||
         isShowPluginPanel
       ) && targetPanel !== TaskDetailTargetPanel.DONT_OPEN_PANEL

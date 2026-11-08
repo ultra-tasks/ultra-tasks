@@ -1,3 +1,4 @@
+import { openIntegrations } from '../../utils/integration-workspace';
 import { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import { ProjectPage } from '../../pages/project.page';
@@ -205,7 +206,7 @@ test.describe('Plainspace Release 2: scheduled time', () => {
       }),
     ).toBeVisible();
     // A state conflict, not an old server: the provider shows no notice.
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
+    await openIntegrations(page);
     await expect(
       page.locator('plainspace-reconnect-notice .callout', { hasText: 'too old' }),
     ).toHaveCount(0);
@@ -238,7 +239,7 @@ test.describe('Plainspace Release 2: scheduled time', () => {
     expect(server.patches.slice(1).map((p) => p.body)).toEqual([{ done: true }]);
     expect(server.tasks.get(TASK_ID)!.scheduledAt).toBeNull();
 
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
+    await openIntegrations(page);
     const tooOld = page.locator('plainspace-reconnect-notice .callout', {
       hasText: 'too old',
     });

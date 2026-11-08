@@ -32,10 +32,6 @@ test.describe('App Features', () => {
       locator: (page: Page) => page.getByRole('menuitem', { name: 'Boards' }),
     },
     {
-      label: 'Issues panel',
-      locator: (page: Page) => page.locator('.e2e-toggle-issue-provider-panel'),
-    },
-    {
       label: 'Project notes',
       locator: (page: Page) => page.locator('.e2e-toggle-notes-btn'),
     },
@@ -44,7 +40,7 @@ test.describe('App Features', () => {
       locator: (page: Page) => page.locator('.sync-btn'),
     },
   ].forEach((feature) => {
-    test(`Element assigned with App feature ${feature.title ?? feature.label} is only visible if feature is enabled`, async ({
+    test(`Element assigned with App feature ${feature.label} is only visible if feature is enabled`, async ({
       page,
       settingsPage,
     }) => {
@@ -87,37 +83,25 @@ test.describe('App Features', () => {
     });
   });
 
-  test('Issues panel app feature hides the mobile bottom-nav panel option', async ({
+  test('the retired issues panel has no desktop or mobile toggle', async ({
     page,
     settingsPage,
   }) => {
+    await goToMainView(page);
+    await expect(page.locator('.e2e-toggle-issue-provider-panel')).not.toBeAttached();
     await page.setViewportSize({ width: 390, height: 844 });
-    const featureSwitch = page.getByRole('switch', {
-      name: 'Issues panel',
-      exact: true,
-    });
-    const issuePanelButton = page.locator('.e2e-toggle-issue-provider-panel');
-    const notesButton = page.locator('.e2e-toggle-notes-btn');
-    const sidePanelMenuButton = page.getByRole('button', {
-      name: 'Side Panel Menu',
-    });
-
-    await goToMainView(page);
     await expect(page.locator('mobile-bottom-nav')).toBeVisible();
-    await sidePanelMenuButton.click();
-    await expect(issuePanelButton).toBeVisible();
-    await page.keyboard.press('Escape');
-
+    await expect(page.locator('.e2e-toggle-issue-provider-panel')).not.toBeAttached();
+    await expect(page.locator('mobile-bottom-nav .e2e-toggle-notes-btn')).toBeVisible();
+    await page.locator('mobile-bottom-nav .tour-navMenuBtn').click();
+    await page
+      .locator('magic-side-nav')
+      .getByRole('menuitem', { name: 'Integrations', exact: true })
+      .click();
+    await expect(page.locator('integrations-page')).toBeVisible();
     await goToAppFeatures(settingsPage);
-    await expect(featureSwitch).toBeVisible();
-    await expect(featureSwitch).toBeChecked();
-    await featureSwitch.click();
-    await expect(featureSwitch).not.toBeChecked();
-
-    await goToMainView(page);
-    await expect(page.locator('mobile-bottom-nav')).toBeVisible();
-    await sidePanelMenuButton.click();
-    await expect(notesButton).toBeVisible();
-    await expect(issuePanelButton).not.toBeAttached();
+    await expect(
+      page.getByRole('switch', { name: 'Issues panel', exact: true }),
+    ).not.toBeAttached();
   });
 });

@@ -80,17 +80,6 @@
           [fallbackIcon]="button.icon || 'extension'"
         ></plugin-icon>
       </button>
-    } @else if (isIssuesPanelEnabled()) {
-      <button
-        mat-button
-        class="nav-button e2e-toggle-issue-provider-panel"
-        [class.active]="isShowIssuePanel()"
-        [attr.aria-pressed]="isShowIssuePanel()"
-        (click)="toggleIssuePanel()"
-        [attr.aria-label]="T.BN.SHOW_ISSUE_PANEL | translate"
-      >
-        <mat-icon>assignment</mat-icon>
-      </button>
     } @else if (isProjectNotesEnabled()) {
       <button
         mat-button
@@ -140,18 +129,6 @@
         [fallbackIcon]="button.icon || 'extension'"
       ></plugin-icon>
       <span>{{ button.label }}</span>
-    </button>
-  }
-
-  @if (isIssuesPanelEnabled()) {
-    <button
-      mat-menu-item
-      class="e2e-toggle-issue-provider-panel"
-      [class.active]="isShowIssuePanel()"
-      (click)="toggleIssuePanel()"
-    >
-      <mat-icon>assignment</mat-icon>
-      <span>{{ T.BN.SHOW_ISSUE_PANEL | translate }}</span>
     </button>
   }
 

@@ -30,19 +30,29 @@ import { DialogEditIssueProviderComponent } from '../issue/dialog-edit-issue-pro
 import { DialogConfirmComponent } from '../../ui/dialog-confirm/dialog-confirm.component';
 import { getIssueProviderTooltip } from '../issue/mapping-helper/get-issue-provider-tooltip';
 import { T } from '../../t.const';
+import { PlainspaceReconnectNoticeComponent } from '../plainspace/reconnect-notice/plainspace-reconnect-notice.component';
 
 type IntegrationFilter = 'all' | 'sync' | 'import' | 'hidden' | 'stopped';
 
 @Component({
   selector: 'integrations-page',
   standalone: true,
-  imports: [FormsModule, MatButton, MatIcon, TranslatePipe, IntegrationSetupComponent],
+  imports: [
+    FormsModule,
+    MatButton,
+    MatIcon,
+    TranslatePipe,
+    IntegrationSetupComponent,
+    PlainspaceReconnectNoticeComponent,
+  ],
   templateUrl: './integrations-page.component.html',
   styleUrl: './integrations.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class IntegrationsPageComponent {
+  readonly T = T;
   readonly I = T.F.INTEGRATIONS;
+  readonly providerScope = getIssueProviderTooltip;
   readonly data = inject(IntegrationService);
   readonly capabilities = inject(IntegrationCapabilityService);
   private readonly _issues = inject(IssueService);
@@ -250,6 +260,13 @@ export class IntegrationsPageComponent {
     this.selectedSource.set(new Set());
     this.browseMode.set(provider.integrationMode ?? 'sync');
     this.sourceSearch.set(provider.pinnedSearch ?? '');
+  }
+  pinSearch(): void {
+    const provider = this.browseProvider();
+    if (!provider) return;
+    const pinnedSearch = provider.pinnedSearch ? '' : this.sourceSearch().trim();
+    this.data.setPinnedSearch(provider.id, pinnedSearch);
+    this.browseProvider.set({ ...provider, pinnedSearch });
   }
   async searchSource(): Promise<void> {
     const provider = this.browseProvider();

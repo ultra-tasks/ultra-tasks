@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import { expect, test } from '../../fixtures/test.fixture';
 import type { Page } from '@playwright/test';
 import { expectNoGlobalError } from '../../utils/assertions';
@@ -205,8 +210,7 @@ test('auto-created issue excludes short syntax tokens (#10024)', async ({
   });
 
   // Configure GitHub Issues with auto-create bound to the test project
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
-  await page.locator('mat-tab-group .mat-mdc-tab:last-child').click();
+  await openIntegrationSetup(page);
   await page.getByRole('button', { name: 'GitHub Issues', exact: true }).click();
   const dialog = page.locator('dialog-edit-issue-provider');
   const repoInput = dialog.locator('input[id*="repo"]');
@@ -235,7 +239,8 @@ test('auto-created issue excludes short syntax tokens (#10024)', async ({
 
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
+  await finishIntegrationSetup(page);
+  await leaveIntegrations(page);
 
   // Hold the date parser's lazy chunk (see file comment) so the dispatched
   // action carries the raw title. CI serves the built app, whose lazy chunks

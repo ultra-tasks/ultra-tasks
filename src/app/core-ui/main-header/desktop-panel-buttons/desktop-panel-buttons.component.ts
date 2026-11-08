@@ -19,22 +19,6 @@ import { GlobalConfigService } from '../../../features/config/global-config.serv
   standalone: true,
   imports: [MatIconButton, MatIcon, MatTooltip, TranslatePipe],
   template: `
-    @if (isIssuesPanelEnabled()) {
-      <button
-        class="panel-btn e2e-toggle-issue-provider-panel"
-        [class.isActive]="isShowIssuePanel()"
-        [attr.aria-pressed]="isShowIssuePanel()"
-        (click)="layoutService.toggleAddTaskPanel()"
-        mat-icon-button
-        matTooltip="{{ T.MH.TOGGLE_SHOW_ISSUE_PANEL | translate }} {{
-          kb()?.toggleIssuePanel ? '[' + kb()?.toggleIssuePanel + ']' : ''
-        }}"
-        [attr.aria-label]="T.MH.TOGGLE_SHOW_ISSUE_PANEL | translate"
-      >
-        <mat-icon>assignment</mat-icon>
-      </button>
-    }
-
     @if (isProjectNotesEnabled()) {
       <button
         class="panel-btn e2e-toggle-notes-btn"
@@ -94,12 +78,8 @@ export class DesktopPanelButtonsComponent {
   private readonly _configService = inject(GlobalConfigService);
 
   readonly kb = input<KeyboardConfig | null>();
-  readonly isShowIssuePanel = input.required<boolean>();
   readonly isShowNotes = input.required<boolean>();
 
-  readonly isIssuesPanelEnabled = computed(
-    () => this._configService.appFeatures().isIssuesPanelEnabled,
-  );
   readonly isProjectNotesEnabled = computed(
     () => this._configService.appFeatures().isProjectNotesEnabled,
   );

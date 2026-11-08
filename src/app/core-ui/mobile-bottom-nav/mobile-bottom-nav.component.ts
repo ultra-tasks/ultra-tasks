@@ -90,10 +90,6 @@ export class MobileBottomNavComponent {
 
   // Panel state signals from layout service
   readonly isShowNotes = this._layoutService.isShowNotes;
-  readonly isShowIssuePanel = this._layoutService.isShowIssuePanel;
-  readonly isIssuesPanelEnabled = computed(
-    () => this._globalConfigService.appFeatures().isIssuesPanelEnabled,
-  );
   readonly isProjectNotesEnabled = computed(
     () => this._globalConfigService.appFeatures().isProjectNotesEnabled,
   );
@@ -138,10 +134,7 @@ export class MobileBottomNavComponent {
    * the nav button itself.
    */
   readonly sidePanelItemCount = computed(
-    () =>
-      this.sidePanelButtons().length +
-      (this.isIssuesPanelEnabled() ? 1 : 0) +
-      (this.isProjectNotesEnabled() ? 1 : 0),
+    () => this.sidePanelButtons().length + (this.isProjectNotesEnabled() ? 1 : 0),
   );
 
   // Navigation methods
@@ -210,10 +203,6 @@ export class MobileBottomNavComponent {
     if (button.onClick) {
       button.onClick();
     }
-  }
-
-  toggleIssuePanel(): void {
-    this._layoutService.toggleAddTaskPanel();
   }
 
   toggleNotes(): void {
