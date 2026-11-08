@@ -63,6 +63,15 @@ export const APP_ROUTES: Routes = [
     canActivate: [FocusOverlayOpenGuard, settingsDialogGuard],
   },
   {
+    path: 'integrations',
+    loadComponent: () =>
+      import('./features/integrations/integrations-page.component').then(
+        (m) => m.IntegrationsPageComponent,
+      ),
+    data: { page: 'integrations' },
+    canActivate: [FocusOverlayOpenGuard],
+  },
+  {
     path: 'plugins',
     loadComponent: () =>
       import('./plugins/ui/plugins-window.component').then(

@@ -1,3 +1,8 @@
+import {
+  integrationForTask,
+  matchesIntegration,
+  canDeleteIntegrationTimeBlock,
+} from '../integrations/integration.model';
 import { nanoid } from 'nanoid';
 import typia from 'typia';
 import { distinctUntilChanged, first, map, take, withLatestFrom } from 'rxjs/operators';
@@ -319,9 +324,6 @@ export class TaskService {
     return this._store.pipe(select(selectMainTasksWithoutTag, { tagId }));
   }
 
-  // META
-
-  // ----
   setCurrentId(id: string | null): void {
     if (id) {
       this._store.dispatch(setCurrentTask({ id }));
@@ -505,7 +507,7 @@ export class TaskService {
         })),
     );
     this._timeBlockDeleteSidecar.set(
-      tasks.filter((t) => !!t.dueWithTime).map((t) => t.id),
+      tasks.filter(canDeleteIntegrationTimeBlock).map((t) => t.id),
     );
     this._store.dispatch(TaskSharedActions.deleteTasks({ taskIds, tasks }));
   }
@@ -1379,8 +1381,8 @@ export class TaskService {
   async getAllIssueIdsForProviderEverywhere(issueProviderId: string): Promise<string[]> {
     const allTasks = await this.getAllTasksEverywhere();
     return allTasks
-      .filter((task) => task.issueProviderId === issueProviderId)
-      .map((task) => task.issueId) as string[];
+      .filter((task) => integrationForTask(task)?.providerId === issueProviderId)
+      .map((task) => integrationForTask(task)!.remoteId);
   }
 
   async getAllTasksEverywhere(): Promise<Task[]> {
@@ -1408,10 +1410,7 @@ export class TaskService {
 
     const findTaskFn = (task: Task | ArchiveTask | undefined): boolean =>
       !!task &&
-      // NOTE: we check all, since it is theoretically possible for the same issueId to appear across issue providers
-      task.issueId === issueId &&
-      task.issueType === issueProviderKey &&
-      task.issueProviderId === issueProviderId;
+      matchesIntegration(task, issueProviderId, issueProviderKey, String(issueId));
 
     const allTasks = (await this._allTasks$.pipe(first()).toPromise()) as Task[];
     const taskWithSameIssue: Task = allTasks.find(findTaskFn) as Task;

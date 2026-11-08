@@ -1,3 +1,4 @@
+import { IntegrationTaskSourceComponent } from '../../integrations/integration-task-source.component';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -108,6 +109,7 @@ import { TaskFocusService } from '../task-focus.service';
     fadeAnimation,
   ],
   imports: [
+    IntegrationTaskSourceComponent,
     TaskTitleComponent,
     TaskDetailItemComponent,
     MatIcon,

@@ -1,3 +1,7 @@
+import {
+  integrationForTask,
+  visibleIntegrationTask,
+} from '../../integrations/integration.model';
 import { getDueTaskCounts } from '../util/count-due-tasks';
 import { createFeatureSelector, createSelector, MemoizedSelector } from '@ngrx/store';
 import { TASK_FEATURE_NAME } from './task.reducer';
@@ -45,9 +49,9 @@ export const mapSubTasksToTask = (
   const subTasks: Task[] = [];
   for (const id of task.subTaskIds) {
     const subTask = s.entities[id];
-    if (subTask) {
+    if (subTask && visibleIntegrationTask(subTask, s.entities)) {
       subTasks.push(subTask);
-    } else {
+    } else if (!subTask) {
       devError('Task data not found for ' + id);
     }
   }
@@ -85,11 +89,14 @@ export const selectTaskEntitiesInActiveProjects = createSelector(
   selectTaskEntities,
   selectArchivedProjectIds,
   (entities, archivedIds): Record<string, Task | undefined> =>
-    archivedIds.size === 0
+    archivedIds.size === 0 && !Object.values(entities).some((t) => t?.integration?.hidden)
       ? entities
       : Object.fromEntries(
           Object.entries(entities).filter(
-            ([, t]) => !t || !t.projectId || !archivedIds.has(t.projectId),
+            ([, t]) =>
+              !t ||
+              (visibleIntegrationTask(t, entities) &&
+                (!t.projectId || !archivedIds.has(t.projectId))),
           ),
         ),
 );
@@ -160,10 +167,15 @@ export const selectAllTasksInActiveProjects = createSelector(
   selectAllTasks,
   selectArchivedProjectIds,
   // Fast path returns same `tasks` ref when no projects are archived, keeping memoization stable.
-  (tasks: Task[], archivedIds: Set<string>): Task[] =>
-    archivedIds.size === 0
-      ? tasks
-      : tasks.filter((t) => !t.projectId || !archivedIds.has(t.projectId)),
+  (tasks: Task[], archivedIds: Set<string>): Task[] => {
+    if (!archivedIds.size && !tasks.some((t) => t.integration?.hidden)) return tasks;
+    const entities = Object.fromEntries(tasks.map((t) => [t.id, t]));
+    return tasks.filter(
+      (t) =>
+        visibleIntegrationTask(t, entities) &&
+        (!t.projectId || !archivedIds.has(t.projectId)),
+    );
+  },
 );
 
 export const selectMapOfAllTasksInActiveProjects = createSelector(
@@ -377,7 +389,7 @@ const createStableWithSubTasksMapper = (): ((
       const subTasks: Task[] = [];
       for (const sid of entry.subTaskIds) {
         const sub = entities[sid];
-        if (sub) {
+        if (sub && visibleIntegrationTask(sub, entities)) {
           subTasks.push(sub);
         }
       }
@@ -1147,8 +1159,10 @@ export const selectTasksByTag = createSelector(
 export const selectAllTaskIssueIdsForIssueProvider = (issueProvider: IssueProvider) => {
   return createSelector(selectAllTasks, (tasks: Task[]): string[] => {
     return tasks
-      .filter((task) => !!task && task.issueProviderId === issueProvider.id)
-      .map((t) => t.issueId as string);
+      .filter(
+        (task) => !!task && integrationForTask(task)?.providerId === issueProvider.id,
+      )
+      .map((t) => integrationForTask(t)!.remoteId);
   });
 };
 

@@ -1,0 +1,215 @@
+<header class="heading">
+  <div>
+    <p class="eyebrow">{{ I.NEW_CONNECTION | translate }}</p>
+    <h1>
+      {{
+        (step() === 0
+          ? I.CHOOSE_PLATFORM
+          : step() === 1
+            ? I.CHOOSE_MODE
+            : step() === 2
+              ? I.MAPPING
+              : I.REVIEW
+        ) | translate
+      }}
+    </h1>
+    <p class="muted">{{ I.CONNECT_HELP | translate }}</p>
+  </div>
+  <button
+    mat-button
+    (click)="setupCanceled.emit()"
+  >
+    {{ I.CANCEL | translate }}
+  </button>
+</header>
+<nav
+  class="steps"
+  [attr.aria-label]="I.NEW_CONNECTION | translate"
+>
+  @for (label of steps; track label; let index = $index) {
+    <span [class.active]="step() === index"
+      ><b>{{ index + 1 }}</b
+      >{{ label | translate }}</span
+    >
+  }
+</nav>
+@if (error()) {
+  <p
+    class="callout callout--warning"
+    role="alert"
+  >
+    {{ I.ERROR | translate }}
+  </p>
+}
+@if (step() === 0) {
+  <div class="setup-grid">
+    <section class="surface">
+      <h2>{{ I.CHOOSE_PLATFORM | translate }}</h2>
+      <div class="provider-grid">
+        @for (choice of choices(); track choice.key) {
+          <button
+            class="provider-choice focus-ring"
+            [disabled]="busy()"
+            (click)="connect(choice)"
+          >
+            <mat-icon aria-hidden="true">{{
+              capabilities.isCalendar(choice.key) ? 'calendar_month' : 'extension'
+            }}</mat-icon
+            ><span>{{ choice.name }}</span>
+          </button>
+        }
+      </div>
+    </section>
+    <aside class="surface">
+      <h3>{{ I.CONNECT | translate }}</h3>
+      <p>{{ I.AUTH_NOTE | translate }}</p>
+      <p class="muted">{{ I.PREVIEW_NOTE | translate }}</p>
+    </aside>
+  </div>
+} @else if (draft(); as provider) {
+  <div class="setup-grid">
+    <div class="stack">
+      <section class="surface">
+        <div class="source-header">
+          <mat-icon>hub</mat-icon>
+          <div>
+            <h2>{{ capabilities.name(provider.issueProviderKey) }}</h2>
+            <span class="muted">{{ scope() }}</span>
+          </div>
+        </div>
+        <p class="callout">
+          {{ capabilities.quirk(provider.issueProviderKey) | translate }}
+        </p>
+      </section>
+      @if (step() === 1) {
+        <div class="mode-grid">
+          <label
+            class="mode-choice"
+            [class.selected]="mode() === 'import'"
+            ><input
+              type="radio"
+              name="integration-mode"
+              value="import"
+              [ngModel]="mode()"
+              (ngModelChange)="mode.set($event)"
+            /><strong>{{ I.IMPORT | translate }}</strong>
+            <p>{{ I.IMPORT_HELP | translate }}</p></label
+          ><label
+            class="mode-choice"
+            [class.selected]="mode() === 'sync'"
+            ><input
+              type="radio"
+              name="integration-mode"
+              value="sync"
+              [ngModel]="mode()"
+              (ngModelChange)="mode.set($event)"
+            /><strong>{{ I.SYNC | translate }}</strong>
+            <p>{{ I.SYNC_HELP | translate }}</p></label
+          >
+        </div>
+        <p class="callout">
+          {{ (mode() === 'import' ? I.IMPORT_REVIEW : I.START_RECEIVE) | translate }}
+        </p>
+      } @else if (step() === 2) {
+        <section class="surface">
+          <h2>{{ I.PROJECT | translate }}</h2>
+          <label class="check-line"
+            ><input
+              type="radio"
+              name="project-mode"
+              [checked]="createProject()"
+              (change)="createProject.set(true)"
+            />{{ I.NEW_PROJECT | translate }}</label
+          >
+          @if (createProject()) {
+            <label class="field"
+              >{{ I.PROJECT_NAME | translate
+              }}<input
+                [ngModel]="projectName()"
+                (ngModelChange)="projectName.set($event)"
+            /></label>
+          }
+          <label class="check-line"
+            ><input
+              type="radio"
+              name="project-mode"
+              [checked]="!createProject()"
+              (change)="createProject.set(false)"
+            />{{ I.EXISTING_PROJECT | translate }}</label
+          >
+          @if (!createProject()) {
+            <select
+              [attr.aria-label]="I.PROJECT | translate"
+              [ngModel]="projectId()"
+              (ngModelChange)="projectId.set($event)"
+            >
+              <option value="">{{ I.USE_SOURCE_DEFAULT | translate }}</option>
+              @for (project of projects(); track project.id) {
+                <option [value]="project.id">{{ project.title }}</option>
+              }
+            </select>
+          }
+          <p class="muted">{{ I.TAGS_LOCAL | translate }}</p>
+        </section>
+        <section class="surface">
+          <h2>{{ I.SOURCE_TAGS | translate }}</h2>
+          <p>{{ I.TAGS_HELP | translate }}</p>
+        </section>
+      } @else {
+        <section class="surface">
+          <h2>{{ (mode() === 'import' ? I.IMPORT : I.SYNC) | translate }}</h2>
+          <p>{{ (mode() === 'import' ? I.IMPORT_REVIEW : I.SYNC_REVIEW) | translate }}</p>
+          @if (mode() === 'sync') {
+            <integration-fields
+              [provider]="provider"
+              [policy]="policy()"
+              (policyChange)="policy.set($event)"
+            />
+          }
+        </section>
+      }
+      <footer class="actions between">
+        <button
+          mat-button
+          (click)="step.set(step() - 1)"
+        >
+          {{ I.BACK | translate }}
+        </button>
+        @if (step() < 3) {
+          <button
+            mat-flat-button
+            [disabled]="step() === 2 && createProject() && !projectName().trim()"
+            (click)="step.set(step() + 1)"
+          >
+            {{ I.CONTINUE | translate }}
+          </button>
+        } @else {
+          <button
+            mat-flat-button
+            (click)="save()"
+          >
+            {{ I.SAVE_CONNECTION | translate }}
+          </button>
+        }
+      </footer>
+    </div>
+    <aside class="surface">
+      <h3>{{ I.REVIEW | translate }}</h3>
+      <dl>
+        <dt>{{ I.SCOPE | translate }}</dt>
+        <dd>{{ scope() }}</dd>
+        <dt>{{ I.MODE | translate }}</dt>
+        <dd>
+          <span
+            class="badge"
+            [class.sync]="mode() === 'sync'"
+            >{{ (mode() === 'sync' ? I.SYNCED : I.IMPORTED) | translate }}</span
+          >
+        </dd>
+        <dt>{{ I.CURRENT_PROJECT | translate }}</dt>
+        <dd>{{ createProject() ? projectName() : (I.EXISTING_PROJECT | translate) }}</dd>
+      </dl>
+      <p class="muted">{{ I.REVIEW_FIRST | translate }}</p>
+    </aside>
+  </div>
+}

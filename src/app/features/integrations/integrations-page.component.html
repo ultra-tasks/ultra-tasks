@@ -1,0 +1,321 @@
+<div class="page-wrapper integration-page">
+  @if (setup()) {
+    <integration-setup
+      (done)="connected($event)"
+      (setupCanceled)="setup.set(false)"
+    />
+  } @else {
+    <header class="heading">
+      <div>
+        <p class="eyebrow">{{ I.TITLE | translate }}</p>
+        <h1>{{ I.CONNECTED_WORK | translate }}</h1>
+        <p class="muted">{{ I.INTRO | translate }}</p>
+      </div>
+      <button
+        mat-flat-button
+        (click)="setup.set(true)"
+      >
+        <mat-icon>add</mat-icon>{{ I.CONNECT | translate }}
+      </button>
+    </header>
+    @if (error()) {
+      <p
+        class="callout"
+        role="alert"
+      >
+        {{ I.ERROR | translate }}
+      </p>
+    }
+    @if (result()) {
+      <p
+        class="feedback"
+        role="status"
+      >
+        {{ I.RESULT | translate }}
+      </p>
+    }
+    <nav
+      class="tabs"
+      [attr.aria-label]="I.TITLE | translate"
+    >
+      @for (tab of tabs; track tab.key) {
+        <button
+          class="tab focus-ring"
+          [class.active]="filter() === tab.key"
+          [attr.aria-pressed]="filter() === tab.key"
+          (click)="changeFilter(tab.key)"
+        >
+          {{ tab.label | translate }} <span>{{ counts()[tab.key] }}</span>
+        </button>
+      }
+    </nav>
+    <div class="toolbar">
+      <input
+        class="search"
+        [attr.aria-label]="I.SEARCH | translate"
+        [placeholder]="I.SEARCH | translate"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event); selected.set(newSet())"
+      />
+      <div class="actions">
+        <select
+          [attr.aria-label]="I.SOURCE | translate"
+          [ngModel]="providerId()"
+          (ngModelChange)="providerId.set($event); selected.set(newSet())"
+        >
+          <option value="">{{ I.ALL | translate }}</option>
+          @for (provider of data.providers(); track provider.id) {
+            <option [value]="provider.id">
+              {{ capabilities.name(provider.issueProviderKey) }}
+            </option>
+          }</select
+        ><button
+          mat-button
+          (click)="selectAll()"
+        >
+          {{ I.SELECT_ALL | translate }}
+        </button>
+      </div>
+    </div>
+    @if (selected().size) {
+      <div
+        class="selection"
+        role="region"
+        [attr.aria-label]="I.SELECTED | translate"
+      >
+        <strong>{{ selected().size }} {{ I.SELECTED | translate }}</strong
+        ><button
+          mat-button
+          [disabled]="busy()"
+          (click)="refresh()"
+        >
+          {{ I.REFRESH | translate }}</button
+        ><button
+          mat-button
+          (click)="hide()"
+        >
+          {{ (filter() === 'hidden' ? I.SHOW : I.HIDE) | translate }}</button
+        ><button
+          mat-button
+          (click)="stop()"
+        >
+          {{ I.STOP | translate }}</button
+        ><button
+          mat-button
+          [disabled]="busy()"
+          (click)="resume()"
+        >
+          {{ I.RESUME | translate }}</button
+        ><button
+          mat-button
+          (click)="data.exportCalendar(selectedIds())"
+        >
+          {{ I.EXPORT_ICS | translate }}</button
+        ><button
+          mat-button
+          (click)="selected.set(newSet())"
+        >
+          {{ I.CLEAR | translate }}
+        </button>
+      </div>
+    }
+    <div class="workspace-grid">
+      <div class="stack">
+        @for (group of groups(); track group.id) {
+          <section class="surface">
+            <header class="source-header">
+              <mat-icon>hub</mat-icon>
+              <div>
+                <h2>{{ group.name }}</h2>
+                <span class="muted">{{ group.scope }}</span>
+              </div>
+              @if (group.provider; as provider) {
+                <button
+                  mat-button
+                  (click)="settings(provider)"
+                >
+                  {{ I.SETTINGS | translate }}
+                </button>
+              }
+            </header>
+            @for (section of group.sections; track section.mode) {
+              <h3 class="section-heading">
+                {{ (section.mode === 'sync' ? I.SYNCED : I.IMPORTED) | translate }}
+                <span class="muted">{{ I.AUTO_SECTION | translate }}</span>
+              </h3>
+              @for (row of section.rows; track row.task.id) {
+                <div class="integration-task">
+                  <input
+                    type="checkbox"
+                    [attr.aria-label]="row.task.title"
+                    [checked]="selected().has(row.task.id)"
+                    (change)="select(row.task.id, $any($event.target).checked)"
+                  />
+                  <div class="task-content">
+                    <button
+                      class="task-title focus-ring"
+                      (click)="data.openTask(row.task)"
+                    >
+                      {{ row.task.title }}
+                    </button>
+                    <div class="task-meta">
+                      <span
+                        class="badge"
+                        [class.sync]="section.mode === 'sync'"
+                        >{{
+                          (section.mode === 'sync' ? I.SYNCED : I.IMPORTED) | translate
+                        }}</span
+                      >
+                      @if (row.project) {
+                        <span>{{ row.project }}</span>
+                      }
+                      <span>{{ row.link.remoteId }}</span>
+                      @if (row.link.stopped) {
+                        <span>{{ I.TRACKING_STOPPED | translate }}</span>
+                      }
+                    </div>
+                  </div>
+                  @if (row.provider; as provider) {
+                    <button
+                      mat-button
+                      (click)="policy(row.task, provider)"
+                    >
+                      {{ I.POLICY | translate }}
+                    </button>
+                  }
+                </div>
+              }
+            }
+          </section>
+        } @empty {
+          <div class="surface empty-state">
+            <mat-icon>hub</mat-icon>
+            <p>{{ I.EMPTY | translate }}</p>
+          </div>
+        }
+      </div>
+      <aside class="stack">
+        <section class="surface">
+          <h3>{{ I.SAME_TASKS | translate }}</h3>
+          <p>{{ I.SAME_TASKS_HELP | translate }}</p>
+        </section>
+        <p class="callout">{{ I.HIDE_HELP | translate }}</p>
+        <section class="surface">
+          <h3>{{ I.SOURCE | translate }}</h3>
+          @for (provider of data.providers(); track provider.id) {
+            <div class="connection">
+              <strong>{{ capabilities.name(provider.issueProviderKey) }}</strong>
+              <div class="actions">
+                <button
+                  mat-button
+                  [disabled]="!provider.isEnabled"
+                  (click)="openSource(provider)"
+                >
+                  {{ I.BROWSE | translate }}</button
+                ><button
+                  mat-button
+                  (click)="settings(provider)"
+                >
+                  {{ I.SETTINGS | translate }}
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+        @if (hasCalendar()) {
+          <p class="callout">{{ I.CALENDAR_HELP | translate }}</p>
+        }
+      </aside>
+    </div>
+    @if (browseProvider(); as provider) {
+      <section class="surface source-browser">
+        <header class="heading">
+          <div>
+            <p class="eyebrow">{{ I.BROWSE | translate }}</p>
+            <h2>{{ capabilities.name(provider.issueProviderKey) }}</h2>
+            <p>{{ I.BROWSE_HELP | translate }}</p>
+          </div>
+          <button
+            mat-button
+            (click)="browseProvider.set(null)"
+          >
+            {{ I.CLOSE | translate }}
+          </button>
+        </header>
+        <p class="callout">
+          {{ capabilities.quirk(provider.issueProviderKey) | translate }}
+        </p>
+        <div class="toolbar">
+          <label class="field"
+            >{{ I.SOURCE_SEARCH | translate
+            }}<input
+              [ngModel]="sourceSearch()"
+              (ngModelChange)="sourceSearch.set($event)"
+              (keyup.enter)="searchSource()" /></label
+          ><button
+            mat-flat-button
+            [disabled]="busy()"
+            (click)="searchSource()"
+          >
+            {{ I.SEARCH_SOURCE | translate }}
+          </button>
+        </div>
+        <div class="mode-grid">
+          <label
+            class="mode-choice"
+            [class.selected]="browseMode() === 'import'"
+            ><input
+              type="radio"
+              name="browse-mode"
+              value="import"
+              [ngModel]="browseMode()"
+              (ngModelChange)="browseMode.set($event)"
+            /><strong>{{ I.IMPORT | translate }}</strong>
+            <p>{{ I.IMPORT_HELP | translate }}</p></label
+          ><label
+            class="mode-choice"
+            [class.selected]="browseMode() === 'sync'"
+            ><input
+              type="radio"
+              name="browse-mode"
+              value="sync"
+              [ngModel]="browseMode()"
+              (ngModelChange)="browseMode.set($event)"
+            /><strong>{{ I.SYNC | translate }}</strong>
+            <p>{{ I.SYNC_HELP | translate }}</p></label
+          >
+        </div>
+        <label class="check-line"
+          ><input
+            type="checkbox"
+            [ngModel]="copyTags()"
+            (ngModelChange)="copyTags.set($event)"
+          />{{ I.IMPORT_TAGS | translate }}</label
+        >
+        <p class="muted">{{ I.ALREADY_ADDED | translate }}</p>
+        @for (item of sourceItems(); track item.issueData.id) {
+          <label class="integration-task"
+            ><input
+              type="checkbox"
+              [checked]="selectedSource().has(item.issueData.id.toString())"
+              (change)="
+                selectSource(item.issueData.id.toString(), $any($event.target).checked)
+              "
+            /><span>{{ item.title }}</span></label
+          >
+        } @empty {
+          <p class="muted">{{ I.NO_SOURCE_ITEMS | translate }}</p>
+        }
+        <footer class="actions">
+          <button
+            mat-flat-button
+            [disabled]="busy() || !selectedSource().size"
+            (click)="addSource()"
+          >
+            {{ I.ADD_SELECTED | translate }} ({{ selectedSource().size }})
+          </button>
+        </footer>
+      </section>
+    }
+  }
+</div>

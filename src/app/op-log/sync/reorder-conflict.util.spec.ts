@@ -255,6 +255,8 @@ const PROVIDER_BASE_FIELDS: Required<IssueProviderPluginType> = {
   id: 'a',
   isEnabled: false,
   issueProviderKey: 'plugin:changed',
+  integrationMode: 'sync',
+  integrationFieldPolicy: {},
   defaultProjectId: OTHER_PROJECT,
   pinnedSearch: 'changed',
   migratedFromProjectId: OTHER_PROJECT,

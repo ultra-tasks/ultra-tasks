@@ -333,6 +333,13 @@ export class MagicNavConfigService {
 
       {
         type: 'route',
+        id: 'integrations',
+        label: T.F.INTEGRATIONS.TITLE,
+        icon: 'hub',
+        route: '/integrations',
+      },
+      {
+        type: 'route',
         id: 'plugins',
         label: T.PS.REDESIGN.PLUGINS,
         icon: 'extension',

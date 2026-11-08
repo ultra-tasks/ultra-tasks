@@ -1,3 +1,7 @@
+import {
+  sameIntegrationLink,
+  taskSyncPolicy,
+} from '../../integrations/integration.model';
 import { Injectable, inject } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { createEffect, ofType } from '@ngrx/effects';
@@ -748,7 +752,11 @@ export class IssueTwoWaySyncEffects {
     // (e.g. dueWithTime from short syntax parsing like @2pm)
     const currentTask = await firstValueFrom(this._taskService.getByIdOnce$(task.id));
     const fieldMappings = adapter.getFieldMappings();
-    const syncConfig = adapter.getSyncConfig(cfg);
+    const syncConfig = taskSyncPolicy(
+      task,
+      adapter.getSyncConfig(cfg),
+      cfg.integrationFieldPolicy,
+    );
     const ctx = { issueId };
     const toPush: Record<string, unknown> = {};
 
@@ -809,6 +817,7 @@ export class IssueTwoWaySyncEffects {
   }
 
   private _hasAutoCreateEnabled(provider: IssueProvider, task: Task): boolean {
+    if (task.integration?.mode === 'import' || task.integration?.stopped) return false;
     // Agenda-view providers (e.g. Google Calendar) should never auto-create issues
     if (this._pluginRegistry.getUseAgendaView(provider.issueProviderKey)) {
       return false;
@@ -938,7 +947,11 @@ export class IssueTwoWaySyncEffects {
     return this._issueProviderService.getCfgOnce$(issueProviderId, issueType).pipe(
       concatMap(async (cfg) => {
         const fieldMappings = adapter.getFieldMappings();
-        const syncConfig = adapter.getSyncConfig(cfg);
+        const syncConfig = taskSyncPolicy(
+          task,
+          adapter.getSyncConfig(cfg),
+          cfg.integrationFieldPolicy,
+        );
 
         // Early exit: check if any changed field is pushable before fetching
         const hasPushableField = fieldMappings.some((m) => {
@@ -954,10 +967,15 @@ export class IssueTwoWaySyncEffects {
 
         const freshIssue = await adapter.fetchIssue(issueId, cfg);
         const freshValues = adapter.extractSyncValues(freshIssue);
-        // Decide on the item as it is now (e.g. it became repeating).
-        const issueSyncConfig = adapter.getSyncConfig(cfg, freshIssue);
-        // Re-fetch task to get post-meta-reducer values (e.g. short syntax parsed title)
+        // Re-read the task after the external read, before deciding or sending a write.
+        // The read and write have no asynchronous gap after this identity check.
         const currentTask = await firstValueFrom(this._taskService.getByIdOnce$(task.id));
+        if (!sameIntegrationLink(currentTask, task)) return;
+        const issueSyncConfig = taskSyncPolicy(
+          currentTask,
+          adapter.getSyncConfig(cfg, freshIssue),
+          cfg.integrationFieldPolicy,
+        );
         // the snapshot predates pushes queued before it; their baseline is newer
         const syncState = currentTask ?? task;
         const lastSyncedValues = syncState.issueLastSyncedValues ?? {};
@@ -1110,7 +1128,11 @@ export class IssueTwoWaySyncEffects {
               const pending = computePendingLocalChanges(
                 current,
                 adapter.getFieldMappings(),
-                adapter.getSyncConfig(cfg),
+                taskSyncPolicy(
+                  current,
+                  adapter.getSyncConfig(cfg),
+                  cfg.integrationFieldPolicy,
+                ),
                 { issueId: current.issueId! },
               );
               return Object.keys(pending).length

@@ -1,3 +1,4 @@
+import type { FieldSyncConfig } from './two-way-sync/issue-sync.model';
 import { JiraIssue, JiraIssueReduced } from './providers/jira/jira-issue.model';
 import { JiraCfg } from './providers/jira/jira.model';
 import { GitlabCfg } from './providers/gitlab/gitlab.model';
@@ -183,6 +184,9 @@ export interface IssueProviderState extends EntityState<IssueProvider> {
 export type IssueProviderPollingMode = 'whenProjectOpen' | 'always';
 
 export interface IssueProviderBase extends BaseIssueProviderCfg {
+  /** New imports inherit this mode; existing linked tasks keep their own policy. */
+  integrationMode?: 'import' | 'sync';
+  integrationFieldPolicy?: FieldSyncConfig;
   id: string;
   isEnabled: boolean;
   issueProviderKey: IssueProviderKey;

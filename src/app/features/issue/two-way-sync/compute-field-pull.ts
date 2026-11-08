@@ -1,3 +1,4 @@
+import { taskSyncPolicy } from '../../integrations/integration.model';
 import { Task } from '../../tasks/task.model';
 import { issueValuesEqual } from './compute-push-decisions';
 import { FieldMapping, FieldMappingContext, FieldSyncConfig } from './issue-sync.model';
@@ -56,7 +57,8 @@ export const computeFieldPullChanges = ({
   let hasPullOnlyMismatch = false;
 
   for (const mapping of fieldMappings) {
-    const direction = syncConfig[mapping.taskField] ?? mapping.defaultDirection;
+    const direction =
+      taskSyncPolicy(task, syncConfig)[mapping.taskField] ?? mapping.defaultDirection;
 
     if (!canPull(direction)) {
       delete taskChanges[mapping.taskField];
@@ -113,7 +115,8 @@ export const hasRemoteFieldChange = (
     return false;
   }
   return fieldMappings.some((mapping) => {
-    const direction = syncConfig[mapping.taskField] ?? mapping.defaultDirection;
+    const direction =
+      taskSyncPolicy(task, syncConfig)[mapping.taskField] ?? mapping.defaultDirection;
     if (!canPull(direction)) {
       return false;
     }
@@ -151,7 +154,8 @@ export const computePendingLocalChanges = (
     if (decidedIssueFields.has(mapping.issueField)) {
       continue;
     }
-    const direction = syncConfig[mapping.taskField] ?? mapping.defaultDirection;
+    const direction =
+      taskSyncPolicy(task, syncConfig)[mapping.taskField] ?? mapping.defaultDirection;
     // Unlike `computePushDecisions`, a key missing from the baseline (an
     // `undefined` JSON dropped on its way here) is not pending. Read as
     // undefined, CalDAV's empty note ('' locally, undefined remotely) would
