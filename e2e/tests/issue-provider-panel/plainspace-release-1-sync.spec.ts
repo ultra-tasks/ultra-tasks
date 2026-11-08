@@ -84,13 +84,16 @@ const renameOffline = async (
   newTitle: string,
 ): Promise<void> => {
   server.isOffline = true;
+  const attemptsBeforeRename = server.offlineRequests.length;
   await renameTask(page, title, newTitle);
-  await waitForFailedPush(server);
+  await waitForFailedPush(server, attemptsBeforeRename);
 };
 
 /** Waits until a push's read of the task got no answer. */
-const waitForFailedPush = async (server: FakePlainspace): Promise<void> => {
-  const attempts = server.offlineRequests.length;
+const waitForFailedPush = async (
+  server: FakePlainspace,
+  attempts: number,
+): Promise<void> => {
   await expect
     .poll(() => server.offlineRequests.slice(attempts), { timeout: 15000 })
     .toContain(`GET /tasks/${TASK_ID}`);
@@ -191,8 +194,9 @@ test.describe('Plainspace Release 1 sync', () => {
     // Offline: the rename's own push fails.
     server.isOffline = true;
     server.isTasksOffline = true;
+    const attemptsBeforeRename = server.offlineRequests.length;
     await renameTask(page, 'Buy tent', 'Buy a tent');
-    await waitForFailedPush(server);
+    await waitForFailedPush(server, attemptsBeforeRename);
     // A push would now go through, but /tasks still fails: nothing is pushed
     // from a failed poll.
     server.isOffline = false;

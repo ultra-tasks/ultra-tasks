@@ -194,10 +194,9 @@ test.describe('Plainspace Release 0', () => {
     await openIntegrations(page);
     await expect(page.locator('integrations-page')).toBeVisible();
     await openProviderTab(page, SPACE.id);
-    const reconnectNotice = activeTab(page).locator(
-      'plainspace-reconnect-notice .callout',
-    );
-    await expect(reconnectNotice).toHaveCount(0);
+    const reconnectNotice = (): ReturnType<typeof activeTab> =>
+      activeTab(page).locator('plainspace-reconnect-notice .callout');
+    await expect(reconnectNotice()).toHaveCount(0);
     await expect(
       page.locator('mat-snack-bar-container', { hasText: /Failed to poll/ }),
     ).toHaveCount(0);
@@ -234,19 +233,19 @@ test.describe('Plainspace Release 0', () => {
       .toBe(200);
     await openProviderTab(page, SPACE_B.id);
     await expect(activeTab(page).locator('p.muted')).toHaveText(SPACE_B.id);
-    await expect(reconnectNotice).toHaveCount(0);
+    await expect(reconnectNotice()).toHaveCount(0);
     await openProviderTab(page, SPACE.id);
-    await expect(reconnectNotice).toBeVisible();
-    await expect(reconnectNotice).toContainText('Plainspace rejected the connection');
+    await expect(reconnectNotice()).toBeVisible();
+    await expect(reconnectNotice()).toContainText('Plainspace rejected the connection');
     await expect(
       page.locator('mat-snack-bar-container', { hasText: /Failed to poll/ }),
     ).toHaveCount(0);
 
     // Item 1: reconnect with the new token.
-    await reconnectNotice.getByRole('button', { name: 'Reconnect' }).click();
+    await reconnectNotice().getByRole('button', { name: 'Reconnect' }).click();
     await connectWithToken(page, 'pat_new');
     await expect(connectDialog).toBeHidden();
-    await expect(reconnectNotice).toHaveCount(0);
+    await expect(reconnectNotice()).toHaveCount(0);
     // The token change restarts polling: the shared project's provider now
     // polls with the new token, and the other host's provider still polls with
     // its own (the stub rejects a token on the wrong host, so a misrouted
@@ -269,7 +268,7 @@ test.describe('Plainspace Release 0', () => {
       server.taskRequests.slice(requestsBeforeRestart).filter((r) => r.status !== 200),
     ).toEqual([]);
     await openProviderTab(page, SPACE_B.id);
-    await expect(reconnectNotice).toHaveCount(0);
+    await expect(reconnectNotice()).toHaveCount(0);
 
     expect(await providerToken(page, SPACE.id)).toBe('pat_new');
     expect(await providerToken(page, SPACE_B.id)).toBe('pat_other_account');
@@ -335,15 +334,14 @@ test.describe('Plainspace Release 0', () => {
     await openIntegrations(page);
     await expect(page.locator('integrations-page')).toBeVisible();
     await openProviderTab(page, SPACE.slug);
-    const reconnectNotice = activeTab(page).locator(
-      'plainspace-reconnect-notice .callout',
-    );
-    await expect(reconnectNotice).toBeVisible();
+    const reconnectNotice = (): ReturnType<typeof activeTab> =>
+      activeTab(page).locator('plainspace-reconnect-notice .callout');
+    await expect(reconnectNotice()).toBeVisible();
 
     // Reconnecting mints pat_new, which revokes pat_mid as well.
     server.tokens.delete(`${HOST} pat_mid`);
     server.tokens.set(`${HOST} pat_new`, 'me@e2e.test');
-    await reconnectNotice.getByRole('button', { name: 'Reconnect' }).click();
+    await reconnectNotice().getByRole('button', { name: 'Reconnect' }).click();
     await connectWithToken(page, 'pat_new');
     await expect(connectDialog).toBeHidden();
 
@@ -364,6 +362,6 @@ test.describe('Plainspace Release 0', () => {
       server.taskRequests.slice(requestsBeforeRestart).filter((r) => r.status !== 200),
     ).toEqual([]);
     await openProviderTab(page, SPACE.id);
-    await expect(reconnectNotice).toHaveCount(0);
+    await expect(reconnectNotice()).toHaveCount(0);
   });
 });

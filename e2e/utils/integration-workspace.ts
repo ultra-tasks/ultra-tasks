@@ -23,12 +23,16 @@ export const finishIntegrationSetup = async (page: Page): Promise<void> => {
   await setup.getByRole('button', { name: 'Continue', exact: true }).click();
   await setup.locator('input[name="project-mode"]').nth(1).check();
   await setup.getByRole('button', { name: 'Continue', exact: true }).click();
+  // The review step renders asynchronously; all() alone can return an empty list.
+  await setup.locator('integration-fields select').first().waitFor();
   for (const select of await setup.locator('integration-fields select').all()) {
     if (
       (await select.inputValue()) !== 'off' &&
       (await select.locator('option[value="both"]').count())
     )
-      await select.selectOption('both');
+      await select.selectOption(
+        (await select.getAttribute('aria-label')) === 'Date' ? 'pushOnly' : 'both',
+      );
   }
   await setup.getByRole('button', { name: 'Save connection', exact: true }).click();
   await expect(setup).toBeHidden();

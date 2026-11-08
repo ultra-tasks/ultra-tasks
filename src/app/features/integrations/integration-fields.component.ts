@@ -4,6 +4,7 @@ import {
   computed,
   inject,
   input,
+  linkedSignal,
   output,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -99,20 +100,23 @@ export class IntegrationFieldsComponent {
   private readonly _capabilities = inject(IntegrationCapabilityService);
   readonly provider = input.required<IssueProvider>();
   readonly policy = input<FieldSyncConfig>({});
+  // Input propagation waits for change detection; keep rapid field edits together.
+  private readonly _draftPolicy = linkedSignal(() => this.policy());
   readonly allowDefault = input(false);
   readonly policyChange = output<FieldSyncConfig>();
   readonly fields = computed(() => this._capabilities.fields(this.provider()));
   readonly readOnly = computed(() => this.fields().every((f) => !f.canWrite));
   value(field: IntegrationField): string {
     return (
-      this.policy()[field.key as keyof Task] ??
+      this._draftPolicy()[field.key as keyof Task] ??
       (this.allowDefault() ? '' : field.defaultDirection)
     );
   }
   change(key: string, value: SyncDirection | ''): void {
-    const next = { ...this.policy() };
+    const next = { ...this._draftPolicy() };
     if (value) next[key as keyof Task] = value;
     else delete next[key as keyof Task];
+    this._draftPolicy.set(next);
     this.policyChange.emit(next);
   }
 }

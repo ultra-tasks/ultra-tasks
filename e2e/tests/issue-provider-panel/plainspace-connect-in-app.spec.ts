@@ -243,12 +243,12 @@ test.describe('Plainspace: connect inside the app', () => {
 });
 
 /**
- * Each provider tab's stored token, checking on the way that none asks to
- * reconnect. Both providers here bind the same space, so tabs go by position.
+ * Each connection's stored token, checking that none asks to reconnect.
+ * Both connections bind the same space, so select them by position.
  */
 const providerTokensWithoutReconnect = async (page: Page): Promise<string[]> => {
   const tabs = page.locator('integrations-page .connection');
-  // Two providers plus the setup overview, which is last.
+  // Both configured connections remain independently editable.
   await expect.poll(() => tabs.count(), { timeout: 30000 }).toBe(2);
   const tokens: string[] = [];
   for (let i = 0; i < 2; i++) {

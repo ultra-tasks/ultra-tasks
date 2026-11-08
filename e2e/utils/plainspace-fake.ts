@@ -464,8 +464,8 @@ const installFakeAuth = async (
 };
 
 /**
- * Adds a Plainspace provider bound to the given project through the issue
- * panel's setup tab, then closes the panel. It polls in the background
+ * Adds a Plainspace connection bound to the given project through the
+ * workspace setup, then returns to Today. It polls in the background
  * ('always' mode) and imports the tasks assigned to me into that project.
  */
 export const addPlainspaceProvider = async (
