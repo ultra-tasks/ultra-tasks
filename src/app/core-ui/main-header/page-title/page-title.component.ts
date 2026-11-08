@@ -422,6 +422,7 @@ export class PageTitleComponent {
     [/boards$/, T.MH.BOARDS, NAV_SECTION_ICON.BOARDS],
     [/habits$/, T.MH.HABITS, NAV_SECTION_ICON.HABITS],
     [/search$/, T.MH.SEARCH, NAV_SECTION_ICON.SEARCH],
+    [/integrations$/, T.F.INTEGRATIONS.TITLE, 'hub'],
     [/scheduled-list$/, T.WW.RECURRING_TASKS, NAV_SECTION_ICON.RECURRING_TASKS],
     [/donate$/, T.MH.DONATE, NAV_SECTION_ICON.DONATE],
     [/config$/, T.PS.GLOBAL_SETTINGS, NAV_SECTION_ICON.SETTINGS],

@@ -60,9 +60,22 @@
             class="task-title"
           ></task-title>
 
-          @if (t.tagIds?.length || t.projectId || t.repeatCfgId || t.issueId || t.notes) {
+          @if (
+            t.tagIds?.length ||
+            t.projectId ||
+            t.repeatCfgId ||
+            t.issueId ||
+            t.integration ||
+            t.notes
+          ) {
             <div class="task-meta-line">
-              @if (t.tagIds?.length || t.projectId || t.repeatCfgId || t.issueId) {
+              @if (
+                t.tagIds?.length ||
+                t.projectId ||
+                t.repeatCfgId ||
+                t.issueId ||
+                t.integration
+              ) {
                 <tag-list
                   [task]="t"
                   [isShowProjectTagNever]="isInSubTaskList()"

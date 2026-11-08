@@ -32,10 +32,6 @@ test.describe('App Features', () => {
       locator: (page: Page) => page.getByRole('menuitem', { name: 'Boards' }),
     },
     {
-      label: 'Issues panel',
-      locator: (page: Page) => page.locator('.e2e-toggle-issue-provider-panel'),
-    },
-    {
       label: 'Project notes',
       locator: (page: Page) => page.locator('.e2e-toggle-notes-btn'),
     },
@@ -44,7 +40,7 @@ test.describe('App Features', () => {
       locator: (page: Page) => page.locator('.sync-btn'),
     },
   ].forEach((feature) => {
-    test(`Element assigned with App feature ${feature.title ?? feature.label} is only visible if feature is enabled`, async ({
+    test(`Element assigned with App feature ${feature.label} is only visible if feature is enabled`, async ({
       page,
       settingsPage,
     }) => {
@@ -87,38 +83,29 @@ test.describe('App Features', () => {
     });
   });
 
-  test('Issues panel app feature hides the mobile drawer panel option', async ({
+  test('the retired issues panel has no desktop or mobile toggle', async ({
     page,
     settingsPage,
   }) => {
+    await goToMainView(page);
+    await expect(page.locator('.e2e-toggle-issue-provider-panel')).not.toBeAttached();
     await page.setViewportSize({ width: 390, height: 844 });
-    const featureSwitch = page.getByRole('switch', {
-      name: 'Issues panel',
-      exact: true,
-    });
-    // On phones the right-panel toggles are action rows in the Browse drawer.
+    await expect(page.locator('mobile-bottom-nav')).toBeVisible();
+    await expect(page.locator('.e2e-toggle-issue-provider-panel')).not.toBeAttached();
+    await page.locator('mobile-bottom-nav .tour-navMenuBtn').click();
     const drawer = page.locator('.nav-sidenav.mobile');
-    const issuePanelRow = drawer.getByRole('menuitem', { name: /Issue Provider Panel/ });
-    const notesRow = drawer.getByRole('menuitem', { name: /Project Notes/ });
-    const browseButton = page.locator('mobile-bottom-nav .e2e-bottom-nav-browse');
-
-    await goToMainView(page);
-    await expect(page.locator('mobile-bottom-nav')).toBeVisible();
-    await browseButton.click();
-    await expect(issuePanelRow).toBeVisible();
-    await page.locator('.mobile-menu-close').click();
-    await expect(drawer).toBeHidden();
-
+    await expect(
+      drawer.getByRole('menuitem', { name: /Issue Provider Panel/ }),
+    ).not.toBeAttached();
+    await expect(drawer.getByRole('menuitem', { name: /Project Notes/ })).toBeVisible();
+    await page
+      .locator('magic-side-nav')
+      .getByRole('menuitem', { name: 'Integrations', exact: true })
+      .click();
+    await expect(page.locator('integrations-page')).toBeVisible();
     await goToAppFeatures(settingsPage);
-    await expect(featureSwitch).toBeVisible();
-    await expect(featureSwitch).toBeChecked();
-    await featureSwitch.click();
-    await expect(featureSwitch).not.toBeChecked();
-
-    await goToMainView(page);
-    await expect(page.locator('mobile-bottom-nav')).toBeVisible();
-    await browseButton.click();
-    await expect(notesRow).toBeVisible();
-    await expect(issuePanelRow).not.toBeAttached();
+    await expect(
+      page.getByRole('switch', { name: 'Issues panel', exact: true }),
+    ).not.toBeAttached();
   });
 });

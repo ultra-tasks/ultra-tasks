@@ -324,6 +324,7 @@ export class LayoutService {
     this._store$.dispatch(hideNonTaskSidePanelContent());
   }
 
+  /** Compatibility entry point for the saved shortcut: opens the Integrations page. */
   toggleAddTaskPanel(): void {
     this._store$.dispatch(toggleIssuePanel());
   }

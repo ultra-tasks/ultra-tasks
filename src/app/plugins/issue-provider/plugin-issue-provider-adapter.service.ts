@@ -1,3 +1,4 @@
+import { taskSyncPolicy } from '../../features/integrations/integration.model';
 import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -692,7 +693,14 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
       return {};
     }
 
-    const twoWaySync = (cfg.pluginConfig?.['twoWaySync'] as Record<string, string>) ?? {};
+    const twoWaySync = taskSyncPolicy(
+      task,
+      (cfg.pluginConfig?.['twoWaySync'] as Record<
+        string,
+        'off' | 'pullOnly' | 'pushOnly' | 'both'
+      >) ?? {},
+      cfg.integrationFieldPolicy,
+    );
     const lastSyncedValues = task.issueLastSyncedValues ?? {};
     const ctx = {
       issueId: task.issueId!,

@@ -24,6 +24,9 @@
       ></task-context-menu>
     }
   </header>
+  @if (task().integration || task().issueId) {
+    <integration-task-source [task]="task()" />
+  }
   <div class="st-planning-actions">
     <button
       type="button"

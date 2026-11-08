@@ -1,8 +1,8 @@
+import { openIntegrations } from '../../utils/integration-workspace';
 import { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import { ProjectPage } from '../../pages/project.page';
 import {
-  activeProviderTab,
   addPlainspaceProvider,
   FakePlainspace,
   installFakePlainspace,
@@ -60,8 +60,8 @@ const sentCode = async (server: FakePlainspace, email: string): Promise<string> 
 };
 
 const openIssuePanel = async (page: Page): Promise<void> => {
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
-  await expect(page.locator('issue-panel')).toBeVisible();
+  await openIntegrations(page);
+  await expect(page.locator('integrations-page')).toBeVisible();
 };
 
 const shareSucceeded = (page: Page): Promise<void> =>
@@ -243,20 +243,19 @@ test.describe('Plainspace: connect inside the app', () => {
 });
 
 /**
- * Each provider tab's stored token, checking on the way that none asks to
- * reconnect. Both providers here bind the same space, so tabs go by position.
+ * Each connection's stored token, checking that none asks to reconnect.
+ * Both connections bind the same space, so select them by position.
  */
 const providerTokensWithoutReconnect = async (page: Page): Promise<string[]> => {
-  const tabs = page.locator('issue-panel .mat-mdc-tab');
-  // Two providers plus the setup overview, which is last.
-  await expect.poll(() => tabs.count(), { timeout: 30000 }).toBe(3);
+  const tabs = page.locator('integrations-page .connection');
+  // Both configured connections remain independently editable.
+  await expect.poll(() => tabs.count(), { timeout: 30000 }).toBe(2);
   const tokens: string[] = [];
   for (let i = 0; i < 2; i++) {
-    await tabs.nth(i).click();
-    const tab = activeProviderTab(page);
-    await expect(tab.locator('header .title')).toHaveText(PLAINSPACE_SPACE.id);
+    const tab = tabs.nth(i);
+    await expect(tab.locator('p.muted')).toHaveText(PLAINSPACE_SPACE.id);
     await expect(tab.locator('plainspace-reconnect-notice .callout')).toHaveCount(0);
-    await tab.locator('header button').first().click();
+    await tab.getByRole('button', { name: 'Connection settings', exact: true }).click();
     const editDialog = page.locator('dialog-edit-issue-provider');
     tokens.push(await editDialog.locator('input[id*="token"]').inputValue());
     await page.keyboard.press('Escape');

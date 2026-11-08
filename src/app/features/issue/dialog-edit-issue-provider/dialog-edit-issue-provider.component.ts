@@ -1,3 +1,4 @@
+import { integrationQuirk } from '../../integrations/integration-capability.service';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -114,12 +115,14 @@ type OptionsLoadState = 'idle' | 'loading' | 'loaded' | 'empty' | 'failed';
 export class DialogEditIssueProviderComponent {
   private readonly _dialogSize = useDialogSize('m');
   readonly T: typeof T = T;
+  readonly integrationQuirk = integrationQuirk;
   readonly HelperClasses = HelperClasses;
   readonly d = inject<{
     issueProvider?: IssueProvider;
     issueProviderKey?: IssueProviderKey;
     calendarContextInfoTarget?: CalendarContextInfoTarget;
     isDuplicate?: boolean;
+    deferSave?: boolean;
   }>(MAT_DIALOG_DATA);
 
   isConnectionWorks = signal(false);
@@ -246,6 +249,11 @@ export class DialogEditIssueProviderComponent {
 
   submit(isSkipClose = false): void {
     if (this.form.valid) {
+      if (this.d.deferSave) {
+        this._isSubmitSuccessful = true;
+        this._matDialogRef.close(this.model);
+        return;
+      }
       if (this.isEdit) {
         this._store.dispatch(
           IssueProviderActions.updateIssueProvider({

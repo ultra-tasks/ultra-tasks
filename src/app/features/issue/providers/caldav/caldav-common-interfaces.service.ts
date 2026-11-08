@@ -1,3 +1,4 @@
+import { integrationSyncPolicy } from '../../../integrations/integration.model';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, Observable } from 'rxjs';
 import { first, map, tap } from 'rxjs/operators';
@@ -274,7 +275,7 @@ export class CaldavCommonInterfacesService extends BaseIssueProviderService<Cald
       wasUpdated,
       addTaskData: wasUpdated ? this.getAddTaskData(issue) : {},
       fieldMappings: this._caldavSyncAdapter.getFieldMappings(),
-      syncConfig: this._caldavSyncAdapter.getSyncConfig(cfg),
+      syncConfig: integrationSyncPolicy(task, this._caldavSyncAdapter, cfg),
       ctx: { issueId: issue.id },
       // A VTODO-wide ETag can change for an unrelated field. "pullOnly" fields
       // are the server's; in "both" mode pending local edits are preserved

@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import type { Locator, Page, Route } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 
@@ -15,7 +20,6 @@ import { expect, test } from '../../fixtures/test.fixture';
  * control's does.
  */
 
-const PANEL_BTN = '.e2e-toggle-issue-provider-panel';
 const DAV_ROOT = '/e2e-caldav/';
 const CAL_HREF = `${DAV_ROOT}cal/`;
 const UNDO_HREF = `${CAL_HREF}undo.ics`;
@@ -119,11 +123,7 @@ const stubCaldav = async (
 };
 
 const setUpCaldavProvider = async (page: Page): Promise<void> => {
-  await page.waitForSelector(PANEL_BTN, { state: 'visible' });
-  await page.click(PANEL_BTN);
-  await page.waitForSelector('mat-tab-group', { state: 'visible' });
-  await page.click('mat-tab-group .mat-mdc-tab:last-child');
-  await page.waitForSelector('issue-provider-setup-overview', { state: 'visible' });
+  await openIntegrationSetup(page);
   await page.getByRole('button', { name: 'CalDAV Events' }).click();
 
   const dialog = page.locator('mat-dialog-container');
@@ -143,11 +143,22 @@ const setUpCaldavProvider = async (page: Page): Promise<void> => {
 
   await dialog.locator('button[type="submit"]').click();
   await expect(dialog).toBeHidden({ timeout: 5000 });
+  await finishIntegrationSetup(page);
+  await page.locator('.source-browser input').first().fill('E2E');
+  await page
+    .locator('.source-browser')
+    .getByRole('button', { name: 'Search source', exact: true })
+    .click();
 };
 
 const importEvent = async (page: Page, title: string): Promise<void> => {
-  const item = page.locator('issue-preview-item').filter({ hasText: title });
-  await item.getByRole('button').first().click();
+  const source = page.locator('.source-browser');
+  await source
+    .locator('.integration-task')
+    .filter({ hasText: title })
+    .locator('input')
+    .check();
+  await source.getByRole('button', { name: /Add selected items/ }).click();
 };
 
 const deleteTask = async (page: Page, task: Locator): Promise<void> => {
@@ -172,9 +183,9 @@ test.describe('Calendar #10155', () => {
     await workViewPage.waitForTaskList();
     await setUpCaldavProvider(page);
 
-    await page.click('mat-tab-group .mat-mdc-tab:first-child');
     await importEvent(page, UNDO_TITLE);
     await importEvent(page, CONTROL_TITLE);
+    await leaveIntegrations(page);
     const undoTask = taskPage.getTaskByText(UNDO_TITLE);
     const controlTask = taskPage.getTaskByText(CONTROL_TITLE);
     await expect(undoTask).toBeVisible();

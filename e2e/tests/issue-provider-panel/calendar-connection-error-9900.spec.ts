@@ -1,3 +1,4 @@
+import { openIntegrationSetup } from '../../utils/integration-workspace';
 import { expect, test } from '../../fixtures/test.fixture';
 
 // #9900: CalendarIntegrationService swallowed the HttpErrorResponse, so the
@@ -15,9 +16,8 @@ test('calendar connection failure shows the HTTP status without exposing its URL
     await route.fulfill({ status: 401, body: 'Unauthorized' });
   });
 
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
-  await page.locator('mat-tab-group .mat-mdc-tab:last-child').click();
-  await page.getByRole('button', { name: 'Other (iCal)' }).click();
+  await openIntegrationSetup(page);
+  await page.getByRole('button', { name: 'Calendar (iCal / Outlook)' }).click();
   const dialog = page.locator('dialog-edit-issue-provider');
   await dialog.locator('input[id*="icalUrl"]').fill(calendarUrl);
   await dialog.getByRole('button', { name: 'Test connection' }).click();

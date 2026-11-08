@@ -1,0 +1,1328 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1"
+    />
+    <title>UltraTasks integration wireframes</title>
+    <style>
+      :root {
+        --ink: #23353a;
+        --muted: #65777b;
+        --line: #c9d2d3;
+        --bg: #f5f7f7;
+        --paper: #fff;
+        --accent: #105f64;
+        --tone: #e8f1f1;
+        --warn: #735c22;
+        --warning: #f8f4e7;
+        --r: 10px;
+        --s: 8px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        color: var(--ink);
+        background: #e4e9e9;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button,
+      a,
+      input,
+      select {
+        outline-offset: 3px;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: white;
+        padding: 8px 14px;
+        min-height: 40px;
+      }
+      button:hover {
+        background: var(--bg);
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+      button.ghost {
+        border-color: transparent;
+        background: transparent;
+      }
+      a {
+        color: var(--accent);
+      }
+      .review {
+        height: 64px;
+        background: #23353a;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 0 24px;
+      }
+      .review strong {
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .review select {
+        background: #fff;
+        border: 0;
+        border-radius: 5px;
+        padding: 8px;
+        max-width: 470px;
+      }
+      .review small {
+        margin-left: auto;
+        color: #d3dfe0;
+      }
+      .frame {
+        min-height: 900px;
+        background: var(--bg);
+        display: grid;
+        grid-template-columns: 224px 1fr;
+        position: relative;
+      }
+      .rail {
+        border-right: 1px solid var(--line);
+        background: #fff;
+        padding: 24px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .brand {
+        font-weight: 750;
+        font-size: 20px;
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        margin: 0 0 28px 7px;
+      }
+      .brand-mark {
+        border-radius: 7px;
+        background: var(--accent);
+        color: #fff;
+        padding: 2px 8px;
+      }
+      .nav {
+        padding: 9px 12px;
+        display: flex;
+        gap: 10px;
+        text-decoration: none;
+        color: var(--ink);
+        border-radius: 6px;
+        align-items: center;
+        min-height: 42px;
+      }
+      .nav.current {
+        background: var(--tone);
+        color: var(--accent);
+        font-weight: 650;
+      }
+      .nav .count {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .rail-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        font-weight: 700;
+        margin: 24px 12px 6px;
+      }
+      .subnav {
+        padding-left: 40px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .rail-bottom {
+        margin-top: auto;
+        padding-top: 30px;
+      }
+      .screen {
+        padding: 32px 40px 34px;
+        min-width: 0;
+      }
+      .eyebrow {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        font-weight: 650;
+      }
+      .heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 24px;
+      }
+      h1 {
+        font-size: 28px;
+        line-height: 1.25;
+        letter-spacing: -0.6px;
+        margin: 5px 0 8px;
+        font-weight: 680;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0 0 12px;
+        font-weight: 650;
+      }
+      h3 {
+        font-size: 15px;
+        margin: 0 0 8px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      .lead {
+        max-width: 780px;
+        color: var(--muted);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .between {
+        justify-content: space-between;
+      }
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 24px;
+        align-items: start;
+      }
+      .twocol {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .threecol {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 24px;
+      }
+      .compact {
+        padding: 16px;
+      }
+      .note {
+        padding: 16px;
+        background: var(--tone);
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      .warning {
+        background: var(--warning);
+        color: var(--warn);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 11px;
+        line-height: 20px;
+        white-space: nowrap;
+        background: white;
+      }
+      .pill.sync {
+        background: var(--tone);
+        border-color: #adcbce;
+        color: var(--accent);
+      }
+      .pill.import {
+        border-style: dashed;
+        color: #566268;
+      }
+      .pill.neutral {
+        background: var(--bg);
+        border-color: transparent;
+      }
+      .pill.warn {
+        color: var(--warn);
+        background: var(--warning);
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid var(--line);
+        margin: 0 0 24px;
+        padding-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        border: 0;
+        background: none;
+        padding: 7px 12px;
+        color: var(--muted);
+      }
+      .tab.active {
+        background: var(--tone);
+        color: var(--accent);
+        font-weight: 650;
+      }
+      .source-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .source-icon {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-weight: 750;
+        font-size: 16px;
+        background: var(--bg);
+        flex-shrink: 0;
+      }
+      .source-head p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .section-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        margin: 20px 0 8px;
+      }
+      .task {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 14px 0;
+        border-top: 1px solid #e5eaea;
+      }
+      .task input {
+        margin-top: 5px;
+        accent-color: var(--accent);
+      }
+      .task-main {
+        flex: 1;
+        min-width: 0;
+      }
+      .task-title {
+        font-weight: 550;
+        font-size: 14px;
+      }
+      .task-meta {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .task-more {
+        background: transparent;
+        border: 0;
+        padding: 0 8px;
+        min-width: 36px;
+        min-height: 32px;
+        font-size: 20px;
+      }
+      .task-extra {
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+        padding-top: 3px;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin: 0 0 16px;
+      }
+      .search {
+        width: 270px;
+        max-width: 100%;
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: white;
+      }
+      .selection {
+        padding: 12px 16px;
+        border: 1px solid #aac8ca;
+        background: var(--tone);
+        border-radius: 8px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .selection button {
+        font-size: 12px;
+        padding: 5px 12px;
+        min-height: 34px;
+      }
+      .stepper {
+        display: flex;
+        gap: 16px;
+        padding: 0 0 24px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        flex-wrap: wrap;
+      }
+      .step.active {
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .step b {
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        display: inline-grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        margin-right: 6px;
+      }
+      .step.active b {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .provider-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      .provider {
+        display: flex;
+        gap: 12px;
+        text-align: left;
+        padding: 16px;
+      }
+      .provider small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .field {
+        display: grid;
+        gap: 7px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .field input,
+      .field select {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #fff;
+        width: 100%;
+        font-weight: 400;
+      }
+      .choice {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 20px;
+        display: block;
+        background: white;
+        cursor: pointer;
+      }
+      .choice.selected {
+        border: 2px solid var(--accent);
+        padding: 19px;
+        background: #f6fafa;
+      }
+      .choice input {
+        accent-color: var(--accent);
+        margin: 0 6px 0 0;
+      }
+      .choice p {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 8px 0 0;
+      }
+      .checks {
+        display: grid;
+        gap: 14px;
+      }
+      .checks label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .checks input {
+        accent-color: var(--accent);
+        margin-top: 5px;
+      }
+      .check-detail {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .footer-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 24px;
+        margin-top: 24px;
+        border-top: 1px solid var(--line);
+        align-items: center;
+      }
+      .micro {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        text-align: left;
+        font-size: 13px;
+      }
+      th {
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 11px;
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 14px 10px;
+        border-bottom: 1px solid #e4eaea;
+        vertical-align: top;
+      }
+      td select {
+        padding: 6px 7px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: #fff;
+        max-width: 100%;
+      }
+      td small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        margin-top: 3px;
+      }
+      .linklike {
+        border: 0;
+        padding: 0;
+        min-height: 30px;
+        color: var(--accent);
+        text-decoration: underline;
+        background: none;
+        font-size: 12px;
+      }
+      .breadcrumb {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 18px;
+      }
+      .mini-line {
+        border-top: 1px solid var(--line);
+        margin: 16px 0;
+      }
+      .footer-caption {
+        margin-top: 22px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .modal-shade {
+        position: absolute;
+        inset: 0;
+        background: #23353a55;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        z-index: 5;
+      }
+      .modal {
+        background: white;
+        width: 560px;
+        max-width: 100%;
+        padding: 28px;
+        border-radius: 14px;
+        box-shadow: 0 8px 40px #23353a33;
+      }
+      .modal h2 {
+        font-size: 22px;
+      }
+      .modal .footer-actions {
+        margin-top: 16px;
+      }
+      .review-list {
+        padding: 14px 16px;
+        margin: 16px 0;
+        background: var(--bg);
+        border-radius: 6px;
+      }
+      .review-list div {
+        padding: 5px 0;
+      }
+      .policy-line {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #e4eaea;
+        font-size: 13px;
+      }
+      .calendar-block {
+        border-left: 3px solid var(--accent);
+        background: var(--tone);
+        padding: 12px 14px;
+        border-radius: 4px;
+        margin: 14px 0;
+      }
+      .calendar-block b {
+        font-size: 13px;
+      }
+      .time {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #23353a;
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 8px;
+        z-index: 10;
+        font-size: 13px;
+        max-width: 90%;
+      }
+      .mobile-top {
+        display: none;
+      }
+      .tagbox {
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .detail-panel {
+        border-left: 1px solid var(--line);
+        padding-left: 24px;
+      }
+      .details-layout {
+        display: grid;
+        grid-template-columns: 1fr 390px;
+        gap: 28px;
+      }
+      .callout-list {
+        padding-left: 18px;
+        margin: 10px 0;
+      }
+      .callout-list li {
+        padding: 5px 0;
+        font-size: 13px;
+      }
+      .conflict {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .conflict-head {
+        padding: 14px 18px;
+        background: var(--bg);
+      }
+      .conflict-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .conflict-body > div {
+        padding: 18px;
+      }
+      .conflict-body > div + div {
+        border-left: 1px solid var(--line);
+      }
+      .small-select {
+        border: 1px solid var(--line);
+        padding: 8px;
+        border-radius: 6px;
+        background: white;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: inline-block;
+        margin-right: 5px;
+      }
+      .mobile-preview {
+        display: none;
+      }
+      .empty {
+        padding: 32px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .count-inline {
+        font-weight: 400;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .fullwidth {
+        width: 100%;
+      }
+      @media (min-width: 1600px) {
+        .screen {
+          max-width: 1450px;
+          width: 100%;
+          margin: 0 auto;
+        }
+      }
+      @media (max-width: 1050px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .frame {
+          grid-template-columns: 190px 1fr;
+        }
+        .screen {
+          padding: 24px;
+        }
+        .details-layout {
+          grid-template-columns: 1fr;
+        }
+        .detail-panel {
+          border-left: 0;
+          padding: 0;
+        }
+        .provider-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .review small {
+          display: none;
+        }
+      }
+      @media (max-width: 650px) {
+        .review {
+          height: 56px;
+          padding: 0 12px;
+          gap: 12px;
+        }
+        .review strong {
+          font-size: 11px;
+        }
+        .review select {
+          width: 210px;
+          font-size: 12px;
+        }
+        .frame {
+          display: block;
+          min-height: 850px;
+        }
+        .rail {
+          display: none;
+        }
+        .mobile-top {
+          display: flex;
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--line);
+          background: white;
+          justify-content: space-between;
+          font-weight: 650;
+        }
+        .screen {
+          padding: 20px 16px 32px;
+        }
+        h1 {
+          font-size: 24px;
+        }
+        .heading {
+          margin-bottom: 20px;
+        }
+        .heading > button {
+          padding: 7px 10px;
+          font-size: 12px;
+        }
+        .threecol,
+        .twocol {
+          grid-template-columns: 1fr;
+        }
+        .card {
+          padding: 16px;
+        }
+        .grid {
+          gap: 16px;
+        }
+        .task-extra {
+          display: none;
+        }
+        .task-title {
+          font-size: 13px;
+        }
+        .task-meta {
+          gap: 4px;
+        }
+        .pill {
+          font-size: 10px;
+          padding: 1px 7px;
+        }
+        .toolbar {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .search {
+          width: 100%;
+        }
+        .tabs {
+          gap: 2px;
+          margin-bottom: 16px;
+        }
+        .tab {
+          padding: 6px 9px;
+          font-size: 12px;
+        }
+        .provider-grid {
+          grid-template-columns: 1fr;
+        }
+        .stepper {
+          gap: 8px;
+        }
+        .step {
+          font-size: 10px;
+        }
+        .step b {
+          width: 18px;
+          height: 18px;
+          margin-right: 3px;
+        }
+        .footer-actions {
+          flex-wrap: wrap;
+        }
+        .screen > aside {
+          display: none;
+        }
+        .selection {
+          gap: 8px;
+          padding: 10px;
+        }
+        .selection strong {
+          font-size: 12px;
+        }
+        .modal {
+          padding: 20px;
+        }
+        .modal-shade {
+          padding: 16px;
+          align-items: start;
+          padding-top: 100px;
+        }
+        .conflict-body {
+          grid-template-columns: 1fr;
+        }
+        .conflict-body > div + div {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+        table {
+          font-size: 11px;
+        }
+        td,
+        th {
+          padding: 10px 5px;
+        }
+        td select {
+          font-size: 11px;
+          width: 100px;
+        }
+        .details-layout {
+          gap: 12px;
+        }
+        .task {
+          gap: 8px;
+        }
+        .calendar-block {
+          margin: 10px 0;
+        }
+        .stepper .step:not(.active) {
+          display: none;
+        }
+      }
+      @media print {
+        .review {
+          display: none;
+        }
+        .frame {
+          min-height: 0;
+        }
+        .screen {
+          padding: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="review">
+      <strong>WIREFRAMES · PROPOSED UI</strong
+      ><select
+        id="screen-select"
+        aria-label="Choose wireframe"
+      ></select
+      ><small>Fictional data · no live connections · November 2026</small>
+    </div>
+    <div
+      id="frame"
+      class="frame"
+    ></div>
+    <div
+      id="toast"
+      class="toast hidden"
+      role="status"
+    ></div>
+    <script>
+      const screens = [
+        ['workspace', '01 · Integration workspace'],
+        ['connect', '02 · Connect an account'],
+        ['scope', '03 · Scope and Import or Sync'],
+        ['mapping', '04 · Map projects and tags'],
+        ['fields', '05 · Field sync policies'],
+        ['bulk', '06 · Batch stop tracking'],
+        ['calendar', '07 · Calendar modes and conversions'],
+        ['detail', '08 · Equal task experience'],
+        ['attention', '09 · Resume and resolve differences'],
+        ['mobile', '10 · Mobile workspace'],
+      ];
+      let current = 'workspace',
+        filter = 'all',
+        source = 'all',
+        mode = 'sync',
+        provider = 'GitHub',
+        calmode = 'sync';
+      let selected = new Set();
+      let modal = false;
+      let tasks = [
+        {
+          id: 1,
+          title: 'Fix keyboard navigation in settings',
+          source: 'GitHub',
+          project: 'Product app',
+          remote: '#142',
+          tag: 'accessibility',
+          mode: 'sync',
+          state: 'active',
+        },
+        {
+          id: 2,
+          title: 'Improve search loading states',
+          source: 'GitHub',
+          project: 'Product app',
+          remote: '#163',
+          tag: 'frontend',
+          mode: 'sync',
+          state: 'active',
+        },
+        {
+          id: 3,
+          title: 'Review account connection copy',
+          source: 'GitHub',
+          project: 'Product app',
+          remote: '#171',
+          tag: 'documentation',
+          mode: 'import',
+          state: 'active',
+        },
+        {
+          id: 4,
+          title: 'Design the project overview',
+          source: 'Linear',
+          project: 'Website',
+          remote: 'WEB-214',
+          tag: 'design',
+          mode: 'sync',
+          state: 'active',
+        },
+        {
+          id: 5,
+          title: 'Review accessibility findings',
+          source: 'Linear',
+          project: 'Website',
+          remote: 'WEB-228',
+          tag: 'accessibility',
+          mode: 'sync',
+          state: 'active',
+        },
+        {
+          id: 6,
+          title: 'Draft launch checklist',
+          source: 'Trello',
+          project: 'Marketing',
+          remote: 'Card 27',
+          tag: 'launch',
+          mode: 'import',
+          state: 'active',
+        },
+        {
+          id: 7,
+          title: 'Collect customer interview notes',
+          source: 'Trello',
+          project: 'Marketing',
+          remote: 'Card 31',
+          tag: 'research',
+          mode: 'import',
+          state: 'active',
+        },
+        {
+          id: 8,
+          title: 'Investigate a flaky browser test',
+          source: 'GitHub',
+          project: 'Product app',
+          remote: '#188',
+          tag: 'testing',
+          mode: 'sync',
+          state: 'hidden',
+        },
+        {
+          id: 9,
+          title: 'Draft the next product announcement',
+          source: 'Trello',
+          project: 'Marketing',
+          remote: 'Card 35',
+          tag: 'launch',
+          mode: 'import',
+          state: 'hidden',
+        },
+        {
+          id: 10,
+          title: 'Explore a previous design direction',
+          source: 'Linear',
+          project: 'Website',
+          remote: 'WEB-190',
+          tag: 'design',
+          mode: 'import',
+          state: 'stopped',
+        },
+      ];
+      const $ = (s) => document.querySelector(s);
+      const badge = (m) =>
+        `<span class="pill ${m === 'sync' ? 'sync' : 'import'}">${m === 'sync' ? '↔ Synced' : '↓ Imported'}</span>`;
+      const icon = (s) =>
+        `<span class="source-icon">${{ GitHub: 'GH', Linear: 'Li', Trello: 'Tr', 'Google Calendar': 'GC' }[s] || s.slice(0, 2)}</span>`;
+      const primary = (text, action) =>
+        `<button class="primary" onclick="${action}">${text}</button>`;
+      function toast(s) {
+        $('#toast').textContent = s;
+        $('#toast').classList.remove('hidden');
+        setTimeout(() => $('#toast').classList.add('hidden'), 3000);
+      }
+      function go(s) {
+        current = s;
+        modal = s === 'bulk';
+        selected = new Set(s === 'bulk' ? [1, 2, 4] : []);
+        if (s === 'workspace' || s === 'mobile') filter = 'all';
+        $('#screen-select').value = s;
+        location.hash = s;
+        render();
+      }
+      function rail() {
+        return `<aside class="rail"><div class="brand"><span class="brand-mark">✓</span> UltraTasks</div><a href="#" class="nav" onclick="toast('Planning views use the same local tasks');return false">☀ Today <span class="count">4</span></a><a href="#" class="nav" onclick="toast('Local and sourced tasks share the Inbox');return false">▱ Inbox</a><a href="#frame" class="nav" onclick="go('calendar');return false">▦ Planner</a><a href="#frame" class="nav current" onclick="source='all';go('workspace');return false">⇄ Integrations <span class="count">${tasks.filter((t) => t.state === 'active').length}</span></a><div class="rail-label">CONNECTED SOURCES</div>${['GitHub', 'Linear', 'Trello'].map((s, i) => `<a href="#frame" class="nav ${source === s ? 'current' : ''}" onclick="source='${s}';go('workspace');return false"><span>${['◉', '◈', '▣'][i]}</span>${s}<span class="count">${tasks.filter((t) => t.source === s && t.state === 'active').length}</span></a><span class="subnav">${['Product app', 'Website', 'Marketing'][i]}</span>`).join('')}<a href="#frame" class="nav" onclick="go('calendar');return false">▦ Google Calendar</a><div class="rail-label">PROJECTS</div><span class="nav">▱ Personal</span><span class="nav">▱ Product app <span class="count">GH</span></span><span class="nav">▱ Website <span class="count">Li</span></span><div class="rail-bottom"><a class="nav" href="#frame" onclick="go('connect');return false">＋ Connect account</a><span class="nav muted">⚙ Settings</span></div></aside>`;
+      }
+      function shell(content) {
+        $('#frame').innerHTML =
+          rail() +
+          `<div><div class="mobile-top"><span>☰ UltraTasks</span><span>⇄ Integrations</span></div><main class="screen">${content}</main></div>`;
+      }
+      function heading(title, subtitle, action = '', eye = 'INTEGRATIONS') {
+        return `<div class="heading"><div><div class="eyebrow">${eye}</div><h1>${title}</h1><p class="lead">${subtitle}</p></div>${action}</div>`;
+      }
+      function steps(active) {
+        return `<div class="stepper">${['Connect', 'Choose scope', 'Map organization', 'Review'].map((s, i) => `<span class="step ${i === active ? 'active' : ''}"><b>${i + 1}</b>${s}</span>`).join('')}</div>`;
+      }
+      function taskRow(t, selectable = true) {
+        return `<div class="task">${selectable ? `<input type="checkbox" aria-label="Select ${t.title}" ${selected.has(t.id) ? 'checked' : ''} onchange="selectTask(${t.id},this.checked)">` : '<input type="checkbox" aria-label="Complete task" onclick="toast(\'Completion follows the field policy\')">'}<div class="task-main"><div class="task-title">${t.title}</div><div class="task-meta">${badge(t.mode)}<span class="pill neutral">${t.project}</span><span>#${t.tag}</span><span>· ${t.remote}</span>${t.state === 'stopped' ? '<span>· Tracking stopped</span>' : ''}</div></div><div class="task-extra">${t.mode === 'sync' ? (t.source === 'Linear' ? '↓ Receive only' : 'Up to date') : 'Snapshot'}</div><button class="task-more" aria-label="Open task source details" onclick="go('detail')">⋯</button></div>`;
+      }
+      function selectTask(id, on) {
+        on ? selected.add(id) : selected.delete(id);
+        render();
+      }
+      function setFilter(f) {
+        filter = f;
+        selected.clear();
+        render();
+      }
+      function actHide() {
+        for (const t of tasks)
+          if (selected.has(t.id)) t.state = filter === 'hidden' ? 'active' : 'hidden';
+        toast(
+          filter === 'hidden' ? 'Tasks shown again' : 'Hidden. Tracking is unchanged.',
+        );
+        selected.clear();
+        render();
+      }
+      function stop() {
+        for (const t of tasks)
+          if (selected.has(t.id)) {
+            t.mode = 'import';
+            t.state = 'stopped';
+          }
+        modal = false;
+        current = 'workspace';
+        $('#screen-select').value = 'workspace';
+        toast('Tracking stopped. Local tasks kept. Automatic re-import blocked.');
+        selected.clear();
+        render();
+      }
+      function workspace() {
+        let visible = tasks.filter(
+          (t) =>
+            (source === 'all' || t.source === source) &&
+            (filter === 'hidden'
+              ? t.state === 'hidden'
+              : filter === 'stopped'
+                ? t.state === 'stopped'
+                : t.state === 'active' && (filter === 'all' || t.mode === filter)),
+        );
+        let groups = ['GitHub', 'Linear', 'Trello'].filter((s) =>
+          visible.some((t) => t.source === s),
+        );
+        return (
+          heading(
+            source === 'all' ? 'Your connected work' : source,
+            'Imported and synced tasks, organized automatically by source.',
+            primary('Connect account', "go('connect')"),
+          ) +
+          `<div class="tabs" role="tablist">${[
+            ['all', 'All', tasks.filter((t) => t.state === 'active').length],
+            [
+              'sync',
+              'Synced',
+              tasks.filter((t) => t.state === 'active' && t.mode === 'sync').length,
+            ],
+            [
+              'import',
+              'Imported',
+              tasks.filter((t) => t.state === 'active' && t.mode === 'import').length,
+            ],
+            ['hidden', 'Hidden', tasks.filter((t) => t.state === 'hidden').length],
+            ['stopped', 'Stopped', tasks.filter((t) => t.state === 'stopped').length],
+          ]
+            .map(
+              ([k, n, c]) =>
+                `<button class="tab ${filter === k ? 'active' : ''}" role="tab" aria-selected="${filter === k}" onclick="setFilter('${k}')">${n} <span class="count-inline">${c}</span></button>`,
+            )
+            .join(
+              '',
+            )}</div><div class="toolbar"><input class="search" aria-label="Search integrated tasks" placeholder="Search connected work" oninput="searchRows(this.value)"><div class="row"><button class="ghost" onclick="selected=new Set(${JSON.stringify(visible.map((t) => t.id))});render()">Select all shown</button><button onclick="go('scope')">Manage scope</button></div></div>${selected.size ? `<div class="selection"><strong>${selected.size} selected</strong><button onclick="actHide()">${filter === 'hidden' ? 'Show' : 'Hide'}</button><button onclick="modal=true;render()">Stop tracking</button><button onclick="go('attention')">Resume / change mode</button><button class="ghost" onclick="selected.clear();render()">Clear</button><span class="micro">Applies to selected items only</span></div>` : ''}<div class="grid"><div class="stack">${
+            groups
+              .map(
+                (s) =>
+                  `<section class="card compact"><div class="source-head">${icon(s)}<div><h3>${s} <span class="count-inline">${s === 'GitHub' ? '· Product app' : s === 'Linear' ? '· Website' : '· Marketing'}</span></h3><p>${s === 'Linear' ? 'Updates from Linear · read-only connector' : s === 'GitHub' ? 'Field policies control updates in both directions' : 'Imported snapshot · no background updates'}</p></div></div>${[
+                    'sync',
+                    'import',
+                  ]
+                    .filter((m) => visible.some((t) => t.source === s && t.mode === m))
+                    .map(
+                      (m) =>
+                        `<div class="section-label">${m === 'sync' ? '↔ Synced' : '↓ Imported'} <span class="pill neutral">Automatic section</span></div>${visible
+                          .filter((t) => t.source === s && t.mode === m)
+                          .map((t) => taskRow(t))
+                          .join('')}`,
+                    )
+                    .join('')}</section>`,
+              )
+              .join('') ||
+            '<div class="card empty">No matching items. Change filters or restore hidden tasks.</div>'
+          }</div><aside class="stack"><div class="card"><h3>The same tasks, everywhere</h3><p class="muted">Plan this work in Today, projects, or your calendar. Source sections are another view of those tasks.</p><div class="mini-line"></div><p class="micro">Imported and Synced badges are automatic. Your own tags stay editable.</p><button class="fullwidth" onclick="go('detail')">View a task</button></div><div class="note"><b>Hide or stop tracking?</b><p style="margin-top:8px">Hide changes visibility. Stop tracking keeps the local task and stops updates and automatic re-import.</p><button class="linklike" onclick="go('bulk')">Preview batch controls</button></div></aside></div><div class="footer-caption">Source sections are generated views · no duplicate local tasks · badges never become remote labels</div>`
+        );
+      }
+      function searchRows(v) {
+        document
+          .querySelectorAll('.task')
+          .forEach((el) =>
+            el.classList.toggle(
+              'hidden',
+              !el.textContent.toLowerCase().includes(v.toLowerCase()),
+            ),
+          );
+      }
+      function connect() {
+        return (
+          heading(
+            'Connect an account',
+            'Authorize access first. Choose projects, calendars, and sync behavior next.',
+            '',
+            'NEW CONNECTION',
+          ) +
+          steps(0) +
+          `<div class="grid"><section class="card"><h2>Choose a platform</h2><div class="provider-grid">${['GitHub', 'Jira', 'Google Calendar', 'Linear', 'Trello', 'More platforms'].map((s) => `<button class="provider" onclick="provider='${s}';toast('${s}: proposed account connection');render()">${icon(s)}<span><b>${s}</b><small>${s === 'More platforms' ? 'All supported connectors' : 'Connect account'}</small></span></button>`).join('')}</div><div class="mini-line"></div><h2>${provider} account</h2><p class="muted">Continue to the platform’s authorization page, then return here to choose what UltraTasks can use.</p>${primary('Continue with ' + provider, "toast('Wireframe only: no authorization request is sent')")}<p class="micro" style="margin-top:12px">Connecting an account does not import items or modify the source.</p><details style="margin-top:24px"><summary>Self-hosted instance or manual access token</summary><div class="stack" style="margin-top:16px"><label class="field">Instance address<input placeholder="https://your-instance.example"></label><label class="field">Access token<input type="password" placeholder="Paste token"></label><button onclick="toast('Wireframe only: token is not stored')">Test connection</button></div></details><div class="footer-actions"><button onclick="go('workspace')">Cancel</button>${primary('Continue to scope', "go('scope')")}</div></section><aside class="stack"><div class="note"><b>One connection experience</b><p style="margin-top:8px">Official authorization where available. Manual credentials remain available for self-hosted services.</p></div><div class="card compact"><h3>Keep access scoped</h3><p class="micro">Start with read access for Import. Additional write access is requested only when you enable supported outbound changes.</p><p class="micro">Platform sign-in availability differs by connector and device. This screen is the proposed flow.</p></div></aside></div>`
+        );
+      }
+      function scope() {
+        return (
+          heading(
+            'Choose what comes in',
+            'Select the source scope and decide whether to take a snapshot or keep it updated.',
+            '',
+            provider.toUpperCase() + ' · DEMO ACCOUNT',
+          ) +
+          steps(1) +
+          `<div class="grid"><div class="stack"><section class="card"><div class="row between"><h2>Source projects</h2><select class="small-select" aria-label="Source capability example" onchange="provider=this.value;render()"><option ${provider === 'GitHub' ? 'selected' : ''}>GitHub</option><option ${provider === 'Linear' ? 'selected' : ''}>Linear</option></select></div><div class="checks"><label><input type="checkbox" checked><span><b>${provider === 'Linear' ? 'Website' : 'demo / product-app'}</b><div class="check-detail">24 matching items · 3 already in UltraTasks</div></span></label><label><input type="checkbox"><span>${provider === 'Linear' ? 'Mobile app' : 'demo / mobile-app'}<div class="check-detail">Excluded from this connection</div></span></label></div><div class="twocol" style="margin-top:20px"><label class="field">Items to include<select><option>Assigned to me</option><option>All open items</option><option>Custom source filter</option></select></label><label class="field">Completed items<select><option>Exclude completed items</option><option>Include completed items</option></select></label></div></section><div class="twocol"><label class="choice ${mode === 'import' ? 'selected' : ''}"><input type="radio" name="mode" value="import" ${mode === 'import' ? 'checked' : ''} onchange="mode='import';render()"><b>Import</b><p>Copy selected items, projects, and tags once. Future changes stay separate.</p></label><label class="choice ${mode === 'sync' ? 'selected' : ''}"><input type="radio" name="mode" value="sync" ${mode === 'sync' ? 'checked' : ''} onchange="mode='sync';render()"><b>Sync</b><p>Keep selected items updated. Field policies control which changes go each way.</p></label></div><div class="note">${mode === 'import' ? '<b>Snapshot only.</b> No background refresh and no source writes. Existing items are skipped unless you review and update them.' : provider === 'Linear' ? '<b>Receive updates only.</b> This connector can keep local tasks current. Sending changes to Linear is not available yet.' : '<b>Starts with updates from GitHub.</b> You can enable supported outbound changes for selected fields during review.'}</div>${mode === 'sync' ? '<label class="row"><input type="checkbox" checked> Include newly matching items automatically</label>' : ''}<div class="footer-actions"><button onclick="go('connect')">Back</button>${primary('Map projects and tags', "go('mapping')")}</div></div><aside class="card"><h3>Preview</h3><div class="policy-line"><span>Matching items</span><b>24</b></div><div class="policy-line"><span>Already linked</span><b>3</b></div><div class="policy-line"><span>Stopped / excluded</span><b>2</b></div><div class="policy-line"><span>New items</span><b>19</b></div><p class="micro" style="margin-top:16px">Existing identities are reused. Stopped items stay excluded until you restore them.</p></aside></div>`
+        );
+      }
+      function mapping() {
+        return (
+          heading(
+            'Map projects and tags',
+            'Bring source organization into UltraTasks while preserving your local organization.',
+            '',
+            provider.toUpperCase() + ' · ' + (mode === 'sync' ? 'SYNC' : 'IMPORT'),
+          ) +
+          steps(2) +
+          `<div class="stack"><section class="card"><h2>Projects</h2><table><thead><tr><th>SOURCE COLLECTION</th><th>ULTRATASKS PROJECT</th><th>ONGOING BEHAVIOR</th></tr></thead><tbody><tr><td><b>${provider === 'Linear' ? 'Website' : 'demo / product-app'}</b><small>${provider === 'Linear' ? 'Project' : 'Repository'} · source ID 7821</small></td><td><select aria-label="Project mapping"><option>Create ${provider === 'Linear' ? 'Website' : 'Product app'}</option><option>Map to existing project…</option></select></td><td>${mode === 'sync' ? 'Receive source renames and membership' : 'Create a project snapshot'}<small>Local project edits stay local</small></td></tr><tr><td>Organization: demo<small>Parent source context</small></td><td>Keep as source breadcrumb</td><td>No extra project created</td></tr></tbody></table></section><section class="card"><div class="row between"><h2>Tags and equivalents</h2><label><input type="checkbox" checked> Include source tags</label></div><table><thead><tr><th>SOURCE LABEL</th><th>LOCAL TAG</th><th>OWNERSHIP</th></tr></thead><tbody><tr><td>accessibility</td><td><span class="pill">#accessibility</span></td><td>Source-managed membership</td></tr><tr><td>frontend</td><td><span class="pill">#frontend</span></td><td>Source-managed membership</td></tr><tr><td>design <small>Name also used by your Linear connection</small></td><td><select aria-label="Resolve tag name collision"><option>Create ${provider} / design</option><option>Use existing #design</option><option>Skip this source label</option></select></td><td>Choose before merging identities</td></tr></tbody></table><p class="micro" style="margin-top:16px">Your own tags remain on the task when source labels change. Renaming a local tag does not rename it remotely.</p></section><div class="note"><b>Automatic badges:</b> ${badge(mode)} <span class="pill">${provider}</span><p style="margin:8px 0 0">System badges are filterable and create source sections. They are never sent back as remote labels.</p></div><div class="footer-actions"><button onclick="go('scope')">Back</button>${primary(mode === 'sync' ? 'Review sync fields' : 'Review import', "go('fields')")}</div></div>`
+        );
+      }
+      function fields() {
+        return (
+          heading(
+            mode === 'import' ? 'Review your import' : 'Choose what stays in sync',
+            mode === 'import'
+              ? 'A one-time snapshot. No background updates or changes at the source.'
+              : 'Start with source updates. Enable write-back only for fields you want UltraTasks to change.',
+            '',
+            provider.toUpperCase() + ' · REVIEW',
+          ) +
+          steps(3) +
+          `<div class="grid"><section class="card"><h2>${mode === 'import' ? 'Snapshot contents' : 'Field policies'}</h2><table><thead><tr><th>ULTRATASKS FIELD</th><th>SOURCE FIELD</th><th>${mode === 'import' ? 'IMPORT RULE' : 'DIRECTION'}</th></tr></thead><tbody>${[
+            ['Title', 'Issue title', 'Receive only'],
+            ['Completion', 'Open / closed', 'Receive only'],
+            ['Private notes', 'Issue description', 'Keep local'],
+            ['Planned work date', 'No direct equivalent', 'Keep local'],
+            ['Projects and tags', 'Repository and labels', 'Receive only'],
+          ]
+            .map(
+              ([a, b, c]) =>
+                `<tr><td><b>${a}</b></td><td>${b}</td><td>${mode === 'import' ? (c === 'Keep local' ? 'Leave local' : 'Copy once') : `<select aria-label="${a} sync direction"><option>${c}</option>${c === 'Keep local' ? '' : provider === 'Linear' ? '' : '<option>Both directions</option><option>Send only</option><option>Keep local</option>'}</select>`}</td></tr>`,
+            )
+            .join(
+              '',
+            )}</tbody></table><div class="note" style="margin-top:20px">${mode === 'import' ? '<b>No live relationship.</b> You can later switch these same tasks to Sync after comparing changes.' : provider === 'Linear' ? '<b>Linear is receive-only in the current connector.</b> The local task experience is the same; unavailable write directions are not offered.' : '<b>What happens when I complete a task?</b> With Receive only, completion stays local. Choose Both directions to also close or reopen the source issue.'}</div><p class="micro" style="margin-top:16px">${mode === 'sync' ? 'Conflicting edits appear in Needs attention. Offline changes remain available locally.' : 'Existing items are skipped by default. Nothing is replaced without a comparison preview.'}</p></section><aside class="stack"><div class="card"><h3>Ready to ${mode === 'sync' ? 'sync' : 'import'}</h3><div class="policy-line"><span>New tasks</span><b>19</b></div><div class="policy-line"><span>New projects</span><b>1</b></div><div class="policy-line"><span>Source tags</span><b>3</b></div><p class="micro" style="margin-top:16px">3 existing items reused or skipped. 2 stopped items stay excluded.</p>${primary(mode === 'sync' ? 'Start sync' : 'Import snapshot', "toast('Demo preview complete. No source changes made.');source='all';go('workspace')")}</div><div class="note">Every task remains editable, schedulable, and trackable in UltraTasks.</div></aside></div><div class="footer-actions"><button onclick="go('mapping')">Back</button><button onclick="toast('Setup draft retained in this wireframe only')">Save for later</button></div>`
+        );
+      }
+      function stopModal() {
+        return `<div class="modal-shade"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="stop-title"><div class="eyebrow">BATCH ACTION · ${selected.size || 3} ITEMS</div><h2 id="stop-title" style="margin-top:8px">Stop tracking these tasks?</h2><p>Keep the tasks in UltraTasks. Stop updates in both directions and prevent automatic re-import.</p><div class="review-list"><div>✓ Keep local tasks, notes, and tracked time</div><div>✓ Move source relationships to Stopped</div><div>✓ Keep source links and show Imported badges</div><div>✓ Leave remote issues unchanged</div></div><p class="micro">You can resume tracking later after comparing local and source changes. Tasks remain available in their projects.</p><div class="note">Want them out of your task lists while sync continues? Use <b>Hide</b> instead.</div><div class="footer-actions"><button onclick="modal=false;current='workspace';render()">Cancel</button>${primary('Stop tracking', 'stop()')}</div></section></div>`;
+      }
+      function calendar() {
+        return (
+          heading(
+            'Google Calendar',
+            'Keep meetings, task imports, and time blocks distinct, with clear field rules.',
+            '<button onclick="go(\'connect\')">Manage account</button>',
+            'CALENDAR CONNECTION',
+          ) +
+          `<div class="tabs">${[
+            ['import', 'Import'],
+            ['export', 'Export'],
+            ['sync', 'Sync'],
+          ]
+            .map(
+              ([id, n]) =>
+                `<button class="tab ${calmode === id ? 'active' : ''}" onclick="calmode='${id}';render()">${n}</button>`,
+            )
+            .join(
+              '',
+            )}</div><div class="grid"><div class="stack"><section class="card"><h2>${calmode === 'import' ? 'Copy events into tasks' : calmode === 'export' ? 'Send tasks to a calendar' : 'Calendar sync scope'}</h2><p class="muted">${calmode === 'import' ? 'Take a snapshot of selected events. Meetings can also stay visible without becoming tasks.' : calmode === 'export' ? 'Export once as an ICS file, or create events directly with a writable connection.' : 'Choose what to display, what becomes a task, and which calendar receives task blocks.'}</p><div class="twocol"><label class="field">Calendars to display<select><option>Work + Personal</option></select></label><label class="field">Events to turn into tasks<select><option>Selected events only</option><option>Matching filter…</option><option>No automatic conversion</option></select></label><label class="field">Calendar for task blocks<select><option>UltraTasks — focus blocks</option></select></label><label class="field">${calmode === 'export' ? 'Output' : 'Task block direction'}<select><option>${calmode === 'export' ? 'Download ICS snapshot' : 'Task → calendar'}</option>${calmode === 'export' ? '<option>Create events directly</option>' : '<option>Off</option>'}</select></label></div><p class="micro" style="margin-top:16px">${calmode === 'export' ? 'An ICS file is a snapshot. Importing it elsewhere does not establish a live sync relationship.' : 'Generated task blocks currently receive updates from UltraTasks. Moving a generated block in Google does not reschedule its task.'}</p></section><section class="card"><h2>Field mapping and conversions</h2><table><thead><tr><th>TASK FIELD</th><th>CALENDAR FIELD</th><th>POLICY</th></tr></thead><tbody><tr><td>Title</td><td>Event summary</td><td>${calmode === 'sync' ? 'Both directions' : 'Copy once'}</td></tr><tr><td>Planned start + estimate</td><td>Start + end</td><td>End = start + duration</td></tr><tr><td>Done</td><td>No native equivalent</td><td><select aria-label="Calendar completion conversion" onchange="$('#conversion-preview').textContent=this.value==='Keep local'?'No calendar change.':'Preview: [DONE] Write proposal — visible in the calendar.'"><option>Keep local</option><option>Send title marker [DONE]</option></select></td></tr><tr><td>Tags / project</td><td>Categories or metadata</td><td>Keep local by default</td></tr></tbody></table><div id="conversion-preview" class="note" style="margin-top:16px">No calendar change.</div><p class="micro" style="margin-top:12px">Only reversible mappings can use both directions. Unsupported fields remain in source details.</p></section><div class="footer-actions"><button onclick="go('workspace')">Back</button>${primary('Review calendar changes', "toast('Review shows affected tasks and events before writing')")}</div></div><aside class="stack"><div class="card"><h3>Preview the relationship</h3><div class="calendar-block"><span class="time">10:00–10:45 · Work</span><br><b>Weekly planning</b><br><span class="micro">External meeting · display only</span></div><div class="calendar-block"><span class="time">14:00–15:00 · UltraTasks</span><br><b>Write proposal</b><br><span class="micro">Task block · sends updates</span></div></div><div class="note warning"><b>Feed or account?</b><p style="margin-top:8px">iCal / Outlook feed: receive only. Google API / CalDAV: writable where permissions allow. Web sign-in support varies.</p></div></aside></div>`
+        );
+      }
+      function detail() {
+        return (
+          heading(
+            'Today',
+            'One daily plan for local, imported, and synced tasks.',
+            '<button onclick="go(\'workspace\')">Open integrations</button>',
+            'DAILY WORK',
+          ) +
+          `<div class="details-layout"><section class="stack"><div class="card compact"><div class="section-label">PLANNED WORK</div>${taskRow(tasks[0], false)}${taskRow(tasks[2], false)}<div class="task"><input type="checkbox" aria-label="Complete local task"><div class="task-main"><div class="task-title">Plan the next release</div><div class="task-meta"><span class="pill neutral">Personal</span><span>Local task</span></div></div></div></div><div class="note">The same scheduling, notes, subtasks, and time tracking are available regardless of origin.</div></section><aside class="detail-panel"><div class="card"><div class="row between">${badge('sync')}<button class="task-more" aria-label="Task menu" onclick="go('bulk')">⋯</button></div><h2 style="margin-top:16px">Fix keyboard navigation in settings</h2><div class="row"><button onclick="toast('Demo timer started')">▶ Start timer</button><button onclick="toast('Schedule this task in the planner')">Schedule</button></div><div class="mini-line"></div><label class="field">Project<select><option>Product app</option></select></label><div class="task-meta" style="margin:16px 0"><span class="pill">#accessibility</span><span class="pill">#my-focus</span></div><label class="field">Private notes<input value="Check focus order with the keyboard"></label><div class="mini-line"></div><h3>GitHub · #142 ↗</h3><p class="micro"><span class="status-dot"></span>Up to date · checked 2 minutes ago</p><div class="policy-line"><span>Title and status</span><span>Receive only</span></div><div class="policy-line"><span>Private notes</span><span>Stay in UltraTasks</span></div><p class="micro" style="margin-top:12px">Completing this task will not close the GitHub issue with the current policy.</p><div class="row"><button onclick="go('fields')">Sync settings</button><button onclick="toast('Task hidden; sync continues')">Hide</button></div><button class="linklike" style="margin-top:12px" onclick="selected=new Set([1]);modal=true;render()">Stop tracking this task</button></div></aside></div>`
+        );
+      }
+      function attention() {
+        return (
+          heading(
+            'Review before resuming',
+            'Compare changes made while tracking was stopped. Keep the same local task and history.',
+            '',
+            'LINEAR · WEB-190',
+          ) +
+          `<div class="grid"><div class="stack"><div class="note warning"><b>Receive-only connection.</b> Resuming can update UltraTasks from Linear. It will not send local changes back.</div><section class="conflict"><div class="conflict-head"><b>Title changed in both places</b><span class="pill warn" style="float:right">Needs a choice</span></div><div class="conflict-body"><div><div class="eyebrow">ULTRATASKS</div><p style="margin-top:12px"><b>Explore a previous design direction</b></p><label><input type="radio" name="conflict" checked> Keep local title</label></div><div><div class="eyebrow">LINEAR</div><p style="margin-top:12px"><b>Explore the new navigation model</b></p><label><input type="radio" name="conflict"> Use source title</label></div></div></section><section class="card"><h2>Keep your local organization</h2><div class="policy-line"><span>Tracked time</span><b>2h 15m · retained</b></div><div class="policy-line"><span>Private notes</span><b>Retained</b></div><div class="policy-line"><span>Project</span><b>Website</b></div><div class="policy-line"><span>Personal tags</span><b>#my-focus · retained</b></div><p class="micro" style="margin-top:16px">Keeping a local title leaves that field local-only for this task. Other supported fields can continue receiving updates.</p></section><div class="footer-actions"><button onclick="go('workspace')">Keep stopped</button>${primary('Resume with these choices', "toast('Demo: same task reconnected after comparison');go('workspace')")}</div></div><aside class="stack"><div class="card"><h3>What changes now?</h3><p>Remove this item's discovery exclusion and resume the supported field policies.</p><p class="micro">Nothing is duplicated or deleted. Pending edits are compared before any outgoing change.</p></div><div class="note">Connection errors and offline state pause sync. They never change the task into an Imported snapshot.</div></aside></div>`
+        );
+      }
+      function render() {
+        let content = {
+          workspace,
+          mobile: workspace,
+          connect,
+          scope,
+          mapping,
+          fields,
+          bulk: workspace,
+          calendar,
+          detail,
+          attention,
+        }[current]();
+        shell(content);
+        if (modal) $('#frame').insertAdjacentHTML('beforeend', stopModal());
+      }
+      $('#screen-select').innerHTML = screens
+        .map(([id, t]) => `<option value="${id}">${t}</option>`)
+        .join('');
+      $('#screen-select').onchange = (e) => go(e.target.value);
+      const initial = location.hash.slice(1);
+      go(screens.some(([id]) => id === initial) ? initial : 'workspace');
+      window.wireframe = { go, render, getTasks: () => tasks };
+    </script>
+  </body>
+</html>

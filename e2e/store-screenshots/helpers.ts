@@ -21,11 +21,16 @@ export const openNotesPanel = async (page: Page): Promise<void> => {
   await btn.click();
 };
 
-/** Toggle the issue provider panel via the e2e-tagged header button. */
+/** Open the dedicated integration workspace. */
 export const openIssueProviderPanel = async (page: Page): Promise<void> => {
-  const btn = page.locator('.e2e-toggle-issue-provider-panel').first();
-  await btn.waitFor({ state: 'visible', timeout: 10_000 });
-  await btn.click();
+  await page
+    .locator('magic-side-nav')
+    .getByRole('menuitem', { name: 'Integrations', exact: true })
+    .click();
+  await page
+    .locator('integrations-page')
+    .getByRole('button', { name: 'Connect account', exact: true })
+    .click();
 };
 
 /** Open the right-hand task detail panel for a known seeded task id. */

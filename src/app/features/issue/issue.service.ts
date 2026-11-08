@@ -1,3 +1,9 @@
+import {
+  integrationPullChanges,
+  sameIntegrationLink,
+} from '../integrations/integration.model';
+import { selectEntities as selectIntegrationProviders } from './store/issue-provider.selectors';
+import { selectTaskEntities } from '../tasks/store/task.selectors';
 import { inject, Injectable } from '@angular/core';
 import { unique } from '../../util/unique';
 import { generateCalendarTaskId } from '../calendar-integration/generate-calendar-task-id';
@@ -111,6 +117,12 @@ export class IssueService {
   private _pluginAdapter = inject(PluginIssueProviderAdapterService);
   private _pluginRegistry = inject(PluginIssueProviderRegistryService);
   private _globalConfigService = inject(GlobalConfigService);
+
+  private readonly _integrationTaskEntities =
+    this._store.selectSignal(selectTaskEntities);
+  private readonly _integrationProviders = this._store.selectSignal(
+    selectIntegrationProviders,
+  );
 
   ISSUE_SERVICE_MAP: { [key: string]: IssueServiceInterface } = {
     [GITLAB_TYPE]: this._gitlabCommonInterfacesService,
@@ -635,7 +647,7 @@ export class IssueService {
       taskDefaults.tagIds = unique([...(taskDefaults.tagIds ?? []), ...providerTagIds]);
     }
 
-    const taskData = {
+    const taskData: Partial<TaskCopy> = {
       issueType: issueProviderKey,
       issueProviderId: issueProviderId,
       issueId: issueDataReduced.id.toString(),
@@ -649,6 +661,18 @@ export class IssueService {
       ...taskDefaults,
       ...additional,
     };
+
+    taskData.integration = additional.integration ?? {
+      providerId: issueProviderId,
+      providerKey: issueProviderKey,
+      remoteId: issueDataReduced.id.toString(),
+      mode: providerCfg.integrationMode ?? 'sync',
+    };
+    if (taskData.integration.mode === 'import') {
+      taskData.issueId = '';
+      taskData.issueProviderId = '';
+      taskData.issueType = undefined;
+    }
 
     // If a precise start time is provided by the provider, avoid setting dueDay as well
     if ((taskData as Partial<TaskCopy>).dueWithTime) {
@@ -714,6 +738,7 @@ export class IssueService {
         subTaskParentId,
         issueProviderId,
         issueProviderKey,
+        taskData.integration?.mode,
       );
     }
 
@@ -725,6 +750,7 @@ export class IssueService {
     parentTaskId: string,
     issueProviderId: string,
     issueProviderKey: IssueProviderKey,
+    mode: 'import' | 'sync' = 'sync',
   ): Promise<void> {
     const provider = this._getService(issueProviderKey);
     if (!provider?.getSubTasks) {
@@ -753,6 +779,15 @@ export class IssueService {
           issueWasUpdated: false,
           issueLastUpdated: Date.now(),
           ...subTaskAdditional,
+          integration: {
+            providerId: issueProviderId,
+            providerKey: issueProviderKey,
+            remoteId: subtask.id.toString(),
+            mode,
+          },
+          ...(mode === 'import'
+            ? { issueId: '', issueProviderId: '', issueType: undefined }
+            : {}),
         });
       }
     } catch (e) {
@@ -881,6 +916,8 @@ export class IssueService {
       }
     }
 
+    // Snapshot/stopped provenance also reserves the identity; polling must not restore it.
+    if (res?.task.integration) return true;
     if (res?.isFromArchive) {
       this._taskService.restoreTask(res.task, res.subTasks || []);
       this._snackService.open({
@@ -974,6 +1011,13 @@ export class IssueService {
    * reducer sets it deterministically. Rare enough that the extra op is fine.
    */
   private _updateTaskFromPoll(task: Task, taskChangesIn: Partial<Task>): void {
+    const current = this._integrationTaskEntities()[task.id];
+    if (!sameIntegrationLink(current, task)) return;
+    taskChangesIn = integrationPullChanges(
+      current!,
+      taskChangesIn,
+      this._integrationProviders()[task.issueProviderId!]?.integrationFieldPolicy,
+    );
     // A done write to a task that is already done would only stamp a new
     // `doneOn`: it moves the completion date and turns a won't-do task into a
     // completed one (`isWontDoTask`).

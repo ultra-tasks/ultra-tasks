@@ -21,6 +21,7 @@ export interface FieldPullInput {
    */
   addTaskData: Partial<Task>;
   fieldMappings: FieldMapping[];
+  /** Resolved preferences, including provider/item limits. */
   syncConfig: FieldSyncConfig;
   ctx: FieldMappingContext;
   /**
