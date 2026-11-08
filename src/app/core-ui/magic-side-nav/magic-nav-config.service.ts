@@ -333,13 +333,6 @@ export class MagicNavConfigService {
 
       {
         type: 'route',
-        id: 'integrations',
-        label: T.F.INTEGRATIONS.TITLE,
-        icon: 'hub',
-        route: '/integrations',
-      },
-      {
-        type: 'route',
         id: 'plugins',
         label: T.PS.REDESIGN.PLUGINS,
         icon: 'extension',
@@ -447,6 +440,14 @@ export class MagicNavConfigService {
         featureConfigKey: 'isSchedulerEnabled',
       });
     }
+
+    items.push({
+      type: 'route',
+      id: 'integrations',
+      label: T.F.INTEGRATIONS.TITLE,
+      icon: 'hub',
+      route: '/integrations',
+    });
 
     if (this.isBoardsEnabled()) {
       items.push({
