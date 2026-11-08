@@ -47,7 +47,7 @@ class OnlineNavigationInstrumentedTest {
         val loads = LinkedBlockingQueue<String>()
         lateinit var view: WebView
         lateinit var handler: WebViewRequestHandler
-        val origin: String get() = server.url("/").toString()
+        val origin: String
 
         init {
             server.dispatcher = object : Dispatcher() {
@@ -56,10 +56,14 @@ class OnlineNavigationInstrumentedTest {
                         .setBody("<html><body><script>SUPAndroid.loaded(location.href)</script></body></html>")
             }
             server.start()
+            // MockWebServer can perform reverse DNS while producing its URL.
+            // Resolve it on the instrumentation thread, before entering the UI.
+            origin = server.url("/").toString()
+            val configuredHost = java.net.URI(origin).rawAuthority
             instrumentation.runOnMainSync {
                 browser = BrowserRecorder()
                 view = WebHelper().instanceView(instrumentation.targetContext)
-                handler = WebViewRequestHandler(browser, "http", "${server.hostName}:${server.port}")
+                handler = WebViewRequestHandler(browser, "http", configuredHost)
                 view.addJavascriptInterface(Probe(loads), "SUPAndroid")
                 view.webViewClient = handler.createClient()
                 view.webChromeClient = WebChromeClient()
