@@ -289,6 +289,7 @@ test.describe('First-run onboarding', () => {
     const runtimeErrors = attachPageErrorCollector(page, 'onboarding model');
     installDevErrorDialogHandler(page, 'onboarding model');
     await openFreshApp(page, { withExamples: false });
+    await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_HINT);
     await addTaskViaComposer(page, `Model tip task ${Date.now()}`);
 
     const hint = page.locator('onboarding-hint');

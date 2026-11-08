@@ -1,5 +1,7 @@
+import type { Store } from '@ngrx/store';
+import type { RootState } from '../../../src/app/root-store/root-state';
 import { expect, test } from '../../fixtures/test.fixture';
-import { fillMarkdownEditor } from '../../utils/markdown-editor';
+import { fillMarkdownEditor, markdownEditor } from '../../utils/markdown-editor';
 import { flushPendingWrites } from '../../utils/waits';
 
 test('task description uses a bounded window and preserves formatting and saved content', async ({
@@ -14,6 +16,19 @@ test('task description uses a bounded window and preserves formatting and saved 
     page.getByRole('button', { name: 'Show/hide calendar panel' }),
   ).toHaveCount(0);
   await workViewPage.addTask('Description window task');
+  const taskId = await taskPage
+    .getTaskByText('Description window task')
+    .getAttribute('data-task-id');
+  const savedNotes = (): Promise<string | undefined> =>
+    page.evaluate((id) => {
+      let state: RootState | undefined;
+      (
+        window as unknown as { __e2eTestHelpers: { store: Store<RootState> } }
+      ).__e2eTestHelpers.store
+        .subscribe((value) => (state = value))
+        .unsubscribe();
+      return state?.tasks.entities[id!]?.notes;
+    }, taskId);
   await settingsPage.openSettingsSection('appFeatures');
   const settingsBox = await page.locator('.settings-window').boundingBox();
   expect(settingsBox).toBeTruthy();
@@ -56,13 +71,19 @@ test('task description uses a bounded window and preserves formatting and saved 
   await dialog.locator('#T-save-note').click();
   await expect(dialog).toHaveCount(0);
   await expect(markdown).toContainText('Important context');
+  await expect.poll(savedNotes).toBe(content);
   await flushPendingWrites(page);
   await page.reload();
   await workViewPage.waitForTaskList();
   await taskPage.openTaskDetail(taskPage.getTaskByText('Description window task'));
-  await expect(page.locator('task-detail-panel inline-markdown').first()).toContainText(
-    'Important context',
-  );
+  await expect.poll(savedNotes).toBe(content);
+  const reopened = page.locator('task-detail-panel inline-markdown').first();
+  // CodeMirror virtualizes long notes. Its focused caret can restore near the
+  // end after reload, where the heading is outside the rendered viewport.
+  const editor = markdownEditor(reopened);
+  await editor.click();
+  await editor.press('ControlOrMeta+Home');
+  await expect(reopened).toContainText('Important context');
   await page.getByRole('menuitem', { name: 'Calendar', exact: true }).click();
   await expect(page.locator('schedule')).toBeVisible();
 });
