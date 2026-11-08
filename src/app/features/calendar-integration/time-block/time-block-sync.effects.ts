@@ -1,3 +1,7 @@
+import {
+  allowsIntegrationWrites,
+  canDeleteIntegrationTimeBlock,
+} from '../../integrations/integration.model';
 import { Injectable, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { PluginBridgeService } from '../../../plugins/plugin-bridge.service';
@@ -190,7 +194,7 @@ export class TimeBlockSyncEffects {
     () =>
       this._actions$.pipe(
         ofType(TaskSharedActions.deleteTask),
-        filter(({ task }) => !!task.dueWithTime),
+        filter(({ task }) => canDeleteIntegrationTimeBlock(task)),
         concatMap(({ task }) => this._queueDeleteTimeBlock$(task.id)),
       ),
     { dispatch: false },
@@ -379,9 +383,17 @@ export class TimeBlockSyncEffects {
     queuedCtx?: TimeBlockContext,
   ): Observable<unknown> {
     const runWithCtx = (ctx: TimeBlockContext): Observable<unknown> =>
-      from(ctx.definition.timeBlock!.deleteEvent(taskId, ctx.config, ctx.http)).pipe(
-        catchError((err) => this._handleError(err, ctx)),
-      );
+      this._taskService
+        .getByIdOnce$(taskId)
+        .pipe(
+          concatMap((task) =>
+            allowsIntegrationWrites(task)
+              ? from(
+                  ctx.definition.timeBlock!.deleteEvent(taskId, ctx.config, ctx.http),
+                ).pipe(catchError((err) => this._handleError(err, ctx)))
+              : EMPTY,
+          ),
+        );
 
     return queuedCtx ? runWithCtx(queuedCtx) : this._withTimeBlockContext$(runWithCtx);
   }
@@ -457,6 +469,7 @@ export class TimeBlockSyncEffects {
   ): Promise<void> {
     // An imported task is already represented by its source calendar event.
     // Writing a second, task-id-based time block to the same provider duplicates it.
+    if (!allowsIntegrationWrites(task)) return;
     if (task.issueId && task.issueProviderId === ctx.providerId) {
       return;
     }

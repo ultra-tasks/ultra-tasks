@@ -18,6 +18,7 @@
   (ngSubmit)="submit()"
 >
   <mat-dialog-content>
+    <p class="callout">{{ integrationQuirk(issueProviderKey) | translate }}</p>
     @if (configFormSection?.help || configFormSection?.helpArr) {
       <help-section>
         @if (configFormSection?.help) {

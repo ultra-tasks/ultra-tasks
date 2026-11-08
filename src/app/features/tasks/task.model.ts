@@ -1,3 +1,4 @@
+import type { TaskIntegration } from '../integrations/integration.model';
 import { IssueProviderKey } from '../issue/issue.model';
 import { EntityState } from '@ngrx/entity';
 import { TaskAttachment } from './task-attachment/task-attachment.model';
@@ -62,6 +63,8 @@ export interface IssueTaskTimeTracked {
 }
 
 export interface IssueFieldsForTask {
+  /** Source relationship; old tasks infer Sync from their existing issue link. */
+  integration?: TaskIntegration;
   // NOTE: keep in mind that the issueId is not unique (especially for github)
   issueId?: string;
   issueProviderId?: string;

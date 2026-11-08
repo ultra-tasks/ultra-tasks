@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import { expect, test } from '../../fixtures/test.fixture';
 
 // #10112: after a restart, plugin providers (GitHub, Linear) register after the
@@ -22,8 +27,7 @@ test('per-project backlog polling starts after restart without a context switch'
   await page.goto('/#/project/INBOX_PROJECT/tasks');
   await workViewPage.waitForTaskList();
 
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
-  await page.locator('issue-panel .mat-mdc-tab').last().click();
+  await openIntegrationSetup(page);
   await page.getByRole('button', { name: 'GitHub Issues', exact: true }).click();
   const dialog = page.locator('dialog-edit-issue-provider');
   await dialog.locator('input[id*="repo"]').fill('e2e/repro');
@@ -33,7 +37,8 @@ test('per-project backlog polling starts after restart without a context switch'
   await dialog.getByText('Auto import to default project').click();
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
+  await finishIntegrationSetup(page);
+  await leaveIntegrations(page);
 
   // Control: re-entering the project in the running app starts polling.
   await page.goto('/#/tag/TODAY/tasks');

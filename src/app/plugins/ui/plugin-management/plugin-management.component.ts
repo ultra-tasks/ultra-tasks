@@ -45,7 +45,6 @@ import { firstValueFrom } from 'rxjs';
 import { Store } from '@ngrx/store';
 import { Router } from '@angular/router';
 import { selectAll as selectAllIssueProviders } from '../../../features/issue/store/issue-provider.selectors';
-import { LayoutService } from '../../../core-ui/layout/layout.service';
 import COMMUNITY_PLUGINS_DATA from '../../../../assets/community-plugins.json';
 import { PluginApiAccess, PluginSecurityService } from '../../plugin-security';
 import { DEV_ONLY_BUNDLED_PLUGIN_IDS } from '../../bundled-plugins.const';
@@ -141,7 +140,6 @@ export class PluginManagementComponent {
   private readonly _dialog = inject(MatDialog);
   private readonly _store = inject(Store);
   private readonly _router = inject(Router);
-  private readonly _layoutService = inject(LayoutService);
   private readonly _pluginBridge = inject(PluginBridgeService);
   private readonly _pluginSecurity = inject(PluginSecurityService);
   private readonly _snackService = inject(SnackService);
@@ -806,23 +804,10 @@ export class PluginManagementComponent {
     return plugin.manifest.type === 'issueProvider';
   }
 
-  /**
-   * Sends the user to the issue-provider panel, the hub where connections are
-   * added and managed. Enabling an issue-provider plugin here only registers it;
-   * setup (and multiple connections per provider) lives in that panel's "+" tab,
-   * which is otherwise hard to find. Navigates to the work view first since the
-   * panel only renders there, then reveals it (guarded so we never toggle it shut).
-   */
-  goToIssuePanel(): Promise<void> {
-    // Close the plugins window explicitly: it closes itself on NavigationEnd,
-    // but from a work view /active/tasks redirects back to the current URL and
-    // no navigation ends, so it would stay on top of the panel.
+  /** Open connection setup in the dedicated workspace, including from the plugins window. */
+  goToIntegrations(): Promise<boolean> {
     this._dialog.getDialogById('plugins-window')?.close();
-    return this._router.navigate(['/active/tasks']).then(() => {
-      if (!this._layoutService.isShowIssuePanel()) {
-        this._layoutService.toggleAddTaskPanel();
-      }
-    });
+    return this._router.navigate(['/integrations']);
   }
 
   openPluginConfig(plugin: PluginInstance): void {

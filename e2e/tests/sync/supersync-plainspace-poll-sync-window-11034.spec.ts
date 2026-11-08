@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import { Page, Route } from '@playwright/test';
 import { test, expect } from '../../fixtures/supersync.fixture';
 import {
@@ -53,9 +58,7 @@ const blockBackgroundSync = (): void => {
  * can already be open, so it is only expanded when the project select is hidden.
  */
 const addPlainspaceProvider = async (page: Page, projectName: RegExp): Promise<void> => {
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
-  await expect(page.locator('issue-panel')).toBeVisible();
-  await page.locator('issue-panel .mat-mdc-tab').last().click();
+  await openIntegrationSetup(page);
   await page.getByRole('button', { name: 'Plainspace', exact: true }).click();
   const editDialog = page.locator('dialog-edit-issue-provider');
   await editDialog.locator('input[id*="host"]').fill(PLAINSPACE_HOST);
@@ -69,7 +72,8 @@ const addPlainspaceProvider = async (page: Page, projectName: RegExp): Promise<v
   await page.getByRole('option', { name: projectName }).click();
   await editDialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(editDialog).toBeHidden();
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
+  await finishIntegrationSetup(page);
+  await leaveIntegrations(page);
 };
 
 interface LinkedTask {

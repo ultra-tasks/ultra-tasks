@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { selectTaskEntities } from '../tasks/store/task.selectors';
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { IssueService } from './issue.service';
@@ -53,6 +55,7 @@ describe('IssueService', () => {
   let projectServiceSpy: jasmine.SpyObj<ProjectService>;
   let calendarIntegrationServiceSpy: jasmine.SpyObj<CalendarIntegrationService>;
   let storeSpy: jasmine.SpyObj<Store>;
+  const currentEntities = signal<Record<string, Task | undefined>>({});
   let translateServiceSpy: jasmine.SpyObj<TranslateService>;
   let globalProgressBarServiceSpy: jasmine.SpyObj<GlobalProgressBarService>;
   let navigateToTaskServiceSpy: jasmine.SpyObj<NavigateToTaskService>;
@@ -123,8 +126,18 @@ describe('IssueService', () => {
     calendarIntegrationServiceSpy = jasmine.createSpyObj('CalendarIntegrationService', [
       'skipCalendarEvent',
     ]);
-    storeSpy = jasmine.createSpyObj('Store', ['select', 'dispatch', 'pipe']);
+    storeSpy = jasmine.createSpyObj('Store', [
+      'select',
+      'dispatch',
+      'pipe',
+      'selectSignal',
+    ]);
     storeSpy.pipe.and.returnValue(of([]));
+    currentEntities.set({});
+    storeSpy.selectSignal.and.callFake(((selector: unknown) =>
+      selector === selectTaskEntities
+        ? currentEntities
+        : signal({})) as Store['selectSignal']);
     translateServiceSpy = jasmine.createSpyObj('TranslateService', ['instant']);
     globalProgressBarServiceSpy = jasmine.createSpyObj('GlobalProgressBarService', [
       'countUp',
@@ -901,6 +914,7 @@ describe('IssueService', () => {
         ]),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTasks([task], caldavProvider);
 
       expect(taskServiceSpy.update).toHaveBeenCalledTimes(1);
@@ -920,6 +934,7 @@ describe('IssueService', () => {
         ]),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTasks([task], caldavProvider);
 
       expect(changesOfLastUpdate().remindAt).toBe(newDue - MIN_10);
@@ -937,6 +952,7 @@ describe('IssueService', () => {
         ]),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTasks([task], caldavProvider);
 
       expect(
@@ -959,6 +975,7 @@ describe('IssueService', () => {
         ]),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTasks([task], caldavProvider);
 
       expect(
@@ -979,6 +996,7 @@ describe('IssueService', () => {
         ]),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTasks([task], caldavProvider);
 
       expect(
@@ -996,6 +1014,7 @@ describe('IssueService', () => {
         }),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTask(task, false, false);
 
       expect(changesOfLastUpdate().remindAt).toBe(newDue);
@@ -1012,6 +1031,7 @@ describe('IssueService', () => {
         }),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTask(task, false, false);
 
       expect('isDone' in changesOfLastUpdate()).toBeFalse();
@@ -1028,6 +1048,7 @@ describe('IssueService', () => {
         }),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTask(task, false, false);
 
       expect(changesOfLastUpdate().isDone).toBeTrue();
@@ -1085,6 +1106,7 @@ describe('IssueService', () => {
           ]),
         );
 
+        currentEntities.set({ [task.id]: task });
         await service.refreshIssueTasks([task], caldavProvider);
 
         const remoteTask = replayOnRemoteDevice(task);
@@ -1102,6 +1124,7 @@ describe('IssueService', () => {
           }),
         );
 
+        currentEntities.set({ [task.id]: task });
         await service.refreshIssueTask(task, false, false);
 
         expect(replayOnRemoteDevice(task).remindAt).toBeUndefined();
@@ -1363,6 +1386,7 @@ describe('IssueService', () => {
         of([createPlainspaceIssue()]),
       );
 
+      currentEntities.set({ [task.id]: task });
       await service.refreshIssueTasks([task], {
         id: PROVIDER_ID,
         issueProviderKey: 'PLAINSPACE',

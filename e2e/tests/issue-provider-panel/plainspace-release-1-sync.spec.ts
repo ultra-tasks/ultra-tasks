@@ -1,3 +1,4 @@
+import { openIntegrations } from '../../utils/integration-workspace';
 import { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
 import { ProjectPage } from '../../pages/project.page';
@@ -83,13 +84,16 @@ const renameOffline = async (
   newTitle: string,
 ): Promise<void> => {
   server.isOffline = true;
+  const attemptsBeforeRename = server.offlineRequests.length;
   await renameTask(page, title, newTitle);
-  await waitForFailedPush(server);
+  await waitForFailedPush(server, attemptsBeforeRename);
 };
 
 /** Waits until a push's read of the task got no answer. */
-const waitForFailedPush = async (server: FakePlainspace): Promise<void> => {
-  const attempts = server.offlineRequests.length;
+const waitForFailedPush = async (
+  server: FakePlainspace,
+  attempts: number,
+): Promise<void> => {
   await expect
     .poll(() => server.offlineRequests.slice(attempts), { timeout: 15000 })
     .toContain(`GET /tasks/${TASK_ID}`);
@@ -190,8 +194,9 @@ test.describe('Plainspace Release 1 sync', () => {
     // Offline: the rename's own push fails.
     server.isOffline = true;
     server.isTasksOffline = true;
+    const attemptsBeforeRename = server.offlineRequests.length;
     await renameTask(page, 'Buy tent', 'Buy a tent');
-    await waitForFailedPush(server);
+    await waitForFailedPush(server, attemptsBeforeRename);
     // A push would now go through, but /tasks still fails: nothing is pushed
     // from a failed poll.
     server.isOffline = false;
@@ -417,7 +422,7 @@ test.describe('Plainspace Release 1 sync', () => {
     expect(server.patches.slice(1).map((p) => p.body)).toEqual([{ done: true }]);
     expect(server.tasks.get(TASK_ID)!.title).toBe('Buy tent');
 
-    await page.locator('.e2e-toggle-issue-provider-panel').click();
+    await openIntegrations(page);
     const tooOld = page.locator('plainspace-reconnect-notice .callout', {
       hasText: 'too old to sync titles and times',
     });

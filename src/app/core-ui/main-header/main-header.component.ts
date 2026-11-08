@@ -143,7 +143,6 @@ export class MainHeaderComponent implements OnDestroy {
   enabledSimpleCounters = toSignal(this.simpleCounterService.enabledSimpleCounters$, {
     initialValue: [],
   });
-  isShowIssuePanel = this.layoutService.isShowIssuePanel;
   isShowNotes = this.layoutService.isShowNotes;
 
   /**
@@ -162,9 +161,6 @@ export class MainHeaderComponent implements OnDestroy {
   private readonly _activePanelKey = computed<string | null>(() => {
     if (this.isShowNotes()) {
       return 'NOTES';
-    }
-    if (this.isShowIssuePanel()) {
-      return 'ISSUES';
     }
     if (this.layoutService.isShowPluginPanel()) {
       return `PLUGIN:${this.layoutService.activePluginId()}`;

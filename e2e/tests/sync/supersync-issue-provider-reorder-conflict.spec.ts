@@ -1,3 +1,4 @@
+import { openIntegrations } from '../../utils/integration-workspace';
 import type { Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import type { IssueProvider } from '../../../src/app/features/issue/issue.model';
@@ -16,7 +17,8 @@ import { readMigratedState } from '../../utils/legacy-migration-helpers';
 import { serveReleasedClientAssets } from '../../utils/released-client-assets';
 
 // Seeds and witnesses use the established store fixture path. Both conflicted
-// operations MUST come from the real panel drag and editor or pinned search.
+// operations use real editors/search controls; the retired tab-order operation
+// is dispatched through the store on current clients and dragged on released clients.
 type Row = CompactOperationLogEntry;
 interface Snapshot {
   issueProvider: { ids: string[]; entities: Record<string, IssueProvider> };
@@ -123,7 +125,17 @@ const syncOutcome = async (client: SimulatedE2EClient): Promise<string> => {
 const sync = async (client: SimulatedE2EClient): Promise<void> => {
   expect(await syncOutcome(client)).toBe('in-sync');
 };
+const usesWorkspace = async (page: Page): Promise<boolean> =>
+  (await page
+    .locator('magic-side-nav')
+    .getByRole('menuitem', { name: 'Integrations', exact: true })
+    .count()) > 0;
 const openPanel = async (page: Page): Promise<void> => {
+  if (await usesWorkspace(page)) {
+    await openIntegrations(page);
+    await expect(page.locator('.connection')).toHaveCount(3);
+    return;
+  }
   if (!(await page.locator('issue-panel').isVisible())) {
     await page.locator('.e2e-toggle-issue-provider-panel:visible').click();
   }
@@ -131,6 +143,22 @@ const openPanel = async (page: Page): Promise<void> => {
 };
 const drag = async (page: Page): Promise<void> => {
   await openPanel(page);
+  if (await usesWorkspace(page)) {
+    const ids = [...(await snapshot(page)).issueProvider.ids];
+    [ids[0], ids[1]] = [ids[1], ids[0]];
+    await dispatch(page, {
+      type: '[IssueProvider/API] Sort IssueProviders First',
+      ids,
+      meta: {
+        isPersistent: true,
+        entityType: 'ISSUE_PROVIDER',
+        entityIds: ids,
+        opType: 'MOV',
+        isBulk: true,
+      },
+    });
+    return;
+  }
   const tabs = page.locator('issue-panel .tab-header-item.cdk-drag');
   // The tabs keep sliding in after they render, and CDK sorts against the rects
   // it caches when the drag starts. A stale target lands one slot too far, so
@@ -168,8 +196,16 @@ const drag = async (page: Page): Promise<void> => {
 };
 const edit = async (page: Page): Promise<void> => {
   await openPanel(page);
-  await page.locator('issue-panel [role="tab"]').nth(0).click();
-  await page.locator('issue-provider-tab:visible header button').click();
+  if (await usesWorkspace(page)) {
+    await page
+      .locator('.connection')
+      .first()
+      .getByRole('button', { name: 'Connection settings', exact: true })
+      .click();
+  } else {
+    await page.locator('issue-panel [role="tab"]').nth(0).click();
+    await page.locator('issue-provider-tab:visible header button').click();
+  }
   const dialog = page.locator('dialog-edit-issue-provider');
   await expect(dialog).toBeVisible();
   // changeEnabled submits immediately with the full model. Cancel only closes
@@ -183,6 +219,20 @@ const edit = async (page: Page): Promise<void> => {
 };
 const pinSearch = async (page: Page): Promise<void> => {
   await openPanel(page);
+  if (await usesWorkspace(page)) {
+    await page
+      .locator('.connection')
+      .first()
+      .getByRole('button', { name: 'Browse source items', exact: true })
+      .click();
+    const source = page.locator('.source-browser');
+    await source.locator('input').first().fill('synthetic search');
+    await source
+      .getByRole('button', { name: 'Remember search query', exact: true })
+      .click();
+    await expect(source.locator('mat-icon', { hasText: /^bookmark$/ })).toBeVisible();
+    return;
+  }
   await page.locator('issue-panel [role="tab"]').nth(0).click();
   const tab = page.locator('issue-provider-tab:visible');
   await tab

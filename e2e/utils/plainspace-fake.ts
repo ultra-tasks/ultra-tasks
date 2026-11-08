@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from './integration-workspace';
 import { expect, Page } from '@playwright/test';
 
 // Plainspace has no E2E harness in this repo, so its integration API is stubbed
@@ -459,17 +464,15 @@ const installFakeAuth = async (
 };
 
 /**
- * Adds a Plainspace provider bound to the given project through the issue
- * panel's setup tab, then closes the panel. It polls in the background
+ * Adds a Plainspace connection bound to the given project through the
+ * workspace setup, then returns to Today. It polls in the background
  * ('always' mode) and imports the tasks assigned to me into that project.
  */
 export const addPlainspaceProvider = async (
   page: Page,
   projectName: string | RegExp,
 ): Promise<void> => {
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
-  await expect(page.locator('issue-panel')).toBeVisible();
-  await page.locator('issue-panel .mat-mdc-tab').last().click();
+  await openIntegrationSetup(page);
   await page.getByRole('button', { name: 'Plainspace', exact: true }).click();
   const editDialog = page.locator('dialog-edit-issue-provider');
   await editDialog.locator('input[id*="host"]').fill(PLAINSPACE_HOST);
@@ -480,7 +483,8 @@ export const addPlainspaceProvider = async (
   await page.getByRole('option', { name: projectName }).click();
   await editDialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(editDialog).toBeHidden();
-  await page.locator('.e2e-toggle-issue-provider-panel').click();
+  await finishIntegrationSetup(page);
+  await leaveIntegrations(page);
 };
 
 /** Successful `/tasks` polls so far. */
@@ -505,40 +509,26 @@ export const waitForPollAfter = async (
   await page.waitForTimeout(1000);
 };
 
-/** The issue panel's open provider tab. */
-export const activeProviderTab = (page: Page): ReturnType<Page['locator']> =>
-  page.locator('issue-panel .mat-mdc-tab-body-active issue-provider-tab');
+const selectedSpace = new WeakMap<Page, string>();
 
-/**
- * Selects the issue panel tab whose header names the given space id. Retried as
- * a whole: right after the panel opens its provider tabs may not be rendered
- * yet (`count()` doesn't wait) and a click during the open animation can be
- * lost, which made a single pass fail on slower CI runners.
- */
+/** The connection currently selected by the test. */
+export const activeProviderTab = (page: Page): ReturnType<Page['locator']> =>
+  page
+    .locator('integrations-page .connection')
+    .filter({ hasText: selectedSpace.get(page) ?? 'Plainspace' })
+    .first();
+
 export const openProviderTab = async (page: Page, spaceId: string): Promise<void> => {
-  const tabs = page.locator('issue-panel .mat-mdc-tab');
-  const header = activeProviderTab(page).locator('header .title');
-  await expect(async () => {
-    // The last tab is the setup overview; at least one provider tab precedes it.
-    const count = await tabs.count();
-    expect(count).toBeGreaterThan(1);
-    for (let i = 0; i < count - 1; i++) {
-      await tabs.nth(i).click();
-      try {
-        await expect(header).toHaveText(spaceId, { timeout: 2000 });
-        return;
-      } catch {
-        // not this tab
-      }
-    }
-    throw new Error(`No issue panel tab for ${spaceId}`);
-  }).toPass({ timeout: 30000 });
+  selectedSpace.set(page, spaceId);
+  await expect(activeProviderTab(page)).toBeVisible();
 };
 
 /** Reads a provider's stored token from its settings dialog, then closes it. */
 export const providerToken = async (page: Page, spaceId: string): Promise<string> => {
   await openProviderTab(page, spaceId);
-  await activeProviderTab(page).locator('header button').first().click();
+  await activeProviderTab(page)
+    .getByRole('button', { name: 'Connection settings', exact: true })
+    .click();
   const dialog = page.locator('dialog-edit-issue-provider');
   const token = await dialog.locator('input[id*="token"]').inputValue();
   await page.keyboard.press('Escape');

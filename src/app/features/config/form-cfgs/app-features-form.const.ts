@@ -71,15 +71,6 @@ export const APP_FEATURES_FORM_CFG: ConfigFormSection<AppFeaturesConfig> = {
       },
     },
     {
-      key: 'isIssuesPanelEnabled',
-      type: 'slide-toggle',
-      templateOptions: {
-        label: T.GCF.APP_FEATURES.ISSUES_PANEL,
-        description: T.GCF.APP_FEATURES.ISSUES_PANEL_HINT,
-        icon: 'assignment',
-      },
-    },
-    {
       key: 'isProjectNotesEnabled',
       type: 'slide-toggle',
       templateOptions: {

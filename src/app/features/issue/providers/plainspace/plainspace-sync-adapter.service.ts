@@ -96,6 +96,13 @@ export class PlainspaceSyncAdapterService implements IssueSyncAdapter<Plainspace
     };
   }
 
+  getSyncConfigLimits(
+    cfg: PlainspaceCfg,
+    issue?: Record<string, unknown>,
+  ): FieldSyncConfig {
+    return this.getSyncConfig(cfg, issue);
+  }
+
   /**
    * Creates the task in Plainspace when it is first added to a Plainspace-backed
    * project (via the generic `autoCreateIssueOnTaskAdd$` effect), then hands the

@@ -213,9 +213,11 @@ export const selectActiveWorkContext = createSelector(
         // match the side nav; fall back to null when unset. `...project` already
         // carries `icon`, but stay explicit since this used to force null.
         icon: project.icon ?? null,
-        taskIds: project.taskIds || [],
+        taskIds: (project.taskIds || []).filter((id) => !!activeTaskEntities[id]),
         isEnableBacklog: project.isEnableBacklog,
-        backlogTaskIds: project.backlogTaskIds || [],
+        backlogTaskIds: (project.backlogTaskIds || []).filter(
+          (id) => !!activeTaskEntities[id],
+        ),
         type: WorkContextType.PROJECT,
         routerLink: `project/${project.id}`,
       };

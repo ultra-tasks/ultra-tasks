@@ -1,3 +1,8 @@
+import {
+  openIntegrationSetup,
+  finishIntegrationSetup,
+  leaveIntegrations,
+} from '../../utils/integration-workspace';
 import { expect, test } from '../../fixtures/test.fixture';
 
 /**
@@ -23,7 +28,6 @@ const EVENT_TITLE = 'E2E-7971 Dentist Appointment';
 // rendering) before asserting the archived event is absent — no flaky fixed timeouts.
 const CONTROL_TITLE = 'E2E-7971 Control Tomorrow';
 
-const PANEL_BTN = '.e2e-toggle-issue-provider-panel';
 const BANNER_SELECTOR = 'banner';
 const SAVE_AND_GO_HOME_BTN =
   'daily-summary button[mat-flat-button]:has(mat-icon:text-matches("^(wb_sunny|check_circle)$"))';
@@ -79,14 +83,10 @@ test.describe('Calendar #7971', () => {
     await workViewPage.waitForTaskList();
 
     // --- Configure a calendar provider with auto-import enabled ---
-    await page.waitForSelector(PANEL_BTN, { state: 'visible' });
-    await page.click(PANEL_BTN);
-    await page.waitForSelector('mat-tab-group', { state: 'visible' });
-    await page.click('mat-tab-group .mat-mdc-tab:last-child');
-    await page.waitForSelector('issue-provider-setup-overview', { state: 'visible' });
+    await openIntegrationSetup(page);
 
     // Open the generic iCal setup dialog ("Other (iCal)" → plain icalUrl, no OAuth).
-    await page.getByRole('button', { name: 'Other (iCal)' }).click();
+    await page.getByRole('button', { name: 'Calendar (iCal / Outlook)' }).click();
     const dialog = page.locator('mat-dialog-container');
     await expect(dialog).toBeVisible({ timeout: 5000 });
 
@@ -97,6 +97,8 @@ test.describe('Calendar #7971', () => {
 
     await dialog.locator('button[type="submit"]').click();
     await expect(dialog).toBeHidden({ timeout: 5000 });
+    await finishIntegrationSetup(page);
+    await leaveIntegrations(page);
 
     // Close the issue-provider panel so it doesn't overlay the task list.
     await page.keyboard.press('Escape');

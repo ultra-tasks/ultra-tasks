@@ -469,6 +469,14 @@ export class MagicNavConfigService {
       });
     }
 
+    items.push({
+      type: 'route',
+      id: 'integrations',
+      label: T.F.INTEGRATIONS.TITLE,
+      icon: 'hub',
+      route: '/integrations',
+    });
+
     if (this.isBoardsEnabled()) {
       items.push({
         type: 'route',
@@ -534,7 +542,7 @@ export class MagicNavConfigService {
   }
 
   /**
-   * The right-panel toggles: plugin side panels, the issue provider panel and the
+   * The right-panel toggles: plugin side panels and the
    * project notes. From 600px up they are header buttons; below that nothing
    * renders those, so the phone drawer lists them (opened from Browse).
    */
@@ -561,17 +569,6 @@ export class MagicNavConfigService {
           this._store.dispatch(togglePluginPanel(button.pluginId));
           button.onClick?.();
         },
-      });
-    }
-
-    if (features.isIssuesPanelEnabled) {
-      items.push({
-        type: 'action',
-        id: 'panel-issues',
-        label: T.BN.SHOW_ISSUE_PANEL,
-        icon: 'assignment',
-        mobileOnly: true,
-        action: () => this._layoutService.toggleAddTaskPanel(),
       });
     }
 

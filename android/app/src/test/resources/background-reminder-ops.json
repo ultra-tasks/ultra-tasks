@@ -369,6 +369,7 @@
           "parentId",
           "repeatCfgId",
           "_hideSubTasksMode",
+          "integration",
           "issueId",
           "issueProviderId",
           "issueType",

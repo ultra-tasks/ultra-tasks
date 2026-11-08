@@ -1,3 +1,4 @@
+import { T } from '../../../t.const';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -33,7 +34,7 @@ import { DateTimeFormatService } from '../../../core/date-time-format/date-time-
  */
 export type TagListTask = Pick<
   Task,
-  'tagIds' | 'issueId' | 'issueType' | 'issuePoints' | 'repeatCfgId'
+  'integration' | 'tagIds' | 'issueId' | 'issueType' | 'issuePoints' | 'repeatCfgId'
 > & { projectId: string | null };
 
 @Component({
@@ -116,10 +117,19 @@ export class TagListComponent {
     const t = this.task();
     const chips: TagComponentTag[] = [];
 
-    if (t.issueId && t.issueType) {
-      const builtInIcon = ISSUE_PROVIDER_ICON_MAP[t.issueType as BuiltInIssueProviderKey];
-      const builtInLabel =
-        ISSUE_PROVIDER_HUMANIZED[t.issueType as BuiltInIssueProviderKey];
+    if (t.integration)
+      chips.push({
+        title: this._translateService.instant(
+          t.integration.mode === 'sync'
+            ? T.F.INTEGRATIONS.SYNCED
+            : T.F.INTEGRATIONS.IMPORTED,
+        ),
+        icon: t.integration.mode === 'sync' ? 'sync' : 'download',
+      });
+    const issueType = t.issueType ?? t.integration?.providerKey;
+    if ((t.issueId || t.integration) && issueType) {
+      const builtInIcon = ISSUE_PROVIDER_ICON_MAP[issueType as BuiltInIssueProviderKey];
+      const builtInLabel = ISSUE_PROVIDER_HUMANIZED[issueType as BuiltInIssueProviderKey];
 
       let icon: string | undefined;
       let label: string | undefined;
@@ -127,9 +137,9 @@ export class TagListComponent {
       if (builtInIcon && builtInLabel) {
         icon = builtInIcon;
         label = builtInLabel;
-      } else if (this._pluginRegistry.hasProvider(t.issueType)) {
-        icon = this._pluginRegistry.getSvgIcon(t.issueType);
-        label = this._pluginRegistry.getHumanReadableName(t.issueType);
+      } else if (this._pluginRegistry.hasProvider(issueType)) {
+        icon = this._pluginRegistry.getSvgIcon(issueType);
+        label = this._pluginRegistry.getHumanReadableName(issueType);
       }
 
       if (label) {

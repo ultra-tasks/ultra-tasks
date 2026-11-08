@@ -131,8 +131,7 @@ const captureLightScenes = async (
   await gotoAndSettle(page, '/#/project/work/tasks');
   await page.locator('task').first().waitFor({ state: 'visible' });
   await openIssueProviderPanel(page);
-  await page.locator('issue-panel').first().waitFor({ state: 'visible' });
-  await page.locator('issue-provider-setup-overview').waitFor({ state: 'visible' });
+  await page.locator('integration-setup').waitFor({ state: 'visible' });
   await page.waitForTimeout(500);
   await shoot('desktop-09-issue-provider-panel', 'issue-provider-panel');
   await applySideNavCollapsed(page, false);

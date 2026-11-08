@@ -132,13 +132,10 @@ describe('MagicNavConfigService panel items', () => {
     expect(layout.toggleNotes).toHaveBeenCalledTimes(1);
   });
 
-  it('lists the issue provider panel and toggles it', () => {
-    const [issues] = panelItems(build({ ...ALL_OFF, isIssuesPanelEnabled: true }));
-
-    expect(issues.id).toBe('panel-issues');
-    expect(issues.label).toBe(T.BN.SHOW_ISSUE_PANEL);
-    issues.action();
-    expect(layout.toggleAddTaskPanel).toHaveBeenCalledTimes(1);
+  it('ignores the retired issue-panel flag', () => {
+    const items = build({ ...ALL_OFF, isIssuesPanelEnabled: true });
+    expect(panelItems(items)).toEqual([]);
+    expect(items.filter((item) => item.id === 'integrations').length).toBe(1);
   });
 
   it('lists every plugin side panel, toggling it and running its own handler', () => {

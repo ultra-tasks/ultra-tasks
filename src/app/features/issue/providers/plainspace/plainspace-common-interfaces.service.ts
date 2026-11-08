@@ -1,3 +1,4 @@
+import { integrationSyncPolicy } from '../../../integrations/integration.model';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
@@ -161,7 +162,7 @@ export class PlainspaceCommonInterfacesService extends BaseIssueProviderService<
           task,
           fieldMappings,
           // Per item: a repeating item's time is never pending.
-          this._syncAdapter.getSyncConfig(cfg, issueRecord),
+          integrationSyncPolicy(task, this._syncAdapter, cfg, issueRecord),
           { issueId: issue.id },
           this._syncAdapter.extractSyncValues(issueRecord),
         );
@@ -197,7 +198,12 @@ export class PlainspaceCommonInterfacesService extends BaseIssueProviderService<
       issue as unknown as Record<string, unknown>,
     );
     const fieldMappings = this._syncAdapter.getFieldMappings();
-    const syncConfig = this._syncAdapter.getSyncConfig(cfg);
+    const syncConfig = integrationSyncPolicy(
+      task,
+      this._syncAdapter,
+      cfg,
+      issue as unknown as Record<string, unknown>,
+    );
     // `/tasks` returns full values, so a field that left its baseline is pulled
     // even when the marker says "seen": the marker of our own PATCH also covers
     // that answer's other changes. This also heals tasks whose marker an older

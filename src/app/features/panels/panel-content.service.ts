@@ -8,13 +8,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TaskService } from '../tasks/task.service';
 import { TaskDetailTargetPanel } from '../tasks/task.model';
 
-export type PanelContentType =
-  | 'NOTES'
-  | 'TASK'
-  | 'ADD_TASK_PANEL'
-  | 'ISSUE_PANEL'
-  | 'TASK_VIEW_CUSTOMIZER_PANEL'
-  | 'PLUGIN';
+export type PanelContentType = 'NOTES' | 'TASK' | 'TASK_VIEW_CUSTOMIZER_PANEL' | 'PLUGIN';
 
 @Injectable({ providedIn: 'root' })
 export class PanelContentService {
@@ -42,15 +36,9 @@ export class PanelContentService {
     const selectedTask = this._selectedTask();
     if (!layoutState) return null;
 
-    const {
-      isShowNotes,
-      isShowIssuePanel,
-      isShowTaskViewCustomizerPanel,
-      isShowPluginPanel,
-    } = layoutState;
+    const { isShowNotes, isShowTaskViewCustomizerPanel, isShowPluginPanel } = layoutState;
 
     if (isShowNotes) return 'NOTES';
-    if (isShowIssuePanel) return 'ISSUE_PANEL';
     if (isShowTaskViewCustomizerPanel) return 'TASK_VIEW_CUSTOMIZER_PANEL';
     if (isShowPluginPanel) return 'PLUGIN';
     if (selectedTask) return 'TASK';
@@ -61,16 +49,10 @@ export class PanelContentService {
     const layoutState = this._layoutFeatureState();
     const selectedTask = this._selectedTask();
     if (!layoutState) return false;
-    const {
-      isShowNotes,
-      isShowIssuePanel,
-      isShowTaskViewCustomizerPanel,
-      isShowPluginPanel,
-    } = layoutState;
+    const { isShowNotes, isShowTaskViewCustomizerPanel, isShowPluginPanel } = layoutState;
     return !!(
       selectedTask ||
       isShowNotes ||
-      isShowIssuePanel ||
       isShowTaskViewCustomizerPanel ||
       isShowPluginPanel
     );

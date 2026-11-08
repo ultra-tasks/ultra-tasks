@@ -4,7 +4,6 @@ import {
   hidePluginPanel,
   showAddTaskBar,
   showPluginPanel,
-  toggleIssuePanel,
   togglePluginPanel,
   toggleShowNotes,
   toggleTaskViewCustomizerPanel,
@@ -107,12 +106,6 @@ const _reducer = createReducer<LayoutState>(
   on(hideNonTaskSidePanelContent, (state) => ({
     ...state,
     ...ALL_PANEL_CONTENT_HIDDEN,
-  })),
-
-  on(toggleIssuePanel, (state) => ({
-    ...state,
-    ...ALL_PANEL_CONTENT_HIDDEN,
-    isShowIssuePanel: !state.isShowIssuePanel,
   })),
 
   on(showPluginPanel, (state, { pluginId }) => ({
