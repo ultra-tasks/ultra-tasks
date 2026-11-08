@@ -1,11 +1,13 @@
 package com.superproductivity.superproductivity.webview
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -14,25 +16,43 @@ import java.io.ByteArrayInputStream
 /**
  * Strip the original WebViewClient logic to ensure that both types share the same logic
  */
-class WebViewRequestHandler(private val activity: Activity, private val serviceHost: String) {
+class WebViewRequestHandler(
+    private val activity: Activity,
+    private val serviceProtocol: String,
+    private val serviceHost: String,
+) {
     private val CORS_SKIP_HEADER = "sp_cors_skip"
+
+    fun createClient(): WebViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+            handleUrlLoading(view, request.url.toString())
+
+        @Deprecated("Deprecated in Java")
+        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
+            handleUrlLoading(view, url)
+
+        override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? =
+            interceptWebRequest(request)
+    }
 
     @Deprecated("Deprecated in Java")
     fun handleUrlLoading(view: WebView, url: String): Boolean {
-        Log.v("TW", url)
-        return if (url.startsWith("http://") || url.startsWith("https://")) {
-            if (url.contains("super-productivity.com") || url.contains("localhost") || url.contains(
-                    serviceHost
-                )
-            ) {
-                false
-            } else {
-                activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                true
-            }
-        } else {
-            false
+        if (InAppNavigationGate.isInAppUrl(url, serviceProtocol, serviceHost)) {
+            return false
         }
+        // Malformed and non-HTTP(S) URLs must not fall through into the bridge WebView.
+        if (InAppNavigationGate.isHttpUrl(url)) {
+            try {
+                activity.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+                )
+            } catch (_: ActivityNotFoundException) {
+                Log.w("TW", "No browser available for external navigation")
+            } catch (_: SecurityException) {
+                Log.w("TW", "External navigation was denied")
+            }
+        }
+        return true
     }
 
 

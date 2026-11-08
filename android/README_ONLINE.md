@@ -84,6 +84,39 @@ You can edit the URL that the web view loads by modifying `android/app/app_confi
   - **`ONLINE_SERVICE_PROTOCOL`**:
     - `http` or `https`.
 
+## Navigation and native bridge boundary
+
+The online compatibility WebView exposes the `SUPAndroid` native bridge. Its
+navigation client keeps HTTP(S) links inside the WebView only when their parsed
+scheme, host and effective port match `ONLINE_SERVICE_PROTOCOL` and
+`ONLINE_SERVICE_HOST`. Default ports are equivalent (`https://host` and
+`https://host:443`, or `http://host` and `http://host:80`); a different port is a
+different origin. Configured local development hosts such as
+`http://10.0.2.2:4200` keep working. The configured
+production host is unchanged.
+
+Other valid HTTP(S) links open externally; if no browser is available, navigation
+remains blocked. Malformed and non-HTTP(S) URLs received by the navigation client
+are blocked. This adapts [upstream security fix #11582](https://github.com/super-productivity/super-productivity/pull/11582)
+and also checks ports and scheme classification.
+
+This is **not complete bridge origin isolation**. [Android's navigation client](https://developer.android.com/reference/android/webkit/WebViewClient) does not call
+`shouldOverrideUrlLoading` for POST requests or application-initiated `loadUrl`
+calls, and not every frame or scheme passes through that callback. The
+[`addJavascriptInterface` bridge is exposed to all frames](<https://developer.android.com/reference/android/webkit/WebView#addJavascriptInterface(java.lang.Object,%20java.lang.String)>),
+with no reliable caller-origin identity. A trusted page embedding untrusted
+frames, or a compromised configured host, remains a risk. The separate
+`sp_cors_skip` resource proxy is unchanged; it is not an authorization gate.
+
+`nativeAccountCall` uses this same bridge without per-origin checks. Session
+clearing is unscoped; token-returning `current`, `refresh` and `detach` operations
+require matching server/account IDs. This does not establish unconditional token
+extraction. Origin-aware bridge replacement is separate work.
+
+Fresh installs normally select connectivity-free mode; existing installations can
+retain online mode. The vulnerable substring handler is present in the
+`ultra-tasks-v0.2.0` source tag, but installed-user exposure has not been measured.
+
 ## Important Notes
 
 - **Local Modifications**: The `app_config.properties` file is intended for local modifications only. **DO NOT COMMIT** this file unless you are absolutely sure of the changes.

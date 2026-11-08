@@ -48,6 +48,18 @@ class NativeAccountInstrumentedTest {
         NativeAccountRuntime.call(context, "configure", input)
         return input
     }
+    @Test fun tokenReturningCallsRequireBothServerAndAccountIdentity() {
+        configure()
+        for (method in listOf("current", "refresh", "detach")) {
+            for (field in listOf("serverId", "accountId")) {
+                val mismatched = JSONObject(identity().toString()).put(field, "different-$field")
+                val error = runCatching { NativeAccountRuntime.call(context, method, mismatched) }.exceptionOrNull()
+                assertTrue("$method must reject a mismatched $field before returning tokens", error is IllegalArgumentException)
+            }
+        }
+        assertTrue(NativeAccountRuntime.available(context))
+        assertEquals("native-access-test", NativeAccountRuntime.call(context, "current", identity()).getString("accessToken"))
+    }
     @Test fun pendingBrowserLoginSurvivesSessionCleanupUntilExplicitCancellation() {
         configure()
         val pending = JSONObject().put("request", JSONObject().put("expiresAt", System.currentTimeMillis() + 240000))

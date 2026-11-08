@@ -19,7 +19,6 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.annotation.RequiresApi
@@ -47,7 +46,11 @@ class FullscreenActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var wvContainer: FrameLayout
     private var isForegroundServiceFailureReceiverRegistered = false
-    private var webViewRequestHandler = WebViewRequestHandler(this, BuildConfig.ONLINE_SERVICE_HOST)
+    private var webViewRequestHandler = WebViewRequestHandler(
+        this,
+        BuildConfig.ONLINE_SERVICE_PROTOCOL,
+        BuildConfig.ONLINE_SERVICE_HOST,
+    )
     val storageHelper =
         SimpleStorageHelper(this) // for scoped storage permission management on Android 10+
     val appUrl =
@@ -230,19 +233,7 @@ class FullscreenActivity : AppCompatActivity() {
                 }
             })
 
-            webView.webViewClient = object : WebViewClient() {
-                @Deprecated("Deprecated in Java")
-                override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                    return webViewRequestHandler.handleUrlLoading(view, url)
-                }
-
-                override fun shouldInterceptRequest(
-                    view: WebView?,
-                    request: WebResourceRequest?
-                ): WebResourceResponse? {
-                    return webViewRequestHandler.interceptWebRequest(request)
-                }
-            }
+            webView.webViewClient = webViewRequestHandler.createClient()
 
             webView.webChromeClient = object : WebChromeClient() {
                 override fun onJsAlert(
