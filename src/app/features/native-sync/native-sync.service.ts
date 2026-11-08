@@ -135,6 +135,25 @@ export class NativeSyncService {
       throw error;
     }
   }
+  async createBrowserAccount(serverUrl: string): Promise<AccountClient> {
+    if (this.unlocked()) throw new Error('NATIVE_SYNC.ERROR_TAB');
+    await this.lock();
+    this.serverUrl = this.normalizeServerUrl(serverUrl);
+    await this.certTrust.setPendingConfig(this, { baseUrl: this.serverUrl });
+    return new AccountClient(this.platform.transport(httpTransport(this.serverUrl)));
+  }
+  async finishBrowserAccount(account: AccountClient, serverUrl: string): Promise<void> {
+    if (this.unlocked() || !account.unlocked || !account.tokens)
+      throw new Error('NATIVE_SYNC.ERROR_TAB');
+    this.serverUrl = this.normalizeServerUrl(serverUrl);
+    this.account = account;
+    try {
+      await this.finishLogin();
+    } catch (error) {
+      await this.lock();
+      throw error;
+    }
+  }
   private async authenticate(identifier: string, password: string): Promise<boolean> {
     this.account = new AccountClient(
       this.platform.transport(httpTransport(this.serverUrl)),

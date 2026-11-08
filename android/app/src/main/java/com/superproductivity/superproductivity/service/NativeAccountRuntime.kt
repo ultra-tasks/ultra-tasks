@@ -77,6 +77,25 @@ object NativeAccountRuntime {
     fun foregroundWaiting(): Boolean = foregroundCalls.get() > 0
     fun call(context: Context, method: String, input: JSONObject): JSONObject = foreground { command(context, method, input) }
     private fun command(context: Context, method: String, input: JSONObject): JSONObject {
+        if (method == "login-save") {
+            val value = input.getString("value")
+            require(value.length <= 16384)
+            val expiry = JSONObject(value).getJSONObject("request").getLong("expiresAt")
+            require(expiry > System.currentTimeMillis() && expiry <= System.currentTimeMillis() + 300000)
+            check(prefs(context).edit().putString("pending_browser_login", value).commit())
+            return JSONObject().put("saved", true)
+        }
+        if (method == "login-clear") {
+            check(prefs(context).edit().remove("pending_browser_login").commit())
+            return JSONObject().put("cleared", true)
+        }
+        if (method == "login-load") {
+            val value = prefs(context).getString("pending_browser_login", null)
+            if (value != null && JSONObject(value).getJSONObject("request").getLong("expiresAt") > System.currentTimeMillis())
+                return JSONObject().put("value", value)
+            check(prefs(context).edit().remove("pending_browser_login").commit())
+            return JSONObject().put("value", JSONObject.NULL)
+        }
         when (method) {
             "configure", "bootstrap" -> {
                 val base = input.getString("baseUrl").trimEnd('/')

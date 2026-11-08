@@ -127,6 +127,13 @@
       android:launchMode="singleTask"
       android:theme="@style/AppTheme.NoActionBarLaunch"
       android:windowSoftInputMode="adjustResize">
+      <!-- Account sign-in return, separate from provider/plugin OAuth. -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="app.ultratasks" android:host="account-login" />
+      </intent-filter>
       <!-- OAuth callback handler for Dropbox authentication -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW" />

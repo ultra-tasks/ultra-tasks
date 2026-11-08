@@ -19,9 +19,9 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
     private func failure(_ status: OSStatus = 1) -> NSError { NSError(domain: service, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "Native account storage or session unavailable. Sign in again."]) }
-    private func query() -> [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: "session"] }
-    private func read() throws -> [String: Any] {
-        var request = query()
+    private func query(_ slot: String = "session") -> [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: slot] }
+    private func read(_ slot: String = "session") throws -> [String: Any] {
+        var request = query(slot)
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
@@ -31,19 +31,19 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
               let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw failure() }
         return value
     }
-    private func write(_ profile: [String: Any]) throws {
+    private func write(_ profile: [String: Any], slot: String = "session") throws {
         let bytes = try JSONSerialization.data(withJSONObject: profile)
-        let status = SecItemUpdate(query() as CFDictionary, [kSecValueData as String: bytes] as CFDictionary)
+        let status = SecItemUpdate(query(slot) as CFDictionary, [kSecValueData as String: bytes] as CFDictionary)
         if status == errSecSuccess { return }
         guard status == errSecItemNotFound else { throw failure(status) }
-        var item = query()
+        var item = query(slot)
         item[kSecValueData as String] = bytes
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let added = SecItemAdd(item as CFDictionary, nil)
         guard added == errSecSuccess else { throw failure(added) }
     }
-    private func clear() throws {
-        let status = SecItemDelete(query() as CFDictionary)
+    private func clear(_ slot: String = "session") throws {
+        let status = SecItemDelete(query(slot) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw failure(status) }
     }
     public func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
@@ -84,6 +84,26 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
         guard let method = call.getString("method"), let input = call.getObject("input") else { call.reject("Invalid native account command"); return }
         queue.async {
             do {
+                if method == "login-clear" { try self.clear("pending-login"); call.resolve(["cleared": true]); return }
+                if method == "login-save" {
+                    guard let value = input["value"] as? String, value.utf8.count <= 16384,
+                          let bytes = value.data(using: .utf8),
+                          let pending = try JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+                          let request = pending["request"] as? [String: Any],
+                          let expiry = request["expiresAt"] as? Double,
+                          expiry > Date().timeIntervalSince1970 * 1000,
+                          expiry <= Date().timeIntervalSince1970 * 1000 + 300000 else { throw self.failure() }
+                    try self.write(["value": value, "expiresAt": expiry], slot: "pending-login")
+                    call.resolve(["saved": true]); return
+                }
+                if method == "login-load" {
+                    do {
+                        let pending = try self.read("pending-login")
+                        if let expiry = pending["expiresAt"] as? Double, expiry > Date().timeIntervalSince1970 * 1000,
+                           let value = pending["value"] as? String { call.resolve(["value": value]); return }
+                    } catch let error as NSError { if error.code != Int(errSecItemNotFound) { throw error } }
+                    try self.clear("pending-login"); call.resolve(["value": NSNull()]); return
+                }
                 if method == "clear" { try self.clear(); call.resolve(["cleared": true]); return }
                 if method == "configure" || method == "bootstrap" {
                     guard let server = input["serverId"] as? String, let account = input["accountId"] as? String,

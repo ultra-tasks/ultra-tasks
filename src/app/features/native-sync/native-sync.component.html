@@ -9,13 +9,13 @@
         <p>{{ native.backgroundError() | translate }}</p>
       </div>
     }
-    @if (message() || native.error()) {
+    @if (message() || accountLogin.error() || native.error()) {
       <div
         class="callout callout--danger"
         role="alert"
       >
         <mat-icon>error_outline</mat-icon>
-        <p>{{ message() || native.error() | translate }}</p>
+        <p>{{ message() || accountLogin.error() || native.error() | translate }}</p>
       </div>
     }
     @if (!native.unlocked()) {
@@ -23,7 +23,33 @@
         <div class="account-context">
           <mat-icon>lock_outline</mat-icon><span>Ultra Tasks</span>
         </div>
-        @if (!needsMfa) {
+        @if (accountLogin.active()) {
+          <h2>{{ T.NATIVE_SYNC.BROWSER_FINISH | translate }}</h2>
+          <p class="intro">{{ T.NATIVE_SYNC.BROWSER_HELP | translate }}</p>
+          <p class="server-address">{{ accountLogin.server() }}</p>
+          <p>
+            {{ T.NATIVE_SYNC.BROWSER_CODE | translate }}
+            <strong>{{ accountLogin.code() }}</strong>
+          </p>
+          <div class="account-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="reopenBrowserLogin()"
+              [disabled]="accountLogin.completing() || working()"
+            >
+              {{ T.NATIVE_SYNC.BROWSER_REOPEN | translate }}
+            </button>
+            <button
+              mat-button
+              type="button"
+              (click)="cancelBrowserLogin()"
+              [disabled]="accountLogin.completing() || working()"
+            >
+              {{ T.G.CANCEL | translate }}
+            </button>
+          </div>
+        } @else if (!needsMfa) {
           <h2>{{ T.NATIVE_SYNC.SIGN_IN | translate }}</h2>
           <p class="intro">{{ T.NATIVE_SYNC.INTRO | translate }}</p>
           <form (ngSubmit)="login()">
@@ -69,6 +95,14 @@
               {{ T.NATIVE_SYNC.UNLOCK | translate }}
             </button>
           </form>
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="startBrowserLogin()"
+            [disabled]="working() || !server"
+          >
+            {{ T.NATIVE_SYNC.BROWSER_CONTINUE | translate }}
+          </button>
           <p class="account-help">{{ T.NATIVE_SYNC.ACCOUNT_HELP | translate }}</p>
           <button
             mat-button

@@ -28,6 +28,7 @@ import {
 import { parseNativeGlassMaterialArg } from './shared-with-frontend/native-glass.model';
 import { createOneShotApiConsumer } from './shared-with-frontend/one-shot-api-consumer';
 import { CertTrustElectronApi } from './shared-with-frontend/cert-trust-hosts';
+import { AccountLoginStoreApi } from './shared-with-frontend/account-login-api';
 
 let pluginNodeExecutionApiConsumed = false;
 
@@ -46,6 +47,11 @@ const consumeCertTrustApi = createOneShotApiConsumer<CertTrustElectronApi>(() =>
 }));
 
 const ea: ElectronAPI = {
+  consumeAccountLoginStore: createOneShotApiConsumer<AccountLoginStoreApi>(() => ({
+    load: () => _invoke('ACCOUNT_LOGIN_STORE', 'load') as Promise<string | null>,
+    save: (value) => _invoke('ACCOUNT_LOGIN_STORE', 'save', value).then(() => undefined),
+    clear: () => _invoke('ACCOUNT_LOGIN_STORE', 'clear').then(() => undefined),
+  })),
   on: (channel: string, listener: (...args: unknown[]) => void) => {
     // NOTE: there is no proper way to unsubscribe apart from unsubscribing all
     ipcRenderer.on(channel, toPayloadOnlyIpcListener(listener));

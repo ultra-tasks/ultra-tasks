@@ -73,6 +73,28 @@
         });
         assert((await command('detach', identity)).refreshToken === 'offline-cache');
         await absent(identity);
+        await command('login-clear');
+        assert((await command('login-load')).value == null);
+        const pending = JSON.stringify({
+          request: { expiresAt: Date.now() + 120000 },
+          verifier: 'synthetic-device-proof',
+        });
+        await command('login-save', { value: pending });
+        assert((await command('login-load')).value === pending);
+        // Session cleanup must not consume an independent pending login.
+        await command('clear');
+        assert((await command('login-load')).value === pending);
+        await command('login-clear');
+        assert((await command('login-load')).value == null);
+        let expiredRejected = false;
+        try {
+          await command('login-save', {
+            value: JSON.stringify({ request: { expiresAt: Date.now() - 1 } }),
+          });
+        } catch {
+          expiredRejected = true;
+        }
+        assert(expiredRejected);
         document.getElementById('result').textContent = 'ULTRA NATIVE KEYCHAIN PASS';
       };
       const start = async () => {

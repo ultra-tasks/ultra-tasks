@@ -80,6 +80,7 @@ import { getDroppedUrl } from './core/drop-paste-input/drop-paste-input';
 import { readableUrl } from './util/readable-url';
 import { MobileBottomNavComponent } from './core-ui/mobile-bottom-nav/mobile-bottom-nav.component';
 import { CertTrustService } from './features/issue/cert-trust.service';
+import { NativeAccountLoginService } from './features/native-sync/native-account-login.service';
 import { StartupService } from './core/startup/startup.service';
 import { DataInitStateService } from './core/data-init/data-init-state.service';
 import { AppUriTaskActionsService } from './features/tasks/app-uri-actions/app-uri-task-actions.service';
@@ -177,6 +178,7 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   // Injected only to trigger its constructor eagerly at app start, so a
   // cold-launch add-task/complete-task URL action is never missed.
   private _appUriTaskActionsService = inject(AppUriTaskActionsService);
+  private readonly _accountLogin = inject(NativeAccountLoginService);
   private _iosShareService = inject(IosShareService);
   private _agentCaptureService = inject(AgentCaptureService);
   readonly onboardingHintService = inject(OnboardingHintService);
@@ -242,6 +244,7 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   constructor() {
     // Claim the one-shot certificate-trust API before plugins load (#11097).
     this._certTrustService.init();
+    this._accountLogin.initialize();
     this._startupService.init();
     this._iosShareService.start();
     this._agentCaptureService.start();

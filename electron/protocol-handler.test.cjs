@@ -62,6 +62,24 @@ const makeWin = () => {
   };
 };
 
+test('account login uses its own callback channel on warm and cold launch', () => {
+  const module = loadModule();
+  const win = makeWin();
+  const url =
+    'ultratasks://account-login?result=' + 'a'.repeat(43) + '&state=' + 'b'.repeat(43);
+  isAppReady = false;
+  module.processProtocolUrl(url, win);
+  assert.equal(win.sent.length, 0);
+  isAppReady = true;
+  module.processPendingProtocolUrls(win);
+  assert.equal(win.sent.length, 1);
+  assert.equal(win.sent[0].channel, 'ACCOUNT_LOGIN_CALLBACK');
+  assert.deepEqual(win.sent[0].payload, { url });
+  module.processProtocolUrl(url, win);
+  assert.equal(win.sent.length, 2);
+  assert.ok(logCalls.every((args) => !JSON.stringify(args).includes('result=')));
+});
+
 test.beforeEach(() => {
   showOrFocusCalls = [];
   toggleVisibilityCalls = [];

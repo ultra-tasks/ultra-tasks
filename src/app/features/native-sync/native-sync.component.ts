@@ -16,6 +16,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Store } from '@ngrx/store';
 import { TranslatePipe } from '@ngx-translate/core';
 import { NativeSyncService } from './native-sync.service';
+import { NativeAccountLoginService } from './native-account-login.service';
 import { StateSnapshotService } from '../../op-log/backup/state-snapshot.service';
 import {
   sharedTaskFromPersonal,
@@ -55,6 +56,7 @@ export class NativeSyncComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   readonly native = inject(NativeSyncService);
+  readonly accountLogin = inject(NativeAccountLoginService);
   private readonly snapshots = inject(StateSnapshotService);
   private readonly dateService = inject(DateService);
   private readonly dialogs = inject(MatDialog);
@@ -201,6 +203,18 @@ export class NativeSyncComponent implements OnInit {
   }
   async runOpenAccount(): Promise<void> {
     await this.run(() => this.native.openAccount(this.server));
+  }
+  async startBrowserLogin(): Promise<void> {
+    this.password = '';
+    this.mfa = '';
+    this.needsMfa = false;
+    await this.run(() => this.accountLogin.start(this.server, this.identifier));
+  }
+  async cancelBrowserLogin(): Promise<void> {
+    await this.run(() => this.accountLogin.cancel());
+  }
+  async reopenBrowserLogin(): Promise<void> {
+    await this.run(() => this.accountLogin.open());
   }
   async cancelMfa(): Promise<void> {
     await this.run(async () => {

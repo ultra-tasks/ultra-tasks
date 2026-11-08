@@ -75,6 +75,10 @@ export const processProtocolUrl = (url: string, mainWin: BrowserWindow | null): 
     log('Protocol path part count:', pathParts.length);
 
     switch (action) {
+      case 'account-login':
+        mainWin.webContents.send(IPC.ACCOUNT_LOGIN_CALLBACK, { url });
+        showOrFocus(mainWin);
+        break;
       case 'oauth-callback':
         log('Received OAuth callback URL via app protocol');
         if (mainWin && mainWin.webContents) {

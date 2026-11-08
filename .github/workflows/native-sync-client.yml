@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'src/app/features/native-sync/**'
+      - 'src/app/core/account-login-callback*'
+      - 'src/app/core/app-url-open-router*'
+      - 'electron/**'
       - 'src/app/op-log/**'
       - 'packages/sync-providers/**'
       - 'packages/shared-schema/**'
@@ -37,3 +40,32 @@ jobs:
         run: npm run quiet -- ultra-private:browser
       - name: Legacy client test transport matches extracted server
         run: npm run quiet -- ultra-legacy:parity
+      - name: Browser sign-in, MFA and blocked app-return fallback
+        run: npm run quiet -- ultra-login:browser
+  desktop-login:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm run quiet -- buildFrontend:dev
+      - run: npm run quiet -- electron:build
+      - name: Real Windows app cold/warm browser return and protected pending storage
+        shell: pwsh
+        run: |
+          $env:ULTRA_ELECTRON_EXECUTABLE = (Resolve-Path 'node_modules/electron/dist/electron.exe').Path
+          $env:ULTRA_ELECTRON_APP = (Get-Location).Path
+          $env:ULTRA_AUTH_SCREENSHOTS = Join-Path (Get-Location).Path '.tmp/account-login-screenshots'
+          npm run quiet -- ultra-login:browser
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: failure()
+        with:
+          name: windows-account-login-screenshots
+          path: .tmp/account-login-screenshots/*.png

@@ -1,4 +1,9 @@
 import { Subject } from 'rxjs';
+import {
+  pendingAccountLoginCallback$,
+  parseAccountLoginCallback,
+  type AccountLoginCallback,
+} from './account-login-callback';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- grandfathered layer-boundary debt
 import { pendingCapacitorAppUriAction$ } from '../features/tasks/app-uri-actions/pending-capacitor-app-uri-action';
 import { pendingCapacitorQuickAction$ } from './app-uri-actions/pending-capacitor-quick-action';
@@ -19,7 +24,7 @@ import {
  * itself — it carries the task title/notes for task actions and an auth code
  * for OAuth callbacks, and log history is exportable (rule #9).
  */
-export type AppUrlRoute = 'task' | 'quick-action' | 'other';
+export type AppUrlRoute = 'task' | 'quick-action' | 'account-login' | 'other';
 
 /**
  * Routes a single Capacitor `appUrlOpen` URL to whichever consumer owns it.
@@ -43,7 +48,13 @@ export const routeCapacitorAppUrl = (
   taskSink: Subject<AppUriTaskAction> = pendingCapacitorAppUriAction$,
   oAuthSink: Subject<string> = pendingCapacitorOAuthUrl$,
   quickActionSink: Subject<AppUriQuickAction> = pendingCapacitorQuickAction$,
+  accountSink: Subject<AccountLoginCallback> = pendingAccountLoginCallback$,
 ): AppUrlRoute => {
+  const callback = parseAccountLoginCallback(url);
+  if (callback) {
+    accountSink.next(callback);
+    return 'account-login';
+  }
   const action = parseAppUriTaskAction(url);
   if (action) {
     taskSink.next(action);

@@ -64,6 +64,14 @@ const TASK_ACTION_HOSTS = exportedHosts(TASK_PARSER, 'TASK_ACTION_HOSTS');
 test('the manifest declares hosts on the app scheme', () => {
   assert.ok(DECLARED_HOSTS.size > 0, `no <data> hosts for ${SCHEME} in the manifest`);
 });
+test('account login callbacks are declared independently of provider OAuth', () => {
+  assert.ok(DECLARED_HOSTS.has('account-login'));
+  assert.ok(DECLARED_HOSTS.has('oauth-callback'));
+  assert.match(
+    readRoot('ios', 'App', 'App', 'Info.plist'),
+    /<string>app\.ultratasks<\/string>/,
+  );
+});
 
 test('every task action host is declared in the manifest', () => {
   assert.ok(TASK_ACTION_HOSTS.length > 0, 'TASK_ACTION_HOSTS is empty');

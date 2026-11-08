@@ -91,6 +91,16 @@ export class NativeSyncPlatformService {
       }
     });
   }
+  async loginStore(
+    method: 'load' | 'save' | 'clear',
+    value?: string,
+  ): Promise<string | null> {
+    if (!this.supported) throw new Error('NATIVE_SYNC.ERROR_NATIVE');
+    const result = (await this.command('login-' + method, value ? { value } : {})) as {
+      value?: string | null;
+    };
+    return result.value ?? null;
+  }
   async bind(
     client: SyncClient,
     baseUrl: string,

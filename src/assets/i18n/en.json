@@ -3989,6 +3989,12 @@
     "BACK_SIGN_IN": "Back to sign in",
     "PRIVACY": "End-to-end encrypted. Your password and vault keys stay on this device.",
     "PRIVATE_SYNC": "Private sync",
-    "SESSION_OPTIONS": "Account & session options"
+    "SESSION_OPTIONS": "Account & session options",
+    "BROWSER_CONTINUE": "Continue in browser",
+    "BROWSER_FINISH": "Finish sign-in in your browser",
+    "BROWSER_HELP": "Sign in on the selected server, then approve the request with the matching code. Keep this app open or return to it when you're done.",
+    "BROWSER_CODE": "Request code:",
+    "BROWSER_REOPEN": "Reopen browser",
+    "BROWSER_RESTART": "Browser sign-in expired or could not be completed. Start again. Your local data is unchanged."
   }
 }
