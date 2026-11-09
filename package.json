@@ -212,6 +212,7 @@
     "ultra-recovery:test": "node tools/run-server-command.js recovery",
     "ultra-realtime:load": "node tools/run-server-command.js load",
     "ultra-private:browser": "npm run buildFrontend:dev && node tools/run-server-command.js private:browser",
+    "ultra-provider:harness": "node tools/run-server-command.js provider:harness",
     "ultra-login:browser": "node tools/run-server-command.js login:browser",
     "server:prepare": "node tools/prepare-sync-server.js",
     "account-crypto:test": "node tools/run-server-command.js crypto",

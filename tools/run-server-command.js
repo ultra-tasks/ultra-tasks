@@ -12,6 +12,7 @@ const scripts = {
   sync: 'test:native',
   'sync:browser': 'test:client:browser',
   'private:browser': 'test:private:browser',
+  'provider:harness': 'test:provider-migration:harness',
   'login:browser': 'test:browser-login:browser',
   realtime: 'test:native',
   recovery: 'test:native',

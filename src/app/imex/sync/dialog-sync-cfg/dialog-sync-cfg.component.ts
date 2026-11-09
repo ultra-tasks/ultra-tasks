@@ -73,6 +73,8 @@ import type { OneDrivePrivateCfg } from '../../../op-log/sync-providers/file-bas
 import type { LocalFileSyncPrivateCfg } from '@sp/sync-providers/local-file';
 import type { SuperSyncPrivateCfg } from '@sp/sync-providers/super-sync';
 import { useDialogSize } from '../../../ui/dialog-size.util';
+import { BackupService } from '../../../op-log/backup/backup.service';
+import { OperationWriteFlushService } from '../../../op-log/sync/operation-write-flush.service';
 
 // `testWebdavConnection` reports a 404 (auth ok, wrong DAV path) via this
 // HTTP status; the package-side `WebDavHttpStatus` enum is not exported to
@@ -112,6 +114,8 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   private _matDialog = inject(MatDialog);
   private _snackService = inject(SnackService);
   private _syncLocalStateService = inject(SyncLocalStateService);
+  private readonly _backups = inject(BackupService);
+  private readonly _writeFlush = inject(OperationWriteFlushService);
 
   private _destroyRef = inject(DestroyRef);
   private _certTrustService = inject(CertTrustService);
@@ -855,7 +859,35 @@ export class DialogSyncCfgComponent implements AfterViewInit {
       }
     }
 
-    await this.syncConfigService.updateSettingsFromForm(configToSave as SyncConfig, true);
+    const switching =
+      this.native.configured() ||
+      (this.isWasEnabled() && providerId !== this._initialProviderId);
+    const save = async (): Promise<void> => {
+      if (switching) {
+        await this._writeFlush.flushPendingWrites();
+        await this._backups.captureImportBackup('LOCAL_IMPORT');
+        if (this.native.configured()) {
+          if (this.native.unlocked()) {
+            await this.native.syncNow();
+            if (this.native.error()) throw new Error('NATIVE_SYNC.ERROR_SYNC');
+          }
+          this._providerManager.markSwitchFromNative();
+          await this.native.disconnect();
+        }
+      }
+      await this.syncConfigService.updateSettingsFromForm(
+        configToSave as SyncConfig,
+        true,
+      );
+      if (switching) await this._writeFlush.flushPendingWrites();
+    };
+    try {
+      if (switching) await this.syncWrapperService.runWithSyncBlocked(save);
+      else await save();
+    } catch {
+      this._snackService.open({ type: 'ERROR', msg: T.SYNC_SETUP.SWITCH_FAILED });
+      return;
+    }
     this._matDialogRef.close();
 
     // Enabling SuperSync from a previously-disabled state: arm the one-time setup

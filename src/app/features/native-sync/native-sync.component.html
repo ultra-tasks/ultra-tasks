@@ -266,27 +266,29 @@
         <section class="account-card">
           <h2>{{ T.NATIVE_SYNC.CONNECT_PERSONAL | translate }}</h2>
           <p class="intro">{{ T.NATIVE_SYNC.MIGRATION_NOTICE | translate }}</p>
-          <mat-checkbox [(ngModel)]="retiredLegacy">{{
-            T.NATIVE_SYNC.RETIRED_LEGACY | translate
-          }}</mat-checkbox>
+          @if (personalScopeInfo()) {
+            <p>{{ T.NATIVE_SYNC.CHOOSE_DATA | translate }}</p>
+          }
           <div class="account-actions">
             <button
               mat-flat-button
               color="primary"
               type="button"
               (click)="link(true)"
-              [disabled]="!retiredLegacy || working()"
+              [disabled]="working() || native.busy()"
             >
               {{ T.NATIVE_SYNC.IMPORT_CURRENT | translate }}
             </button>
-            <button
-              mat-stroked-button
-              type="button"
-              (click)="link(false)"
-              [disabled]="!retiredLegacy || working()"
-            >
-              {{ T.NATIVE_SYNC.USE_ACCOUNT | translate }}
-            </button>
+            @if (personalScopeInfo()) {
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="link(false)"
+                [disabled]="working() || native.busy()"
+              >
+                {{ T.NATIVE_SYNC.USE_ACCOUNT | translate }}
+              </button>
+            }
           </div>
         </section>
       } @else {

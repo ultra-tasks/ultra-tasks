@@ -27,6 +27,10 @@ import { auditTime, filter, type Subscription } from 'rxjs';
 import { LOCAL_ACTIONS } from '../../util/local-actions.token';
 import { isPersistentAction } from '../../op-log/core/persistent-action.interface';
 import { OperationWriteFlushService } from '../../op-log/sync/operation-write-flush.service';
+import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
+import { GlobalConfigService } from '../config/global-config.service';
+import { BackupService } from '../../op-log/backup/backup.service';
+import { updateGlobalConfigSection } from '../config/store/global-config.actions';
 
 interface CachedAccount {
   capabilities: Capabilities;
@@ -42,6 +46,9 @@ export class NativeSyncService {
   private readonly certTrust = inject(CertTrustService);
   private readonly localActions = inject(LOCAL_ACTIONS);
   private readonly writeFlush = inject(OperationWriteFlushService);
+  private readonly legacySync = inject(SyncWrapperService);
+  private readonly config = inject(GlobalConfigService);
+  private readonly backups = inject(BackupService);
   readonly platform = inject(NativeSyncPlatformService);
   readonly backgroundError = signal('');
   readonly status = signal('NATIVE_SYNC.LOCKED');
@@ -297,7 +304,9 @@ export class NativeSyncService {
           .filter((s) => !s.revoked)
           .map((s) => s.info),
       );
-      this.linked.set(await this.bridge.bind(this.client));
+      const wasLinked = await this.bridge.bind(this.client);
+      // A saved account baseline must not reactivate while a file provider is live.
+      this.linked.set(wasLinked && !this.config.sync()?.isEnabled);
       this.unlocked.set(true);
       this.localChanges = this.localActions
         .pipe(filter(isPersistentAction), auditTime(500))
@@ -313,6 +322,21 @@ export class NativeSyncService {
       if (this.linked()) await this.syncNow();
       this.startRealtime();
       await this.updatePlatform();
+      const personal = this.scopes().find((scope) => scope.kind === 'personal');
+      const incomplete =
+        personal &&
+        this.client.state.migrations[personal.id] &&
+        !this.client.state.migrations[personal.id].complete;
+      if (!this.linked() && (!personal || incomplete)) {
+        try {
+          await this.link(true, true);
+        } catch (error) {
+          // The recovery copy and local data remain available for another attempt.
+          this.error.set(
+            error instanceof Error ? error.message : 'NATIVE_SYNC.ERROR_SYNC',
+          );
+        }
+      }
     } catch (error) {
       await this.lock();
       throw error;
@@ -397,17 +421,116 @@ export class NativeSyncService {
     this.account!.adoptTokens(tokens as Parameters<AccountClient['adoptTokens']>[0]);
     await this.cache();
   }
-  async link(migrate: boolean): Promise<void> {
+  async link(migrate: boolean, automatic = false): Promise<void> {
     this.busy.set(true);
+    this.error.set('');
+    let changedWhileChoosing = false;
+    let retiringLegacy = false;
+    let retiredLegacy = false;
+    const choiceChanges = !migrate
+      ? this.localActions.pipe(filter(isPersistentAction)).subscribe((action) => {
+          // The provider switch itself disables local-only sync settings.
+          if (
+            retiringLegacy &&
+            action.type === updateGlobalConfigSection.type &&
+            action.sectionKey === 'sync'
+          )
+            return;
+          changedWhileChoosing = true;
+        })
+      : undefined;
     try {
-      await this.writeFlush.flushPendingWrites();
-      if (migrate) await this.bridge.migrate();
-      else await this.bridge.useExisting();
+      if (!this.client) throw new Error('NATIVE_SYNC.ERROR_SYNC');
+      const chosenScope = this.scopes().find((scope) => scope.kind === 'personal');
+      const previousScopeId = this.bridge.scopeId;
+      const scopes = await this.client.refreshScopes();
+      this.scopes.set(scopes);
+      const discoveredPersonal = scopes.find((scope) => scope.kind === 'personal');
+      if (!previousScopeId && discoveredPersonal) {
+        await this.bridge.bind(this.client);
+        // A second device may have initialized the account while sign-in ran.
+        if (automatic) return;
+      }
+      const personal =
+        this.bridge.scopeId && this.client?.state.scopes[this.bridge.scopeId];
+      const journal = personal && this.client?.state.migrations[personal.info.id];
+      const resumingInitialMigration = !!journal && !journal.complete;
+      const changedSinceChoice = (scope: ScopeInfo): boolean =>
+        !!chosenScope &&
+        (scope.id !== chosenScope.id ||
+          scope.sequence !== chosenScope.sequence ||
+          scope.generation !== chosenScope.generation ||
+          scope.controlVersion !== chosenScope.controlVersion);
+      if (
+        migrate &&
+        !resumingInitialMigration &&
+        discoveredPersonal &&
+        changedSinceChoice(discoveredPersonal)
+      )
+        throw new Error('NATIVE_SYNC.ERROR_REMOTE_CHANGED');
+      if (
+        personal &&
+        !resumingInitialMigration &&
+        (personal.intents.length || personal.uncertain)
+      )
+        throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');
+      if (
+        migrate &&
+        personal &&
+        !resumingInitialMigration &&
+        this.account?.capabilities?.features['personalReplacement'] !== true
+      )
+        throw new Error('NATIVE_SYNC.ERROR_REPLACEMENT_UNAVAILABLE');
+      if (personal && !resumingInitialMigration) {
+        await this.client.syncScope(personal.info.id);
+        const current = this.client.state.scopes[personal.info.id].info;
+        this.scopes.update((values) =>
+          values.map((value) => (value.id === current.id ? current : value)),
+        );
+        if (migrate && changedSinceChoice(current))
+          throw new Error('NATIVE_SYNC.ERROR_REMOTE_CHANGED');
+        if (current.state !== 'active')
+          throw new Error('NATIVE_SYNC.ERROR_MIGRATION_BUSY');
+      }
+      const perform = async (): Promise<void> => {
+        await this.writeFlush.flushPendingWrites();
+        if (this.config.sync()?.isEnabled) {
+          await this.backups.captureImportBackup('LOCAL_IMPORT');
+          retiringLegacy = true;
+          try {
+            this.config.updateSection('sync', { isEnabled: false }, true);
+            retiredLegacy = true;
+          } finally {
+            retiringLegacy = false;
+          }
+          await this.writeFlush.flushPendingWrites();
+        }
+        if (migrate) await this.bridge.migrate();
+        else
+          await this.bridge.useExisting(() => {
+            if (changedWhileChoosing) {
+              this.error.set('NATIVE_SYNC.ERROR_LOCAL_CHANGED');
+              throw new Error('NATIVE_SYNC.ERROR_LOCAL_CHANGED');
+            }
+          });
+      };
+      if (this.config.sync()?.isEnabled)
+        await this.legacySync.runWithSyncBlocked(perform);
+      else await perform();
       this.linked.set(true);
       await this.refresh();
       await this.syncNow();
       await this.updatePlatform();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'NATIVE_SYNC.ERROR_LOCAL_CHANGED') {
+        this.error.set(error.message);
+      } else if (retiredLegacy && !this.linked()) {
+        this.error.set('NATIVE_SYNC.ERROR_SWITCH_INTERRUPTED');
+        throw new Error('NATIVE_SYNC.ERROR_SWITCH_INTERRUPTED');
+      }
+      throw error;
     } finally {
+      choiceChanges?.unsubscribe();
       this.busy.set(false);
     }
   }
@@ -416,7 +539,8 @@ export class NativeSyncService {
       this.resyncRequested = true;
       return this.inFlight;
     }
-    if (!this.client || !this.unlocked() || this.closing) return Promise.resolve();
+    if (!this.client || !this.unlocked() || !this.linked() || this.closing)
+      return Promise.resolve();
     this.inFlight = (async () => {
       do {
         this.resyncRequested = false;

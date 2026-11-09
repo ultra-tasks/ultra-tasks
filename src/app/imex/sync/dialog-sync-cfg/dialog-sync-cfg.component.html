@@ -7,18 +7,9 @@
       [value]="setupProvider()"
       (selectionChange)="selectSetupProvider($event.value)"
     >
-      <mat-option
-        [value]="ultraSync"
-        [disabled]="isWasEnabled()"
-        >UltraSync</mat-option
-      >
+      <mat-option [value]="ultraSync">UltraSync</mat-option>
       @for (option of setupOptions(); track option.value) {
-        <mat-option
-          [value]="option.value"
-          [disabled]="
-            native.configured() || (isWasEnabled() && option.value !== savedProvider())
-          "
-        >
+        <mat-option [value]="option.value">
           {{ option.label | translate }}
         </mat-option>
       }

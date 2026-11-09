@@ -24,6 +24,8 @@ import {
 import type { GlobalConfigState } from '../config/global-config.model';
 import { selectCurrentTaskId } from '../tasks/store/task.selectors';
 import { ValidateStateService } from '../../op-log/validation/validate-state.service';
+import { replacePersonalRecords } from './native-personal-replacement';
+import { TabSeqFrontierService } from '../../op-log/persistence/tab-seq-frontier.service';
 
 /** Keeps the local op log as the durable intent source; only encrypted records leave the device. */
 @Injectable({ providedIn: 'root' })
@@ -33,6 +35,7 @@ export class NativePersonalBridgeService {
   private readonly sync = inject(OperationLogSyncService);
   private readonly backups = inject(BackupService);
   private readonly validation = inject(ValidateStateService);
+  private readonly tabFrontier = inject(TabSeqFrontierService);
   private readonly currentTaskId = inject(Store).selectSignal(selectCurrentTaskId);
   private baseline?: PersonalBaseline;
   private client?: SyncClient;
@@ -87,21 +90,45 @@ export class NativePersonalBridgeService {
     if (!validation.isValid) throw new Error('NATIVE_SYNC.ERROR_DATA');
     await this.backups.captureImportBackup('LOCAL_IMPORT');
     const baseline = await personalRecords(source, client.state.device.id);
-    this.scopeId = await client.migrate(Object.values(baseline.records));
+    const incomplete =
+      this.scopeId &&
+      client.state.migrations[this.scopeId] &&
+      !client.state.migrations[this.scopeId].complete;
+    if (this.scopeId && !incomplete) {
+      await replacePersonalRecords(client, this.scopeId, Object.values(baseline.records));
+    } else {
+      this.scopeId = await client.migrate(Object.values(baseline.records));
+    }
     const imported = client.records(this.scopeId);
     this.baseline = baselineFromHeads(imported, restorePersonal(imported));
-    await this.apply();
+    await this.apply(() => this.assertSafeTabFrontier());
   }
-  async useExisting(): Promise<void> {
+  async useExisting(assertUnchanged?: () => void): Promise<void> {
     if (!this.scopeId) throw new Error('NATIVE_SYNC.ERROR_NO_PERSONAL');
     await this.snapshot();
     await this.backups.captureImportBackup('REMOTE_IMPORT');
+    const scope = this.client!.state.scopes[this.scopeId];
+    if (scope.intents.length || scope.uncertain)
+      throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');
     await this.client!.syncScope(this.scopeId);
     if (this.client!.state.scopes[this.scopeId].info.state !== 'active')
       throw new Error('Personal migration is still in progress on another device');
     // The user explicitly chose the account's existing dataset; the recovery copy retains this device's data.
     this.baseline = undefined;
-    await this.apply();
+    await this.apply(async () => {
+      await this.assertSafeTabFrontier();
+      assertUnchanged?.();
+    });
+  }
+  private async assertSafeTabFrontier(): Promise<void> {
+    // Called under the operation-log lock. A different tab's durable writes
+    // do not necessarily reach this tab's action stream or in-memory state.
+    const [first, lastSeq] = await Promise.all([
+      this.opStore.getFirstOpEntry(),
+      this.opStore.getLastSeq(),
+    ]);
+    if (!this.tabFrontier.isReplacementSafeAt(first?.seq ?? null, lastSeq))
+      throw new Error('NATIVE_SYNC.ERROR_LOCAL_CHANGED');
   }
   async capture(): Promise<void> {
     if (!this.client || !this.scopeId || !this.baseline) return;
@@ -131,12 +158,13 @@ export class NativePersonalBridgeService {
     for (let offset = 0; offset < changes.length; offset += 100)
       await this.client.edit(this.scopeId, changes.slice(offset, offset + 100));
   }
-  async apply(): Promise<void> {
+  async apply(assertUnchanged?: () => Promise<void> | void): Promise<void> {
     const client = this.client!;
     if (!this.scopeId) return;
     let committed: PersonalBaseline | undefined;
     await this.sync.applyNativeSnapshot(async () => {
       // Called inside the op-log cutoff with deferred capture already open.
+      if (assertUnchanged) await assertUnchanged();
       await this.capture();
       const heads = client.records(this.scopeId!);
       const restored = restorePersonal(heads);

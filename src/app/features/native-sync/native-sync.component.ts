@@ -12,7 +12,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatRadioModule } from '@angular/material/radio';
 import { Store } from '@ngrx/store';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -48,7 +47,6 @@ import { selectAllProjects } from '../project/store/project.selectors';
     MatFormFieldModule,
     MatInputModule,
     MatIconModule,
-    MatCheckboxModule,
     MatRadioModule,
   ],
   templateUrl: './native-sync.component.html',
@@ -78,7 +76,6 @@ export class NativeSyncComponent implements OnInit {
   password = '';
   mfa = '';
   needsMfa = false;
-  retiredLegacy = false;
   projectTitle = '';
   sourceProject = '';
   includeDescription = false;
@@ -102,6 +99,9 @@ export class NativeSyncComponent implements OnInit {
     () => !!this.scope() && this.scope()?.ownerId === this.native.account?.account?.id,
   );
   readonly personalProjects = inject(Store).selectSignal(selectAllProjects);
+  readonly personalScopeInfo = computed(() =>
+    this.native.scopes().find((scope) => scope.kind === 'personal'),
+  );
   readonly privateRecords = computed(() => {
     this.native.revision();
     const scope = this.native.scopes().find((s) => s.kind === 'personal');

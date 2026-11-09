@@ -205,7 +205,16 @@ const DEVICE_FIELDS: ReadonlyArray<readonly [ProviderToken<object>, readonly str
         '_vectorClockCache',
       ],
     ],
-    [TabSeqFrontierService, ['_frontier', '_hasForeignWrites']],
+    [
+      TabSeqFrontierService,
+      [
+        '_frontier',
+        '_hasForeignWrites',
+        '_unestablishedFirstOwnSeq',
+        '_unestablishedLastOwnSeq',
+        '_unestablishedHasGap',
+      ],
+    ],
     [
       OperationLogDownloadService,
       [

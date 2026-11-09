@@ -8,6 +8,10 @@ on:
       - 'src/app/core/app-url-open-router*'
       - 'electron/**'
       - 'src/app/op-log/**'
+      - 'src/app/imex/sync/**'
+      - 'e2e/tests/sync/ultrasync-provider-migration.spec.ts'
+      - 'e2e/tests/sync/ultrasync-offline-replacement.spec.ts'
+      - 'e2e/tests/sync/ultrasync-provider-late-edit.spec.ts'
       - 'packages/sync-providers/**'
       - 'packages/shared-schema/**'
       - 'package*.json'
@@ -25,7 +29,7 @@ concurrency:
 jobs:
   private-client:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -38,6 +42,28 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Real private server and two Angular clients
         run: npm run quiet -- ultra-private:browser
+      - name: Switch between real WebDAV and private account sync
+        env:
+          E2E_BASE_URL: http://127.0.0.1:4244
+          E2E_ULTRA_URL: http://127.0.0.1:4244
+          E2E_REQUIRE_WEBDAV: 'true'
+          E2E_REQUIRE_ULTRA: 'true'
+          E2E_WORKERS: '2'
+        run: |
+          set -euo pipefail
+          npm run quiet -- buildFrontend:e2e
+          docker compose up -d --build webdav-e2e
+          npm run ultra-provider:harness > .tmp/provider-migration-harness.log 2>&1 &
+          harness=$!
+          trap 'kill "$harness" 2>/dev/null || true; docker compose stop webdav-e2e' EXIT
+          ./scripts/wait-for-webdav.sh
+          for attempt in {1..90}; do
+            if curl --silent --fail http://127.0.0.1:4244/provider-migration-ready > /dev/null; then break; fi
+            if ! kill -0 "$harness" 2>/dev/null; then cat .tmp/provider-migration-harness.log; exit 1; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4244/provider-migration-ready > /dev/null
+          npm run quiet -- e2e:file e2e/tests/sync/ultrasync-provider-migration.spec.ts e2e/tests/sync/ultrasync-offline-replacement.spec.ts e2e/tests/sync/ultrasync-provider-late-edit.spec.ts --project=chromium --retries=0
       - name: Legacy client test transport matches extracted server
         run: npm run quiet -- ultra-legacy:parity
       - name: Browser sign-in, MFA and blocked app-return fallback

@@ -24,6 +24,8 @@ import { SyncLocalStateService } from '../../../op-log/sync/sync-local-state.ser
 import { CertTrustService } from '../../../features/issue/cert-trust.service';
 import { NativeSyncService } from '../../../features/native-sync/native-sync.service';
 import { ULTRA_SYNC_SETUP } from '../sync-setup-options';
+import { BackupService } from '../../../op-log/backup/backup.service';
+import { OperationWriteFlushService } from '../../../op-log/sync/operation-write-flush.service';
 
 describe('DialogSyncCfgComponent', () => {
   let component: DialogSyncCfgComponent;
@@ -63,8 +65,10 @@ describe('DialogSyncCfgComponent', () => {
       'sync',
       'markPromptEncryptionAfterSetupSync',
       'forceUpload',
+      'runWithSyncBlocked',
     ]);
     mockSyncWrapperService.sync.and.resolveTo();
+    mockSyncWrapperService.runWithSyncBlocked.and.callFake(async (run) => run());
     mockSyncLocalStateService = jasmine.createSpyObj('SyncLocalStateService', [
       'confirmOverwriteOfUndecryptableRemoteOps',
     ]);
@@ -76,6 +80,7 @@ describe('DialogSyncCfgComponent', () => {
       'getProviderById',
       'getAllProviders',
       'notifyProviderTargetChanged',
+      'markSwitchFromNative',
     ]);
     mockProviderManager.getAllProviders.and.resolveTo([]);
 
@@ -110,6 +115,18 @@ describe('DialogSyncCfgComponent', () => {
         { provide: SyncLocalStateService, useValue: mockSyncLocalStateService },
         { provide: CertTrustService, useValue: mockCertTrustService },
         { provide: NativeSyncService, useValue: { configured: () => false } },
+        {
+          provide: BackupService,
+          useValue: {
+            captureImportBackup: jasmine
+              .createSpy('captureImportBackup')
+              .and.resolveTo({}),
+          },
+        },
+        {
+          provide: OperationWriteFlushService,
+          useValue: { flushPendingWrites: async () => undefined },
+        },
       ],
     });
     // Replace the Formly-based template with a minimal placeholder so we can
@@ -689,6 +706,75 @@ describe('DialogSyncCfgComponent', () => {
   });
 
   describe('save() — provider without auth requirement', () => {
+    it('disconnects an unlocked UltraSync session before it is locked', async () => {
+      let unlocked = true;
+      const disconnect = jasmine.createSpy('disconnect').and.callFake(async () => {
+        expect(unlocked).toBeTrue();
+      });
+      Object.assign(component.native, {
+        configured: () => true,
+        unlocked: () => unlocked,
+        error: () => '',
+        syncNow: jasmine.createSpy('syncNow').and.resolveTo(),
+        lock: jasmine.createSpy('lock').and.callFake(async () => {
+          unlocked = false;
+        }),
+        disconnect,
+      });
+      mockProviderManager.getProviderById.and.resolveTo({
+        id: SyncProviderId.WebDAV,
+        isReady: jasmine.createSpy('isReady').and.resolveTo(true),
+      } as any);
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.resolveTo({
+        wasConfigured: false,
+      });
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(disconnect).toHaveBeenCalledTimes(1);
+      expect(mockSyncConfigService.updateSettingsFromForm).toHaveBeenCalled();
+    });
+
+    it('does not enable the next provider when online disconnection fails', async () => {
+      const backups = TestBed.inject(BackupService);
+      Object.assign(component.native, {
+        configured: () => true,
+        unlocked: () => true,
+        error: () => '',
+        syncNow: jasmine.createSpy('syncNow').and.resolveTo(),
+        disconnect: jasmine.createSpy('disconnect').and.callFake(async () => {
+          expect(backups.captureImportBackup).toHaveBeenCalledWith('LOCAL_IMPORT');
+          throw new Error('Could not revoke the session');
+        }),
+      });
+      mockProviderManager.getProviderById.and.resolveTo({
+        id: SyncProviderId.WebDAV,
+        isReady: jasmine.createSpy('isReady').and.resolveTo(true),
+      } as any);
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.resolveTo({
+        wasConfigured: false,
+      });
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+      expect(mockDialogRef.close).not.toHaveBeenCalled();
+      expect(mockSnackService.open).toHaveBeenCalledWith({
+        type: 'ERROR',
+        msg: T.SYNC_SETUP.SWITCH_FAILED,
+      });
+    });
+
     it('should close dialog and save config for WebDAV (no getAuthHelper)', async () => {
       const webdavProvider = {
         id: SyncProviderId.WebDAV,
