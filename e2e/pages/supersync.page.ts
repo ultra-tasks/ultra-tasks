@@ -466,6 +466,20 @@ export class SuperSyncPage extends BasePage {
       await this.baseUrlInput.waitFor({ state: 'visible', timeout: 3000 });
     }
 
+    // The input becomes visible before the expansion animation has finished.
+    // Wait for that animation so the Save button cannot move under the click.
+    await advancedCollapsible
+      .locator('..')
+      .locator('.collapsible-panel')
+      .evaluate(async (panel) => {
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+        await Promise.all(
+          panel.getAnimations({ subtree: true }).map((animation) => animation.finished),
+        );
+      });
+
     // Fill in base URL
     await this.baseUrlInput.fill(config.baseUrl);
 

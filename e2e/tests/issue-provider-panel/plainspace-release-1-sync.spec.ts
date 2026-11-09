@@ -10,6 +10,7 @@ import {
   waitForPollAfter,
 } from '../../utils/plainspace-fake';
 import { deleteTaskViaContextMenu } from '../../utils/recently-deleted-helpers';
+import { flushPendingWrites } from '../../utils/waits';
 
 // Release 1 of the multi-user collaboration plan
 // (docs/plans/2026-10-21-multi-user-collaboration.md): per-field pull,
@@ -148,6 +149,9 @@ const localTask = (page: Page): Promise<Record<string, unknown>> =>
 
 /** Restarts the app; the update and import polls run 8 s after load. */
 const restart = async (page: Page, server: FakePlainspace): Promise<void> => {
+  // These scenarios exercise syncing an already-saved offline edit. The UI can
+  // render the edit before its asynchronous IndexedDB write has completed.
+  await flushPendingWrites(page);
   const before = successfulPolls(server);
   await page.reload();
   await waitForPollAfter(page, server, before);
@@ -200,11 +204,13 @@ test.describe('Plainspace Release 1 sync', () => {
     // A push would now go through, but /tasks still fails: nothing is pushed
     // from a failed poll.
     server.isOffline = false;
+    await flushPendingWrites(page);
     const failedBefore = server.taskListRequests.length;
     await page.reload();
     await expect
       .poll(() => server.taskListRequests.length, { timeout: 30000 })
       .toBeGreaterThanOrEqual(failedBefore + 2);
+    await expect(taskRow(page, 'Buy a tent')).toBeVisible();
     // Deliberate: a push queued by a failed poll would show up meanwhile.
     await page.waitForTimeout(2000);
     expect(server.patches).toEqual([]);
