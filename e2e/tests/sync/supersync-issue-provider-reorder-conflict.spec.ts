@@ -582,7 +582,7 @@ for (const scenario of scenarios) {
           expect(compacted.issueProvider).toEqual(interrupted.issueProvider);
           expect(compacted.config).toEqual(interrupted.config);
           await a.page.reload();
-          await waitForAppReady(a.page);
+          await waitForAppReady(a.page, { ensureRoute: false });
           expect(await snapshot(a.page)).toEqual(compacted);
           offline = false;
           allowUpload = true;
@@ -617,7 +617,7 @@ for (const scenario of scenarios) {
             expect(await snapshot(a.page)).toEqual(compacted);
           }
           await a.page.reload();
-          await waitForAppReady(a.page);
+          await waitForAppReady(a.page, { ensureRoute: false });
           expect(await snapshot(a.page)).toEqual(compacted);
           expect(
             pending(await rows(a.page)).some((r) => r.op.id === original.op.id),
@@ -639,7 +639,7 @@ for (const scenario of scenarios) {
         }
         allowUpload = true;
         await a.page.reload();
-        await waitForAppReady(a.page);
+        await waitForAppReady(a.page, { ensureRoute: false });
         expect((await snapshot(a.page)).issueProvider).toEqual(interrupted.issueProvider);
         expect(pending(await rows(a.page)).some((r) => r.op.id === local.op.id)).toBe(
           true,
@@ -669,7 +669,7 @@ for (const scenario of scenarios) {
         evidence.pendingAfterCancel = pending(await rows(a.page));
         expect(evidence.pendingAfterCancel).toEqual(pendingBefore);
         await a.page.reload();
-        await waitForAppReady(a.page);
+        await waitForAppReady(a.page, { ensureRoute: false });
         evidence.afterRestart = {
           pending: pending(await rows(a.page)),
           state: await snapshot(a.page),

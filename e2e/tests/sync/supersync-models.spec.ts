@@ -57,12 +57,14 @@ const createTagReliably = async (page: Page, tagName: string): Promise<void> => 
   const dialog = page.locator('mat-dialog-container');
   await dialog.waitFor({ state: 'visible', timeout: 10000 });
 
-  const input = dialog.locator('input[type="text"]').first();
-  await input.fill(tagName);
-
-  const submitBtn = dialog
-    .locator('button[type="submit"], button:has-text("Save")')
-    .first();
+  const input = dialog.getByRole('textbox', { name: 'Tag Name' });
+  const submitBtn = dialog.getByRole('button', { name: 'Save', exact: true });
+  // Form initialization can replace a value entered as the dialog opens.
+  await expect(async () => {
+    await input.fill(tagName);
+    await expect(input).toHaveValue(tagName, { timeout: 1000 });
+    await expect(submitBtn).toBeEnabled({ timeout: 1000 });
+  }).toPass({ timeout: 10000 });
   await submitBtn.click();
 
   await dialog.waitFor({ state: 'hidden' });
