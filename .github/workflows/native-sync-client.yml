@@ -10,6 +10,7 @@ on:
       - 'src/app/op-log/**'
       - 'src/app/imex/sync/**'
       - 'e2e/tests/sync/ultrasync-provider-migration.spec.ts'
+      - 'e2e/tests/sync/ultrasync-provider-save-in-flight.spec.ts'
       - 'e2e/tests/sync/ultrasync-offline-replacement.spec.ts'
       - 'e2e/tests/sync/ultrasync-provider-late-edit.spec.ts'
       - 'packages/sync-providers/**'
@@ -64,6 +65,7 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:4244/provider-migration-ready > /dev/null
           npm run quiet -- e2e:file e2e/tests/sync/ultrasync-provider-migration.spec.ts e2e/tests/sync/ultrasync-offline-replacement.spec.ts e2e/tests/sync/ultrasync-provider-late-edit.spec.ts --project=chromium --retries=0
+          npm run quiet -- e2e:file e2e/tests/sync/ultrasync-provider-save-in-flight.spec.ts --project=chromium --retries=0
       - name: Legacy client test transport matches extracted server
         run: npm run quiet -- ultra-legacy:parity
       - name: Browser sign-in, MFA and blocked app-return fallback

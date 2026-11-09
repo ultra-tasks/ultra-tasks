@@ -100,71 +100,16 @@ const checkWorklogForArchivedTasks = async (
 };
 
 /**
- * Helper to export backup from the app by reading IndexedDB directly
+ * Export the same backup a user downloads, including the live state and archive.
  */
 const exportBackup = async (page: SimulatedE2EClient['page']): Promise<string> => {
-  // Get backup data directly from IndexedDB (more reliable than Angular DI)
-  const backupData = await page.evaluate(async () => {
-    // Helper to get value from IndexedDB store
-    const getFromStore = <T>(
-      database: IDBDatabase,
-      storeName: string,
-      key: string,
-    ): Promise<T | undefined> => {
-      return new Promise((resolve, reject) => {
-        const tx = database.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        const request = store.get(key);
-        request.onsuccess = () => resolve(request.result as T);
-        request.onerror = () => reject(request.error);
-      });
-    };
-
-    // Open the SUP_OPS database (stores state cache and archives)
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('SUP_OPS');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-
-    // Get state cache from state_cache store
-    const stateCacheEntry = await getFromStore<{
-      id: string;
-      state: Record<string, unknown>;
-    }>(db, 'state_cache', 'current');
-
-    // Get archive data from SUP_OPS database (same DB, different stores)
-    // Archives are stored as { id: 'current', data: ArchiveModel, lastModified: number }
-    const archiveYoungEntry = await getFromStore<{
-      id: string;
-      data: { task: { ids: string[]; entities: Record<string, unknown> } };
-    }>(db, 'archive_young', 'current');
-
-    const archiveOldEntry = await getFromStore<{
-      id: string;
-      data: { task: { ids: string[]; entities: Record<string, unknown> } };
-    }>(db, 'archive_old', 'current');
-
-    const state = stateCacheEntry?.state || {};
-    const defaultArchive = { task: { ids: [], entities: {} } };
-
-    return {
-      timestamp: Date.now(),
-      lastUpdate: Date.now(),
-      crossModelVersion: 4.5,
-      data: {
-        ...state,
-        archiveYoung: archiveYoungEntry?.data || defaultArchive,
-        archiveOld: archiveOldEntry?.data || defaultArchive,
-      },
-    };
-  });
-
-  // Write to temp file
-  const tempDir = os.tmpdir();
-  const backupPath = path.join(tempDir, `sp-backup-${Date.now()}.json`);
-  fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2));
-
+  const importPage = new ImportPage(page);
+  await importPage.navigateToImportPage();
+  const downloadPromise = page.waitForEvent('download');
+  await importPage.exportBackupBtn.click();
+  const download = await downloadPromise;
+  const backupPath = path.join(os.tmpdir(), `sp-backup-${Date.now()}.json`);
+  await download.saveAs(backupPath);
   return backupPath;
 };
 
@@ -277,6 +222,7 @@ test.describe('@supersync Backup Recovery with Existing SYNC_IMPORT', () => {
       console.log('[Backup Recovery] Phase 4: Exporting backup');
 
       backupPath = await exportBackup(clientA.page);
+      expect(fs.readFileSync(backupPath, 'utf8')).toContain(archivedTaskName);
       console.log(`[Backup Recovery] Exported backup to: ${backupPath}`);
 
       // ============ PHASE 5: Import backup (CRITICAL - should use reason='recovery') ============

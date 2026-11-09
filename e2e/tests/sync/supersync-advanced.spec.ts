@@ -101,11 +101,8 @@ test.describe('@supersync SuperSync Advanced', () => {
       // replaces the one we opened. Wait it out before every click in the menu.
       await waitForMenuSettled(clientB.page);
 
-      // Click "Toggle Tags" in context menu (using text match or class if available)
-      // Based on i18n: T.F.TASK.CMP.TOGGLE_TAGS -> 'Toggle Tags' (en)
-      const toggleTagsItem = clientB.page
-        .locator('.mat-mdc-menu-item')
-        .filter({ hasText: /^Tags/ });
+      // Use the task context menu's shared tag control.
+      const toggleTagsItem = clientB.page.locator('.e2e-edit-tags-btn').first();
       await toggleTagsItem.click();
 
       // Wait for tag list submenu

@@ -108,7 +108,7 @@ test.describe('@webdav WebDAV Sync Advanced Features', () => {
     await openTaskDetailPanel(pageA, taskA);
 
     const addAttachmentItem = pageA.locator(
-      'task-detail-panel task-detail-item.input-item:has(mat-icon:text("attachment"))',
+      'task-detail-panel task-detail-item.input-item:has(mat-icon:text-is("attach_file"))',
     );
     await addAttachmentItem.waitFor({ state: 'visible' });
     await addAttachmentItem.click();

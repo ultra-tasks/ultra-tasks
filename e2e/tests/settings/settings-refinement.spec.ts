@@ -1,5 +1,23 @@
 import { test, expect } from '../../fixtures/test.fixture';
 import { readFile } from 'node:fs/promises';
+import { ImportPage } from '../../pages/import.page';
+
+test('the shared export control downloads a native backup', async ({
+  page,
+  workViewPage,
+}) => {
+  await workViewPage.waitForTaskList();
+  await workViewPage.addTask('Native export witness');
+  const importPage = new ImportPage(page);
+  await importPage.navigateToImportPage();
+  const downloaded = page.waitForEvent('download');
+  await importPage.exportBackupBtn.click();
+  const path = await (await downloaded).path();
+  if (!path) throw new Error('No downloaded backup');
+  const backup = await readFile(path, 'utf8');
+  expect(JSON.parse(backup)).toBeTruthy();
+  expect(backup).toContain('Native export witness');
+});
 
 test('dedicated settings categories reveal themes, shortcuts, sound and date examples', async ({
   page,

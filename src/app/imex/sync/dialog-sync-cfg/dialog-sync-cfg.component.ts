@@ -133,8 +133,14 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   readonly native = inject(NativeSyncService);
   readonly ultraSync = ULTRA_SYNC_SETUP;
   readonly setupProvider = signal<SyncSetupProvider>(ULTRA_SYNC_SETUP);
+  readonly isInitialSettingsLoading = signal(true);
+  readonly isInitialSettingsLoadFailed = signal(false);
+  readonly isInitialSettingsUnavailable = computed(
+    () => this.isInitialSettingsLoading() || this.isInitialSettingsLoadFailed(),
+  );
   readonly isProviderConfigLoading = signal(false);
   readonly isProviderConfigLoadFailed = signal(false);
+  readonly isSaving = signal(false);
   readonly savedProvider = signal<SyncProviderId | null>(null);
   private readonly otherSavedProviders = signal<SyncProviderId[]>([]);
   readonly setupOptions = computed(() =>
@@ -159,6 +165,7 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   form: FormGroup = new FormGroup({});
 
   selectSetupProvider(provider: SyncSetupProvider): void {
+    if (this.isInitialSettingsUnavailable() || this.isSaving()) return;
     const previousProvider = this.setupProvider();
     if (
       previousProvider !== provider &&
@@ -590,33 +597,47 @@ export class DialogSyncCfgComponent implements AfterViewInit {
     this._destroyRef.onDestroy(
       () => void this._certTrustService.setPendingConfig(this, null),
     );
+    this.retryInitialSettings();
+  }
+
+  retryInitialSettings(): void {
+    this.isInitialSettingsLoading.set(true);
+    this.isInitialSettingsLoadFailed.set(false);
     this.syncConfigService.syncSettingsForm$
       .pipe(first(), takeUntilDestroyed(this._destroyRef))
-      .subscribe((v) => {
-        this._initialProviderId = toSyncProviderId(v.syncProvider);
-        if (this._initialProviderId === SyncProviderId.LocalFile) {
-          this._localFileSafBaseline =
-            (v.localFileSync as LocalFileSyncPrivateCfg | undefined)?.safFolderUri ?? '';
-        }
-        this.savedProvider.set(this._initialProviderId);
-        if (this._initialProviderId) void this._loadSavedProviders();
-        this.form
-          .get('syncProvider')
-          ?.setValue(this._initialProviderId, { emitEvent: false });
-        this._selectedProviderWasConfigured = v.isEnabled;
-        if (v.isEnabled) {
-          this.isWasEnabled.set(true);
-          if (this._initialProviderId) this.setupProvider.set(this._initialProviderId);
-        }
-        // First-time setup ⇔ sync was previously disabled. Encryption-warning
-        // hideExpressions in sync-form.const.ts read this flag to suppress
-        // the post-save SuperSync encryption prompt during initial setup.
-        this.updateTmpCfg({
-          ...v,
-          isEnabled: true,
-          _isInitialSetup: !v.isEnabled,
-          _activeProviderId: this._initialProviderId,
-        });
+      .subscribe({
+        next: (v) => {
+          this._initialProviderId = toSyncProviderId(v.syncProvider);
+          if (this._initialProviderId === SyncProviderId.LocalFile) {
+            this._localFileSafBaseline =
+              (v.localFileSync as LocalFileSyncPrivateCfg | undefined)?.safFolderUri ??
+              '';
+          }
+          this.savedProvider.set(this._initialProviderId);
+          if (this._initialProviderId) void this._loadSavedProviders();
+          this.form
+            .get('syncProvider')
+            ?.setValue(this._initialProviderId, { emitEvent: false });
+          this._selectedProviderWasConfigured = v.isEnabled;
+          if (v.isEnabled) {
+            this.isWasEnabled.set(true);
+            if (this._initialProviderId) this.setupProvider.set(this._initialProviderId);
+          }
+          // First-time setup ⇔ sync was previously disabled. Encryption-warning
+          // hideExpressions in sync-form.const.ts read this flag to suppress
+          // the post-save SuperSync encryption prompt during initial setup.
+          this.updateTmpCfg({
+            ...v,
+            isEnabled: true,
+            _isInitialSetup: !v.isEnabled,
+            _activeProviderId: this._initialProviderId,
+          });
+          this.isInitialSettingsLoading.set(false);
+        },
+        error: () => {
+          this.isInitialSettingsLoading.set(false);
+          this.isInitialSettingsLoadFailed.set(true);
+        },
       });
   }
 
@@ -807,10 +828,12 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   }
 
   close(): void {
+    if (this.isSaving()) return;
     this._matDialogRef.close();
   }
 
   openUltraSync(): void {
+    if (this.isSaving()) return;
     // Account settings is itself a window on phones. Close that window too
     // so it cannot cover the destination after RouterLink navigates.
     this._matDialog.closeAll();
@@ -887,6 +910,21 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   }
 
   async save(): Promise<void> {
+    if (this.isInitialSettingsUnavailable() || this.isSaving()) return;
+    this.isSaving.set(true);
+    const previouslyDisableClose = this._matDialogRef.disableClose;
+    this._matDialogRef.disableClose = true;
+    try {
+      await this._saveSettings();
+    } catch {
+      this._snackService.open({ type: 'ERROR', msg: T.SYNC_SETUP.SAVE_FAILED });
+    } finally {
+      this._matDialogRef.disableClose = previouslyDisableClose;
+      this.isSaving.set(false);
+    }
+  }
+
+  private async _saveSettings(): Promise<void> {
     // Check if form is valid
     if (!this.form.valid) {
       // Mark all fields as touched to show validation errors

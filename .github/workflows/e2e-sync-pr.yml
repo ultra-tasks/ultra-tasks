@@ -257,13 +257,18 @@ jobs:
           path: .tmp/e2e-test-results/**/*.*
           retention-days: 30
 
-  # Job 3: WebDAV E2E tests (single job — the suite is small, no sharding).
+  # Job 3: WebDAV E2E tests. A single job timed out after starting 137/147
+  # tests on the PR runner (2026-11); keep the gate fail-closed across shards.
   e2e-webdav:
-    name: WebDAV E2E
+    name: WebDAV E2E ${{ matrix.shard }}/3
     needs: [detect, build]
     if: needs.detect.outputs.webdav == 'true'
     runs-on: ${{ vars.USE_BLACKSMITH == 'true' && github.event.pull_request.user.login == 'johannesjo' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
       UNSPLASH_CLIENT_ID: ${{ secrets.UNSPLASH_CLIENT_ID }}
@@ -314,7 +319,7 @@ jobs:
       - name: Run WebDAV E2E Tests
         env:
           E2E_REQUIRE_WEBDAV: 'true'
-        run: npm run e2e:all -- --grep "@webdav"
+        run: npm run e2e:all -- --grep "@webdav" --shard=${{ matrix.shard }}/3
 
       - name: Print Docker Logs on Failure
         if: ${{ failure() }}
@@ -330,7 +335,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-sync-pr-webdav-results-${{ github.run_id }}
+          name: e2e-sync-pr-webdav-results-${{ matrix.shard }}-${{ github.run_id }}
           path: .tmp/e2e-test-results/**/*.*
           retention-days: 30
 

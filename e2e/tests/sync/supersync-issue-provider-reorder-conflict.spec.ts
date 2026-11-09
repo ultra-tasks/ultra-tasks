@@ -707,7 +707,9 @@ for (const scenario of scenarios) {
         expect(pending(await rows(client.page))).toEqual([]);
         expect(replacements(await rows(client.page))).toEqual(replacementsBefore[index]);
         await client.page.reload();
-        await waitForAppReady(client.page);
+        // This scenario deliberately leaves clients on Integrations; the
+        // default readiness route only matches task views.
+        await waitForAppReady(client.page, { ensureRoute: false });
         expect(await snapshot(client.page)).toEqual(final);
         expect(pending(await rows(client.page))).toEqual([]);
         expect(replacements(await rows(client.page))).toEqual(replacementsBefore[index]);

@@ -554,8 +554,7 @@ test.describe('@supersync reorder crossing content (#10264)', () => {
       await c.page
         .locator('.disabled-item')
         .filter({ hasText: disabledId })
-        .locator('button')
-        .filter({ hasText: 'visibility' })
+        .getByRole('button', { name: 'Enabled', exact: true })
         .click();
       expect(
         (await snapshot(c.page, 'habits', [disabledId])).entities[disabledId].isEnabled,

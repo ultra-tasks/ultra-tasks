@@ -10,7 +10,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormlyModule } from '@ngx-formly/core';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { DialogSyncCfgComponent } from './dialog-sync-cfg.component';
 import { SyncConfigService } from '../sync-config.service';
 import { SyncWrapperService } from '../sync-wrapper.service';
@@ -142,6 +142,47 @@ describe('DialogSyncCfgComponent', () => {
   });
 
   describe('UltraSync setup', () => {
+    it('waits for initial sync settings before accepting a provider choice', () => {
+      const settings = new Subject<SyncConfig>();
+      (
+        mockSyncConfigService as unknown as { syncSettingsForm$: typeof settings }
+      ).syncSettingsForm$ = settings;
+      const pending = TestBed.createComponent(DialogSyncCfgComponent).componentInstance;
+
+      expect(pending.isInitialSettingsLoading()).toBeTrue();
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+
+      settings.next({ ...baseSyncConfig, syncProvider: SyncProviderId.SuperSync });
+      expect(pending.isInitialSettingsUnavailable()).toBeFalse();
+      expect(pending.savedProvider()).toBe(SyncProviderId.SuperSync);
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(SyncProviderId.WebDAV);
+    });
+
+    it('allows retrying an initial sync settings load that fails', async () => {
+      const settings = new Subject<SyncConfig>();
+      const service = mockSyncConfigService as unknown as {
+        syncSettingsForm$: typeof mockGlobalConfigService.sync$;
+      };
+      service.syncSettingsForm$ = settings;
+      const pending = TestBed.createComponent(DialogSyncCfgComponent).componentInstance;
+      settings.error(new Error('settings load failed'));
+
+      expect(pending.isInitialSettingsLoading()).toBeFalse();
+      expect(pending.isInitialSettingsLoadFailed()).toBeTrue();
+      await pending.save();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+
+      service.syncSettingsForm$ = of(baseSyncConfig);
+      pending.retryInitialSettings();
+      expect(pending.isInitialSettingsUnavailable()).toBeFalse();
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(SyncProviderId.WebDAV);
+    });
+
     it('retains dormant configured providers while excluding providers with no stored configuration', fakeAsync(() => {
       mockProviderManager.getAllProviders.and.resolveTo([
         {
@@ -597,6 +638,89 @@ describe('DialogSyncCfgComponent', () => {
     });
   });
 
+  describe('save() — in-flight guard', () => {
+    it('blocks another save, provider changes, and closing until the save settles', async () => {
+      let finishAuth!: (value: { wasConfigured: boolean }) => void;
+      const auth = new Promise<{ wasConfigured: boolean }>((resolve) => {
+        finishAuth = resolve;
+      });
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.returnValue(
+        auth,
+      );
+      mockProviderManager.getProviderById.and.resolveTo({
+        id: SyncProviderId.WebDAV,
+      } as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+      component.setupProvider.set(SyncProviderId.WebDAV);
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      const pending = component.save();
+      await Promise.resolve();
+      expect(component.isSaving()).toBeTrue();
+      expect(mockDialogRef.disableClose).toBeTrue();
+
+      await component.save();
+      component.selectSetupProvider(ULTRA_SYNC_SETUP);
+      component.close();
+      component.openUltraSync();
+      expect(component.setupProvider()).toBe(SyncProviderId.WebDAV);
+      expect(mockDialogRef.close).not.toHaveBeenCalled();
+      expect(mockMatDialog.closeAll).not.toHaveBeenCalled();
+      expect(
+        mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary,
+      ).toHaveBeenCalledTimes(1);
+
+      finishAuth({ wasConfigured: false });
+      await pending;
+      expect(mockSyncConfigService.updateSettingsFromForm).toHaveBeenCalledTimes(1);
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).not.toBeTrue();
+    });
+
+    it('unlocks the dialog and reports an error if a save step rejects', async () => {
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.rejectWith(
+        new Error('authentication failed'),
+      );
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).not.toBeTrue();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+      expect(mockSnackService.open).toHaveBeenCalledWith({
+        type: 'ERROR',
+        msg: T.SYNC_SETUP.SAVE_FAILED,
+      });
+      component.close();
+      expect(mockDialogRef.close).toHaveBeenCalled();
+    });
+
+    it('restores a pre-existing disableClose setting after a save step rejects', async () => {
+      mockDialogRef.disableClose = true;
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.rejectWith(
+        new Error('authentication failed'),
+      );
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).toBeTrue();
+    });
+  });
+
   describe('save() — auth cancelled (reproduces issue #7131)', () => {
     it('should NOT close dialog when Dropbox auth is cancelled and provider is not ready', async () => {
       const providerNeedingAuth = {
@@ -618,6 +742,8 @@ describe('DialogSyncCfgComponent', () => {
       await component.save();
 
       expect(mockDialogRef.close).not.toHaveBeenCalled();
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).not.toBeTrue();
     });
 
     it('should NOT save config when Dropbox auth is cancelled and provider is not ready', async () => {

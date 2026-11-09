@@ -42,7 +42,9 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   const originalId = await original.getAttribute('id');
   await taskPage.openTaskDetail(original);
   const panel = page.locator('task-detail-panel');
-  await panel.locator('task-detail-item').filter({ hasText: 'Links & Files' }).click();
+  await panel
+    .locator('task-detail-item.input-item:has(mat-icon:text-is("attach_file"))')
+    .click();
   await page
     .locator('dialog-edit-task-attachment input[name="title"]')
     .fill('Synthetic original link');

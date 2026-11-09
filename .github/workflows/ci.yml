@@ -63,7 +63,7 @@ jobs:
           echo "→ code=${code}"
           echo "code=${code}" >> "$GITHUB_OUTPUT"
 
-  # Verify package-lock.json only uses the official npm registry.
+  # Registry dependencies must use npm; explicit tarballs must be declared and pinned.
   # Prevents contributors using mirror registries from rewriting all resolved URLs.
   check-lockfile-registry:
     name: Check package-lock.json registry
@@ -74,20 +74,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
-      - name: Reject non-standard registry URLs
-        run: |
-          # The plugin-dev workspace has its own lockfile, installed by release builds.
-          for LOCKFILE in package-lock.json packages/plugin-dev/package-lock.json; do
-            BAD_COUNT=$(grep '"resolved": "https\?://' "$LOCKFILE" | grep -cv 'registry.npmjs.org' || true)
-            if [ "$BAD_COUNT" -gt 0 ]; then
-              echo "::error::$LOCKFILE contains $BAD_COUNT resolved URLs pointing to a non-standard registry."
-              echo "Examples:"
-              grep '"resolved": "https\?://' "$LOCKFILE" | grep -v 'registry.npmjs.org' | head -5
-              echo ""
-              echo "Rewrite those 'resolved' URLs to https://registry.npmjs.org/ (or run 'npm install --registry=https://registry.npmjs.org/' next to it). Deleting the lockfile would re-resolve every dependency."
-              exit 1
-            fi
-          done
+      - name: Check registry and explicitly declared tarball URLs
+        run: node tools/check-lockfile-registry.js
       # npm reads no parent .npmrc inside packages/plugin-dev (its own npm
       # project), so it carries a copy; keep the settings identical.
       - name: Check plugin-dev .npmrc mirrors the root one

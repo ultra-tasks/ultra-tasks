@@ -872,13 +872,13 @@ test.describe('@supersync SuperSync LWW Conflict Resolution', () => {
       await page.waitForTimeout(300);
 
       // Find and click "Move to project" / "Add to project" option
-      // The button has mat-icon "forward" and text containing "project"
+      // The menu uses the drive_file_move icon for its project submenu.
       const menuPanel = page.locator('.mat-mdc-menu-panel').first();
       await menuPanel.waitFor({ state: 'visible', timeout: 5000 });
 
       const moveToProjectBtn = menuPanel
         .locator('button[mat-menu-item]')
-        .filter({ has: page.locator('mat-icon:has-text("forward")') })
+        .filter({ has: page.locator('mat-icon:text-is("drive_file_move")') })
         .first();
       await moveToProjectBtn.waitFor({ state: 'visible', timeout: 5000 });
       await moveToProjectBtn.click();
