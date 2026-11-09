@@ -466,20 +466,6 @@ export class SuperSyncPage extends BasePage {
       await this.baseUrlInput.waitFor({ state: 'visible', timeout: 3000 });
     }
 
-    // The input becomes visible before the expansion animation has finished.
-    // Wait for that animation so the Save button cannot move under the click.
-    await advancedCollapsible
-      .locator('..')
-      .locator('.collapsible-panel')
-      .evaluate(async (panel) => {
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        );
-        await Promise.all(
-          panel.getAnimations({ subtree: true }).map((animation) => animation.finished),
-        );
-      });
-
     // Fill in base URL
     await this.baseUrlInput.fill(config.baseUrl);
 
@@ -512,6 +498,29 @@ export class SuperSyncPage extends BasePage {
 
     // Save configuration first (without encryption changes)
     // Encryption can only be enabled/disabled after the provider is active
+    // Formly may replace a panel while its animation is running, canceling
+    // the animation's finished promise. Wait for the current panel after all
+    // form edits so it cannot move the Save button under the click.
+    await this.page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    await this.page.waitForFunction(
+      () => {
+        const input = document.querySelector('dialog-sync-cfg .e2e-baseUrl input');
+        const panel = input?.closest('.collapsible-panel');
+        return (
+          !!panel &&
+          panel
+            .getAnimations({ subtree: true })
+            .every((animation) => animation.playState !== 'running' && !animation.pending)
+        );
+      },
+      undefined,
+      { timeout: 10000 },
+    );
     await expect(this.saveBtn).toBeEnabled({ timeout: 5000 });
     await this.saveBtn.click();
 
