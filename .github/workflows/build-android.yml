@@ -5,7 +5,15 @@ on:
     tags:
       - ultra-tasks-v*
   workflow_dispatch:
-    inputs: {}
+    inputs:
+      source_ref:
+        description: 'Optional release tag to rebuild'
+        type: string
+        required: false
+      version_code:
+        description: 'Optional Android version code for a replacement build'
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -30,6 +38,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          ref: ${{ inputs.source_ref || github.ref }}
           # Full commit/tag graph (blobless, so cheap) is needed to derive the
           # per-push dev versionCode from the last stable tag.
           fetch-depth: 0
@@ -105,7 +114,7 @@ jobs:
       - name: Build
         run: npm run dist:android:prod
         env:
-          ANDROID_VERSION_CODE: ${{ steps.devvc.outputs.code }}
+          ANDROID_VERSION_CODE: ${{ inputs.version_code || steps.devvc.outputs.code }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.DROID_KEYSTORE_PASSWORD }}
           RELEASE_KEYSTORE_ALIAS: ${{ secrets.DROID_KEYSTORE_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.DROID_KEY_PASSWORD }}

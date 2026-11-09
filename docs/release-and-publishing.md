@@ -1,5 +1,12 @@
 # Release and publishing runbook
 
+To rebuild a signed Android release for Play after a rejected or invalidated
+bundle, manually dispatch `build-android.yml` from `main` with `source_ref` set
+to the existing `ultra-tasks-v...` release tag and `version_code` set to an
+unused higher Android version code. The visible version comes from that tag.
+Download and validate the `sup-android-release` artifact before uploading its AAB
+to Play; a manual dispatch does not publish a release or upload to Play.
+
 > **Status:** Maintained
 >
 > **Last verified against workflows:** 2026-11-04
