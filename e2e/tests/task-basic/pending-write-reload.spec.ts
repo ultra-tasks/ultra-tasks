@@ -46,19 +46,21 @@ test('a reload warns while a task edit is waiting for a local write', async ({
 
     // The browser cannot await IndexedDB during beforeunload. Keep this page
     // open when it warns, then let the queued write finish before retrying.
-    const beforeUnload = page.waitForEvent('dialog', { timeout: 5000 });
-    const reload = page.reload({ timeout: 3000 }).catch(() => null);
+    const beforeUnload = page.waitForEvent('dialog', { timeout: 10000 });
+    const reloadRequest = page
+      .evaluate(() => {
+        window.setTimeout(() => window.location.reload(), 0);
+      })
+      .catch(() => undefined);
     const dialog = await beforeUnload;
     expect(dialog.type()).toBe('beforeunload');
     await dialog.dismiss();
+    await reloadRequest;
     await expect(page.locator('task').filter({ hasText: 'After reload' })).toBeVisible();
     await lockPage.evaluate(() =>
       (window as Window & { __releaseWriteLock?: () => void }).__releaseWriteLock?.(),
     );
     await flushPendingWrites(page);
-    // A dismissed beforeunload cancels navigation, so Playwright may wait
-    // until its short navigation timeout before resolving the reload call.
-    await reload;
     let unexpectedDialog = false;
     page.on('dialog', (unexpected) => {
       unexpectedDialog = true;
