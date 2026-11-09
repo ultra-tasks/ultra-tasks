@@ -10,6 +10,9 @@ export type VideoProfile = {
 };
 
 const getVideoProfile = (variant: string): VideoProfile => {
+  if (variant === 'demo') {
+    return { size: { width: 1280, height: 720 }, deviceScaleFactor: 1 };
+  }
   if (variant === 'ms-store' || variant === 'updates') {
     return {
       // Microsoft Store trailers must be exactly 1920x1080.

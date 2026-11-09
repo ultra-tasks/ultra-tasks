@@ -39,6 +39,7 @@ export default defineConfig({
     navigationTimeout: 45_000,
     actionTimeout: 20_000,
     launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
       args: [
         '--disable-dev-shm-usage',
         '--no-sandbox',

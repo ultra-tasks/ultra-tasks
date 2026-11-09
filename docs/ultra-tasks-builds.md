@@ -2,13 +2,15 @@
 
 ## Download and install
 
-[Get the latest desktop release](https://github.com/ultra-tasks/ultra-tasks/releases/latest). Version 0.2.0 is available for Windows, macOS, and Linux. The release page includes `SHA256SUMS.txt` for checking downloads.
+[Get the latest release](https://github.com/ultra-tasks/ultra-tasks/releases/latest). Desktop downloads and Android APKs are available. The release page includes `SHA256SUMS.txt` for checking downloads.
 
 - **Windows (x64 or ARM64):** run the Setup installer, or use the Portable executable. Builds are unsigned, so SmartScreen may ask for confirmation. Check that the download came from this repository before approving it.
 - **macOS:** choose `arm64` for Apple Silicon, `x64` for Intel, or the Universal DMG for either. Open the DMG and move Ultra Tasks into Applications; ZIP alternatives are also provided. Builds are ad-hoc signed, without an Apple Developer ID, and are not Apple-notarized. If Gatekeeper blocks the first launch, open **System Settings → Privacy & Security → Open Anyway** and confirm the app you downloaded.
 - **Linux (x64):** install the DEB or RPM with your distribution's package manager, or make the AppImage executable and open it. The AppImage may require FUSE support from your distribution.
 
-These are desktop downloads from GitHub. Ultra Tasks mobile and app-store releases are not available yet. Upstream Super Productivity store links install Super Productivity.
+- **Android:** download a signed APK from the [download page](https://ultratasks.app/download/#android) or GitHub release. Android may ask you to allow installations from your browser or file manager. A variant without Google Play services is also available.
+
+These downloads are not in app stores yet; iOS is not available. Upstream Super Productivity store links install Super Productivity.
 
 Updates are installed manually. The optional update check notifies you about a new release; it does not install it. Keep a backup before upgrading or trying development builds.
 
@@ -22,7 +24,7 @@ Ultra Tasks has its own application identity (`app.ultratasks`), data folder, an
 
 ## Optional sync and compatibility
 
-Core tasks and time tracking work offline. Sync is optional. The fork inherits provider implementations including Nextcloud/WebDAV, Dropbox, SuperSync, desktop local-file sync, and OneDrive where supported. See the [sync comparison](wiki/3.08-Sync-Integration-Comparison.md) for provider and platform differences. The hosted Ultra Tasks sync service is coming soon.
+Core tasks and time tracking work offline. Sync is optional. OneDrive and WebDAV are available for personal sync. Existing SuperSync, Dropbox, Nextcloud, and desktop local-file configurations remain usable as deprecated connections. See the [sync comparison](wiki/3.08-Sync-Integration-Comparison.md) for provider and platform differences. UltraSync is in beta. Self-hosting is available; new registrations on the official service are temporarily closed. See the [latest release notes](https://github.com/ultra-tasks/ultra-tasks/releases/latest) for the current beta scope.
 
 Upstream-compatible data and sync remain a project requirement: Ultra Tasks must follow upstream migrations and must not introduce a separate task-storage format, sync protocol, encryption scheme, or conflict-resolution model. New display preferences should stay device-local where possible.
 

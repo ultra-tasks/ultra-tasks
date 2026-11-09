@@ -14,6 +14,22 @@ Each successful capture writes a `.trim.json` beside its exact `.mkv` in
 with matching metadata, so a failed capture cannot reuse another recording's trim.
 Older `.webm` captures must be captured again.
 
+## Ultra Tasks product demo
+
+The `demo` variant records a 16:9 tour of task capture and editing, Upcoming,
+the project board, and Focus mode. It uses an isolated, disposable sample
+workspace and real app controls. The checked-in MP4 is linked from the README.
+
+```sh
+REEL_VARIANT=demo SP_SCREENSHOT_BG_DISABLE=1 npm run video:capture -- --grep 'capture, edit, plan and focus'
+REEL_VARIANT=demo VIDEO_QUICK=1 npm run video:build
+cp dist/video/reel-demo.mp4 docs/brand/ultra-tasks-demo.mp4
+```
+
+Review `.tmp/video/review/reel-demo-contact.png` and the MP4 before updating
+the checked-in demo. If needed, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` selects an
+installed Chromium binary, and `E2E_BASE_URL` selects an already running app.
+
 Recordings keep device pixels: `profile.ts` sets each variant's CSS viewport and
 scale, and the capture config launches Chromium at that same scale.
 

@@ -168,7 +168,9 @@ export const test = base.extend<VideoFixtures>({
     if (isMobile) {
       await installTapRipple(page);
     } else {
-      await installCursor(page, { style: VARIANT === 'updates' ? 'arrow' : 'ring' });
+      await installCursor(page, {
+        style: VARIANT === 'updates' || VARIANT === 'demo' ? 'arrow' : 'ring',
+      });
     }
 
     // Suppress UI noise that fights with the choreographed reel:
@@ -200,9 +202,11 @@ export const test = base.extend<VideoFixtures>({
            pre-roll seed import. focus-mode-overlay is its own element, not a
            mat-dialog, so it's unaffected. The backdrop goes too: it would
            otherwise dim the whole frame, e.g. behind a reminder dialog. */
-        body:not([data-sp-video-variant="updates"]) .cdk-overlay-pane:has(.mat-mdc-dialog-container):not(:has(dialog-import-encryption-warning)),
-        body:not([data-sp-video-variant="updates"]) .cdk-overlay-pane:has(mat-dialog-container):not(:has(dialog-import-encryption-warning)),
-        body:not([data-sp-video-variant="updates"])
+        body:not([data-sp-video-variant="updates"]):not([data-sp-video-variant="demo"])
+          .cdk-overlay-pane:has(.mat-mdc-dialog-container):not(:has(dialog-import-encryption-warning)),
+        body:not([data-sp-video-variant="updates"]):not([data-sp-video-variant="demo"])
+          .cdk-overlay-pane:has(mat-dialog-container):not(:has(dialog-import-encryption-warning)),
+        body:not([data-sp-video-variant="updates"]):not([data-sp-video-variant="demo"])
           .cdk-overlay-backdrop:has(+ .cdk-overlay-pane mat-dialog-container):not(:has(+ .cdk-overlay-pane dialog-import-encryption-warning)) {
           display: none !important;
         }

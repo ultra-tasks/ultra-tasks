@@ -9,9 +9,9 @@
 A calm, free and open-source to-do list, planner and time tracker.<br />
 Make room for your work, your plans, and everything in between.
 
-**[Download Ultra Tasks](#download)** · [Explore the website](https://ultratasks.app) · [Give feedback](https://github.com/ultra-tasks/ultra-tasks/issues/new/choose)
+**[Download Ultra Tasks](#download)** · [▶ Watch the demo](docs/brand/ultra-tasks-demo.mp4) · [Explore the website](https://ultratasks.app) · [Give feedback](https://github.com/ultra-tasks/ultra-tasks/issues/new/choose)
 
-Windows · macOS · Linux<br />
+Windows · macOS · Linux · Android<br />
 **Works offline. No account needed. No ads or tracking in the app.**
 
 </div>
@@ -51,14 +51,14 @@ Keep projects as lists, turn their sections into board columns, or switch to Cal
 
 ![The Work project in Board layout, with tasks grouped into This week, Up next, and Ideas.](docs/brand/screenshots/project-board.png)
 
-Screenshots show the current development build with sample tasks. Released builds may look slightly different.
+Screenshots use sample tasks. Appearance may vary by release.
 
 ## Your tasks. Your time. Your business.
 
 - **Local first.** Core tasks, planning, and time tracking work on your device, offline, without an account.
 - **Quiet by default.** No ads, analytics, or telemetry in the app. Reminders are there when you choose to enable them.
 - **Your data stays yours.** Export a backup, protect it with a password, or browse local recovery points.
-- **Sync is optional.** Connect a provider when you need it. Provider support and encryption options are explained in the [sync guide](docs/wiki/3.08-Sync-Integration-Comparison.md). The hosted Ultra Tasks sync service is coming soon.
+- **Sync is optional.** Connect a provider when you need it. Provider support and encryption options are explained in the [sync guide](docs/wiki/3.08-Sync-Integration-Comparison.md). UltraSync is in beta: self-hosting is available, and new sign-ups on the official service are temporarily closed.
 - **Open source.** Read the code, run it yourself, and help improve it.
 
 ## And the details you would hope for
@@ -70,17 +70,16 @@ Screenshots show the current development build with sample tasks. Released build
 
 ## Download
 
-**[Get the latest release](https://github.com/ultra-tasks/ultra-tasks/releases/latest)** · [What's new in 0.2.0](https://github.com/ultra-tasks/ultra-tasks/releases/tag/ultra-tasks-v0.2.0)
+**[Choose your download](https://ultratasks.app/download/)** · [Latest release and checksums](https://github.com/ultra-tasks/ultra-tasks/releases/latest)
 
-Ultra Tasks is free and in early development. The current desktop release is **0.2.0**.
+Ultra Tasks is free and in beta. Choose your platform:
 
-| Your computer                      | Download 0.2.0                                                                                                                                                                                                                                                                                                                                                                               |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Windows** · x64 and ARM64        | [Installer](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-Setup.exe) · [Portable](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-Portable.exe)                                                                                                                                        |
-| **macOS** · Apple Silicon or Intel | [Apple Silicon DMG](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-arm64.dmg) · [Intel DMG](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-x64.dmg) · [Universal DMG](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-universal.dmg) |
-| **Linux** · x64                    | [AppImage](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-x86_64.AppImage) · [DEB](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-amd64.deb) · [RPM](https://github.com/ultra-tasks/ultra-tasks/releases/download/ultra-tasks-v0.2.0/Ultra-Tasks-0.2.0-x86_64.rpm)                     |
+- **[Windows](https://ultratasks.app/download/#windows):** installer or portable app for x64 and ARM64.
+- **[macOS](https://ultratasks.app/download/#macos):** Apple Silicon, Intel, and universal downloads.
+- **[Linux](https://ultratasks.app/download/#linux):** x64 AppImage, DEB, and RPM.
+- **[Android](https://ultratasks.app/download/#android):** signed direct-download APK, with a variant without Google Play services.
 
-ZIP alternatives and checksums are on the release page. Linux AppImages may need FUSE support. Mobile and app-store releases are not available yet. Updates are installed manually; the optional update check tells you when a new release is available.
+The platform links lead to the maintained download page, so they do not point to an older release when a new version ships. The Android app is not in an app store yet; iOS and the hosted web app are coming soon. Linux AppImages may need FUSE. Updates are installed manually; the optional update check tells you when a new release is available.
 
 <details>
 <summary>Installing an early release</summary>
