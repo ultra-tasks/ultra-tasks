@@ -26,6 +26,7 @@ import { NativeSyncService } from '../../../features/native-sync/native-sync.ser
 import { ULTRA_SYNC_SETUP } from '../sync-setup-options';
 import { BackupService } from '../../../op-log/backup/backup.service';
 import { OperationWriteFlushService } from '../../../op-log/sync/operation-write-flush.service';
+import type { LocalFileSyncPrivateCfg } from '@sp/sync-providers/local-file';
 
 describe('DialogSyncCfgComponent', () => {
   let component: DialogSyncCfgComponent;
@@ -187,6 +188,260 @@ describe('DialogSyncCfgComponent', () => {
       expect(component.form.get('syncProvider')?.value).toBe(SyncProviderId.WebDAV);
       expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+    }));
+
+    it('waits for the selected provider settings before showing its form', fakeAsync(() => {
+      let finishLoad!: (value: null) => void;
+      const load = new Promise<null>((resolve) => (finishLoad = resolve));
+      mockProviderManager.getProviderById.and.resolveTo({
+        privateCfg: { load: () => load },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+      const previousModel = component._tmpUpdatedCfg;
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      expect(component.isProviderConfigLoading()).toBeTrue();
+
+      finishLoad(null);
+      flushMicrotasks();
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component._tmpUpdatedCfg).not.toBe(previousModel);
+      expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
+    }));
+
+    it('ignores a pending provider load after switching to UltraSync', fakeAsync(() => {
+      let finishLoad!: (value: { encryptKey: string }) => void;
+      const load = new Promise<{ encryptKey: string }>(
+        (resolve) => (finishLoad = resolve),
+      );
+      mockProviderManager.getProviderById.and.resolveTo({
+        privateCfg: { load: () => load },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(ULTRA_SYNC_SETUP);
+      finishLoad({ encryptKey: 'stale-provider-key' });
+      flushMicrotasks();
+
+      expect(component.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component.isProviderConfigLoadFailed()).toBeFalse();
+      expect(component._tmpUpdatedCfg.encryptKey).not.toBe('stale-provider-key');
+    }));
+
+    it('allows retrying a failed provider settings load', fakeAsync(() => {
+      const load = jasmine.createSpy('load').and.rejectWith(new Error('load failed'));
+      mockProviderManager.getProviderById.and.resolveTo({
+        privateCfg: { load },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component.isProviderConfigLoadFailed()).toBeTrue();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+
+      load.and.resolveTo(null);
+      component.retryProviderConfig();
+      flushMicrotasks();
+      expect(component.isProviderConfigLoadFailed()).toBeFalse();
+      expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
+    }));
+
+    it('ignores a failure from an older provider load', fakeAsync(() => {
+      let rejectOldLoad!: (reason: Error) => void;
+      const oldLoad = new Promise<null>((_resolve, reject) => (rejectOldLoad = reject));
+      const oldProvider = {
+        privateCfg: { load: () => oldLoad },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      const newProvider = {
+        privateCfg: { load: async () => null },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      mockProviderManager.getProviderById.and.callFake(async (providerId) =>
+        providerId === SyncProviderId.WebDAV ? oldProvider : newProvider,
+      );
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(SyncProviderId.OneDrive);
+      flushMicrotasks();
+      rejectOldLoad(new Error('stale load failed'));
+      flushMicrotasks();
+
+      expect(component.setupProvider()).toBe(SyncProviderId.OneDrive);
+      expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.OneDrive);
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component.isProviderConfigLoadFailed()).toBeFalse();
+    }));
+
+    it('preserves unsaved common settings when a provider is selected', fakeAsync(() => {
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      component.form.addControl('syncInterval', new FormControl(60000));
+      component.form.addControl('isManualSyncOnly', new FormControl(true));
+      component.form.addControl('isCompressionEnabled', new FormControl(false));
+      component.form.addControl('isUseSplitSyncFiles', new FormControl(true));
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.syncInterval).toBe(60000);
+      expect(component._tmpUpdatedCfg.isManualSyncOnly).toBeTrue();
+      expect(component._tmpUpdatedCfg.isCompressionEnabled).toBeFalse();
+      expect(component._tmpUpdatedCfg.isUseSplitSyncFiles).toBeTrue();
+    }));
+
+    it('keeps unsaved provider drafts and encryption keys separate', fakeAsync(() => {
+      let superEncryptionKey = 'super-key';
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        const privateCfg =
+          providerId === SyncProviderId.SuperSync
+            ? { accessToken: 'saved-token', encryptKey: superEncryptionKey }
+            : { userName: 'saved-user', encryptKey: 'webdav-key' };
+        return {
+          privateCfg: { load: async () => privateCfg },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      const tokenControl = new FormControl('draft-token');
+      tokenControl.markAsDirty();
+      component.form.addControl(
+        'superSync',
+        new FormGroup({ accessToken: tokenControl }),
+      );
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      expect(component._tmpUpdatedCfg.encryptKey).toBe('webdav-key');
+
+      superEncryptionKey = 'rotated-super-key';
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      expect(component._tmpUpdatedCfg.superSync?.accessToken).toBe('draft-token');
+      expect(component._tmpUpdatedCfg.encryptKey).toBe('rotated-super-key');
+    }));
+
+    it('uses fresh credentials for untouched provider fields', fakeAsync(() => {
+      let token = 'saved-token';
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.SuperSync ? { accessToken: token } : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      component.form.addControl(
+        'superSync',
+        new FormGroup({ accessToken: new FormControl(token) }),
+      );
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      token = 'rotated-token';
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.superSync?.accessToken).toBe('rotated-token');
+    }));
+
+    it('uses newly saved credentials instead of a first-setup default', fakeAsync(() => {
+      let savedConfig: { accessToken: string; encryptKey: string } | null = null;
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.SuperSync ? savedConfig : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      component.form.addControl(
+        'superSync',
+        new FormGroup({ accessToken: new FormControl('initial-value') }),
+      );
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      savedConfig = { accessToken: 'fresh-token', encryptKey: 'fresh-key' };
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.superSync?.accessToken).toBe('fresh-token');
+      expect(component._tmpUpdatedCfg.encryptKey).toBe('fresh-key');
+    }));
+
+    it('retains an Android folder picked before switching providers', fakeAsync(() => {
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.LocalFile
+                ? { safFolderUri: 'content://saved-folder' }
+                : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+      component.selectSetupProvider(SyncProviderId.LocalFile);
+      flushMicrotasks();
+      const folder = new FormControl('content://saved-folder');
+      component.form.addControl('localFileSync', new FormGroup({ safFolderUri: folder }));
+      // Formly's Android picker sets the control value programmatically and
+      // marks the containing form dirty, not the individual control.
+      folder.setValue('content://new-folder');
+      component.form.markAsDirty();
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(SyncProviderId.LocalFile);
+      flushMicrotasks();
+
+      expect(
+        (component._tmpUpdatedCfg.localFileSync as LocalFileSyncPrivateCfg | undefined)
+          ?.safFolderUri,
+      ).toBe('content://new-folder');
+    }));
+
+    it('retains a detected Nextcloud user ID when switching away and back', fakeAsync(() => {
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.Nextcloud
+                ? { userName: 'alice@example.com', loginName: '' }
+                : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+      component.selectSetupProvider(SyncProviderId.Nextcloud);
+      flushMicrotasks();
+      component.form.addControl(
+        'nextcloud',
+        new FormGroup({
+          userName: new FormControl('alice@example.com'),
+          loginName: new FormControl(''),
+        }),
+      );
+      (
+        component as unknown as {
+          _applyDetectedUserIdResult: (result: {
+            success: boolean;
+            userId: string;
+          }) => void;
+        }
+      )._applyDetectedUserIdResult({ success: true, userId: 'alice' });
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(SyncProviderId.Nextcloud);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.nextcloud?.userName).toBe('alice');
+      expect(component._tmpUpdatedCfg.nextcloud?.loginName).toBe('alice@example.com');
     }));
 
     it('keeps a saved enabled deprecated connection selected', () => {

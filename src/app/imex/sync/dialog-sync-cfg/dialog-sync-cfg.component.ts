@@ -41,6 +41,7 @@ import {
 } from '../sync-setup-options';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
 import { SyncConfig } from '../../../features/config/global-config.model';
+import { DEFAULT_GLOBAL_CONFIG } from '../../../features/config/default-global-config.const';
 import {
   OAUTH_SYNC_PROVIDERS,
   SyncProviderId,
@@ -80,6 +81,14 @@ import { OperationWriteFlushService } from '../../../op-log/sync/operation-write
 // HTTP status; the package-side `WebDavHttpStatus` enum is not exported to
 // the app, so the discriminator value is named locally instead of inlined.
 const HTTP_NOT_FOUND = 404;
+
+const PROVIDER_FORM_KEYS: Partial<Record<SyncProviderId, keyof SyncConfig>> = {
+  [SyncProviderId.SuperSync]: 'superSync',
+  [SyncProviderId.WebDAV]: 'webDav',
+  [SyncProviderId.Nextcloud]: 'nextcloud',
+  [SyncProviderId.LocalFile]: 'localFileSync',
+  [SyncProviderId.OneDrive]: 'oneDrive',
+};
 
 type SyncFormModel = SyncConfig & {
   _isInitialSetup?: boolean;
@@ -124,6 +133,8 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   readonly native = inject(NativeSyncService);
   readonly ultraSync = ULTRA_SYNC_SETUP;
   readonly setupProvider = signal<SyncSetupProvider>(ULTRA_SYNC_SETUP);
+  readonly isProviderConfigLoading = signal(false);
+  readonly isProviderConfigLoadFailed = signal(false);
   readonly savedProvider = signal<SyncProviderId | null>(null);
   private readonly otherSavedProviders = signal<SyncProviderId[]>([]);
   readonly setupOptions = computed(() =>
@@ -148,14 +159,81 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   form: FormGroup = new FormGroup({});
 
   selectSetupProvider(provider: SyncSetupProvider): void {
-    this.setupProvider.set(provider);
-    if (provider !== ULTRA_SYNC_SETUP) {
-      if (!this.form.get('syncProvider')) {
-        this.form.addControl('syncProvider', new FormControl(provider));
-      }
-      this.form.get('syncProvider')?.setValue(provider, { emitEvent: false });
-      this._providerConfigLoad = this._loadProviderConfig(provider);
+    const previousProvider = this.setupProvider();
+    if (
+      previousProvider !== provider &&
+      previousProvider !== ULTRA_SYNC_SETUP &&
+      !this.isProviderConfigLoading() &&
+      !this.isProviderConfigLoadFailed() &&
+      this._tmpUpdatedCfg.syncProvider === previousProvider
+    ) {
+      const formValue = this.form.value as Partial<SyncFormModel>;
+      this._tmpUpdatedCfg = {
+        ...this._tmpUpdatedCfg,
+        isEnabled: formValue.isEnabled ?? this._tmpUpdatedCfg.isEnabled,
+        syncInterval: formValue.syncInterval ?? this._tmpUpdatedCfg.syncInterval,
+        isManualSyncOnly:
+          formValue.isManualSyncOnly ?? this._tmpUpdatedCfg.isManualSyncOnly,
+        isCompressionEnabled:
+          formValue.isCompressionEnabled ?? this._tmpUpdatedCfg.isCompressionEnabled,
+        isUseSplitSyncFiles:
+          formValue.isUseSplitSyncFiles ?? this._tmpUpdatedCfg.isUseSplitSyncFiles,
+      };
+
+      this._rememberProviderDraft(previousProvider, true);
     }
+    this.setupProvider.set(provider);
+    if (provider === ULTRA_SYNC_SETUP) {
+      this._providerConfigLoadId++;
+      this.isProviderConfigLoading.set(false);
+      this.isProviderConfigLoadFailed.set(false);
+      return;
+    }
+    if (!this.form.get('syncProvider')) {
+      this.form.addControl('syncProvider', new FormControl(provider));
+    }
+    this.form.get('syncProvider')?.setValue(provider, { emitEvent: false });
+    this._providerConfigLoad = this._loadProviderConfig(provider);
+  }
+
+  retryProviderConfig(): void {
+    const provider = this.setupProvider();
+    if (provider !== ULTRA_SYNC_SETUP)
+      this._providerConfigLoad = this._loadProviderConfig(provider);
+  }
+
+  private _rememberProviderDraft(
+    providerId: SyncProviderId,
+    saveInitialValues = false,
+  ): void {
+    const providerKey = PROVIDER_FORM_KEYS[providerId];
+    const providerForm = providerKey && this.form.get(providerKey);
+    if (!(providerForm instanceof FormGroup)) return;
+
+    // Retain only deliberately edited provider fields. Untouched credentials
+    // and encryption metadata must come from the latest private config.
+    const draft = { ...this._providerDrafts.get(providerId) };
+    const initialValues: Record<string, unknown> = {};
+    const needsInitialValues =
+      saveInitialValues &&
+      !this._selectedProviderWasConfigured &&
+      !this._providerInitialValues.has(providerId);
+    let hasChanges = false;
+    for (const [key, control] of Object.entries(providerForm.controls)) {
+      if (control instanceof FormControl && control.enabled) {
+        if (needsInitialValues) initialValues[key] = control.value;
+        const isChangedAndroidFolder =
+          providerId === SyncProviderId.LocalFile &&
+          key === 'safFolderUri' &&
+          (control.value ?? '') !== this._localFileSafBaseline;
+        if (control.dirty || isChangedAndroidFolder) {
+          draft[key] = control.value;
+          hasChanges = true;
+        }
+      }
+    }
+    if (needsInitialValues) this._providerInitialValues.set(providerId, initialValues);
+    if (hasChanges || needsInitialValues) this._providerDrafts.set(providerId, draft);
   }
 
   /**
@@ -386,8 +464,12 @@ export class DialogSyncCfgComponent implements AfterViewInit {
         priorUserName !== result.userId
       ) {
         loginNameCtrl?.setValue(priorUserName);
+        loginNameCtrl?.markAsDirty();
       }
-      userNameCtrl?.setValue(result.userId);
+      if (userNameCtrl && userNameCtrl.value !== result.userId) {
+        userNameCtrl.setValue(result.userId);
+        userNameCtrl.markAsDirty();
+      }
       this._snackService.open({
         type: 'SUCCESS',
         msg: T.F.SYNC.FORM.NEXTCLOUD.S_DETECT_USER_ID_SUCCESS,
@@ -490,6 +572,12 @@ export class DialogSyncCfgComponent implements AfterViewInit {
   private _providerConfigLoad: Promise<void> = Promise.resolve();
   private _providerConfigLoadId = 0;
   private _selectedProviderWasConfigured = false;
+  private _localFileSafBaseline = '';
+  private readonly _providerDrafts = new Map<SyncProviderId, Record<string, unknown>>();
+  private readonly _providerInitialValues = new Map<
+    SyncProviderId,
+    Record<string, unknown>
+  >();
 
   constructor() {
     // A pending LocalFile folder pick must never outlive this settings
@@ -506,6 +594,10 @@ export class DialogSyncCfgComponent implements AfterViewInit {
       .pipe(first(), takeUntilDestroyed(this._destroyRef))
       .subscribe((v) => {
         this._initialProviderId = toSyncProviderId(v.syncProvider);
+        if (this._initialProviderId === SyncProviderId.LocalFile) {
+          this._localFileSafBaseline =
+            (v.localFileSync as LocalFileSyncPrivateCfg | undefined)?.safFolderUri ?? '';
+        }
         this.savedProvider.set(this._initialProviderId);
         if (this._initialProviderId) void this._loadSavedProviders();
         this.form
@@ -586,6 +678,8 @@ export class DialogSyncCfgComponent implements AfterViewInit {
 
   private async _loadProviderConfig(providerId: SyncProviderId): Promise<void> {
     const loadId = ++this._providerConfigLoadId;
+    this.isProviderConfigLoading.set(true);
+    this.isProviderConfigLoadFailed.set(false);
     this._selectedProviderWasConfigured = false;
 
     // Clear provider-owned encryption synchronously. Save waits for this load,
@@ -597,67 +691,111 @@ export class DialogSyncCfgComponent implements AfterViewInit {
       isEncryptionEnabled: false,
     });
 
-    const provider = await this._providerManager.getProviderById(providerId);
-    const privateCfg = provider ? await provider.privateCfg.load() : null;
-    const globalCfg = await firstValueFrom(this._globalConfigService.sync$);
+    try {
+      const provider = await this._providerManager.getProviderById(providerId);
+      const privateCfg = provider ? await provider.privateCfg.load() : null;
+      const globalCfg = await firstValueFrom(this._globalConfigService.sync$);
 
-    // A later provider selection owns the form now. Never let an older async
-    // load restore stale credentials or encryption state.
-    if (loadId !== this._providerConfigLoadId) {
-      return;
+      // A later provider selection owns the form now. Never let an older async
+      // load restore stale credentials or encryption state.
+      if (loadId !== this._providerConfigLoadId) {
+        return;
+      }
+
+      this._selectedProviderWasConfigured = privateCfg !== null;
+      const draft = this._providerDrafts.get(providerId);
+      const initialValues = privateCfg
+        ? undefined
+        : this._providerInitialValues.get(providerId);
+      if (providerId === SyncProviderId.LocalFile) {
+        const safFolder =
+          draft?.safFolderUri ??
+          (privateCfg as LocalFileSyncPrivateCfg | null)?.safFolderUri;
+        this._localFileSafBaseline = typeof safFolder === 'string' ? safFolder : '';
+      }
+      const encryptionCfg = privateCfg as {
+        encryptKey?: string;
+        isEncryptionEnabled?: boolean;
+      } | null;
+      const encryptKey = encryptionCfg?.encryptKey ?? '';
+      let providerSpecificUpdate: Partial<SyncConfig> = {
+        encryptKey,
+        isEncryptionEnabled:
+          providerId === SyncProviderId.SuperSync
+            ? (encryptionCfg?.isEncryptionEnabled ?? false)
+            : (encryptionCfg?.isEncryptionEnabled ?? !!encryptKey),
+      };
+
+      if (providerId === SyncProviderId.SuperSync && (draft || privateCfg)) {
+        providerSpecificUpdate = {
+          ...providerSpecificUpdate,
+          superSync: {
+            ...DEFAULT_GLOBAL_CONFIG.sync.superSync,
+            ...initialValues,
+            ...(privateCfg as SuperSyncPrivateCfg),
+            ...draft,
+          },
+        };
+      } else if (providerId === SyncProviderId.WebDAV && (draft || privateCfg)) {
+        providerSpecificUpdate = {
+          ...providerSpecificUpdate,
+          webDav: {
+            ...DEFAULT_GLOBAL_CONFIG.sync.webDav,
+            ...initialValues,
+            ...(privateCfg as WebdavPrivateCfg),
+            ...draft,
+          },
+        };
+      } else if (providerId === SyncProviderId.LocalFile && (draft || privateCfg)) {
+        providerSpecificUpdate = {
+          ...providerSpecificUpdate,
+          localFileSync: {
+            ...DEFAULT_GLOBAL_CONFIG.sync.localFileSync,
+            ...initialValues,
+            ...(privateCfg as LocalFileSyncPrivateCfg),
+            ...draft,
+          },
+        };
+      } else if (providerId === SyncProviderId.Nextcloud && (draft || privateCfg)) {
+        providerSpecificUpdate = {
+          ...providerSpecificUpdate,
+          nextcloud: {
+            ...DEFAULT_GLOBAL_CONFIG.sync.nextcloud,
+            ...initialValues,
+            ...(privateCfg as NextcloudPrivateCfg),
+            ...draft,
+          },
+        };
+      } else if (providerId === SyncProviderId.OneDrive && (draft || privateCfg)) {
+        providerSpecificUpdate = {
+          ...providerSpecificUpdate,
+          oneDrive: {
+            ...DEFAULT_GLOBAL_CONFIG.sync.oneDrive,
+            ...initialValues,
+            ...(privateCfg as OneDrivePrivateCfg),
+            ...draft,
+          },
+        };
+      }
+
+      this._tmpUpdatedCfg = {
+        ...this._tmpUpdatedCfg,
+        ...providerSpecificUpdate,
+        syncProvider: providerId,
+        // Preserve global settings (?? not || so explicit `false` is honoured)
+        isEnabled: this._tmpUpdatedCfg.isEnabled,
+        syncInterval: this._tmpUpdatedCfg.syncInterval ?? globalCfg.syncInterval,
+        isManualSyncOnly:
+          this._tmpUpdatedCfg.isManualSyncOnly ?? globalCfg.isManualSyncOnly,
+        isCompressionEnabled:
+          this._tmpUpdatedCfg.isCompressionEnabled ?? globalCfg.isCompressionEnabled,
+      };
+    } catch {
+      if (loadId === this._providerConfigLoadId)
+        this.isProviderConfigLoadFailed.set(true);
+    } finally {
+      if (loadId === this._providerConfigLoadId) this.isProviderConfigLoading.set(false);
     }
-
-    this._selectedProviderWasConfigured = privateCfg !== null;
-    const encryptionCfg = privateCfg as {
-      encryptKey?: string;
-      isEncryptionEnabled?: boolean;
-    } | null;
-    const encryptKey = encryptionCfg?.encryptKey ?? '';
-    let providerSpecificUpdate: Partial<SyncConfig> = {
-      encryptKey,
-      isEncryptionEnabled:
-        providerId === SyncProviderId.SuperSync
-          ? (encryptionCfg?.isEncryptionEnabled ?? false)
-          : (encryptionCfg?.isEncryptionEnabled ?? !!encryptKey),
-    };
-
-    if (providerId === SyncProviderId.SuperSync && privateCfg) {
-      providerSpecificUpdate = {
-        ...providerSpecificUpdate,
-        superSync: privateCfg as SuperSyncPrivateCfg,
-      };
-    } else if (providerId === SyncProviderId.WebDAV && privateCfg) {
-      providerSpecificUpdate = {
-        ...providerSpecificUpdate,
-        webDav: privateCfg as WebdavPrivateCfg,
-      };
-    } else if (providerId === SyncProviderId.LocalFile && privateCfg) {
-      providerSpecificUpdate = {
-        ...providerSpecificUpdate,
-        localFileSync: privateCfg as LocalFileSyncPrivateCfg,
-      };
-    } else if (providerId === SyncProviderId.Nextcloud && privateCfg) {
-      providerSpecificUpdate = {
-        ...providerSpecificUpdate,
-        nextcloud: privateCfg as NextcloudPrivateCfg,
-      };
-    } else if (providerId === SyncProviderId.OneDrive && privateCfg) {
-      providerSpecificUpdate = {
-        ...providerSpecificUpdate,
-        oneDrive: privateCfg as OneDrivePrivateCfg,
-      };
-    }
-
-    Object.assign(this._tmpUpdatedCfg, providerSpecificUpdate, {
-      syncProvider: providerId,
-      // Preserve global settings (?? not || so explicit `false` is honoured)
-      isEnabled: this._tmpUpdatedCfg.isEnabled,
-      syncInterval: globalCfg.syncInterval ?? this._tmpUpdatedCfg.syncInterval,
-      isManualSyncOnly:
-        globalCfg.isManualSyncOnly ?? this._tmpUpdatedCfg.isManualSyncOnly,
-      isCompressionEnabled:
-        globalCfg.isCompressionEnabled ?? this._tmpUpdatedCfg.isCompressionEnabled,
-    });
   }
 
   private async _waitForCurrentProviderConfig(): Promise<void> {
@@ -758,6 +896,7 @@ export class DialogSyncCfgComponent implements AfterViewInit {
     }
 
     await this._waitForCurrentProviderConfig();
+    if (this.isProviderConfigLoadFailed()) return;
 
     // Explicitly sync form values to _tmpUpdatedCfg in case modelChange didn't fire
     // This is especially important on Android WebView where change detection can be unreliable
@@ -985,6 +1124,17 @@ export class DialogSyncCfgComponent implements AfterViewInit {
     // Use Object.assign to preserve the object reference for Formly
     // This ensures Formly detects changes to the model
     Object.assign(this._tmpUpdatedCfg, cfg);
+    const provider = this.setupProvider();
+    if (
+      provider !== ULTRA_SYNC_SETUP &&
+      !this.isProviderConfigLoading() &&
+      !this.isProviderConfigLoadFailed() &&
+      this._tmpUpdatedCfg.syncProvider === provider
+    ) {
+      // Record edits while controls are still visible; Formly can remove a
+      // control when another setting hides it before the provider is switched.
+      this._rememberProviderDraft(provider);
+    }
   }
 
   async reauth(): Promise<void> {

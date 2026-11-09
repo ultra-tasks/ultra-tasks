@@ -4023,6 +4023,8 @@
     "LEGACY_LOCAL_FILE": "Local file — existing connection (deprecated)",
     "LEGACY_NOTICE": "This saved connection still works. It is no longer offered for new setup. You can disconnect it and use UltraSync, OneDrive, or WebDAV. Local export and backup remain available.",
     "SWITCH_HELP": "Switching changes this device only. Switch your other devices as well. Your existing provider keeps its data, and a recovery copy is saved on this device.",
+    "LOADING_PROVIDER": "Loading provider settings...",
+    "RETRY_PROVIDER": "Retry",
     "SWITCH_FAILED": "Could not switch providers. Your tasks and recovery copy remain on this device. Check the connection and try again.",
     "DISCONNECT_ULTRA": "Disconnect UltraSync on this device",
     "DISCONNECT_HELP": "Disconnecting keeps your local tasks and the server’s encrypted data. If this device is locked or offline, revoke its old session from the account dashboard when possible.",

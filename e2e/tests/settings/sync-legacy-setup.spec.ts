@@ -39,7 +39,7 @@ test('saved legacy setup preserves tasks and remains available after restart', a
   await expect(taskPage.getTaskByText(witness)).toBeVisible();
 });
 
-test('provider helper saves a disconnect before selecting a different provider', async ({
+test('an enabled legacy provider permits switching and the disconnect helper still works', async ({
   page,
   workViewPage,
 }) => {
@@ -77,6 +77,14 @@ test('provider helper saves a disconnect before selecting a different provider',
   });
   const sync = new SuperSyncPage(page);
   const dialog = await sync.openSuperSyncSettings();
+  await sync.accessTokenInput.fill('synthetic-unsaved-token');
+  const trackingPresence = dialog.getByRole('checkbox', { name: /live tracking/i });
+  if (!(await trackingPresence.isVisible())) {
+    await dialog.locator('.collapsible-header:has-text("Advanced")').last().click();
+  }
+  await trackingPresence.setChecked(true);
+  await sync.presenceDeviceNameInput.fill('synthetic-device-draft');
+  await trackingPresence.setChecked(false);
   await expect(page.getByRole('listbox')).toBeHidden();
   await sync.providerSelect.click();
   const options = page.getByRole('listbox');
@@ -85,9 +93,48 @@ test('provider helper saves a disconnect before selecting a different provider',
     name: 'WebDAV — personal sync only',
     exact: true,
   });
-  await expect(alternative).toBeDisabled();
-  await options.getByRole('option', { selected: true }).click();
+  await expect(alternative).toBeEnabled();
+  await alternative.click();
   await expect(options).toBeHidden();
+  await expect(dialog.locator('.e2e-userName input')).toBeVisible();
+  await expect(sync.accessTokenInput).toBeHidden();
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+  await expect(dialog).toContainText('Switching changes this device only');
+  const webdavFolder = dialog.locator('.e2e-syncFolderPath input');
+  await expect(webdavFolder).toHaveValue('super-productivity');
+  await dialog.locator('.e2e-userName input').fill('synthetic-webdav-draft');
+
+  await sync.providerSelect.click();
+  await page
+    .getByRole('option', {
+      name: 'SuperSync — existing connection (deprecated)',
+      exact: true,
+    })
+    .click();
+  await expect(sync.accessTokenInput).toHaveValue('synthetic-unsaved-token');
+  if (!(await trackingPresence.isVisible())) {
+    await dialog.locator('.collapsible-header:has-text("Advanced")').last().click();
+  }
+  await trackingPresence.setChecked(true);
+  await expect(sync.presenceDeviceNameInput).toHaveValue('synthetic-device-draft');
+
+  await sync.providerSelect.click();
+  await alternative.click();
+  await expect(dialog.locator('.e2e-userName input')).toHaveValue(
+    'synthetic-webdav-draft',
+  );
+  await expect(webdavFolder).toHaveValue('super-productivity');
+
+  // The legacy helper is still used by provider suites that disconnect first.
+  await sync.providerSelect.click();
+  await page
+    .getByRole('option', {
+      name: 'SuperSync — existing connection (deprecated)',
+      exact: true,
+    })
+    .click();
+  await expect(sync.accessTokenInput).toHaveValue('synthetic-unsaved-token');
+  await sync.accessTokenInput.fill('synthetic-legacy-access-token');
 
   await disconnectBeforeProviderSwitch(page, 'WebDAV');
   await sync.providerSelect.click();
