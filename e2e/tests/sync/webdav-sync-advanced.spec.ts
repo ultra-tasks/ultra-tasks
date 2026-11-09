@@ -116,14 +116,18 @@ test.describe('@webdav WebDAV Sync Advanced Features', () => {
     const dialog = pageA.locator('dialog-edit-task-attachment');
     await expect(dialog).toBeVisible();
 
-    // Fill title
-    await dialog.locator('input[name="title"]').fill('Google');
-
-    // Fill path/url
+    // The form may finish initializing after the dialog first appears.
+    const titleInput = dialog.locator('input[name="title"]');
     const pathInput = dialog.locator('input[name="path"]');
-    await pathInput.fill('https://google.com');
-
-    await dialog.locator('button[type="submit"]').click();
+    const save = dialog.getByRole('button', { name: 'Save', exact: true });
+    await expect(async () => {
+      await titleInput.fill('Google');
+      await pathInput.fill('https://google.com');
+      await expect(titleInput).toHaveValue('Google', { timeout: 1000 });
+      await expect(pathInput).toHaveValue('https://google.com', { timeout: 1000 });
+      await expect(save).toBeEnabled({ timeout: 1000 });
+    }).toPass({ timeout: 15000 });
+    await save.click();
 
     // Verify attachment indicator appears on task
     const attachmentBtn = taskA.locator('.attachment-btn');

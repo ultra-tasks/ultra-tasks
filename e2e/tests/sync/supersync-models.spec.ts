@@ -9,7 +9,7 @@ import {
   createProjectReliably,
   type SimulatedE2EClient,
 } from '../../utils/supersync-helpers';
-import { ProjectPage } from '../../pages/project.page';
+import { NotePage } from '../../pages/note.page';
 
 // Robust helper to create a tag
 const createTagReliably = async (page: Page, tagName: string): Promise<void> => {
@@ -357,13 +357,12 @@ test.describe('@supersync SuperSync Models', () => {
         throw new Error('Project id not found after creation');
       }
 
-      await clientA.page.goto(`/#/project/${projectId}`);
+      await clientA.page.goto(`/#/project/${projectId}/tasks`);
       await clientA.page.waitForLoadState('networkidle');
 
       // Add Note
       const noteContent = `This is a synced note ${testRunId}`;
-      const projectPageA = new ProjectPage(clientA.page);
-      await projectPageA.addNote(noteContent, projectId);
+      await new NotePage(clientA.page).addNote(noteContent);
 
       // Sync A
       await clientA.sync.syncAndWait();
@@ -392,14 +391,11 @@ test.describe('@supersync SuperSync Models', () => {
         }
       }
 
-      await clientB.page.goto(`/#/project/${projectId}`);
+      await clientB.page.goto(`/#/project/${projectId}/tasks`);
       await clientB.page.waitForLoadState('networkidle');
 
       // Verify Note
-      const toggleNotesBtn = clientB.page.locator('.e2e-toggle-notes-btn');
-      if (await toggleNotesBtn.isVisible()) {
-        await toggleNotesBtn.click();
-      }
+      await new NotePage(clientB.page).ensureNotesVisible();
 
       const notesWrapper = clientB.page.locator('notes');
       await expect(notesWrapper).toBeVisible();

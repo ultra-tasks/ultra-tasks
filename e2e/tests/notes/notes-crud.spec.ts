@@ -17,6 +17,22 @@ test.describe('Notes CRUD Operations', () => {
     expect(noteExists).toBe(true);
   });
 
+  test('creates a note from a project task view', async ({
+    page,
+    workViewPage,
+    projectPage,
+    notePage,
+    testPrefix,
+  }) => {
+    await workViewPage.waitForTaskList();
+    await projectPage.createProject('Notes project');
+    await projectPage.navigateToProjectByName('Notes project');
+    await expect(page).toHaveURL(/#\/project\/[^/]+\/tasks/);
+    const noteContent = `${testPrefix}-Project note`;
+    await notePage.addNote(noteContent);
+    await expect(page.locator('notes')).toContainText(noteContent);
+  });
+
   test('should edit an existing note', async ({
     page,
     workViewPage,
