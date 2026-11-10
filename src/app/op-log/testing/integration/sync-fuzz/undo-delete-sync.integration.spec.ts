@@ -9,7 +9,7 @@ import { FuzzDevice, SyncFuzzHarness } from './sync-fuzz-harness';
 
 const TASK_ID = 'undo-delete-task';
 
-describe('existing delete and restore operations against concurrent edits', () => {
+describe('delete and restore operations against concurrent edits', () => {
   let harness: SyncFuzzHarness;
   let a: FuzzDevice;
   let b: FuzzDevice;
@@ -54,7 +54,7 @@ describe('existing delete and restore operations against concurrent edits', () =
   for (const restoreKind of ['trash', 'snackbar'] as const) {
     for (const uploadFirst of ['A', 'B'] as const) {
       for (const editNewer of [false, true]) {
-        it(`${restoreKind} restore ${editNewer ? 'preserves' : 'currently loses'} a concurrent ${editNewer ? 'newer' : 'older'} title when ${uploadFirst} uploads first`, async () => {
+        it(`${restoreKind} restore preserves a concurrent ${editNewer ? 'newer' : 'older'} title when ${uploadFirst} uploads first`, async () => {
           const edit = (): Promise<void> =>
             harness.as(b, () =>
               harness.dispatch(
@@ -101,10 +101,9 @@ describe('existing delete and restore operations against concurrent edits', () =
           for (let round = 0; round < 2; round++) {
             for (const device of order) expect(await harness.sync(device)).toBeTrue();
           }
-          // The old restore snapshot currently overwrites an unseen older edit.
-          // Pin the limitation until restore can preserve original field clocks;
-          // deletion must not be added to history while this control passes.
-          const expectedTitle = editNewer ? 'Edited on B' : 'Original';
+          // The delete and its restore carry the same snapshot, so the round trip
+          // wrote no field and must not outrank the concurrent edit.
+          const expectedTitle = 'Edited on B';
           expect((await taskOn(a))?.title).toBe(expectedTitle);
           expect((await taskOn(b))?.title).toBe(expectedTitle);
           await harness.restart(a);
@@ -114,7 +113,7 @@ describe('existing delete and restore operations against concurrent edits', () =
     }
   }
 
-  it('exposes the same loss with a third client editing after the first edit', async () => {
+  it('keeps the latest of two concurrent edits across a delete and restore', async () => {
     const c = await harness.addDevice('C');
     expect(await harness.sync(c)).toBeTrue();
     harness.tick();
@@ -142,10 +141,9 @@ describe('existing delete and restore operations against concurrent edits', () =
     for (let round = 0; round < 3; round++) {
       for (const device of [a, b, c]) expect(await harness.sync(device)).toBeTrue();
     }
-    // The restore's snapshot is newer than both edits. A fix that merely
-    // rewrites the first edit into a snapshot at restore time would similarly
-    // defeat the later concurrent edit rather than preserving its timestamp.
+    // The round trip wrote nothing, so the edits resolve against each other:
+    // the later one wins on every device, not the restore's older snapshot.
     for (const device of [a, b, c])
-      expect((await taskOn(device))?.title).toBe('Original');
+      expect((await taskOn(device))?.title).toBe('Later concurrent edit');
   }, 60_000);
 });

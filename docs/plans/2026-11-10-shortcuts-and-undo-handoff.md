@@ -112,8 +112,24 @@ reminder or a time still loses to a concurrent write of that same field
 (`REMINDER_FIELDS` keeps the overlap path whole-task by design). Today's
 order can differ between devices (native replay prepends, a patch appends).
 
-Still open in stage 1: delete/restore overwriting a concurrent title edit, and
-project-list order after a concurrent move and add.
+Delete/restore (fixed the same day): a snackbar or trash restore after a delete
+carries the same task snapshot the delete carried, so the round trip changes no
+field, yet timestamp LWW treated its newer snapshot as the writer of every field
+and discarded an older concurrent edit (and, in the three-client case, both
+edits). `demoteNetNoopRestorePlans` (`conflict-net-noop-restore.util.ts`, called
+by `ConflictResolutionPlannerService`) now recognises a client's delete directly
+followed by a restore with an identical snapshot (ignoring `subTasks` and
+`modified`) as inert, and lets a side that wrote something beat a side made only
+of such pairs, whatever the timestamps. Only timestamp-decided TASK plans are
+touched; archive and delete-wins precedence, multi-entity (cascade) deletes,
+restores that change a field (for example to Today) and two inert sides keep the
+old behaviour. Nothing is added to the wire. `undo-delete-sync` (9 cases: trash
+and snackbar restore, both upload orders, edit older and newer, plus the
+three-client case) now asserts that the edit survives; 5 of them fail without
+the change. Not covered: project-list order after a restore (the specs compare
+the title only).
+
+Still open in stage 1: project-list order after a concurrent move and add.
 
 ## Validation completed
 

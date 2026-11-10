@@ -397,6 +397,19 @@ Proof: `undo-plan-conflicts-sync.integration.spec.ts` (32 cases, both upload
 orders and timestamp winners, with and without undo/redo, restart) and
 `undo-scheduling-sync.integration.spec.ts`.
 
+**Decision 6, delete→restore round trips (2026-11-10, fork).** A client's
+`deleteTask` directly followed by `restoreTask`/`restoreDeletedTask` carrying
+the same task snapshot wrote no field. `demoteNetNoopRestorePlans` marks such
+pairs inert (per client, ignoring `subTasks` and `modified`) and, for
+timestamp-decided TASK plans, lets a side holding any non-inert op beat a side
+made only of them, so an unrelated concurrent edit is no longer lost to the
+restore's newer snapshot. Detection emits one conflict per remote op, so pairs
+are found across all of an entity's conflicts and each plan's sides are judged
+on their own ops. Archive and delete-wins plans, cascade (multi-entity)
+deletes, restores that change a field and two inert sides keep whole-entity
+LWW. Proof: `undo-delete-sync.integration.spec.ts` and
+`conflict-net-noop-restore.util.spec.ts`.
+
 **Decision 5a (2026-10-01, #10421).** Asked whether rule 1 below stays within
 decision 5, @johannesjo answered: "Ponder in sub agent and act according to
 recommendation". As recommended:
