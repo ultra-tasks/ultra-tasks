@@ -1,10 +1,10 @@
 # Ultra Tasks 0.3.0
 
-This beta introduces **UltraSync**: private, end-to-end encrypted account sync across your devices, with a self-hostable server and an account dashboard.
+This beta introduces the **UltraTasks Account**: private, end-to-end encrypted sync across your devices, with a self-hostable server and an account dashboard.
 
 ## What's new
 
-- UltraSync is the default in new sync setup. Use the official service or a custom HTTPS endpoint for your own Docker installation.
+- Your UltraTasks account is the default in new sync setup. Use the official service or a custom HTTPS endpoint for your own Docker installation.
 - Sign in directly in the app or continue in your browser, complete two-factor authentication, and return to the requesting app. The encrypted handoff supports cold starts and a polling fallback when return links are blocked.
 - The account dashboard supports TOTP, passkeys/security keys as second factors, recovery keys, device-session management, and encrypted-storage usage.
 - Private changes sync automatically while unlocked, with live notifications and a 60-second HTTP fallback. Mobile suspension, network conditions and account size affect delivery time.
@@ -16,7 +16,7 @@ This beta introduces **UltraSync**: private, end-to-end encrypted account sync a
 
 ## Beta scope
 
-UltraSync supports private personal sync. Team collaboration, the full hosted task application, and Google Drive integration follow later. Keep your recovery key and an exported backup. Large accounts still use full-head catch-up and can incur substantial transfer and latency; this beta does not promise sub-two-second convergence for every dataset. Physical-device acceptance and independent specialist cryptographic review remain outstanding.
+Your UltraTasks account supports private personal sync. Team collaboration, the full hosted task application, and Google Drive integration follow later. Keep your recovery key and an exported backup. Large accounts still use full-head catch-up and can incur substantial transfer and latency; this beta does not promise sub-two-second convergence for every dataset. Physical-device acceptance and independent specialist cryptographic review remain outstanding.
 
 The official dashboard is at [app.ultratasks.app/account](https://app.ultratasks.app/account). Self-hosting code and Docker installation instructions are in [ultra-tasks-server](https://github.com/ultra-tasks/ultra-tasks-server).
 

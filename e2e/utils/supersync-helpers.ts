@@ -1468,6 +1468,20 @@ export const archiveDoneTasks = async (client: SimulatedE2EClient): Promise<void
   const saveAndGoHomeBtn = client.page.locator(
     'daily-summary button[mat-flat-button]:has(mat-icon:text-matches("^(wb_sunny|check_circle)$"))',
   );
+  // The summary initially renders a spinner; its asynchronously loaded table
+  // and dynamic-height tab can move this button after it becomes visible.
+  await client.page.locator('daily-summary .week-section').waitFor({
+    state: 'visible',
+    timeout: UI_VISIBLE_TIMEOUT_LONG,
+  });
+  await client.page.locator('daily-summary mat-tab-group').evaluate(async (tabs) => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    await Promise.all(
+      tabs.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    );
+  });
   await saveAndGoHomeBtn.waitFor({ state: 'visible', timeout: UI_VISIBLE_TIMEOUT });
   // Wait for navigation back to work view.
   // Use negative lookahead: /(active\/tasks|tag\/TODAY)/ would match the

@@ -14,6 +14,7 @@ import { OperationLogStoreService } from '../../op-log/persistence/operation-log
 import { OperationLogSyncService } from '../../op-log/sync/operation-log-sync.service';
 import { BackupService } from '../../op-log/backup/backup.service';
 import { ValidateStateService } from '../../op-log/validation/validate-state.service';
+import { TabSeqFrontierService } from '../../op-log/persistence/tab-seq-frontier.service';
 
 describe('NativePersonalBridgeService', () => {
   const identity = { serverId: 'test-server', accountId: 'test-account' };
@@ -32,10 +33,16 @@ describe('NativePersonalBridgeService', () => {
       account: { identity: () => identity, unlocked: { masterKey: randomKey() } },
       state: {
         device: { id: 'device' },
-        scopes: { personal: { info: { id: 'personal', kind: 'personal' } } },
+        scopes: {
+          personal: {
+            info: { id: 'personal', kind: 'personal', state: 'active' },
+            intents: [],
+          },
+        },
       },
       records: () => ({}),
       edit: jasmine.createSpy().and.resolveTo(),
+      syncScope: jasmine.createSpy().and.resolveTo(),
     } as unknown as SyncClient;
     TestBed.configureTestingModule({
       providers: [
@@ -52,10 +59,22 @@ describe('NativePersonalBridgeService', () => {
             clearNativeSyncBaseline: async () => {
               saved = undefined;
             },
+            getFirstOpEntry: jasmine
+              .createSpy('getFirstOpEntry')
+              .and.resolveTo(undefined),
+            getLastSeq: jasmine.createSpy('getLastSeq').and.resolveTo(0),
           },
         },
-        { provide: OperationLogSyncService, useValue: {} },
-        { provide: BackupService, useValue: {} },
+        {
+          provide: OperationLogSyncService,
+          useValue: {
+            applyNativeSnapshot: async (prepare: () => Promise<unknown>) => prepare(),
+          },
+        },
+        {
+          provide: BackupService,
+          useValue: { captureImportBackup: jasmine.createSpy().and.resolveTo({}) },
+        },
         { provide: ValidateStateService, useValue: {} },
       ],
     });
@@ -96,6 +115,50 @@ describe('NativePersonalBridgeService', () => {
     await service.capture();
     expect(client.edit).not.toHaveBeenCalled();
     expect(snapshot).not.toHaveBeenCalled();
+  });
+  it('refuses an account snapshot if a different tab wrote beyond this tab’s frontier', async () => {
+    await service.bind(client);
+    TestBed.inject(TabSeqFrontierService).establishFrontier(4);
+    (TestBed.inject(OperationLogStoreService).getLastSeq as jasmine.Spy).and.resolveTo(5);
+    await expectAsync(service.useExisting()).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_LOCAL_CHANGED',
+    );
+  });
+  it('fails closed when the tab frontier is unknown and the operation log is nonempty', async () => {
+    await service.bind(client);
+    (
+      TestBed.inject(OperationLogStoreService).getFirstOpEntry as jasmine.Spy
+    ).and.resolveTo({
+      seq: 5,
+    });
+    (TestBed.inject(OperationLogStoreService).getLastSeq as jasmine.Spy).and.resolveTo(5);
+    await expectAsync(service.useExisting()).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_LOCAL_CHANGED',
+    );
+  });
+  it('allows a fresh profile when every stored operation was written by this tab', async () => {
+    await service.bind(client);
+    TestBed.inject(TabSeqFrontierService).observeOwnWrite(5);
+    TestBed.inject(TabSeqFrontierService).observeOwnWrite(6);
+    (
+      TestBed.inject(OperationLogStoreService).getFirstOpEntry as jasmine.Spy
+    ).and.resolveTo({
+      seq: 5,
+    });
+    (TestBed.inject(OperationLogStoreService).getLastSeq as jasmine.Spy).and.resolveTo(6);
+    await expectAsync(
+      service.useExisting(() => {
+        throw new Error('choice guard reached');
+      }),
+    ).toBeRejectedWithError('choice guard reached');
+  });
+  it('allows an empty unestablished log to reach the choice guard', async () => {
+    await service.bind(client);
+    await expectAsync(
+      service.useExisting(() => {
+        throw new Error('choice guard reached');
+      }),
+    ).toBeRejectedWithError('choice guard reached');
   });
   it('retains local changes and refuses to dual-write while a legacy provider is enabled', async () => {
     await baseline();

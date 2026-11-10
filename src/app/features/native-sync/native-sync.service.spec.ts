@@ -13,6 +13,9 @@ import { LOCAL_ACTIONS } from '../../util/local-actions.token';
 import { Subject } from 'rxjs';
 import { OperationWriteFlushService } from '../../op-log/sync/operation-write-flush.service';
 import type { Action } from '@ngrx/store';
+import { GlobalConfigService } from '../config/global-config.service';
+import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
+import { BackupService } from '../../op-log/backup/backup.service';
 
 describe('NativeSyncService', () => {
   let service: NativeSyncService;
@@ -27,6 +30,25 @@ describe('NativeSyncService', () => {
         NativeSyncService,
         { provide: CertTrustService, useValue: certTrust },
         { provide: LOCAL_ACTIONS, useValue: actions },
+        {
+          provide: GlobalConfigService,
+          useValue: {
+            sync: () => ({ isEnabled: false }),
+            updateSection: jasmine.createSpy('updateSection'),
+          },
+        },
+        {
+          provide: SyncWrapperService,
+          useValue: { runWithSyncBlocked: async (run: () => Promise<void>) => run() },
+        },
+        {
+          provide: BackupService,
+          useValue: {
+            captureImportBackup: jasmine
+              .createSpy('captureImportBackup')
+              .and.resolveTo({}),
+          },
+        },
         {
           provide: OperationWriteFlushService,
           useValue: { flushPendingWrites: async () => undefined },
@@ -51,6 +73,7 @@ describe('NativeSyncService', () => {
             unlink: jasmine.createSpy('unlink').and.resolveTo(),
             capture: async () => undefined,
             apply: async () => undefined,
+            migrate: jasmine.createSpy('migrate').and.resolveTo(),
             scopeId: 'personal',
           },
         },
@@ -253,6 +276,76 @@ describe('NativeSyncService', () => {
     expect(invitations).not.toHaveBeenCalled();
     expect(offers).not.toHaveBeenCalled();
     expect(service.sharingEnabled()).toBeFalse();
+  });
+  it('leaves the old provider enabled when the account cannot be checked', async () => {
+    const client = preparePrivateClient();
+    (client.refreshScopes as jasmine.Spy).and.rejectWith(new Error('offline'));
+    const config = TestBed.inject(GlobalConfigService);
+    spyOn(config, 'sync').and.returnValue({ isEnabled: true } as ReturnType<
+      typeof config.sync
+    >);
+    const backup = TestBed.inject(BackupService).captureImportBackup as jasmine.Spy;
+    await expectAsync(service.link(true)).toBeRejectedWithError('offline');
+    expect(backup).not.toHaveBeenCalled();
+    expect(config.updateSection).not.toHaveBeenCalled();
+    expect(service.linked()).toBeFalse();
+  });
+  it('does not turn off the old provider if its recovery snapshot fails', async () => {
+    preparePrivateClient();
+    const config = TestBed.inject(GlobalConfigService);
+    spyOn(config, 'sync').and.returnValue({ isEnabled: true } as ReturnType<
+      typeof config.sync
+    >);
+    const backup = TestBed.inject(BackupService).captureImportBackup as jasmine.Spy;
+    backup.and.rejectWith(new Error('no local storage'));
+    await expectAsync(service.link(true)).toBeRejectedWithError('no local storage');
+    expect(config.updateSection).not.toHaveBeenCalled();
+    expect(TestBed.inject(NativePersonalBridgeService).migrate).not.toHaveBeenCalled();
+  });
+  it('does not upload account changes until the user connects personal data', async () => {
+    const client = preparePrivateClient();
+    const upload = spyOn(client, 'syncAll').and.resolveTo({});
+    await service.syncNow();
+    expect(upload).not.toHaveBeenCalled();
+  });
+  it('asks for a choice if another device initializes the account during automatic setup', async () => {
+    const client = preparePrivateClient();
+    const scope = {
+      id: 'personal',
+      kind: 'personal',
+      sequence: 1,
+      generation: 1,
+      controlVersion: 1,
+    } as ReturnType<typeof service.scopes>[number];
+    (client.refreshScopes as jasmine.Spy).and.resolveTo([scope]);
+    TestBed.inject(NativePersonalBridgeService).scopeId = undefined;
+    await service.link(true, true);
+    expect(service.linked()).toBeFalse();
+    expect(service.scopes()).toEqual([scope]);
+    expect(TestBed.inject(GlobalConfigService).updateSection).not.toHaveBeenCalled();
+    expect(TestBed.inject(NativePersonalBridgeService).migrate).not.toHaveBeenCalled();
+  });
+  it('refuses to replace account data if it changed while the user was choosing', async () => {
+    const client = preparePrivateClient();
+    const old = {
+      id: 'personal',
+      kind: 'personal',
+      sequence: 1,
+      generation: 1,
+      controlVersion: 1,
+    } as ReturnType<typeof service.scopes>[number];
+    const newer = { ...old, sequence: 2 };
+    service.scopes.set([old]);
+    client.state.scopes = {
+      personal: { info: old, key: '', counter: 0, heads: {}, intents: [], conflicts: [] },
+    };
+    client.state.migrations = {};
+    (client.refreshScopes as jasmine.Spy).and.resolveTo([newer]);
+    await expectAsync(service.link(true)).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_REMOTE_CHANGED',
+    );
+    expect(TestBed.inject(GlobalConfigService).updateSection).not.toHaveBeenCalled();
+    expect(TestBed.inject(NativePersonalBridgeService).migrate).not.toHaveBeenCalled();
   });
   it('captures only after pending operation writes finish and repeats for edits arriving during a sync', async () => {
     const client = preparePrivateClient();

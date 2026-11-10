@@ -15,6 +15,8 @@ test.describe('Subtask inline input', () => {
     await draft.fill('First child');
     await draft.press('Enter');
     await draft.press('Escape');
+    // Wait for the closing animation before opening a new input for this task.
+    await expect(draft).toHaveCount(0);
     const addSubtask = parent
       .locator('.add-subtask-action')
       .getByRole('button', { name: 'Add subtask', exact: true });

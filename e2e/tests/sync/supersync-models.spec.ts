@@ -9,7 +9,7 @@ import {
   createProjectReliably,
   type SimulatedE2EClient,
 } from '../../utils/supersync-helpers';
-import { ProjectPage } from '../../pages/project.page';
+import { NotePage } from '../../pages/note.page';
 
 // Robust helper to create a tag
 const createTagReliably = async (page: Page, tagName: string): Promise<void> => {
@@ -57,12 +57,14 @@ const createTagReliably = async (page: Page, tagName: string): Promise<void> => 
   const dialog = page.locator('mat-dialog-container');
   await dialog.waitFor({ state: 'visible', timeout: 10000 });
 
-  const input = dialog.locator('input[type="text"]').first();
-  await input.fill(tagName);
-
-  const submitBtn = dialog
-    .locator('button[type="submit"], button:has-text("Save")')
-    .first();
+  const input = dialog.getByRole('textbox', { name: 'Tag Name' });
+  const submitBtn = dialog.getByRole('button', { name: 'Save', exact: true });
+  // Form initialization can replace a value entered as the dialog opens.
+  await expect(async () => {
+    await input.fill(tagName);
+    await expect(input).toHaveValue(tagName, { timeout: 1000 });
+    await expect(submitBtn).toBeEnabled({ timeout: 1000 });
+  }).toPass({ timeout: 10000 });
   await submitBtn.click();
 
   await dialog.waitFor({ state: 'hidden' });
@@ -355,13 +357,12 @@ test.describe('@supersync SuperSync Models', () => {
         throw new Error('Project id not found after creation');
       }
 
-      await clientA.page.goto(`/#/project/${projectId}`);
+      await clientA.page.goto(`/#/project/${projectId}/tasks`);
       await clientA.page.waitForLoadState('networkidle');
 
       // Add Note
       const noteContent = `This is a synced note ${testRunId}`;
-      const projectPageA = new ProjectPage(clientA.page);
-      await projectPageA.addNote(noteContent, projectId);
+      await new NotePage(clientA.page).addNote(noteContent);
 
       // Sync A
       await clientA.sync.syncAndWait();
@@ -390,14 +391,11 @@ test.describe('@supersync SuperSync Models', () => {
         }
       }
 
-      await clientB.page.goto(`/#/project/${projectId}`);
+      await clientB.page.goto(`/#/project/${projectId}/tasks`);
       await clientB.page.waitForLoadState('networkidle');
 
       // Verify Note
-      const toggleNotesBtn = clientB.page.locator('.e2e-toggle-notes-btn');
-      if (await toggleNotesBtn.isVisible()) {
-        await toggleNotesBtn.click();
-      }
+      await new NotePage(clientB.page).ensureNotesVisible();
 
       const notesWrapper = clientB.page.locator('notes');
       await expect(notesWrapper).toBeVisible();

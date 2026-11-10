@@ -32,7 +32,8 @@ import * as os from 'os';
  */
 const exportBackup = async (page: SimulatedE2EClient['page']): Promise<string> => {
   // Navigate to settings page
-  await new ImportPage(page).navigateToImportPage();
+  const importPage = new ImportPage(page);
+  await importPage.navigateToImportPage();
 
   // Set up download handler before clicking export
   const tempDir = os.tmpdir();
@@ -41,12 +42,8 @@ const exportBackup = async (page: SimulatedE2EClient['page']): Promise<string> =
   // Wait for download and save to temp file
   const downloadPromise = page.waitForEvent('download');
 
-  // Click the export button (export current data).
-  // Use exact name match — after #7141, a sibling "Export Data (anonymized)"
-  // button shares the "Export" prefix and would break a loose has-text selector.
-  const exportBtn = page.getByRole('button', { name: 'Export Data', exact: true });
-  await exportBtn.waitFor({ state: 'visible', timeout: 5000 });
-  await exportBtn.click();
+  // Use the shared page object's native-backup export control.
+  await importPage.exportBackupBtn.click();
 
   const download = await downloadPromise;
   await download.saveAs(backupPath);

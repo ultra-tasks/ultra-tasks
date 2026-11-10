@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/supersync.fixture';
+import { TaskPage } from '../../pages/task.page';
 import {
   createTestUser,
   getSuperSyncConfig,
@@ -124,13 +125,7 @@ const openTaskDetail = async (
 ): Promise<void> => {
   const task = client.page.locator(`task:not(.isDone):has-text("${taskName}")`).first();
   await task.waitFor({ state: 'visible', timeout: 10000 });
-  await task.locator('.first-line').first().hover();
-  const showDetailBtn = client.page.getByRole('button', {
-    name: 'Show/hide task panel',
-  });
-  await showDetailBtn.waitFor({ state: 'visible', timeout: 5000 });
-  await showDetailBtn.click();
-  await client.page.waitForTimeout(300);
+  await new TaskPage(client.page).openTaskDetail(task);
 };
 
 /** Open the repeat dialog for the task, set skipOverdue, save. */

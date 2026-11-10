@@ -10,7 +10,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormlyModule } from '@ngx-formly/core';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { DialogSyncCfgComponent } from './dialog-sync-cfg.component';
 import { SyncConfigService } from '../sync-config.service';
 import { SyncWrapperService } from '../sync-wrapper.service';
@@ -24,6 +24,9 @@ import { SyncLocalStateService } from '../../../op-log/sync/sync-local-state.ser
 import { CertTrustService } from '../../../features/issue/cert-trust.service';
 import { NativeSyncService } from '../../../features/native-sync/native-sync.service';
 import { ULTRA_SYNC_SETUP } from '../sync-setup-options';
+import { BackupService } from '../../../op-log/backup/backup.service';
+import { OperationWriteFlushService } from '../../../op-log/sync/operation-write-flush.service';
+import type { LocalFileSyncPrivateCfg } from '@sp/sync-providers/local-file';
 
 describe('DialogSyncCfgComponent', () => {
   let component: DialogSyncCfgComponent;
@@ -63,8 +66,10 @@ describe('DialogSyncCfgComponent', () => {
       'sync',
       'markPromptEncryptionAfterSetupSync',
       'forceUpload',
+      'runWithSyncBlocked',
     ]);
     mockSyncWrapperService.sync.and.resolveTo();
+    mockSyncWrapperService.runWithSyncBlocked.and.callFake(async (run) => run());
     mockSyncLocalStateService = jasmine.createSpyObj('SyncLocalStateService', [
       'confirmOverwriteOfUndecryptableRemoteOps',
     ]);
@@ -76,6 +81,7 @@ describe('DialogSyncCfgComponent', () => {
       'getProviderById',
       'getAllProviders',
       'notifyProviderTargetChanged',
+      'markSwitchFromNative',
     ]);
     mockProviderManager.getAllProviders.and.resolveTo([]);
 
@@ -110,6 +116,18 @@ describe('DialogSyncCfgComponent', () => {
         { provide: SyncLocalStateService, useValue: mockSyncLocalStateService },
         { provide: CertTrustService, useValue: mockCertTrustService },
         { provide: NativeSyncService, useValue: { configured: () => false } },
+        {
+          provide: BackupService,
+          useValue: {
+            captureImportBackup: jasmine
+              .createSpy('captureImportBackup')
+              .and.resolveTo({}),
+          },
+        },
+        {
+          provide: OperationWriteFlushService,
+          useValue: { flushPendingWrites: async () => undefined },
+        },
       ],
     });
     // Replace the Formly-based template with a minimal placeholder so we can
@@ -123,7 +141,48 @@ describe('DialogSyncCfgComponent', () => {
     component = fixture.componentInstance;
   });
 
-  describe('UltraSync setup', () => {
+  describe('UltraTasks Account setup', () => {
+    it('waits for initial sync settings before accepting a provider choice', () => {
+      const settings = new Subject<SyncConfig>();
+      (
+        mockSyncConfigService as unknown as { syncSettingsForm$: typeof settings }
+      ).syncSettingsForm$ = settings;
+      const pending = TestBed.createComponent(DialogSyncCfgComponent).componentInstance;
+
+      expect(pending.isInitialSettingsLoading()).toBeTrue();
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+
+      settings.next({ ...baseSyncConfig, syncProvider: SyncProviderId.SuperSync });
+      expect(pending.isInitialSettingsUnavailable()).toBeFalse();
+      expect(pending.savedProvider()).toBe(SyncProviderId.SuperSync);
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(SyncProviderId.WebDAV);
+    });
+
+    it('allows retrying an initial sync settings load that fails', async () => {
+      const settings = new Subject<SyncConfig>();
+      const service = mockSyncConfigService as unknown as {
+        syncSettingsForm$: typeof mockGlobalConfigService.sync$;
+      };
+      service.syncSettingsForm$ = settings;
+      const pending = TestBed.createComponent(DialogSyncCfgComponent).componentInstance;
+      settings.error(new Error('settings load failed'));
+
+      expect(pending.isInitialSettingsLoading()).toBeFalse();
+      expect(pending.isInitialSettingsLoadFailed()).toBeTrue();
+      await pending.save();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+
+      service.syncSettingsForm$ = of(baseSyncConfig);
+      pending.retryInitialSettings();
+      expect(pending.isInitialSettingsUnavailable()).toBeFalse();
+      pending.selectSetupProvider(SyncProviderId.WebDAV);
+      expect(pending.setupProvider()).toBe(SyncProviderId.WebDAV);
+    });
+
     it('retains dormant configured providers while excluding providers with no stored configuration', fakeAsync(() => {
       mockProviderManager.getAllProviders.and.resolveTo([
         {
@@ -150,12 +209,12 @@ describe('DialogSyncCfgComponent', () => {
       ).toBeFalse();
       expect(saved.setupProvider()).toBe(ULTRA_SYNC_SETUP);
     }));
-    it('closes the underlying Account window when continuing to UltraSync', () => {
+    it('closes the underlying Account window when continuing to UltraTasks Account', () => {
       component.openUltraSync();
       expect(mockMatDialog.closeAll).toHaveBeenCalled();
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
     });
-    it('defaults new setup to UltraSync without persisting a legacy target', () => {
+    it('defaults new setup to UltraTasks Account without persisting a legacy target', () => {
       expect(component.setupProvider()).toBe(ULTRA_SYNC_SETUP);
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
       expect(
@@ -170,6 +229,260 @@ describe('DialogSyncCfgComponent', () => {
       expect(component.form.get('syncProvider')?.value).toBe(SyncProviderId.WebDAV);
       expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+    }));
+
+    it('waits for the selected provider settings before showing its form', fakeAsync(() => {
+      let finishLoad!: (value: null) => void;
+      const load = new Promise<null>((resolve) => (finishLoad = resolve));
+      mockProviderManager.getProviderById.and.resolveTo({
+        privateCfg: { load: () => load },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+      const previousModel = component._tmpUpdatedCfg;
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      expect(component.isProviderConfigLoading()).toBeTrue();
+
+      finishLoad(null);
+      flushMicrotasks();
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component._tmpUpdatedCfg).not.toBe(previousModel);
+      expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
+    }));
+
+    it('ignores a pending provider load after switching to UltraTasks Account', fakeAsync(() => {
+      let finishLoad!: (value: { encryptKey: string }) => void;
+      const load = new Promise<{ encryptKey: string }>(
+        (resolve) => (finishLoad = resolve),
+      );
+      mockProviderManager.getProviderById.and.resolveTo({
+        privateCfg: { load: () => load },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(ULTRA_SYNC_SETUP);
+      finishLoad({ encryptKey: 'stale-provider-key' });
+      flushMicrotasks();
+
+      expect(component.setupProvider()).toBe(ULTRA_SYNC_SETUP);
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component.isProviderConfigLoadFailed()).toBeFalse();
+      expect(component._tmpUpdatedCfg.encryptKey).not.toBe('stale-provider-key');
+    }));
+
+    it('allows retrying a failed provider settings load', fakeAsync(() => {
+      const load = jasmine.createSpy('load').and.rejectWith(new Error('load failed'));
+      mockProviderManager.getProviderById.and.resolveTo({
+        privateCfg: { load },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component.isProviderConfigLoadFailed()).toBeTrue();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+
+      load.and.resolveTo(null);
+      component.retryProviderConfig();
+      flushMicrotasks();
+      expect(component.isProviderConfigLoadFailed()).toBeFalse();
+      expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
+    }));
+
+    it('ignores a failure from an older provider load', fakeAsync(() => {
+      let rejectOldLoad!: (reason: Error) => void;
+      const oldLoad = new Promise<null>((_resolve, reject) => (rejectOldLoad = reject));
+      const oldProvider = {
+        privateCfg: { load: () => oldLoad },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      const newProvider = {
+        privateCfg: { load: async () => null },
+      } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      mockProviderManager.getProviderById.and.callFake(async (providerId) =>
+        providerId === SyncProviderId.WebDAV ? oldProvider : newProvider,
+      );
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(SyncProviderId.OneDrive);
+      flushMicrotasks();
+      rejectOldLoad(new Error('stale load failed'));
+      flushMicrotasks();
+
+      expect(component.setupProvider()).toBe(SyncProviderId.OneDrive);
+      expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.OneDrive);
+      expect(component.isProviderConfigLoading()).toBeFalse();
+      expect(component.isProviderConfigLoadFailed()).toBeFalse();
+    }));
+
+    it('preserves unsaved common settings when a provider is selected', fakeAsync(() => {
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      component.form.addControl('syncInterval', new FormControl(60000));
+      component.form.addControl('isManualSyncOnly', new FormControl(true));
+      component.form.addControl('isCompressionEnabled', new FormControl(false));
+      component.form.addControl('isUseSplitSyncFiles', new FormControl(true));
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.syncInterval).toBe(60000);
+      expect(component._tmpUpdatedCfg.isManualSyncOnly).toBeTrue();
+      expect(component._tmpUpdatedCfg.isCompressionEnabled).toBeFalse();
+      expect(component._tmpUpdatedCfg.isUseSplitSyncFiles).toBeTrue();
+    }));
+
+    it('keeps unsaved provider drafts and encryption keys separate', fakeAsync(() => {
+      let superEncryptionKey = 'super-key';
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        const privateCfg =
+          providerId === SyncProviderId.SuperSync
+            ? { accessToken: 'saved-token', encryptKey: superEncryptionKey }
+            : { userName: 'saved-user', encryptKey: 'webdav-key' };
+        return {
+          privateCfg: { load: async () => privateCfg },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      const tokenControl = new FormControl('draft-token');
+      tokenControl.markAsDirty();
+      component.form.addControl(
+        'superSync',
+        new FormGroup({ accessToken: tokenControl }),
+      );
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      expect(component._tmpUpdatedCfg.encryptKey).toBe('webdav-key');
+
+      superEncryptionKey = 'rotated-super-key';
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      expect(component._tmpUpdatedCfg.superSync?.accessToken).toBe('draft-token');
+      expect(component._tmpUpdatedCfg.encryptKey).toBe('rotated-super-key');
+    }));
+
+    it('uses fresh credentials for untouched provider fields', fakeAsync(() => {
+      let token = 'saved-token';
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.SuperSync ? { accessToken: token } : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      component.form.addControl(
+        'superSync',
+        new FormGroup({ accessToken: new FormControl(token) }),
+      );
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      token = 'rotated-token';
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.superSync?.accessToken).toBe('rotated-token');
+    }));
+
+    it('uses newly saved credentials instead of a first-setup default', fakeAsync(() => {
+      let savedConfig: { accessToken: string; encryptKey: string } | null = null;
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.SuperSync ? savedConfig : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+      component.form.addControl(
+        'superSync',
+        new FormGroup({ accessToken: new FormControl('initial-value') }),
+      );
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      savedConfig = { accessToken: 'fresh-token', encryptKey: 'fresh-key' };
+      component.selectSetupProvider(SyncProviderId.SuperSync);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.superSync?.accessToken).toBe('fresh-token');
+      expect(component._tmpUpdatedCfg.encryptKey).toBe('fresh-key');
+    }));
+
+    it('retains an Android folder picked before switching providers', fakeAsync(() => {
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.LocalFile
+                ? { safFolderUri: 'content://saved-folder' }
+                : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+      component.selectSetupProvider(SyncProviderId.LocalFile);
+      flushMicrotasks();
+      const folder = new FormControl('content://saved-folder');
+      component.form.addControl('localFileSync', new FormGroup({ safFolderUri: folder }));
+      // Formly's Android picker sets the control value programmatically and
+      // marks the containing form dirty, not the individual control.
+      folder.setValue('content://new-folder');
+      component.form.markAsDirty();
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(SyncProviderId.LocalFile);
+      flushMicrotasks();
+
+      expect(
+        (component._tmpUpdatedCfg.localFileSync as LocalFileSyncPrivateCfg | undefined)
+          ?.safFolderUri,
+      ).toBe('content://new-folder');
+    }));
+
+    it('retains a detected Nextcloud user ID when switching away and back', fakeAsync(() => {
+      mockProviderManager.getProviderById.and.callFake(async (providerId) => {
+        return {
+          privateCfg: {
+            load: async () =>
+              providerId === SyncProviderId.Nextcloud
+                ? { userName: 'alice@example.com', loginName: '' }
+                : null,
+          },
+        } as unknown as Awaited<ReturnType<SyncProviderManager['getProviderById']>>;
+      });
+      component.selectSetupProvider(SyncProviderId.Nextcloud);
+      flushMicrotasks();
+      component.form.addControl(
+        'nextcloud',
+        new FormGroup({
+          userName: new FormControl('alice@example.com'),
+          loginName: new FormControl(''),
+        }),
+      );
+      (
+        component as unknown as {
+          _applyDetectedUserIdResult: (result: {
+            success: boolean;
+            userId: string;
+          }) => void;
+        }
+      )._applyDetectedUserIdResult({ success: true, userId: 'alice' });
+
+      component.selectSetupProvider(SyncProviderId.WebDAV);
+      flushMicrotasks();
+      component.selectSetupProvider(SyncProviderId.Nextcloud);
+      flushMicrotasks();
+
+      expect(component._tmpUpdatedCfg.nextcloud?.userName).toBe('alice');
+      expect(component._tmpUpdatedCfg.nextcloud?.loginName).toBe('alice@example.com');
     }));
 
     it('keeps a saved enabled deprecated connection selected', () => {
@@ -325,6 +638,89 @@ describe('DialogSyncCfgComponent', () => {
     });
   });
 
+  describe('save() — in-flight guard', () => {
+    it('blocks another save, provider changes, and closing until the save settles', async () => {
+      let finishAuth!: (value: { wasConfigured: boolean }) => void;
+      const auth = new Promise<{ wasConfigured: boolean }>((resolve) => {
+        finishAuth = resolve;
+      });
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.returnValue(
+        auth,
+      );
+      mockProviderManager.getProviderById.and.resolveTo({
+        id: SyncProviderId.WebDAV,
+      } as Awaited<ReturnType<SyncProviderManager['getProviderById']>>);
+      component.setupProvider.set(SyncProviderId.WebDAV);
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      const pending = component.save();
+      await Promise.resolve();
+      expect(component.isSaving()).toBeTrue();
+      expect(mockDialogRef.disableClose).toBeTrue();
+
+      await component.save();
+      component.selectSetupProvider(ULTRA_SYNC_SETUP);
+      component.close();
+      component.openUltraSync();
+      expect(component.setupProvider()).toBe(SyncProviderId.WebDAV);
+      expect(mockDialogRef.close).not.toHaveBeenCalled();
+      expect(mockMatDialog.closeAll).not.toHaveBeenCalled();
+      expect(
+        mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary,
+      ).toHaveBeenCalledTimes(1);
+
+      finishAuth({ wasConfigured: false });
+      await pending;
+      expect(mockSyncConfigService.updateSettingsFromForm).toHaveBeenCalledTimes(1);
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).not.toBeTrue();
+    });
+
+    it('unlocks the dialog and reports an error if a save step rejects', async () => {
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.rejectWith(
+        new Error('authentication failed'),
+      );
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).not.toBeTrue();
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+      expect(mockSnackService.open).toHaveBeenCalledWith({
+        type: 'ERROR',
+        msg: T.SYNC_SETUP.SAVE_FAILED,
+      });
+      component.close();
+      expect(mockDialogRef.close).toHaveBeenCalled();
+    });
+
+    it('restores a pre-existing disableClose setting after a save step rejects', async () => {
+      mockDialogRef.disableClose = true;
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.rejectWith(
+        new Error('authentication failed'),
+      );
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).toBeTrue();
+    });
+  });
+
   describe('save() — auth cancelled (reproduces issue #7131)', () => {
     it('should NOT close dialog when Dropbox auth is cancelled and provider is not ready', async () => {
       const providerNeedingAuth = {
@@ -346,6 +742,8 @@ describe('DialogSyncCfgComponent', () => {
       await component.save();
 
       expect(mockDialogRef.close).not.toHaveBeenCalled();
+      expect(component.isSaving()).toBeFalse();
+      expect(mockDialogRef.disableClose).not.toBeTrue();
     });
 
     it('should NOT save config when Dropbox auth is cancelled and provider is not ready', async () => {
@@ -689,6 +1087,75 @@ describe('DialogSyncCfgComponent', () => {
   });
 
   describe('save() — provider without auth requirement', () => {
+    it('disconnects an unlocked UltraTasks Account session before it is locked', async () => {
+      let unlocked = true;
+      const disconnect = jasmine.createSpy('disconnect').and.callFake(async () => {
+        expect(unlocked).toBeTrue();
+      });
+      Object.assign(component.native, {
+        configured: () => true,
+        unlocked: () => unlocked,
+        error: () => '',
+        syncNow: jasmine.createSpy('syncNow').and.resolveTo(),
+        lock: jasmine.createSpy('lock').and.callFake(async () => {
+          unlocked = false;
+        }),
+        disconnect,
+      });
+      mockProviderManager.getProviderById.and.resolveTo({
+        id: SyncProviderId.WebDAV,
+        isReady: jasmine.createSpy('isReady').and.resolveTo(true),
+      } as any);
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.resolveTo({
+        wasConfigured: false,
+      });
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(disconnect).toHaveBeenCalledTimes(1);
+      expect(mockSyncConfigService.updateSettingsFromForm).toHaveBeenCalled();
+    });
+
+    it('does not enable the next provider when online disconnection fails', async () => {
+      const backups = TestBed.inject(BackupService);
+      Object.assign(component.native, {
+        configured: () => true,
+        unlocked: () => true,
+        error: () => '',
+        syncNow: jasmine.createSpy('syncNow').and.resolveTo(),
+        disconnect: jasmine.createSpy('disconnect').and.callFake(async () => {
+          expect(backups.captureImportBackup).toHaveBeenCalledWith('LOCAL_IMPORT');
+          throw new Error('Could not revoke the session');
+        }),
+      });
+      mockProviderManager.getProviderById.and.resolveTo({
+        id: SyncProviderId.WebDAV,
+        isReady: jasmine.createSpy('isReady').and.resolveTo(true),
+      } as any);
+      mockSyncWrapperService.configuredAuthForSyncProviderIfNecessary.and.resolveTo({
+        wasConfigured: false,
+      });
+      component._tmpUpdatedCfg = {
+        ...component._tmpUpdatedCfg,
+        syncProvider: SyncProviderId.WebDAV,
+        isEnabled: true,
+      };
+
+      await component.save();
+
+      expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
+      expect(mockDialogRef.close).not.toHaveBeenCalled();
+      expect(mockSnackService.open).toHaveBeenCalledWith({
+        type: 'ERROR',
+        msg: T.SYNC_SETUP.SWITCH_FAILED,
+      });
+    });
+
     it('should close dialog and save config for WebDAV (no getAuthHelper)', async () => {
       const webdavProvider = {
         id: SyncProviderId.WebDAV,

@@ -60,6 +60,9 @@ import { OpLog } from '../../core/log';
 export class TabSeqFrontierService {
   private _frontier: number | null = null;
   private _hasForeignWrites = false;
+  private _unestablishedFirstOwnSeq: number | null = null;
+  private _unestablishedLastOwnSeq: number | null = null;
+  private _unestablishedHasGap = false;
 
   establishFrontier(seq: number): void {
     if (seq === 0) {
@@ -71,10 +74,21 @@ export class TabSeqFrontierService {
     }
     this._frontier = seq;
     this._hasForeignWrites = false;
+    this._clearUnestablishedWrites();
   }
 
   observeOwnWrite(seq: number): void {
-    if (this._frontier === null || seq <= this._frontier) {
+    if (this._frontier === null) {
+      if (this._unestablishedFirstOwnSeq === null) {
+        this._unestablishedFirstOwnSeq = seq;
+        this._unestablishedLastOwnSeq = seq;
+      } else if (seq > this._unestablishedLastOwnSeq!) {
+        if (seq !== this._unestablishedLastOwnSeq! + 1) this._unestablishedHasGap = true;
+        this._unestablishedLastOwnSeq = seq;
+      }
+      return;
+    }
+    if (seq <= this._frontier) {
       return;
     }
     if (seq !== this._frontier + 1 && !this._hasForeignWrites) {
@@ -96,6 +110,13 @@ export class TabSeqFrontierService {
   resetToUnestablished(): void {
     this._frontier = null;
     this._hasForeignWrites = false;
+    this._clearUnestablishedWrites();
+  }
+
+  private _clearUnestablishedWrites(): void {
+    this._unestablishedFirstOwnSeq = null;
+    this._unestablishedLastOwnSeq = null;
+    this._unestablishedHasGap = false;
   }
 
   isSaveSafeAt(globalLastSeq: number): boolean {
@@ -103,6 +124,23 @@ export class TabSeqFrontierService {
       return true;
     }
     return !this._hasForeignWrites && globalLastSeq === this._frontier;
+  }
+
+  /**
+   * A full-state replacement must not discard another tab's operations. While
+   * unestablished, accept a nonempty log only when its whole sequence range
+   * was observed as contiguous writes by this tab. Read the endpoints while
+   * holding the operation-log lock, so another tab cannot append between them.
+   */
+  isReplacementSafeAt(firstSeq: number | null, lastSeq: number): boolean {
+    if (this._frontier !== null) return this.isSaveSafeAt(lastSeq);
+    if (lastSeq === 0) return firstSeq === null;
+    return (
+      !this._unestablishedHasGap &&
+      firstSeq !== null &&
+      firstSeq === this._unestablishedFirstOwnSeq &&
+      lastSeq === this._unestablishedLastOwnSeq
+    );
   }
 
   /**

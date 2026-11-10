@@ -118,6 +118,7 @@ describe('SyncWrapperService', () => {
         'invalidateCredentialCache',
         'getLastSyncedProviderId',
         'setLastSyncedProviderId',
+        'hasPendingSwitchFromNative',
         'bumpSyncEpoch',
         'assertSyncEpochUnchanged',
       ],
@@ -132,6 +133,7 @@ describe('SyncWrapperService', () => {
     mockProviderManager.invalidateCredentialCache.and.returnValue(Promise.resolve());
     mockProviderManager.getProviderById.and.returnValue(Promise.resolve(undefined));
     mockProviderManager.getLastSyncedProviderId.and.returnValue(null);
+    mockProviderManager.hasPendingSwitchFromNative.and.returnValue(false);
     mockProviderManager.getActiveProvider.and.returnValue({
       id: SyncProviderId.SuperSync,
     } as any);
@@ -869,6 +871,20 @@ describe('SyncWrapperService', () => {
   });
 
   describe('_sync() - Provider switch detection', () => {
+    it('downloads from the beginning after leaving UltraTasks Account, even for the previous file provider', async () => {
+      mockProviderManager.hasPendingSwitchFromNative.and.returnValue(true);
+      mockProviderManager.getLastSyncedProviderId.and.returnValue(
+        SyncProviderId.SuperSync,
+      );
+      configSubject.next(createMockSyncConfig(SyncProviderId.SuperSync));
+
+      await service.sync();
+
+      expect(mockSyncService.downloadRemoteOps).toHaveBeenCalledWith(
+        mockSyncCapableProvider,
+        jasmine.objectContaining({ forceFromSeq0: true }),
+      );
+    });
     it('should pass forceFromSeq0 when provider has changed', async () => {
       mockProviderManager.getLastSyncedProviderId.and.returnValue(SyncProviderId.Dropbox);
       configSubject.next(createMockSyncConfig(SyncProviderId.SuperSync));

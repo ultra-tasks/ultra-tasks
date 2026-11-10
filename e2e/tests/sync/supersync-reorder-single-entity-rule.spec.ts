@@ -357,6 +357,8 @@ const habitOrder = (page: Page): Promise<string[]> =>
 /** Same CDK gesture as the reorder wedge spec, including its enabled-only footprint. */
 const dragHabits = async (page: Page): Promise<void> => {
   await openHabits(page);
+  // Route entry scales the page briefly; read drag coordinates only at rest.
+  await expect(page.locator('.ng-animating')).toHaveCount(0);
   const before = await habitOrder(page);
   const from = await page.locator('.habit-row').last().boundingBox();
   const to = await page.locator('.habit-row').first().boundingBox();

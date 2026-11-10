@@ -1,5 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import type { Page } from '@playwright/test';
+import { createHeaderCounters } from '../../utils/header-counters';
 
 /**
  * The action row keeps whatever scroll it was left with, so the two moments
@@ -14,8 +15,8 @@ import type { Page } from '@playwright/test';
  *   scrolled behind the start edge, a running timer's pause control is
  *   invisible, and the start fade can land on the group gap and say nothing.
  *
- * Widths here are chosen so the row genuinely overflows (~60-80px at 720px
- * with the default side nav), which is what makes the reveal observable.
+ * The tracking test adds two counters so the row genuinely overflows at 720px
+ * with the default side nav, which is what makes the reveal observable.
  */
 
 const scroller = (page: Page): ReturnType<Page['locator']> =>
@@ -61,10 +62,11 @@ test.describe('main header action-row reveal', () => {
     taskPage,
   }) => {
     await workViewPage.waitForTaskList();
+    await createHeaderCounters(page, ['Counter one', 'Counter two']);
     await page.setViewportSize({ width: 720, height: 860 });
     await workViewPage.addTask('track me');
 
-    // The lean header fits at this width until a panel takes part of its space.
+    // The header fits at this width until a panel takes part of its space.
     await page.locator('.e2e-toggle-notes-btn').first().click();
     await expect(page.locator('right-panel.isOpen')).toBeVisible();
     await expect(page.locator('right-panel.isPanelAnimating')).toHaveCount(0);

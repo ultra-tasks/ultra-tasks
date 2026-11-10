@@ -12,7 +12,7 @@ import {
   archiveTask,
   navigateToWorkView,
 } from '../../utils/supersync-helpers';
-import { waitForAppReady } from '../../utils/waits';
+import { waitForAppReady, waitForMenuSettled } from '../../utils/waits';
 
 type Priority = 'high' | 'medium' | 'low' | 1 | 2 | 3 | null;
 interface Backup {
@@ -212,7 +212,9 @@ test('@supersync preserves mixed priority encodings through import, both sync di
     );
     const before = (await getLocalOpLogSummary(a.page)).length;
     await row.click({ button: 'right' });
+    await waitForMenuSettled(a.page);
     await a.page.getByRole('menuitem', { name: /Priority/, exact: false }).click();
+    await waitForMenuSettled(a.page);
     const high = a.page.getByRole('menuitemradio', { name: /High/ });
     await expect(high).toHaveAttribute('aria-checked', 'true');
     await high.click();

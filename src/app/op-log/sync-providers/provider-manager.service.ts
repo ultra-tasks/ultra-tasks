@@ -445,6 +445,15 @@ export class SyncProviderManager {
   }
 
   private readonly _LAST_SYNCED_PROVIDER_KEY = 'SP_LAST_SYNCED_PROVIDER_ID';
+  private readonly _NATIVE_SWITCH_KEY = 'SP_SYNC_FROM_NATIVE_PENDING';
+
+  markSwitchFromNative(): void {
+    localStorage.setItem(this._NATIVE_SWITCH_KEY, '1');
+  }
+
+  hasPendingSwitchFromNative(): boolean {
+    return localStorage.getItem(this._NATIVE_SWITCH_KEY) === '1';
+  }
 
   getLastSyncedProviderId(): SyncProviderId | null {
     return toSyncProviderId(localStorage.getItem(this._LAST_SYNCED_PROVIDER_KEY));
@@ -452,6 +461,7 @@ export class SyncProviderManager {
 
   setLastSyncedProviderId(id: SyncProviderId): void {
     localStorage.setItem(this._LAST_SYNCED_PROVIDER_KEY, id);
+    localStorage.removeItem(this._NATIVE_SWITCH_KEY);
   }
 
   /**

@@ -12,10 +12,53 @@ describe('TabSeqFrontierService (#9438)', () => {
     expect(service.isSaveSafeAt(42)).toBe(true);
   });
 
-  it('ignores own writes before a frontier is established', () => {
+  it('leaves ordinary snapshot checks default-open before a frontier is established', () => {
     service.observeOwnWrite(7);
     expect(service.isSaveSafeAt(7)).toBe(true);
     expect(service.isSaveSafeAt(99)).toBe(true);
+  });
+
+  it('allows an empty log and a fresh profile with only contiguous own writes for replacement', () => {
+    expect(service.isReplacementSafeAt(null, 0)).toBe(true);
+    service.observeOwnWrite(1);
+    service.observeOwnWrite(2);
+    expect(service.isReplacementSafeAt(1, 2)).toBe(true);
+  });
+
+  it('rejects a foreign operation before the first observed own write', () => {
+    service.observeOwnWrite(8);
+    expect(service.isReplacementSafeAt(7, 8)).toBe(false);
+  });
+
+  it('rejects a foreign operation between observed own writes', () => {
+    service.observeOwnWrite(7);
+    service.observeOwnWrite(9);
+    expect(service.isReplacementSafeAt(7, 9)).toBe(false);
+  });
+
+  it('rejects a foreign operation after the last observed own write', () => {
+    service.observeOwnWrite(7);
+    service.observeOwnWrite(8);
+    expect(service.isReplacementSafeAt(7, 9)).toBe(false);
+  });
+
+  it('fails closed for unknown or truncated ranges', () => {
+    expect(service.isReplacementSafeAt(7, 7)).toBe(false);
+    service.observeOwnWrite(7);
+    service.observeOwnWrite(8);
+    expect(service.isReplacementSafeAt(8, 8)).toBe(false);
+    expect(service.isReplacementSafeAt(7, 0)).toBe(false);
+  });
+
+  it('clears observed ranges after a wipe and accepts the resumed sequence generator', () => {
+    service.observeOwnWrite(2);
+    service.observeOwnWrite(4);
+    service.establishFrontier(0);
+    expect(service.isReplacementSafeAt(2, 4)).toBe(false);
+    expect(service.isReplacementSafeAt(null, 0)).toBe(true);
+    service.observeOwnWrite(20);
+    service.observeOwnWrite(21);
+    expect(service.isReplacementSafeAt(20, 21)).toBe(true);
   });
 
   it('is safe exactly at the established frontier', () => {

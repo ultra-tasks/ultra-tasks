@@ -16,7 +16,6 @@ import {
 } from '../../utils/plainspace-fake';
 
 const TASK_ID = 'task-1';
-const REMOTE_TIME = '2026-11-03T14:30:00.000Z';
 
 /** The task's `dueWithTime` as this client's store has it, or null. */
 const dueWithTime = (page: Page): Promise<number | null> =>
@@ -48,6 +47,9 @@ test.describe('@supersync Plainspace: a time removed in Plainspace', () => {
     test.setTimeout(240000);
     const appUrl = baseURL || 'http://localhost:4242';
     const projectName = `Camping ${testRunId}`;
+    // An overdue fixed date opens a reminder dialog and blocks the sync button.
+    const weekInMs = 7 * 24 * 60 * 60 * 1000;
+    const remoteTime = new Date(Date.now() + weekInMs).toISOString();
     let clientA: SimulatedE2EClient | null = null;
     let clientB: SimulatedE2EClient | null = null;
 
@@ -58,14 +60,14 @@ test.describe('@supersync Plainspace: a time removed in Plainspace', () => {
       clientA = await createSimulatedClient(browser, appUrl, 'A', testRunId);
       const server = await installFakePlainspace(clientA.page);
       server.addAssignedTask(TASK_ID, 'Buy tent');
-      server.remoteEdit(TASK_ID, { scheduledAt: REMOTE_TIME });
+      server.remoteEdit(TASK_ID, { scheduledAt: remoteTime });
       const projectPageA = new ProjectPage(clientA.page);
       await projectPageA.createProject(projectName);
       await addPlainspaceProvider(clientA.page, projectName);
       await projectPageA.navigateToProjectByName(projectName);
       await expect
         .poll(() => dueWithTime(clientA!.page), { timeout: 30000 })
-        .toBe(Date.parse(REMOTE_TIME));
+        .toBe(Date.parse(remoteTime));
       await clientA.sync.setupSuperSync(syncConfig);
       await clientA.sync.syncAndWait();
 
@@ -77,7 +79,7 @@ test.describe('@supersync Plainspace: a time removed in Plainspace', () => {
       await clientB.sync.syncAndWait();
       await expect
         .poll(() => dueWithTime(clientB!.page), { timeout: 30000 })
-        .toBe(Date.parse(REMOTE_TIME));
+        .toBe(Date.parse(remoteTime));
 
       // Someone removes the time in Plainspace; A pulls it.
       server.remoteEdit(TASK_ID, { scheduledAt: null });

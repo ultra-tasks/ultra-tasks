@@ -4,26 +4,31 @@
   <mat-form-field>
     <mat-label>{{ T.F.SYNC.FORM.L_SYNC_PROVIDER | translate }}</mat-label>
     <mat-select
+      [disabled]="isInitialSettingsUnavailable() || isSaving()"
       [value]="setupProvider()"
       (selectionChange)="selectSetupProvider($event.value)"
     >
-      <mat-option
-        [value]="ultraSync"
-        [disabled]="isWasEnabled()"
-        >UltraSync</mat-option
-      >
+      <mat-option [value]="ultraSync">UltraTasks Account</mat-option>
       @for (option of setupOptions(); track option.value) {
-        <mat-option
-          [value]="option.value"
-          [disabled]="
-            native.configured() || (isWasEnabled() && option.value !== savedProvider())
-          "
-        >
+        <mat-option [value]="option.value">
           {{ option.label | translate }}
         </mat-option>
       }
     </mat-select>
   </mat-form-field>
+  @if (isInitialSettingsLoading()) {
+    <p aria-live="polite">{{ T.SYNC_SETUP.LOADING_PROVIDER | translate }}</p>
+  }
+  @if (isInitialSettingsLoadFailed()) {
+    <p role="alert">{{ T.SYNC_SETUP.INITIAL_SETTINGS_ERROR | translate }}</p>
+    <button
+      type="button"
+      mat-button
+      (click)="retryInitialSettings()"
+    >
+      {{ T.SYNC_SETUP.RETRY_PROVIDER | translate }}
+    </button>
+  }
   @if (isWasEnabled() || native.configured()) {
     <p>{{ T.SYNC_SETUP.SWITCH_HELP | translate }}</p>
   }
@@ -36,8 +41,30 @@
       <p>{{ T.SYNC_SETUP.LEGACY_NOTICE | translate }}</p>
     }
   }
-  @if (_tmpUpdatedCfg && setupProvider() !== ultraSync) {
-    <form [formGroup]="form">
+  @if (isProviderConfigLoading() && setupProvider() !== ultraSync) {
+    <p aria-live="polite">{{ T.SYNC_SETUP.LOADING_PROVIDER | translate }}</p>
+  }
+  @if (isProviderConfigLoadFailed() && setupProvider() !== ultraSync) {
+    <p role="alert">{{ T.SYNC_SETUP.SAVED_CONNECTIONS_ERROR | translate }}</p>
+    <button
+      type="button"
+      mat-button
+      (click)="retryProviderConfig()"
+    >
+      {{ T.SYNC_SETUP.RETRY_PROVIDER | translate }}
+    </button>
+  }
+  @if (
+    _tmpUpdatedCfg &&
+    setupProvider() !== ultraSync &&
+    !isProviderConfigLoading() &&
+    !isProviderConfigLoadFailed()
+  ) {
+    <form
+      [formGroup]="form"
+      [attr.inert]="isSaving() ? '' : null"
+      [attr.aria-busy]="isSaving()"
+    >
       <formly-form
         (modelChange)="updateTmpCfg($event)"
         [fields]="fields()"
@@ -47,12 +74,16 @@
       </formly-form>
     </form>
   }
+  @if (isSaving()) {
+    <p role="status">{{ T.SYNC_SETUP.SAVING | translate }}</p>
+  }
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
   <div class="wrap-buttons">
     <button
       (click)="close()"
+      [disabled]="isSaving()"
       mat-button
     >
       {{ T.G.CANCEL | translate }}
@@ -61,6 +92,7 @@
       <button
         mat-flat-button
         color="primary"
+        [disabled]="isInitialSettingsUnavailable() || isSaving()"
         routerLink="/native-sync"
         (click)="openUltraSync()"
       >
@@ -68,7 +100,13 @@
       </button>
     } @else {
       <button
-        [disabled]="!form.valid"
+        [disabled]="
+          isInitialSettingsUnavailable() ||
+          isSaving() ||
+          isProviderConfigLoading() ||
+          isProviderConfigLoadFailed() ||
+          !form.valid
+        "
         (click)="save()"
         color="primary"
         mat-flat-button

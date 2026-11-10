@@ -5,14 +5,26 @@ import { expect, test } from '../../fixtures/test.fixture';
 import { flushPendingWrites } from '../../utils/waits';
 import { closeDetailPanelIfOpen } from '../../utils/schedule-task-helper';
 
-const saveAttachment = async (page: Page, path: string): Promise<void> => {
+const saveAttachment = async (
+  page: Page,
+  path: string,
+  title?: string,
+): Promise<void> => {
   const dialog = page.locator('dialog-edit-task-attachment');
   const pathInput = dialog.locator('input[name="path"]');
   const save = dialog.getByRole('button', { name: 'Save', exact: true });
   // A fill that lands while the dialog is still opening can be cleared again,
   // so fill until the value sticks and the form accepts it.
   await expect(async () => {
+    if (title !== undefined) {
+      await dialog.locator('input[name="title"]').fill(title);
+    }
     await pathInput.fill(path);
+    if (title !== undefined) {
+      await expect(dialog.locator('input[name="title"]')).toHaveValue(title, {
+        timeout: 1000,
+      });
+    }
     await expect(pathInput).toHaveValue(path, { timeout: 1000 });
     await expect(save).toBeEnabled({ timeout: 1000 });
   }).toPass({ timeout: 15000 });
@@ -42,11 +54,17 @@ test('duplicate attachment edits and deletion stay scoped to the copied task', a
   const originalId = await original.getAttribute('id');
   await taskPage.openTaskDetail(original);
   const panel = page.locator('task-detail-panel');
-  await panel.locator('task-detail-item').filter({ hasText: 'Links & Files' }).click();
-  await page
-    .locator('dialog-edit-task-attachment input[name="title"]')
-    .fill('Synthetic original link');
-  await saveAttachment(page, 'https://attachment.example.test/original');
+  await panel
+    .locator('task-detail-item.input-item:has(mat-icon:text-is("attach_file"))')
+    .click();
+  await saveAttachment(
+    page,
+    'https://attachment.example.test/original',
+    'Synthetic original link',
+  );
+  await expect(panel.locator('a.attachment-link')).toContainText(
+    'Synthetic original link',
+  );
   await expect
     .poll(() => attachmentPath(page, originalId))
     .toBe('https://attachment.example.test/original');

@@ -18,6 +18,7 @@ import { Log } from '../log';
 import { T } from '../../t.const';
 import { OperationLogStoreService } from '../../op-log/persistence/operation-log-store.service';
 import { OperationLogSyncService } from '../../op-log/sync/operation-log-sync.service';
+import { OperationWriteFlushService } from '../../op-log/sync/operation-write-flush.service';
 import { LegacyPfDbService } from '../persistence/legacy-pf-db.service';
 import { LegacySupDbService } from '../persistence/legacy-sup-db.service';
 import { confirmDialog } from '../../util/native-dialogs';
@@ -74,6 +75,7 @@ export class StartupService {
   private _trackingReminderService = inject(TrackingReminderService);
   private _updateCheckService = inject(UpdateCheckService);
   private _opLogStore = inject(OperationLogStoreService);
+  private _operationWriteFlushService = inject(OperationWriteFlushService);
   private _legacyPfDb = inject(LegacyPfDbService);
   private _legacySupDb = inject(LegacySupDbService);
   private _store = inject(Store);
@@ -187,7 +189,9 @@ export class StartupService {
         }
         if (
           gCfg.misc.isConfirmBeforeExit ||
-          this._syncWrapperService.isSyncInProgressSync()
+          this._syncWrapperService.isSyncInProgressSync() ||
+          // An edit can be visible while its IndexedDB operation is still queued.
+          this._operationWriteFlushService.hasPendingWrites()
         ) {
           e.preventDefault();
           e.returnValue = '';

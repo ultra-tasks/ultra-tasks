@@ -206,7 +206,14 @@ test.describe('@supersync Android share capture', () => {
     const grants = await (await api(user, '/grants')).json();
     expect(grants.otherPendingCount).toBe(1);
 
-    await clientA.sync.syncAndWait();
+    // The capture is imported immediately after a successful sync and can
+    // create a new pending operation before the completed icon appears.
+    // Observe the sync response, then verify the import and flush it below.
+    const syncResponse = clientA.page.waitForResponse(
+      (response) => response.url().includes('/api/sync/ops') && response.ok(),
+    );
+    await clientA.sync.clickSyncBtn();
+    expect(await (await syncResponse).finished()).toBeNull();
     await expectInboxTask(clientA, title);
     await expect
       .poll(async () => (await (await api(user, '/grants')).json()).otherPendingCount, {

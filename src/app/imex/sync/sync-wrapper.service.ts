@@ -608,14 +608,14 @@ export class SyncWrapperService {
       // Detect provider switch: force fresh download to trigger conflict dialog
       const lastSyncedProvider = this._providerManager.getLastSyncedProviderId();
       const isProviderSwitch =
-        lastSyncedProvider !== null && lastSyncedProvider !== providerId;
+        this._providerManager.hasPendingSwitchFromNative() ||
+        (lastSyncedProvider !== null && lastSyncedProvider !== providerId);
       if (isProviderSwitch) {
         SyncLog.warn(
           `SyncWrapperService: Provider switch detected (${lastSyncedProvider} → ${providerId}). ` +
             'Forcing download from seq 0 for fresh state comparison.',
         );
       }
-
       // Capture sync history BEFORE download. The SYNC_IMPORT conflict gate (both the
       // download and piggyback-upload paths) uses this to decide whether a USE_LOCAL
       // choice would overwrite a populated remote with throwaway pre-first-sync state.

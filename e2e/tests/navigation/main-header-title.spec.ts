@@ -1,5 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import type { Page } from '@playwright/test';
+import { createHeaderCounters } from '../../utils/header-counters';
 
 /**
  * How the header divides a row that is too narrow for everything in it (#9480).
@@ -14,24 +15,6 @@ import type { Page } from '@playwright/test';
  * Asserted against the live layout rather than against any bookkeeping: the
  * regressions here were always the CSS and the model disagreeing.
  */
-const createClickCounter = async (page: Page, title: string): Promise<void> => {
-  await page.goto('/#/habits');
-  await page.waitForURL(/habits/);
-
-  await page.locator('.add-habit-btn').click();
-  const dialog = page.locator('dialog-simple-counter-edit-settings');
-  await expect(dialog).toBeVisible();
-
-  await dialog.locator('formly-form input').first().fill(title);
-  await dialog.locator('mat-select').first().click();
-  await page.locator('mat-option:has-text("Click Counter")').click();
-  await dialog.locator('button[type="submit"]').click();
-  await expect(dialog).toBeHidden();
-
-  await page.goto('/#/tag/TODAY/tasks');
-  await page.waitForURL(/(active\/tasks|tag\/TODAY\/tasks)/);
-};
-
 const openNotesPanel = async (page: Page): Promise<void> => {
   await page.locator('.e2e-toggle-notes-btn').first().click();
   await expect(page.locator('right-panel.isOpen')).toBeVisible();
@@ -251,7 +234,7 @@ test.describe('main header title and action row', () => {
     workViewPage,
   }) => {
     await workViewPage.waitForTaskList();
-    await createClickCounter(page, 'Water');
+    await createHeaderCounters(page, ['Water']);
     await page.setViewportSize({ width: 400, height: 860 });
 
     // Not inline any more, and one trigger in their place.
@@ -321,6 +304,7 @@ test.describe('main header title and action row', () => {
    */
   test('scrolls the action row with a plain wheel', async ({ page, workViewPage }) => {
     await workViewPage.waitForTaskList();
+    await createHeaderCounters(page, ['Counter one', 'Counter two']);
     await page.setViewportSize({ width: 700, height: 860 });
     await openNotesPanel(page);
 
@@ -367,18 +351,18 @@ test.describe('main header title and action row', () => {
   }) => {
     await page.setViewportSize({ width: 1100, height: 900 });
     await workViewPage.waitForTaskList();
+    await createHeaderCounters(page, ['Counter one', 'Counter two']);
     await workViewPage.addTask('A tracked task with a fairly long name');
     await page.locator('.play-btn.tour-playBtn').first().click();
 
     const pill = page.locator('.current-task-title');
 
     // One window width, two answers -- which is the whole point, and the thing
-    // a viewport rule cannot express. At 1100px the row has ~320px of leftover
-    // and the pill shows.
+    // a viewport rule cannot express. At 1100px the pill initially has room.
     await expect(pill).toBeVisible();
 
-    // Same 1100px window, but the notes panel now takes the leftover down to
-    // zero, so the pill goes. This is the assertion that fails against the
+    // Same 1100px window, but the notes panel now takes the leftover below the
+    // pill's minimum, so it goes. This is the assertion that fails against the
     // 1080px cutoff it replaced: at 1100px that rule shows the pill, with
     // nowhere for it to sit (#8818 in reverse).
     await openNotesPanel(page);

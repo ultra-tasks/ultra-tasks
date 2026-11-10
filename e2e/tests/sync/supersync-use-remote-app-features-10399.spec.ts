@@ -130,7 +130,7 @@ const exportedAppFeatures = async (page: Page): Promise<Record<string, unknown>>
   const importPage = new ImportPage(page);
   await importPage.navigateToImportPage();
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export Data', exact: true }).click();
+  await importPage.exportBackupBtn.click();
   const download = await downloadPromise;
   const backupPath = path.join(os.tmpdir(), `sp-10399-${Date.now()}.json`);
   await download.saveAs(backupPath);
