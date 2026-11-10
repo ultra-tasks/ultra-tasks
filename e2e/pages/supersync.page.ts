@@ -440,10 +440,11 @@ export class SuperSyncPage extends BasePage {
     // first-time setup. Close/reopen so the dialog reads the durable fixture.
     const configRestored = await restoreSavedSuperSyncConnection(this.page);
     if (configRestored) {
-      await this.page
-        .locator('dialog-sync-cfg')
-        .getByRole('button', { name: 'Cancel', exact: true })
-        .click();
+      const dialog = this.page.locator('dialog-sync-cfg');
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      // The closing dialog can still look visible when the next right-click
+      // occurs, causing the subsequent readiness check to match the old one.
+      await expect(dialog).toBeHidden();
       await this.clickSyncBtn({ button: 'right', noWaitAfter: true });
       await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
     }
