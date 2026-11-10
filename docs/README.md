@@ -49,6 +49,9 @@ must link to their replacement, and keep their original number.
 
 ## Active plans
 
+- [Zen-inspired shell: audit and combined proposal](plans/2026-11-10-zen-inspired-shell-proposal.md)
+  — review of the Codex Upcoming, Calendar, empty-state, Focus and first-run work against
+  Zen Browser prior art, with ordered fixes and declined ideas
 - [UltraSync and account sign-in for app 0.3.0](plans/2026-11-07-ultrasync-0.3.0-release.md)
   — official/custom account setup, browser-to-app sign-in, MFA/storage parity,
   private-sync delivery, and personal-only provider migration; Google Drive follows later
