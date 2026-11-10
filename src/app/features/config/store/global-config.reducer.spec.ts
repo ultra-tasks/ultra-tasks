@@ -226,6 +226,74 @@ describe('GlobalConfigReducer', () => {
     });
 
     describe('keyboard migration', () => {
+      it('uses current defaults for fields missing from a saved keyboard config', () => {
+        const result = globalConfigReducer(
+          initialGlobalConfigState,
+          loadAllData({
+            appDataComplete: {
+              globalConfig: { ...initialGlobalConfigState, keyboard: { showHelp: null } },
+            } as unknown as AppDataComplete,
+          }),
+        );
+
+        expect(result.keyboard.showHelp).toBeNull();
+        expect(result.keyboard.showSearchBar).toBe('Ctrl+F');
+        expect(result.keyboard.goToScheduledView).toBe('Shift+C');
+        expect(result.keyboard.goToSettings).toBe('Ctrl+,');
+        expect(result.keyboard.taskScheduleToday).toBe('Alt+T');
+        expect(result.keyboard.taskCopy).toBe('Ctrl+C');
+        expect(result.keyboard.taskPaste).toBe('Ctrl+V');
+        expect(result.keyboard.undo).toBe('Ctrl+Z');
+        expect(result.keyboard.redo).toBe('Ctrl+Y');
+      });
+
+      it('loads the complete current defaults from an empty keyboard config', () => {
+        const result = globalConfigReducer(
+          initialGlobalConfigState,
+          loadAllData({
+            appDataComplete: {
+              globalConfig: { ...initialGlobalConfigState, keyboard: {} },
+            } as unknown as AppDataComplete,
+          }),
+        );
+
+        expect(result.keyboard).toEqual(DEFAULT_GLOBAL_CONFIG.keyboard);
+      });
+
+      it('keeps explicitly assigned shortcuts when filling missing defaults', () => {
+        const result = globalConfigReducer(
+          initialGlobalConfigState,
+          loadAllData({
+            appDataComplete: {
+              globalConfig: {
+                ...initialGlobalConfigState,
+                keyboard: { showSearchBar: 'Alt+F', goToSettings: null },
+              },
+            } as unknown as AppDataComplete,
+          }),
+        );
+
+        expect(result.keyboard.showSearchBar).toBe('Alt+F');
+        expect(result.keyboard.goToSettings).toBeNull();
+        expect(result.keyboard.goToScheduledView).toBe('Shift+C');
+      });
+
+      it('preserves explicitly disabled clipboard and history shortcuts', () => {
+        const result = globalConfigReducer(
+          initialGlobalConfigState,
+          loadAllData({
+            appDataComplete: {
+              globalConfig: {
+                ...initialGlobalConfigState,
+                keyboard: { taskCopy: null, redo: null },
+              },
+            } as unknown as AppDataComplete,
+          }),
+        );
+        expect(result.keyboard.taskCopy).toBeNull();
+        expect(result.keyboard.redo).toBeNull();
+      });
+
       const legacyKeyboardWithoutTaskNotesShortcut = (
         overrides: Record<string, unknown>,
       ): Record<string, unknown> => {

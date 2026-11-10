@@ -62,6 +62,7 @@ import { DateService } from '../../../core/date/date.service';
 import { canConvertTaskToSubTask } from '../util/can-convert-task-to-sub-task';
 import { TODAY_TAG } from '../../tag/tag.const';
 import { TaskMultiSelectService } from '../task-multi-select.service';
+import { TaskDoneOrderService } from '../task-done-order.service';
 
 export type TaskListId = 'PARENT' | 'SUB';
 export type ListModelId = DropListModelSource | string;
@@ -127,6 +128,7 @@ export class TaskListComponent implements OnDestroy, AfterViewInit {
   private _taskViewCustomizerService = inject(TaskViewCustomizerService);
   private _externalDragService = inject(TaskExternalDragService);
   private _dateService = inject(DateService);
+  private readonly _doneOrder = inject(TaskDoneOrderService);
   private _ngZone = inject(NgZone);
   dropListService = inject(DropListService);
   private _layoutService = inject(LayoutService);
@@ -642,12 +644,12 @@ export class TaskListComponent implements OnDestroy, AfterViewInit {
       return;
     }
 
-    // The Done list is always ordered by completion date, so reordering within
-    // it can't take effect (the view re-sorts on the next emission). Skip the
-    // move to avoid emitting a spurious taskIds-reorder op that would sync to
-    // other devices. Dragging a task OUT of Done (DONE -> UNDONE) still falls
-    // through below.
+    // Project Done lists support a manual order without changing completion time.
+    // Other contexts retain completion-date ordering.
     if (src === 'DONE' && target === 'DONE') {
+      if (srcListId === 'PARENT' && targetListId === 'PARENT') {
+        this._doneOrder.moveAfter(taskId, getAnchorFromDragDrop(taskId, newOrderedIds));
+      }
       return;
     }
 

@@ -4,6 +4,7 @@ import {
   NavigatorWithKeyboard,
   NavigatorKeyboard,
 } from '../core/keyboard-layout/keyboard-layout.service';
+import { IS_MAC } from './is-mac';
 
 // Re-export types for backwards compatibility
 export type { KeyboardLayout, NavigatorWithKeyboard, NavigatorKeyboard };
@@ -91,6 +92,7 @@ export const prepareKeyCode = (code: KeyboardEvent['code']): string => {
       codeMapping: {
         [KEYS.MINUS.code]: KEYS.MINUS.raw,
         [KEYS.PLUS.code]: KEYS.PLUS.raw,
+        Comma: ',',
       },
       replaces: {
         Key: '',
@@ -184,7 +186,18 @@ export const checkKeyCombo = (
 
   const isCorrectKeyPressed = isComboIncludesPlusKey
     ? pressedKey === KEYS.PLUS.raw
-    : pressedKey === splittedCombo.key;
+    : pressedKey === splittedCombo.key || (splittedCombo.key === ',' && ev.key === ',');
 
   return isAllModifiersValid && isCorrectKeyPressed;
 };
+
+/** Adds the macOS equivalent of selected standard defaults without changing
+ * the literal meaning of arbitrary user-configured shortcuts. */
+export const checkStandardKeyCombo = (
+  ev: KeyboardEvent,
+  combo: string | null | undefined,
+  standard: string,
+  isMac = IS_MAC,
+): boolean =>
+  checkKeyCombo(ev, combo) ||
+  (isMac && combo === standard && checkKeyCombo(ev, standard.replace('Ctrl+', 'Meta+')));

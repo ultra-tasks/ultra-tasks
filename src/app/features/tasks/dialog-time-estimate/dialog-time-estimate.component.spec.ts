@@ -5,6 +5,7 @@ import { DEFAULT_TASK, Task } from '../task.model';
 import { TaskService } from '../task.service';
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
 import { DialogTimeEstimateComponent } from './dialog-time-estimate.component';
+import { TaskUndoService } from '../task-undo.service';
 
 const OTHER_DAY = '2026-10-01';
 
@@ -13,6 +14,7 @@ describe('DialogTimeEstimateComponent closing (#10823)', () => {
   let keydown$: Subject<KeyboardEvent>;
   let dialogRef: { disableClose: boolean; close: jasmine.Spy } & Record<string, unknown>;
   let taskService: jasmine.SpyObj<TaskService>;
+  let taskUndoService: jasmine.SpyObj<TaskUndoService>;
 
   const task: Task = {
     ...DEFAULT_TASK,
@@ -36,6 +38,7 @@ describe('DialogTimeEstimateComponent closing (#10823)', () => {
       keydownEvents: () => keydown$,
     };
     taskService = jasmine.createSpyObj('TaskService', ['update']);
+    taskUndoService = jasmine.createSpyObj('TaskUndoService', ['updateEstimate']);
 
     await TestBed.configureTestingModule({
       imports: [DialogTimeEstimateComponent],
@@ -44,6 +47,7 @@ describe('DialogTimeEstimateComponent closing (#10823)', () => {
         { provide: MAT_DIALOG_DATA, useValue: { task } },
         { provide: MatDialog, useValue: {} },
         { provide: TaskService, useValue: taskService },
+        { provide: TaskUndoService, useValue: taskUndoService },
         { provide: DateTimeFormatService, useValue: { currentLocale: () => 'en' } },
       ],
     })
@@ -71,6 +75,18 @@ describe('DialogTimeEstimateComponent closing (#10823)', () => {
     backdropClick$.next(new MouseEvent('click'));
 
     expect(taskService.update).toHaveBeenCalledTimes(1);
+    expect(taskUndoService.updateEstimate).not.toHaveBeenCalled();
+  });
+
+  it('uses the history service for a supported estimate-only edit', () => {
+    taskUndoService.updateEstimate.and.returnValue(true);
+    const cmp = createComponent();
+    cmp.taskCopy.timeEstimate = 120000;
+
+    cmp.submit();
+
+    expect(taskUndoService.updateEstimate).toHaveBeenCalledWith('task-1', 60000, 120000);
+    expect(taskService.update).not.toHaveBeenCalled();
   });
 
   it('closes without an update when tapping outside unchanged', () => {

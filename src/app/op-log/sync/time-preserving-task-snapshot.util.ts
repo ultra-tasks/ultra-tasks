@@ -43,6 +43,7 @@ const OPTIONAL_TASK_FIELDS = Object.keys({
   issuePoints: true,
   issueLastSyncedValues: true,
   priority: true,
+  doneOrder: true,
   dueWithTime: true,
   dueDay: true,
   hasPlannedTime: true,
@@ -57,7 +58,11 @@ const OPTIONAL_TASK_FIELDS = Object.keys({
  * Optional fields added after v19.2.0. Snapshots from released clients don't
  * list them in `clearedFields`, so they're cleared but not required below.
  */
-const OPTIONAL_TASK_FIELDS_AFTER_V19_2 = new Set(['wontDoOn', 'integration']);
+const OPTIONAL_TASK_FIELDS_AFTER_V19_2 = new Set([
+  'wontDoOn',
+  'integration',
+  'doneOrder',
+]);
 
 /** Resolution rows are inspected by their keys only, never merged by value. */
 export const isTimelessTaskPatch = (op: Operation, entityId: string): boolean => {

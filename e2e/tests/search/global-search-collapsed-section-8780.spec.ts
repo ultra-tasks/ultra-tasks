@@ -94,7 +94,7 @@ test.describe('Global Search — collapsed section (#8780)', () => {
     await section.locator('.collapsible-header').first().click();
     await expect(taskRow).toHaveCount(0);
 
-    await page.keyboard.press('Shift+F');
+    await page.keyboard.press('Control+F');
     await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
     await page.locator('search-page .search-field input').fill(taskName);
     const result = page
@@ -171,7 +171,7 @@ test.describe('Global Search — collapsed section (#8780)', () => {
     await section.locator('.collapsible-header').first().click();
     await expect(page.locator(`task[data-task-id="${parentId}"]`)).toHaveCount(0);
 
-    await page.keyboard.press('Shift+F');
+    await page.keyboard.press('Control+F');
     await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
     await page.locator('search-page .search-field input').fill(subTaskName);
     const result = page

@@ -7,6 +7,7 @@ import { provideMockActions } from '@ngrx/effects/testing';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { of, Subject, throwError } from 'rxjs';
 import { IssueTwoWaySyncEffects } from './issue-two-way-sync.effects';
+import { LocalExternalSyncSuppressionService } from '../../integrations/local-external-sync-suppression.service';
 import { TaskService } from '../../tasks/task.service';
 import { IssueProviderService } from '../issue-provider.service';
 import { IssueSyncAdapterRegistryService } from './issue-sync-adapter-registry.service';
@@ -209,6 +210,76 @@ describe('IssueTwoWaySyncEffects', () => {
   });
 
   describe('pushFieldsOnTaskUpdate$', () => {
+    it('never queues an update that was made while its integration was read-only', fakeAsync(() => {
+      effects.pushFieldsOnTaskUpdate$.subscribe();
+      const action = TaskSharedActions.updateTask({
+        task: { id: 'task-1', changes: { notes: 'Local note' } },
+      });
+      TestBed.inject(LocalExternalSyncSuppressionService).suppress(action);
+      actions$.next(action);
+      tick();
+      expect(taskServiceSpy.getByIdOnce$).not.toHaveBeenCalled();
+      expect(issueProviderServiceSpy.getCfgOnce$).not.toHaveBeenCalled();
+    }));
+
+    for (const readOnly of ['import', 'stopped'] as const) {
+      it(`does not contact the provider for a ${readOnly} task edit`, fakeAsync(() => {
+        const adapter = createMockAdapter({
+          getFieldMappings: jasmine.createSpy('getFieldMappings').and.returnValue([
+            {
+              taskField: 'notes',
+              issueField: 'description',
+              defaultDirection: 'both',
+              toIssueValue: (value: unknown) => value,
+              toTaskValue: (value: unknown) => value,
+            },
+          ]),
+        });
+        adapterRegistry.register('TEST_PROVIDER', adapter);
+        taskServiceSpy.getByIdOnce$.and.returnValue(
+          of(
+            createMockTask({
+              id: 'task-1',
+              issueType: 'TEST_PROVIDER' as any,
+              issueId: 'issue-1',
+              issueProviderId: 'provider-1',
+              integration: {
+                providerId: 'provider-1',
+                providerKey: 'JIRA',
+                remoteId: 'issue-1',
+                mode: readOnly === 'import' ? 'import' : 'sync',
+                stopped: readOnly === 'stopped',
+              },
+            }),
+          ),
+        );
+        issueProviderServiceSpy.getCfgOnce$.and.returnValue(
+          of(createMockIssueProvider()),
+        );
+        effects.pushFieldsOnTaskUpdate$.subscribe();
+        actions$.next(
+          TaskSharedActions.updateTask({
+            task: { id: 'task-1', changes: { notes: 'Local note' } },
+          }),
+        );
+        tick();
+        expect(adapter.fetchIssue).not.toHaveBeenCalled();
+        expect(adapter.pushChanges).not.toHaveBeenCalled();
+      }));
+    }
+
+    it('does not push priority-only edits of linked tasks', fakeAsync(() => {
+      effects.pushFieldsOnTaskUpdate$.subscribe();
+      actions$.next(
+        TaskSharedActions.updateTask({
+          task: { id: 'task-1', changes: { priority: 2 } },
+        }),
+      );
+      tick();
+      expect(taskServiceSpy.getByIdOnce$).not.toHaveBeenCalled();
+      expect(issueProviderServiceSpy.getCfgOnce$).not.toHaveBeenCalled();
+    }));
+
     it('should push isDone change to remote issue', fakeAsync(() => {
       const adapter = createMockAdapter({
         getFieldMappings: jasmine

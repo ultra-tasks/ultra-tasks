@@ -2,7 +2,7 @@ import { computed, inject, Injectable } from '@angular/core';
 import { TaskFocusService } from './task-focus.service';
 import { TaskService } from './task.service';
 import { GlobalConfigService } from '../config/global-config.service';
-import { checkKeyCombo } from '../../util/check-key-combo';
+import { checkKeyCombo, checkStandardKeyCombo } from '../../util/check-key-combo';
 import { Log } from '../../core/log';
 import { TaskComponent } from './task/task.component';
 import { TaskContextMenuComponent } from './task-context-menu/task-context-menu.component';
@@ -12,7 +12,6 @@ import { isInputElement } from '../../util/dom-element';
 import { getDomFocusedTaskId } from './get-dom-focused-task-id';
 import { TaskMultiSelectService } from './task-multi-select.service';
 import { TaskBulkActionService } from './task-bulk-action.service';
-import { taskToMarkdownChecklist } from './task-to-markdown-checklist';
 import { GROUP_NAV_SELECTOR } from '../../ui/collapsible/collapsible.component';
 import { findAdjacentFocusable } from '../../util/find-adjacent-focusable';
 
@@ -102,7 +101,7 @@ export class TaskShortcutService {
       }
     }
 
-    // Schedule for today (Shift+T). This is the one task shortcut wired to work
+    // Schedule for today. This is the one task shortcut wired to work
     // without a live <task> component, so it also fires from views that render
     // <planner-task> (the Planner overdue list). When a real <task> is focused
     // we delegate instead, because that path also keeps keyboard focus sane when
@@ -161,26 +160,7 @@ export class TaskShortcutService {
       return false;
     }
 
-    // Ctrl+C / Cmd+C: copy the focused task and its sub tasks as a markdown
-    // checklist. Match on `code` (physical position) so the shortcut still
-    // fires on non-Latin layouts, mirroring how native copy is bound.
-    if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && ev.code === 'KeyC') {
-      const target = ev.target;
-      const hasTextSelected = !!window.getSelection()?.toString();
-      if (
-        !(target instanceof HTMLElement && isInputElement(target)) &&
-        !hasTextSelected
-      ) {
-        // Read from the store rather than lastFocusedTaskComponent, which can
-        // lag behind the DOM-derived focusedTaskId — the task under the focus
-        // border must always be the one that lands on the clipboard.
-        this._copyTaskAsMarkdownChecklist(focusedTaskId);
-        ev.preventDefault();
-        return true;
-      }
-    }
-
-    const isShiftOrCtrlPressed = ev.shiftKey || ev.ctrlKey;
+    const isUnmodified = !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey;
 
     // Check if the focused task's context menu is open - if so, skip arrow navigation shortcuts
     const isContextMenuOpen = this._isTaskContextMenuOpen(focusedTaskId);
@@ -190,7 +170,7 @@ export class TaskShortcutService {
     // "edit title" handler below. A user-bound `togglePlay` is checked
     // earlier (line ~74), so remapping `togglePlay` to Mod+Enter takes
     // precedence over this hardcoded combo.
-    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+    if (ev.ctrlKey !== ev.metaKey && !ev.altKey && !ev.shiftKey && ev.key === 'Enter') {
       this._handleTaskShortcut(focusedTaskId, 'addSubTask');
       ev.preventDefault();
       return true;
@@ -199,7 +179,7 @@ export class TaskShortcutService {
     // Basic task actions that work through component delegation
     if (
       !isContextMenuOpen &&
-      (checkKeyCombo(ev, keys.taskEditTitle) || ev.key === 'Enter')
+      (checkKeyCombo(ev, keys.taskEditTitle) || (isUnmodified && ev.key === 'Enter'))
     ) {
       this._handleTaskShortcut(focusedTaskId, 'focusTitleForEdit');
       ev.preventDefault();
@@ -265,7 +245,7 @@ export class TaskShortcutService {
       ev.preventDefault();
       return true;
     }
-    if (checkKeyCombo(ev, keys.taskDuplicate)) {
+    if (checkStandardKeyCombo(ev, keys.taskDuplicate, 'Ctrl+D')) {
       this._handleTaskShortcut(focusedTaskId, 'duplicateTask');
       ev.preventDefault();
       return true;
@@ -313,7 +293,7 @@ export class TaskShortcutService {
     // Navigation shortcuts - only work if context menu is not open
     if (
       !isContextMenuOpen &&
-      ((!isShiftOrCtrlPressed && ev.key === 'ArrowUp') ||
+      ((isUnmodified && ev.key === 'ArrowUp') ||
         checkKeyCombo(ev, keys.selectPreviousTask))
     ) {
       this._handleTaskShortcut(focusedTaskId, 'handleArrowUp');
@@ -323,8 +303,7 @@ export class TaskShortcutService {
 
     if (
       !isContextMenuOpen &&
-      ((!isShiftOrCtrlPressed && ev.key === 'ArrowDown') ||
-        checkKeyCombo(ev, keys.selectNextTask))
+      ((isUnmodified && ev.key === 'ArrowDown') || checkKeyCombo(ev, keys.selectNextTask))
     ) {
       this._handleTaskShortcut(focusedTaskId, 'handleArrowDown');
       ev.preventDefault();
@@ -334,7 +313,8 @@ export class TaskShortcutService {
     // Arrow navigation for expand/collapse - only work if context menu is not open
     if (
       !isContextMenuOpen &&
-      (ev.key === 'ArrowLeft' || checkKeyCombo(ev, keys.collapseSubTasks))
+      ((isUnmodified && ev.key === 'ArrowLeft') ||
+        checkKeyCombo(ev, keys.collapseSubTasks))
     ) {
       this._handleTaskShortcut(focusedTaskId, 'handleArrowLeft');
       ev.preventDefault();
@@ -343,7 +323,8 @@ export class TaskShortcutService {
 
     if (
       !isContextMenuOpen &&
-      (ev.key === 'ArrowRight' || checkKeyCombo(ev, keys.expandSubTasks))
+      ((isUnmodified && ev.key === 'ArrowRight') ||
+        checkKeyCombo(ev, keys.expandSubTasks))
     ) {
       this._handleTaskShortcut(focusedTaskId, 'handleArrowRight');
       ev.preventDefault();
@@ -438,8 +419,8 @@ export class TaskShortcutService {
     }
 
     // Ctrl/Cmd+A on a focused row selects every row of its list. Goes through
-    // checkKeyCombo so the user's keyboard-layout map applies. The global
-    // handler lets Cmd+key through from inputs, so guard against a title edit.
+    // checkKeyCombo so the user's keyboard-layout map applies. Guard against
+    // a title edit when this service is called directly.
     if (
       selectableRowId &&
       (checkKeyCombo(ev, 'Ctrl+A') || checkKeyCombo(ev, 'Meta+A')) &&
@@ -577,28 +558,6 @@ export class TaskShortcutService {
       return true;
     }
     return false;
-  }
-
-  /**
-   * Writes the task and its sub tasks to the clipboard as a markdown checklist.
-   */
-  private _copyTaskAsMarkdownChecklist(taskId: TaskId): void {
-    this._taskService
-      .getByIdWithSubTaskData$(taskId)
-      // getByIdWithSubTaskData$ is a `take(1)` store select, so this resolves
-      // synchronously — no cleanup needed.
-      .subscribe((task) => {
-        // The selector returns undefined for an unknown id (#9946).
-        if (!task) {
-          Log.warn('No task data to copy for focused task');
-          return;
-        }
-        void navigator.clipboard
-          ?.writeText(taskToMarkdownChecklist(task))
-          .catch((err) => {
-            Log.warn('Failed to copy task to clipboard:', err);
-          });
-      });
   }
 
   /**

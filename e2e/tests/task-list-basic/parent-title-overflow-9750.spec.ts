@@ -41,11 +41,11 @@ test.describe('Task title overflow with parent title', () => {
     await parentTask.waitFor({ state: 'visible' });
     await workViewPage.addSubTask(parentTask, SUB_TASK);
 
-    // Shift+T === taskScheduleToday: the sub-task moves into Today on its own,
+    // Alt+T === taskScheduleToday: the sub-task moves into Today on its own,
     // which is what makes it render flat with a `.parent-title` line.
     const subTask = taskPage.getTaskByText(SUB_TASK).last();
     await subTask.focus();
-    await subTask.press('Shift+T');
+    await subTask.press('Alt+T');
 
     await page.goto('/#/tag/TODAY/tasks');
     await workViewPage.waitForTaskList();

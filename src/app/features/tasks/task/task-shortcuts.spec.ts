@@ -25,6 +25,7 @@ import {
 import { TaskService } from '../task.service';
 import { WorkContextService } from '../../work-context/work-context.service';
 import { TaskComponent } from './task.component';
+import { TaskUndoService } from '../task-undo.service';
 import { SnackService } from '../../../core/snack/snack.service';
 import { TranslateService } from '@ngx-translate/core';
 import { LocaleDatePipe } from '../../../ui/pipes/locale-date.pipe';
@@ -128,6 +129,13 @@ describe('TaskComponent shortcut handling', () => {
     await TestBed.configureTestingModule({
       imports: [TaskComponent],
       providers: [
+        {
+          provide: TaskUndoService,
+          useValue: {
+            updateNotes: () => false,
+            updateTitle: () => false,
+          },
+        },
         {
           provide: TaskMultiSelectService,
           useValue: {
@@ -428,6 +436,30 @@ describe('TaskComponent shortcut handling', () => {
     const [comp, config] = matDialog.open.calls.mostRecent().args;
     expect(comp).toBe(DialogFullscreenMarkdownComponent);
     expect(config?.closeOnNavigation).toBe(false);
+  });
+
+  it('records a fullscreen notes save once when undo supports the task', () => {
+    fixture.componentRef.setInput('task', {
+      ...createTopLevelTask('Task'),
+      notes: 'Old',
+    });
+    spyOn(TestBed.inject(Location), 'subscribe').and.returnValue({
+      unsubscribe: () => {},
+    } as never);
+    const undo = TestBed.inject(TaskUndoService);
+    spyOn(undo, 'updateNotes').and.returnValue(true);
+    spyOn(component, 'focusSelf');
+    const matDialog = TestBed.inject(MatDialog) as jasmine.SpyObj<MatDialog>;
+    matDialog.open.and.returnValue({
+      afterClosed: () => of('New'),
+      getState: () => MatDialogState.OPEN,
+      componentInstance: { close: () => {} },
+    } as never);
+
+    component.openNotesFullscreen();
+
+    expect(undo.updateNotes).toHaveBeenCalledOnceWith('top-1', 'Old', 'New');
+    expect(taskServiceSpy.update).not.toHaveBeenCalled();
   });
 
   it('does NOT delete on Escape for existing subtask with cleared title', () => {

@@ -58,6 +58,13 @@
     @if (section?.key === 'reminder' && !cfg?.['disableReminders']) {
       <exact-alarm-hint />
     }
+    @if (section?.key === 'keyboard') {
+      <keyboard-shortcut-conflicts
+        [keyboard]="cfg"
+        [fields]="section?.items"
+        (save)="onSave({ sectionKey: 'keyboard', config: $event })"
+      />
+    }
     @if (section?.items && !section?.customSection) {
       <config-form
         (save)="onSave($event)"

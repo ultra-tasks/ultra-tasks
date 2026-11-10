@@ -133,6 +133,30 @@ describe('TaskDuplicateService', () => {
     );
   });
 
+  it('copies a completed task to the requested project without parsing its title', () => {
+    taskService.add.and.returnValue('new-task');
+    const completed: TaskWithSubTasks = {
+      ...parentTask,
+      isDone: true,
+      doneOn: 123,
+      subTasks: [],
+      subTaskIds: [],
+    };
+
+    expect(service.duplicate(completed, 'target-project', true)).toBe('new-task');
+    expect(taskService.add).toHaveBeenCalledWith(
+      'Parent task (copy)',
+      false,
+      jasmine.objectContaining({
+        isDone: true,
+        doneOn: 123,
+        projectId: 'target-project',
+      }),
+      false,
+      true,
+    );
+  });
+
   it('creates an undated subtask with its copied parent before applying defaults', () => {
     const undatedSubTask: Task = {
       ...DEFAULT_TASK,

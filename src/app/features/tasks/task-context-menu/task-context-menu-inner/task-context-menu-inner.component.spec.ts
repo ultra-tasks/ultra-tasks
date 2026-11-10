@@ -1,3 +1,4 @@
+import { TaskUndoService } from '../../task-undo.service';
 import { TaskContextMenuInnerComponent } from './task-context-menu-inner.component';
 import { ComponentFixture, TestBed, fakeAsync, flush, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
@@ -101,6 +102,14 @@ describe('TaskContextMenuInnerComponent', () => {
         TranslateModule.forRoot(),
       ],
       providers: [
+        {
+          provide: TaskUndoService,
+          useValue: {
+            updateNotes: () => false,
+            updateEstimate: () => false,
+            updatePriority: () => false,
+          },
+        },
         provideMockStore(),
         { provide: TaskService, useValue: taskService },
         { provide: TaskDuplicateService, useValue: taskDuplicateService },
@@ -517,6 +526,16 @@ describe('TaskContextMenuInnerComponent', () => {
   });
 
   describe('priority submenu', () => {
+    it('records a priority change once when undo supports the task', () => {
+      const undo = TestBed.inject(TaskUndoService);
+      spyOn(undo, 'updatePriority').and.returnValue(true);
+      component.taskSet = { ...DEFAULT_TASK, id: 'task-1', priority: null } as Task;
+
+      component.setPriority(3);
+
+      expect(undo.updatePriority).toHaveBeenCalledOnceWith('task-1', null, 3);
+      expect(taskService.update).not.toHaveBeenCalled();
+    });
     const menuItems = (selector: string): HTMLElement[] =>
       Array.from(
         document.querySelectorAll<HTMLElement>(`.cdk-overlay-container ${selector}`),

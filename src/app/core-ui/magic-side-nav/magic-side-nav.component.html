@@ -202,6 +202,7 @@
                   @case ('action') {
                     <nav-item
                       [container]="'action'"
+                      [shortcut]="item.id === 'search' ? searchShortcut() : null"
                       [icon]="item.icon"
                       [svgIcon]="item.svgIcon"
                       [label]="item.label"

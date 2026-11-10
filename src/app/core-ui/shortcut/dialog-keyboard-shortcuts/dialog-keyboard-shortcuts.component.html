@@ -25,9 +25,30 @@
           </tr>
         } @else {
           <tr>
-            <td class="action-name">{{ row.label | translate }}</td>
+            <td class="action-name">
+              {{ row.label | translate }}
+              @if (row.conflict) {
+                <div class="shortcut-conflict">
+                  {{ T.GCF.KEYBOARD.SHORTCUT_CONFLICT | translate }}
+                </div>
+                @if (row.suggested && row.key) {
+                  <button
+                    mat-button
+                    type="button"
+                    (click)="useSuggestion(row.key)"
+                  >
+                    {{ T.GCF.KEYBOARD.USE_SUGGESTED | translate }}
+                    <kbd>{{ row.suggested }}</kbd>
+                  </button>
+                }
+              }
+            </td>
             <td class="shortcut-cell">
-              <kbd class="shortcut-key">{{ row.combo }}</kbd>
+              @if (row.combo) {
+                <kbd class="shortcut-key">{{ row.combo }}</kbd>
+              } @else {
+                {{ T.G.NONE | translate }}
+              }
             </td>
           </tr>
         }
@@ -37,6 +58,26 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
+  <button
+    mat-button
+    [disabled]="!taskUndo.canUndo()"
+    (click)="taskUndo.undo()"
+  >
+    {{ undoLabel() | translate }}
+    @if (undoKey()) {
+      <kbd>{{ undoKey() }}</kbd>
+    }
+  </button>
+  <button
+    mat-button
+    [disabled]="!taskUndo.canRedo()"
+    (click)="taskUndo.redo()"
+  >
+    {{ redoLabel() | translate }}
+    @if (redoKey()) {
+      <kbd>{{ redoKey() }}</kbd>
+    }
+  </button>
   <button
     mat-button
     mat-dialog-close

@@ -18,6 +18,7 @@ import { ContextMenuComponent } from '../../../ui/context-menu/context-menu.comp
     <nav-item
       [container]="'group'"
       [label]="'Projects'"
+      [shortcut]="shortcut()"
       [expanded]="expanded()"
       [ariaControls]="'projects-children'"
       [menuTriggerFor]="withMenu() ? menu : null"
@@ -31,6 +32,7 @@ import { ContextMenuComponent } from '../../../ui/context-menu/context-menu.comp
 class HostComponent {
   readonly expanded = signal(false);
   readonly withMenu = signal(false);
+  readonly shortcut = signal<string | null>(null);
 }
 
 describe('NavItemComponent group header', () => {
@@ -68,6 +70,14 @@ describe('NavItemComponent group header', () => {
     fixture.detectChanges();
 
     expect(headerBtn().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('describes the shortcut separately from the accessible row name', () => {
+    fixture.componentInstance.shortcut.set('Ctrl+F');
+    fixture.detectChanges();
+    expect(headerBtn().getAttribute('aria-label')).toBe('Projects');
+    expect(headerBtn().getAttribute('aria-description')).toBe('Ctrl+F');
+    expect(headerBtn().querySelector('kbd')?.textContent).toContain('Ctrl+F');
   });
 
   it('leaves aria-expanded to the menu trigger when it has a menu', () => {

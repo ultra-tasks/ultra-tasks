@@ -44,7 +44,7 @@ test.describe('Add to Today - Subtask Support', () => {
     // Now use keyboard shortcut to add subtask to Today
     // (This is the most reliable method and what users would actually do)
     await subtask.click();
-    await page.keyboard.press('Shift+T');
+    await page.keyboard.press('Alt+T');
     await page.waitForTimeout(500);
 
     // Verify subtask appears in Today view
@@ -54,7 +54,7 @@ test.describe('Add to Today - Subtask Support', () => {
     await expect(todaySubtask).toBeVisible();
   });
 
-  test('should add subtask to Today via keyboard shortcut (Ctrl+T)', async ({
+  test('should add subtask to Today via keyboard shortcut (Alt+T)', async ({
     page,
     workViewPage,
   }) => {
@@ -87,8 +87,8 @@ test.describe('Add to Today - Subtask Support', () => {
     // Focus the subtask (click on it)
     await subtask.click();
 
-    // Press Shift+T to add to today
-    await page.keyboard.press('Shift+T');
+    // Press Alt+T to add to today
+    await page.keyboard.press('Alt+T');
 
     // Wait for state update
     await page.waitForTimeout(500);
@@ -210,7 +210,7 @@ test.describe('Add to Today - Subtask Support', () => {
 });
 
 test.describe('Add to Today - keyboard shortcut', () => {
-  test('Shift+T schedules a top-level project task for Today', async ({
+  test('Alt+T schedules a top-level project task for Today', async ({
     page,
     projectPage,
     workViewPage,
@@ -230,7 +230,7 @@ test.describe('Add to Today - keyboard shortcut', () => {
 
     await task.focus();
     await expect(task).toBeFocused();
-    await page.keyboard.press('Shift+T');
+    await page.keyboard.press('Alt+T');
 
     // Assert real Today membership. Checking that the row is still visible in
     // the project — as the subtask tests above do — passes even when the

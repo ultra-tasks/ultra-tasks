@@ -13,14 +13,20 @@ export class TaskDuplicateService {
   private readonly _taskService = inject(TaskService);
   private readonly _store = inject(Store);
 
-  duplicate(task: TaskWithSubTasks): string | null {
-    if (task.parentId || task.isDone) {
+  duplicate(
+    task: TaskWithSubTasks,
+    targetProjectId?: string,
+    isClipboard = false,
+  ): string | null {
+    if (!isClipboard && (task.parentId || task.isDone)) {
       return null;
     }
 
     const taskData = {
-      isDone: false,
-      projectId: task.projectId || undefined,
+      isDone: isClipboard ? task.isDone : false,
+      ...(isClipboard && task.doneOn && { doneOn: task.doneOn }),
+      ...(isClipboard && task.wontDoOn && { wontDoOn: task.wontDoOn }),
+      projectId: targetProjectId || task.projectId || undefined,
       tagIds: task.tagIds || [],
       attachments: task.attachments,
       ...(task.notes && { notes: task.notes }),
@@ -34,12 +40,20 @@ export class TaskDuplicateService {
       ...(task.dueWithTime && { dueWithTime: task.dueWithTime }),
       ...(task.timeEstimate && { timeEstimate: task.timeEstimate }),
     };
-    const taskId = this._taskService.add(
-      `${task.title} (copy)`,
-      false,
-      { ...taskData, ...timeData },
-      false,
-    );
+    const taskId = isClipboard
+      ? this._taskService.add(
+          `${task.title} (copy)`,
+          false,
+          { ...taskData, ...timeData },
+          false,
+          true,
+        )
+      : this._taskService.add(
+          `${task.title} (copy)`,
+          false,
+          { ...taskData, ...timeData },
+          false,
+        );
 
     for (const subTask of task.subTasks) {
       const subTaskObj = this._taskService.createNewTaskWithDefaults({
@@ -51,7 +65,7 @@ export class TaskDuplicateService {
             doneOn: subTask.doneOn,
             wontDoOn: subTask.wontDoOn,
           }),
-          projectId: subTask.projectId,
+          projectId: targetProjectId || subTask.projectId,
           ...(subTask.dueDay && { dueDay: subTask.dueDay }),
           ...(subTask.dueWithTime && { dueWithTime: subTask.dueWithTime }),
           timeEstimate: subTask.timeEstimate,

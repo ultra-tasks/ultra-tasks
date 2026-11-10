@@ -1,3 +1,4 @@
+import { TaskUndoService } from '../task-undo.service';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { ComponentRef, NO_ERRORS_SCHEMA, signal, WritableSignal } from '@angular/core';
 import { EMPTY, of } from 'rxjs';
@@ -107,6 +108,15 @@ describe('TaskDetailPanelComponent', () => {
       ],
       schemas: [NO_ERRORS_SCHEMA],
       providers: [
+        {
+          provide: TaskUndoService,
+          useValue: {
+            updateNotes: () => false,
+            updateTitle: () => false,
+            updateEstimate: () => false,
+            updatePriority: () => false,
+          },
+        },
         provideRouter([]),
         { provide: ClipboardImageService, useValue: mockClipboardImageService },
         { provide: TaskAttachmentService, useValue: mockAttachmentService },
@@ -140,6 +150,18 @@ describe('TaskDetailPanelComponent', () => {
     const push = spyOn(window.history, 'pushState');
     component.ngOnInit();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('records a saved notes edit once when undo supports the task', () => {
+    const undo = TestBed.inject(TaskUndoService);
+    spyOn(undo, 'updateNotes').and.returnValue(true);
+    component.changeTaskNotes('Updated notes');
+    expect(undo.updateNotes).toHaveBeenCalledOnceWith(
+      MOCK_TASK.id,
+      MOCK_TASK.notes ?? '',
+      'Updated notes',
+    );
+    expect(mockTaskService.update).not.toHaveBeenCalled();
   });
 
   it('preserves router state when opening a new panel history entry', () => {
@@ -472,6 +494,15 @@ describe('TaskDetailPanelComponent stale-focus guard', () => {
       imports: [TaskDetailPanelComponent],
       providers: [
         {
+          provide: TaskUndoService,
+          useValue: {
+            updateNotes: () => false,
+            updateTitle: () => false,
+            updateEstimate: () => false,
+            updatePriority: () => false,
+          },
+        },
+        {
           provide: TaskService,
           useValue: {
             taskDetailPanelTargetPanel$: EMPTY,
@@ -657,6 +688,15 @@ describe('TaskDetailPanelComponent description target focuses the editor', () =>
       imports: [TaskDetailPanelComponent],
       providers: [
         {
+          provide: TaskUndoService,
+          useValue: {
+            updateNotes: () => false,
+            updateTitle: () => false,
+            updateEstimate: () => false,
+            updatePriority: () => false,
+          },
+        },
+        {
           provide: TaskService,
           useValue: {
             taskDetailPanelTargetPanel$: of(TaskDetailTargetPanel.Notes),
@@ -757,6 +797,15 @@ describe('TaskDetailPanelComponent add sub-task', () => {
     await TestBed.configureTestingModule({
       imports: [TaskDetailPanelComponent],
       providers: [
+        {
+          provide: TaskUndoService,
+          useValue: {
+            updateNotes: () => false,
+            updateTitle: () => false,
+            updateEstimate: () => false,
+            updatePriority: () => false,
+          },
+        },
         {
           provide: TaskService,
           useValue: {

@@ -7,6 +7,7 @@ import { provideMockActions } from '@ngrx/effects/testing';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { Subject, of, Subscription } from 'rxjs';
 import { TimeBlockSyncEffects, COALESCE_MS } from './time-block-sync.effects';
+import { LocalExternalSyncSuppressionService } from '../../integrations/local-external-sync-suppression.service';
 import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions';
 import { TaskService } from '../../tasks/task.service';
 import { PluginIssueProviderRegistryService } from '../../../plugins/issue-provider/plugin-issue-provider-registry.service';
@@ -198,6 +199,48 @@ describe('TimeBlockSyncEffects', () => {
     expect(upsertEventSpy.calls.mostRecent().args[0]).toBe('task-1');
     flush();
   }));
+
+  it('does not queue a calendar write for an update made while read-only', fakeAsync(() => {
+    const action = TaskSharedActions.updateTask({
+      task: { id: 'task-1', changes: { title: 'New' } },
+    });
+    TestBed.inject(LocalExternalSyncSuppressionService).suppress(action);
+    actions$.next(action);
+    tick(COALESCE_MS);
+    expect(upsertEventSpy).not.toHaveBeenCalled();
+    flush();
+  }));
+
+  for (const readOnly of ['import', 'stopped'] as const) {
+    it(`does not update a calendar block for a ${readOnly} integration`, fakeAsync(() => {
+      getByIdOnce$Spy.and.returnValue(
+        of(
+          createTask('task-1', {
+            integration: {
+              providerId: 'other-provider',
+              providerKey: 'JIRA',
+              remoteId: 'issue-1',
+              mode: readOnly === 'import' ? 'import' : 'sync',
+              stopped: readOnly === 'stopped',
+            },
+          }),
+        ),
+      );
+      actions$.next(
+        TaskSharedActions.updateTask({
+          task: { id: 'task-1', changes: { title: 'New' } },
+        }),
+      );
+      actions$.next(
+        TaskSharedActions.updateTask({
+          task: { id: 'task-1', changes: { timeEstimate: 42 } },
+        }),
+      );
+      tick(COALESCE_MS);
+      expect(upsertEventSpy).not.toHaveBeenCalled();
+      flush();
+    }));
+  }
 
   it('does not create a time-block mirror for a task imported from the same provider (#9206)', fakeAsync(() => {
     const task = createTask('task-1', {

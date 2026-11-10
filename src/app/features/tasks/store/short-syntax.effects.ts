@@ -17,6 +17,7 @@ import {
 import { GlobalConfigService } from '../../config/global-config.service';
 import { unique } from '../../../util/unique';
 import { TaskService } from '../task.service';
+import { TaskUndoService } from '../task-undo.service';
 import { EMPTY, from, of } from 'rxjs';
 import { ProjectService } from '../../project/project.service';
 import { TagService } from '../../tag/tag.service';
@@ -45,6 +46,7 @@ import { TaskTimeSyncService } from '../task-time-sync.service';
 export class ShortSyntaxEffects {
   private _actions$ = inject(LOCAL_ACTIONS);
   private _taskService = inject(TaskService);
+  private _taskUndoService = inject(TaskUndoService);
   private _tagService = inject(TagService);
   private _projectService = inject(ProjectService);
   private _globalConfigService = inject(GlobalConfigService);
@@ -143,6 +145,9 @@ export class ShortSyntaxEffects {
               ),
             )
             .then((r) => {
+              // A user-initiated title edit is undoable only when parsing did
+              // not turn it into a scheduling, tag, attachment or other edit.
+              this._taskUndoService.resolveTitleChange(originalAction, !!r);
               if (environment.production) {
                 TaskLog.log('shortSyntax', {
                   taskId: task.id,

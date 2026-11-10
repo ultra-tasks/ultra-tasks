@@ -1,0 +1,27 @@
+@if (conflicts().length) {
+  <section
+    class="callout"
+    aria-live="polite"
+  >
+    <strong>{{ T.GCF.KEYBOARD.CONFLICT_REVIEW | translate }}</strong>
+    @for (conflict of conflicts(); track conflict.key) {
+      <div class="conflict-row">
+        <span
+          >{{ conflict.label | translate }} <kbd>{{ conflict.current }}</kbd></span
+        >
+        @if (conflict.suggested) {
+          <button
+            mat-button
+            type="button"
+            (click)="useSuggestion(conflict.key)"
+          >
+            {{ T.GCF.KEYBOARD.USE_SUGGESTED | translate }}
+            <kbd>{{ conflict.suggested }}</kbd>
+          </button>
+        } @else {
+          <span>{{ T.GCF.KEYBOARD.CHANGE_IN_SETTINGS | translate }}</span>
+        }
+      </div>
+    }
+  </section>
+}

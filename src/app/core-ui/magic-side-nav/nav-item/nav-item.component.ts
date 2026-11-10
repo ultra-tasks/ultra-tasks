@@ -117,6 +117,7 @@ export class NavItemComponent {
 
   // Presentational row inputs
   label = input<string | undefined>(undefined);
+  shortcut = input<string | null | undefined>(null);
   icon = input<string | undefined>(undefined);
   svgIcon = input<string | undefined>(undefined);
   showLabels = input<boolean>(true);

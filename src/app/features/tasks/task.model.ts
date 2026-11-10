@@ -96,6 +96,9 @@ export interface TaskCopy
       | 'issuePoints'
     >,
     IssueFieldsForTask {
+  /** Optional manual order for a completed task in its project. A later
+   * completion gets a new timestamp and naturally returns to date ordering. */
+  doneOrder?: { projectId: string; doneOn: number | null; key: string } | null;
   // Override required fields that are optional in plugin type
   projectId: string;
   timeSpentOnDay: TimeSpentOnDay;

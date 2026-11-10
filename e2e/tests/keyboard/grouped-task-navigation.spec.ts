@@ -14,7 +14,7 @@ test('navigates across project group headers with configured task shortcuts', as
   await workViewPage.addTask('Project task');
   const projectTask = taskPage.getTaskByText('Project task');
   await projectTask.focus();
-  await page.keyboard.press('Shift+T');
+  await page.keyboard.press('Alt+T');
 
   await page.goto('/#/tag/TODAY/tasks');
   await workViewPage.waitForTaskList();

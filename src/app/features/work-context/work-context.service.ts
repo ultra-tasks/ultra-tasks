@@ -32,6 +32,7 @@ import { DEFAULT_TAG_COLOR } from './work-context.const';
 import { getDefaultWorkContextTheme } from './work-context-default-theme.util';
 import { TagService } from '../tag/tag.service';
 import { ArchiveTask, Task, TaskWithSubTasks } from '../tasks/task.model';
+import { sortDoneTasksByProjectOrder } from '../tasks/done-task-order';
 import { isCompletedTask } from '../tasks/util/is-wont-do-task';
 import {
   hasTasksToWorkOn,
@@ -521,9 +522,12 @@ export class WorkContextService {
   // Re-evaluated on day change so yesterday's tasks drop out after rollover.
   // Perf note: the source still maps every task in the workspace on each store
   // emission (O(all tasks)); tracking done IDs per context would avoid the scan.
-  doneTasks$: Observable<TaskWithSubTasks[]> = this.isTodayList$.pipe(
-    switchMap((isToday) =>
-      isToday
+  doneTasks$: Observable<TaskWithSubTasks[]> = combineLatest([
+    this.isTodayList$,
+    this.isActiveWorkContextProject$,
+  ]).pipe(
+    switchMap(([isToday, isProject]) => {
+      const tasks$ = isToday
         ? combineLatest([
             this.doneTasksToArchive$,
             this._globalTrackingIntervalService.todayDateStr$,
@@ -535,8 +539,11 @@ export class WorkContextService {
               );
             }),
           )
-        : this.doneTasksToArchive$,
-    ),
+        : this.doneTasksToArchive$;
+      return isProject
+        ? tasks$.pipe(map((tasks) => sortDoneTasksByProjectOrder(tasks)))
+        : tasks$;
+    }),
   );
 
   constructor() {

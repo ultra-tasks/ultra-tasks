@@ -16,6 +16,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { TaskService } from '../task.service';
+import { TaskUndoService } from '../task-undo.service';
 import { TaskDuplicateService } from '../task-duplicate.service';
 import { TaskMultiSelectService } from '../task-multi-select.service';
 import { TaskMoveToProjectService } from '../task-move-to-project.service';
@@ -196,6 +197,7 @@ const isInteractiveTarget = (target: EventTarget | null): boolean =>
 })
 export class TaskComponent implements OnDestroy, AfterViewInit {
   private readonly _taskService = inject(TaskService);
+  private readonly _taskUndoService = inject(TaskUndoService);
   private readonly _taskDuplicateService = inject(TaskDuplicateService);
   private readonly _matDialog = inject(MatDialog);
   private readonly _location = inject(Location);
@@ -864,13 +866,6 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
     move: (id: string, parentId: string | undefined, isBacklog: boolean) => void,
   ): void {
     const t = this.task();
-    // Top-level done tasks in the main list are ordered by completion date, so
-    // a manual reorder can't take effect — skip it to avoid emitting a spurious
-    // taskIds-reorder op that would sync to other devices. Done subtasks and
-    // backlog tasks are not auto-sorted, so they stay reorderable.
-    if (t.isDone && !t.parentId && !this.isBacklog()) {
-      return;
-    }
     move(t.id, t.parentId, this.isBacklog());
     // timeout required to let changes take place
     setTimeout(() => this.focusSelf());
@@ -1044,7 +1039,9 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
     const task = this.task();
 
     if (wasChanged) {
-      this._taskService.update(task.id, { title: newVal });
+      if (!this._taskUndoService.updateTitle(task.id, task.title, newVal)) {
+        this._taskService.update(task.id, { title: newVal });
+      }
     }
 
     if (submitTrigger === 'modEnter') {
@@ -1077,10 +1074,12 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
     });
 
     dialogRef.afterClosed().subscribe((result) => {
-      if (result?.action === 'DELETE') {
-        this._taskService.update(task.id, { notes: '' });
-      } else if (typeof result === 'string') {
-        this._taskService.update(task.id, { notes: result });
+      const notes =
+        result?.action === 'DELETE' ? '' : typeof result === 'string' ? result : null;
+      if (notes !== null && notes !== (task.notes ?? '')) {
+        if (!this._taskUndoService.updateNotes(task.id, task.notes ?? '', notes)) {
+          this._taskService.update(task.id, { notes });
+        }
       }
       this.focusSelf();
     });
@@ -1193,9 +1192,10 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
     if (!this._multiSelect.isTouchSelectionMode()) this._multiSelect.clear();
     window.clearTimeout(this._doneAnimationTimeout);
     this.focusNext(true, true);
+    const task = this.task();
     this._doneAnimationTimeout = this._taskService.toggleDoneWithAnimation(
-      this.task().id,
-      this.task().isDone,
+      task.id,
+      task.isDone,
       (v) => this.showDoneAnimation.set(v),
     );
   }

@@ -60,6 +60,7 @@ import { Section } from '../../../section/section.model';
 import { SectionService } from '../../../section/section.service';
 import { selectSectionsByContextIdMap } from '../../../section/store/section.selectors';
 import { TaskService } from '../../task.service';
+import { TaskUndoService } from '../../task-undo.service';
 import { MatDialog } from '@angular/material/dialog';
 import { IssueService } from '../../../issue/issue.service';
 import { SnackService } from '../../../../core/snack/snack.service';
@@ -155,6 +156,7 @@ export interface MoveTarget {
 export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
   private readonly _datePipe = inject(LocaleDatePipe);
   private readonly _taskService = inject(TaskService);
+  private readonly _taskUndoService = inject(TaskUndoService);
   private readonly _matDialog = inject(MatDialog);
   private readonly _issueService = inject(IssueService);
   private readonly _elementRef = inject(ElementRef);
@@ -685,14 +687,20 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
     if (ms === this.task.timeEstimate) {
       return;
     }
-    this._taskService.update(this.task.id, { timeEstimate: ms });
+    if (!this._taskUndoService.updateEstimate(this.task.id, this.task.timeEstimate, ms)) {
+      this._taskService.update(this.task.id, { timeEstimate: ms });
+    }
   }
 
   setPriority(priority: TaskPriority | null): void {
     if (priority === this.priority) {
       return;
     }
-    this._taskService.update(this.task.id, { priority });
+    if (
+      !this._taskUndoService.updatePriority(this.task.id, this.task.priority, priority)
+    ) {
+      this._taskService.update(this.task.id, { priority });
+    }
   }
 
   addSubTask(): void {

@@ -42,6 +42,8 @@ import { SwipeDirective } from '../../ui/swipe-gesture/swipe.directive';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import { TranslatePipe } from '@ngx-translate/core';
 import { T } from '../../t.const';
+import { GlobalConfigService } from '../../features/config/global-config.service';
+import { IS_MAC } from '../../util/is-mac';
 
 // 56px = 24px icon + 16px (var(--s2)) padding on each side, so the left-aligned
 // nav icons sit centered in the collapsed rail.
@@ -82,6 +84,11 @@ const SIDENAV_WIDTH_ANIMATION_DURATION_MS = 370;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
+  private readonly _globalConfig = inject(GlobalConfigService);
+  readonly searchShortcut = computed(() => {
+    const combo = this._globalConfig.cfg()?.keyboard?.showSearchBar;
+    return IS_MAC && combo === 'Ctrl+F' ? '⌘F / Ctrl+F' : combo;
+  });
   readonly navigationItems = computed(() => {
     const isMobile = this.isMobile();
     const isListed = (item: NavItem): boolean =>

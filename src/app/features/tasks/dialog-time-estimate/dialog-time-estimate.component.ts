@@ -39,6 +39,7 @@ import { KeysPipe } from '../../../ui/pipes/keys.pipe';
 import { TranslatePipe } from '@ngx-translate/core';
 import { LocaleDatePipe } from '../../../ui/pipes/locale-date.pipe';
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
+import { TaskUndoService } from '../task-undo.service';
 
 @Component({
   selector: 'dialog-time-estimate',
@@ -70,6 +71,7 @@ export class DialogTimeEstimateComponent implements AfterViewInit {
   private _matDialogRef = inject<MatDialogRef<DialogTimeEstimateComponent>>(MatDialogRef);
   private _matDialog = inject(MatDialog);
   private _taskService = inject(TaskService);
+  private _taskUndoService = inject(TaskUndoService);
   private _cd = inject(ChangeDetectorRef);
   private _el = inject(ElementRef);
   private _dateTimeFormatService = inject(DateTimeFormatService);
@@ -118,10 +120,19 @@ export class DialogTimeEstimateComponent implements AfterViewInit {
   }
 
   submit(): void {
-    this._taskService.update(this.taskCopy.id, {
-      timeEstimate: this.taskCopy.timeEstimate,
-      timeSpentOnDay: this.timeSpentOnDayCopy,
-    });
+    if (
+      this._isTimeSpentChanged() ||
+      !this._taskUndoService.updateEstimate(
+        this.taskCopy.id,
+        this.task.timeEstimate,
+        this.taskCopy.timeEstimate,
+      )
+    ) {
+      this._taskService.update(this.taskCopy.id, {
+        timeEstimate: this.taskCopy.timeEstimate,
+        timeSpentOnDay: this.timeSpentOnDayCopy,
+      });
+    }
     this._matDialogRef.close({
       timeEstimate: this.taskCopy.timeEstimate,
       timeSpentOnDay: this.timeSpentOnDayCopy,
@@ -157,6 +168,10 @@ export class DialogTimeEstimateComponent implements AfterViewInit {
     if ((this.taskCopy.timeEstimate || 0) !== (this.task.timeEstimate || 0)) {
       return true;
     }
+    return this._isTimeSpentChanged();
+  }
+
+  private _isTimeSpentChanged(): boolean {
     const before = this.task.timeSpentOnDay || {};
     const after = this.timeSpentOnDayCopy;
     const days = new Set([...Object.keys(before), ...Object.keys(after)]);

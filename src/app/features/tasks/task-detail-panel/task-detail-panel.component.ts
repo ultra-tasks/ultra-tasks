@@ -31,6 +31,7 @@ import {
 } from 'rxjs/operators';
 import { T } from '../../../t.const';
 import { TaskService } from '../task.service';
+import { TaskUndoService } from '../task-undo.service';
 import { Router } from '@angular/router';
 import {
   expandAnimation,
@@ -143,6 +144,7 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   // Services
   attachmentService = inject(TaskAttachmentService);
   taskService = inject(TaskService);
+  private readonly _taskUndoService = inject(TaskUndoService);
   layoutService = inject(LayoutService);
 
   private _clipboardImageService = inject(ClipboardImageService);
@@ -610,7 +612,11 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   changeTaskNotes(notes: string): void {
-    this.taskService.update(this.task().id, { notes });
+    const task = this.task();
+    if ((task.notes ?? '') === notes) return;
+    if (!this._taskUndoService.updateNotes(task.id, task.notes ?? '', notes)) {
+      this.taskService.update(task.id, { notes });
+    }
   }
 
   openTaskMenu(event: MouseEvent): void {
@@ -867,7 +873,10 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
 
   updateTaskTitleIfChanged(isChanged: boolean, newTitle: string): void {
     if (isChanged) {
-      this.taskService.update(this.task().id, { title: newTitle });
+      const task = this.task();
+      if (!this._taskUndoService.updateTitle(task.id, task.title, newTitle)) {
+        this.taskService.update(task.id, { title: newTitle });
+      }
     }
   }
 

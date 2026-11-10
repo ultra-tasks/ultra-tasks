@@ -75,6 +75,8 @@ export const KEYBOARD_SETTINGS_FORM_CFG: ConfigFormSection<KeyboardConfig> = {
         ]
       : []),
     kbField('triggerSync', T.GCF.KEYBOARD.TRIGGER_SYNC),
+    kbField('undo', T.GCF.KEYBOARD.UNDO),
+    kbField('redo', T.GCF.KEYBOARD.REDO),
 
     // TASKS
     subSectionHeading(T.GCF.KEYBOARD.TASK_SHORTCUTS),
@@ -86,6 +88,9 @@ export const KEYBOARD_SETTINGS_FORM_CFG: ConfigFormSection<KeyboardConfig> = {
         text: T.GCF.KEYBOARD.TASK_SHORTCUTS_INFO,
       },
     },
+    kbField('taskCopy', T.GCF.KEYBOARD.COPY_TASKS),
+    kbField('taskCut', T.GCF.KEYBOARD.CUT_TASKS),
+    kbField('taskPaste', T.GCF.KEYBOARD.PASTE_TASKS),
     kbField('taskEditTitle', T.GCF.KEYBOARD.TASK_EDIT_TITLE),
     kbField('taskToggleDetailPanelOpen', T.GCF.KEYBOARD.TASK_TOGGLE_DETAIL_PANEL_OPEN),
     kbField('taskOpenNotesPanel', T.GCF.KEYBOARD.TASK_OPEN_NOTES_PANEL),

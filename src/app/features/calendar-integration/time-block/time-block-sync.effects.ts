@@ -25,6 +25,7 @@ import { TaskService } from '../../tasks/task.service';
 import { Task } from '../../tasks/task.model';
 import { isCompletedTask } from '../../tasks/util/is-wont-do-task';
 import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions';
+import { LocalExternalSyncSuppressionService } from '../../integrations/local-external-sync-suppression.service';
 import { PlannerActions } from '../../planner/store/planner.actions';
 import { PluginHttpService } from '../../../plugins/issue-provider/plugin-http.service';
 import { PluginIssueProviderRegistryService } from '../../../plugins/issue-provider/plugin-issue-provider-registry.service';
@@ -90,6 +91,7 @@ const MAX_PARALLEL_TIME_BLOCK_HTTP = 3;
 
 @Injectable()
 export class TimeBlockSyncEffects {
+  private readonly _externalSyncSuppression = inject(LocalExternalSyncSuppressionService);
   private readonly _actions$ = inject(LOCAL_ACTIONS);
   private readonly _store = inject(Store);
   private readonly _taskService = inject(TaskService);
@@ -131,6 +133,7 @@ export class TimeBlockSyncEffects {
           }
           if (action.type === TaskSharedActions.updateTask.type) {
             const a = action as ReturnType<typeof TaskSharedActions.updateTask>;
+            if (this._externalSyncSuppression.isSuppressed(a)) return null;
             const changes = a.task.changes;
             const isRelevant =
               'title' in changes || 'timeEstimate' in changes || 'isDone' in changes;

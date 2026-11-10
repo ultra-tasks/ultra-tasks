@@ -65,6 +65,7 @@ import { deleteTag, deleteTags } from '../../tag/store/tag.actions';
 import { IssueSyncAdapterResolverService } from './issue-sync-adapter-resolver.service';
 import { shortSyntaxForNewWords } from '../../tasks/util/short-syntax-for-new-words';
 import { IssueSharedTitleService } from './issue-shared-title.service';
+import { LocalExternalSyncSuppressionService } from '../../integrations/local-external-sync-suppression.service';
 import { selectShortSyntaxConfig } from '../../config/store/global-config.reducer';
 import { DEFAULT_GLOBAL_CONFIG } from '../../config/default-global-config.const';
 import { selectAllTagsWithoutMyDay } from '../../tag/store/tag.reducer';
@@ -172,6 +173,7 @@ interface AutoCreateTrigger {
 
 @Injectable()
 export class IssueTwoWaySyncEffects {
+  private readonly _externalSyncSuppression = inject(LocalExternalSyncSuppressionService);
   private readonly _actions$ = inject(LOCAL_ACTIONS);
   private readonly _store = inject(Store);
   private readonly _taskService = inject(TaskService);
@@ -219,8 +221,11 @@ export class IssueTwoWaySyncEffects {
             PlannerActions.transferTask,
           ),
           map((action) => ({ action, ...ACTION_EXTRACTORS[action.type](action) })),
-          filter(({ taskId, changes }) => {
+          filter(({ action, taskId, changes }) => {
             if (this._syncOriginatedTaskIds.delete(taskId)) {
+              return false;
+            }
+            if (this._externalSyncSuppression.isSuppressed(action)) {
               return false;
             }
             // Skip poll-originated updates that include sync bookkeeping fields
@@ -273,6 +278,8 @@ export class IssueTwoWaySyncEffects {
             !!fullTask?.issueType &&
             !!fullTask.issueProviderId &&
             !!fullTask.issueId &&
+            fullTask.integration?.mode !== 'import' &&
+            !fullTask.integration?.stopped &&
             !!this._getAdapter(fullTask.issueType) &&
             !this._syncState.isMissing(fullTask.id);
           if (!isPushable) {

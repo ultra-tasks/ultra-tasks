@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { TaskService } from './task.service';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { WorkContextService } from '../work-context/work-context.service';
@@ -29,6 +29,7 @@ import { signal } from '@angular/core';
 import { DeletedTaskIssueSidecarService } from '../issue/two-way-sync/deleted-task-issue-sidecar.service';
 import { TaskTimeSyncService } from './task-time-sync.service';
 import { selectTaskEntities } from './store/task.selectors';
+import { TaskDoneOrderService } from './task-done-order.service';
 
 describe('TaskService', () => {
   let service: TaskService;
@@ -37,6 +38,7 @@ describe('TaskService', () => {
   let deletedTaskIssueSidecar: DeletedTaskIssueSidecarService;
   let taskTimeSync: TaskTimeSyncService;
   let tickSubject: Subject<{ duration: number; date: string }>;
+  let doneOrder: jasmine.SpyObj<TaskDoneOrderService>;
 
   const createMockTask = (id: string, overrides: Partial<Task> = {}): Task =>
     ({
@@ -58,6 +60,11 @@ describe('TaskService', () => {
 
   beforeEach(() => {
     tickSubject = new Subject();
+    doneOrder = jasmine.createSpyObj<TaskDoneOrderService>('TaskDoneOrderService', [
+      'moveRelative',
+      'moveAfter',
+    ]);
+    doneOrder.moveRelative.and.returnValue(false);
 
     const workContextServiceSpy = jasmine.createSpyObj('WorkContextService', [''], {
       activeWorkContextType: WorkContextType.PROJECT,
@@ -151,6 +158,7 @@ describe('TaskService', () => {
           selectors: [],
         }),
         { provide: WorkContextService, useValue: workContextServiceSpy },
+        { provide: TaskDoneOrderService, useValue: doneOrder },
         {
           provide: GlobalTrackingIntervalService,
           useValue: globalTrackingIntervalServiceSpy,
@@ -505,6 +513,32 @@ describe('TaskService', () => {
     });
   });
 
+  describe('toggleDoneWithAnimation', () => {
+    it('completes the task after the animation', fakeAsync(() => {
+      const animate = jasmine.createSpy('animate');
+      service.toggleDoneWithAnimation('task-1', false, animate);
+      expect(store.dispatch).not.toHaveBeenCalled();
+      tick(200);
+      expect(animate).toHaveBeenCalledOnceWith(true);
+      expect(store.dispatch).toHaveBeenCalledWith(
+        TaskSharedActions.updateTask({
+          task: { id: 'task-1', changes: { isDone: true } },
+        }),
+      );
+    }));
+
+    it('reopens the task immediately', () => {
+      const animate = jasmine.createSpy('animate');
+      service.toggleDoneWithAnimation('task-1', true, animate);
+      expect(animate).toHaveBeenCalledOnceWith(false);
+      expect(store.dispatch).toHaveBeenCalledWith(
+        TaskSharedActions.updateTask({
+          task: { id: 'task-1', changes: { isDone: false } },
+        }),
+      );
+    });
+  });
+
   describe('markIssueUpdatesAsRead', () => {
     it('should update task with issueWasUpdated: false', () => {
       service.markIssueUpdatesAsRead('task-1');
@@ -518,6 +552,13 @@ describe('TaskService', () => {
   });
 
   describe('moveToTop', () => {
+    it('routes a completed project task through completed-list ordering', () => {
+      doneOrder.moveRelative.and.returnValue(true);
+      service.moveToTop('task-1', null, false);
+      expect(doneOrder.moveRelative).toHaveBeenCalledOnceWith('task-1', 'top');
+      expect(store.dispatch).not.toHaveBeenCalled();
+    });
+
     it('should dispatch moveSubTaskToTop for subtask', () => {
       service.moveToTop('subtask-1', 'parent-1', false);
 

@@ -309,8 +309,11 @@
         [attr.aria-expanded]="container() === 'group' ? expanded() : null"
         [attr.aria-controls]="container() === 'group' ? ariaControls() : null"
         [class]="tourClass()"
-        [attr.aria-label]="showLabels() ? null : rowLabel"
-        [matTooltip]="showLabels() ? '' : rowLabel"
+        [attr.aria-label]="shortcut() || !showLabels() ? rowLabel : null"
+        [attr.aria-description]="shortcut() || null"
+        [matTooltip]="
+          shortcut() ? rowLabel + ' (' + shortcut() + ')' : showLabels() ? '' : rowLabel
+        "
         matTooltipPosition="right"
         matTooltipTouchGestures="off"
         (click)="clicked.emit()"
@@ -347,6 +350,13 @@
           >
             {{ label() | translate }}
           </span>
+        }
+        @if (showLabels() && shortcut()) {
+          <kbd
+            class="nav-shortcut"
+            aria-hidden="true"
+            >{{ shortcut() }}</kbd
+          >
         }
       </button>
     }

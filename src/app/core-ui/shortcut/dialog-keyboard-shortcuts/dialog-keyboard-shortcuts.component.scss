@@ -59,6 +59,12 @@
     white-space: nowrap;
   }
 
+  .shortcut-conflict {
+    font: var(--type-label);
+    color: var(--text-color-muted);
+    margin-top: var(--s-half);
+  }
+
   .shortcut-key {
     display: inline-flex;
     align-items: center;

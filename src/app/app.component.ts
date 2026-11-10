@@ -60,6 +60,7 @@ import { Store } from '@ngrx/store';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MarkdownPasteService } from './features/tasks/markdown-paste.service';
+import { TaskClipboardService } from './features/tasks/task-clipboard.service';
 import { TaskService } from './features/tasks/task.service';
 import { TaskAttachmentService } from './features/tasks/task-attachment/task-attachment.service';
 import { MatMenuItem } from '@angular/material/menu';
@@ -152,6 +153,7 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   private _activatedRoute = inject(ActivatedRoute);
   private _matDialog = inject(MatDialog);
   private _markdownPasteService = inject(MarkdownPasteService);
+  private _taskClipboard = inject(TaskClipboardService);
   private _taskService = inject(TaskService);
   private _taskAttachmentService = inject(TaskAttachmentService);
   private _translateService = inject(TranslateService);
@@ -328,10 +330,20 @@ export class AppComponent implements OnDestroy, AfterViewInit {
     }
   }
 
+  @HostListener('document:copy', ['$event']) onCopy(ev: ClipboardEvent): void {
+    this._taskClipboard.copy(ev, false);
+  }
+
+  @HostListener('document:cut', ['$event']) onCut(ev: ClipboardEvent): void {
+    this._taskClipboard.copy(ev, true);
+  }
+
   @HostListener('document:paste', ['$event']) onPaste(ev: ClipboardEvent): void {
     // Skip handling inside input elements
     const target = ev.target as HTMLElement;
     if (isInputElement(target)) return;
+
+    if (this._taskClipboard.paste(ev)) return;
 
     const clipboardData = ev.clipboardData;
     if (!clipboardData) return;

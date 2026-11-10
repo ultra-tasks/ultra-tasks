@@ -11,6 +11,7 @@ import { ShortSyntaxEffects } from './short-syntax.effects';
 import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions';
 import { addNewTagsFromShortSyntax, addSubTask } from './task.actions';
 import { TaskService } from '../task.service';
+import { TaskUndoService } from '../task-undo.service';
 import { TagService } from '../../tag/tag.service';
 import { ProjectService } from '../../project/project.service';
 import { GlobalConfigService } from '../../config/global-config.service';
@@ -53,6 +54,7 @@ describe('ShortSyntaxEffects', () => {
   };
   let taskTimeSyncServiceSpy: jasmine.SpyObj<TaskTimeSyncService>;
   let sharedTitleSpy: jasmine.SpyObj<IssueSharedTitleService>;
+  let resolveTitleChange: jasmine.Spy;
   let dateInputLocale: DateInputLocale;
 
   const createTask = (id: string, partial: Partial<Task> = {}): Task => ({
@@ -125,6 +127,7 @@ describe('ShortSyntaxEffects', () => {
     taskTimeSyncServiceSpy = jasmine.createSpyObj('TaskTimeSyncService', ['flushOne']);
     sharedTitleSpy = jasmine.createSpyObj('IssueSharedTitleService', ['getSharedTitle']);
     sharedTitleSpy.getSharedTitle.and.resolveTo(undefined);
+    resolveTitleChange = jasmine.createSpy('resolveTitleChange');
     dateInputLocale = DEFAULT_DATE_INPUT_LOCALE;
 
     TestBed.configureTestingModule({
@@ -133,6 +136,7 @@ describe('ShortSyntaxEffects', () => {
         provideMockActions(() => actions$),
         provideMockStore(),
         { provide: TaskService, useValue: taskServiceMock },
+        { provide: TaskUndoService, useValue: { resolveTitleChange } },
         { provide: TagService, useValue: tagServiceMock },
         { provide: ProjectService, useValue: projectServiceMock },
         { provide: GlobalConfigService, useValue: globalConfigServiceMock },
@@ -154,6 +158,29 @@ describe('ShortSyntaxEffects', () => {
   });
 
   describe('shortSyntax$', () => {
+    it('reports whether a title update produced syntax changes', fakeAsync(() => {
+      effects.shortSyntax$.subscribe();
+      const plain = TaskSharedActions.updateTask({
+        task: { id: 'task-1', changes: { title: 'Plain title' } },
+      });
+      taskServiceMock.getByIdOnce$.and.returnValue(
+        of(createTask('task-1', { title: 'Plain title' })),
+      );
+      actions$.next(plain);
+      tick();
+      expect(resolveTitleChange).toHaveBeenCalledWith(plain, false);
+
+      const syntax = TaskSharedActions.updateTask({
+        task: { id: 'task-2', changes: { title: 'Title #existingTag' } },
+      });
+      taskServiceMock.getByIdOnce$.and.returnValue(
+        of(createTask('task-2', { title: 'Title #existingTag' })),
+      );
+      actions$.next(syntax);
+      tick();
+      expect(resolveTitleChange).toHaveBeenCalledWith(syntax, true);
+    }));
+
     it('should NOT emit when isIgnoreShortSyntax is true', fakeAsync(() => {
       const task = createTask('task-1', { title: '#newtag some task' });
       taskServiceMock.getByIdOnce$.and.returnValue(of(task));

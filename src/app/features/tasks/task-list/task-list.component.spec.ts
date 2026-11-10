@@ -20,6 +20,7 @@ import { WorkContextType } from '../../work-context/work-context.model';
 import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions';
 import { Task } from '../task.model';
 import { Section } from '../../section/section.model';
+import { TaskDoneOrderService } from '../task-done-order.service';
 
 describe('TaskListComponent', () => {
   let component: TaskListComponent;
@@ -36,6 +37,7 @@ describe('TaskListComponent', () => {
     blockAniTrigger$: { next: jasmine.Spy };
   };
   let store: MockStore;
+  let doneOrder: jasmine.SpyObj<TaskDoneOrderService>;
 
   type MockDragTask = Omit<Partial<Task>, 'parentId'> & {
     id: string;
@@ -59,6 +61,10 @@ describe('TaskListComponent', () => {
     }) as unknown as CdkDropList;
 
   beforeEach(async () => {
+    doneOrder = jasmine.createSpyObj<TaskDoneOrderService>('TaskDoneOrderService', [
+      'moveAfter',
+      'moveRelative',
+    ]);
     sectionServiceMock = jasmine.createSpyObj<SectionService>('SectionService', [
       'addTaskToSection',
       'removeTaskFromSection',
@@ -101,6 +107,7 @@ describe('TaskListComponent', () => {
           },
         },
         provideMockStore({ initialState: {} }),
+        { provide: TaskDoneOrderService, useValue: doneOrder },
         {
           provide: TaskService,
           useValue: {
@@ -793,9 +800,10 @@ describe('TaskListComponent', () => {
       expect(sectionServiceMock.removeTaskFromSection).not.toHaveBeenCalled();
     });
 
-    it('skips a reorder WITHIN the Done list (auto-sorted) so no moveTaskInTodayList op is emitted', () => {
-      callMove('task1', 'DONE', 'DONE', 'PARENT', 'PARENT');
+    it('routes a Done list reorder through completed-list ordering', () => {
+      callMove('task1', 'DONE', 'DONE', 'PARENT', 'PARENT', ['before', 'task1']);
 
+      expect(doneOrder.moveAfter).toHaveBeenCalledOnceWith('task1', 'before');
       const dispatched = (store.dispatch as jasmine.Spy).calls
         .allArgs()
         .map((args) => args[0]);

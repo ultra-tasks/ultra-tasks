@@ -7,7 +7,6 @@ import { signal } from '@angular/core';
 import { TaskMultiSelectService } from './task-multi-select.service';
 import { TaskBulkActionService } from './task-bulk-action.service';
 import { of } from 'rxjs';
-import { Task, TaskWithSubTasks } from './task.model';
 
 describe('TaskShortcutService', () => {
   let service: TaskShortcutService;
@@ -28,6 +27,7 @@ describe('TaskShortcutService', () => {
     isSelecting: ReturnType<typeof signal<boolean>>;
     count: ReturnType<typeof signal<number>>;
     has: jasmine.Spy;
+    selectedIdsInDomOrder: jasmine.Spy;
     focusedRowId: () => string | null;
     toggle: jasmine.Spy;
     selectAllInListOfFocused: jasmine.Spy;
@@ -104,6 +104,9 @@ describe('TaskShortcutService', () => {
       isSelecting: signal(false),
       count: signal(0),
       has: jasmine.createSpy('has').and.returnValue(true),
+      selectedIdsInDomOrder: jasmine
+        .createSpy('selectedIdsInDomOrder')
+        .and.returnValue([]),
       // Mirrors the real lookup: the focused <task> outside the detail panel.
       focusedRowId: () => {
         const el = document.activeElement?.closest('task');
@@ -441,6 +444,25 @@ describe('TaskShortcutService', () => {
   });
 
   describe('other shortcuts require focused task', () => {
+    it('leaves modified navigation and Enter keys available for configured shortcuts', () => {
+      setFocusedTask('focused-task-1');
+      expect(
+        service.handleTaskShortcuts(
+          createKeyboardEvent('ArrowLeft', 'ArrowLeft', { ctrlKey: true }),
+        ),
+      ).toBeFalse();
+      expect(
+        service.handleTaskShortcuts(
+          createKeyboardEvent('ArrowDown', 'ArrowDown', { altKey: true }),
+        ),
+      ).toBeFalse();
+      expect(
+        service.handleTaskShortcuts(
+          createKeyboardEvent('Enter', 'Enter', { altKey: true }),
+        ),
+      ).toBeFalse();
+    });
+
     it('should close an open context menu through its inner component', () => {
       const innerMenu = {
         onClose: jasmine.createSpy('onClose'),
@@ -612,161 +634,6 @@ describe('TaskShortcutService', () => {
         // Assert
         expect(result).toBe(false);
       }
-    });
-  });
-
-  describe('copy focused task shortcut', () => {
-    let originalClipboardDescriptor: PropertyDescriptor | undefined;
-    let writeText: jasmine.Spy;
-
-    const stubFocusedTaskData = (task: Partial<TaskWithSubTasks> | undefined): void => {
-      mockTaskService.getByIdWithSubTaskData$.and.returnValue(
-        of(task as TaskWithSubTasks | undefined),
-      );
-    };
-
-    beforeEach(() => {
-      writeText = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
-      originalClipboardDescriptor = Object.getOwnPropertyDescriptor(
-        navigator,
-        'clipboard',
-      );
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: { writeText },
-      });
-      setFocusedTask('focused-task-1');
-      stubFocusedTaskData({
-        id: 'focused-task-1',
-        title: 'Task title to copy',
-        isDone: false,
-        subTasks: [],
-      });
-      mockTaskFocusService.lastFocusedTaskComponent.set({
-        task: () => ({ id: 'focused-task-1', title: 'Task title to copy' }),
-        taskContextMenu: () => undefined,
-      });
-    });
-
-    afterEach(() => {
-      if (originalClipboardDescriptor) {
-        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
-      } else {
-        delete (navigator as { clipboard?: Clipboard }).clipboard;
-      }
-      originalClipboardDescriptor = undefined;
-    });
-
-    it('should copy the focused task as a markdown checklist on Ctrl+C', () => {
-      const event = createKeyboardEvent('c', 'KeyC', { ctrlKey: true });
-      spyOn(event, 'preventDefault');
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(true);
-      expect(writeText).toHaveBeenCalledWith('- [ ] Task title to copy');
-      expect(event.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should copy the focused task as a markdown checklist on Cmd+C', () => {
-      const event = createKeyboardEvent('c', 'KeyC', { metaKey: true });
-      spyOn(event, 'preventDefault');
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(true);
-      expect(writeText).toHaveBeenCalledWith('- [ ] Task title to copy');
-      expect(event.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should fire on non-Latin keyboard layouts (key=Cyrillic, code=KeyC)', () => {
-      // Cyrillic 'с' (U+0441) — what the physical KeyC produces on a
-      // Russian layout. The shortcut must still trigger so behavior matches
-      // the browser's native Ctrl+C, which binds on physical position.
-      const event = createKeyboardEvent('с', 'KeyC', { ctrlKey: true });
-      spyOn(event, 'preventDefault');
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(true);
-      expect(writeText).toHaveBeenCalledWith('- [ ] Task title to copy');
-      expect(event.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should copy sub tasks as an indented checklist', () => {
-      stubFocusedTaskData({
-        id: 'focused-task-1',
-        title: 'Parent',
-        isDone: false,
-        subTasks: [
-          { title: 'Sub done', isDone: true },
-          { title: 'Sub open', isDone: false },
-        ] as Task[],
-      });
-      const event = createKeyboardEvent('c', 'KeyC', { ctrlKey: true });
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(true);
-      expect(writeText).toHaveBeenCalledWith(
-        '- [ ] Parent\n  - [x] Sub done\n  - [ ] Sub open',
-      );
-    });
-
-    it('should copy the task under the focus border even when lastFocusedTaskComponent is stale', () => {
-      mockTaskFocusService.lastFocusedTaskComponent.set({
-        task: () => ({ id: 'some-other-task', title: 'Stale title' }),
-        taskContextMenu: () => undefined,
-      });
-      const event = createKeyboardEvent('c', 'KeyC', { ctrlKey: true });
-      spyOn(event, 'preventDefault');
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(true);
-      expect(mockTaskService.getByIdWithSubTaskData$).toHaveBeenCalledWith(
-        'focused-task-1',
-      );
-      expect(writeText).toHaveBeenCalledWith('- [ ] Task title to copy');
-      expect(event.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should swallow the key without copying when the task is missing from the store', () => {
-      // selectTaskByIdWithSubTaskData returns undefined for an unknown id (#9946).
-      stubFocusedTaskData(undefined);
-      const event = createKeyboardEvent('c', 'KeyC', { ctrlKey: true });
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(true);
-      expect(writeText).not.toHaveBeenCalled();
-    });
-
-    it('should not override native copy when the event target is an input', () => {
-      const input = document.createElement('input');
-      const event = createKeyboardEvent('c', 'KeyC', { metaKey: true });
-      Object.defineProperty(event, 'target', { configurable: true, value: input });
-      spyOn(event, 'preventDefault');
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(false);
-      expect(writeText).not.toHaveBeenCalled();
-      expect(event.preventDefault).not.toHaveBeenCalled();
-    });
-
-    it('should not override native copy when text is selected', () => {
-      spyOn(window, 'getSelection').and.returnValue({
-        toString: () => 'selected text',
-      } as unknown as Selection);
-      const event = createKeyboardEvent('c', 'KeyC', { ctrlKey: true });
-      spyOn(event, 'preventDefault');
-
-      const result = service.handleTaskShortcuts(event);
-
-      expect(result).toBe(false);
-      expect(writeText).not.toHaveBeenCalled();
-      expect(event.preventDefault).not.toHaveBeenCalled();
     });
   });
 

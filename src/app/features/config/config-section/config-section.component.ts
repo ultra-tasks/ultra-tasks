@@ -34,6 +34,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { Log } from '../../../core/log';
 import { ExactAlarmHintComponent } from '../../reminder/exact-alarm-hint/exact-alarm-hint.component';
+import { KeyboardShortcutConflictsComponent } from '../keyboard-shortcut-conflicts/keyboard-shortcut-conflicts.component';
 
 interface CustomFormInstance {
   cfg?: Record<string, unknown>;
@@ -57,6 +58,7 @@ interface CustomFormInstance {
     MatButton,
     MatIcon,
     ExactAlarmHintComponent,
+    KeyboardShortcutConflictsComponent,
   ],
 })
 export class ConfigSectionComponent implements OnInit, AfterViewInit, OnDestroy {

@@ -2,6 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { Action, Store, StoreModule } from '@ngrx/store';
 import { LOCAL_ACTIONS, ALL_ACTIONS } from './local-actions.token';
 import { reducerFailureGuardMetaReducer } from '../root-store/meta/reducer-failure-guard.meta-reducer';
+import { TaskSharedActions } from '../root-store/meta/task-shared.actions';
+import { LocalExternalSyncSuppressionService } from '../features/integrations/local-external-sync-suppression.service';
 
 /**
  * Tests for LOCAL_ACTIONS and ALL_ACTIONS injection tokens.
@@ -24,6 +26,25 @@ describe('LOCAL_ACTIONS token', () => {
   });
 
   describe('LOCAL_ACTIONS', () => {
+    it('preserves the local intent marker on the original dispatched action', (done) => {
+      const suppression = TestBed.inject(LocalExternalSyncSuppressionService);
+      const action = TaskSharedActions.updateTask({
+        task: { id: 'task', changes: { title: 'Local edit' } },
+      });
+      suppression.suppress(action);
+      const emissions: Action[] = [];
+      const sub = TestBed.inject(LOCAL_ACTIONS).subscribe((a) => emissions.push(a));
+      store.dispatch(action);
+
+      setTimeout(() => {
+        const observed = emissions.find((a) => a.type === action.type);
+        expect(observed).toBe(action);
+        expect(suppression.isSuppressed(observed!)).toBeTrue();
+        sub.unsubscribe();
+        done();
+      }, 0);
+    });
+
     it('should filter out actions the reducer rejected (#10195)', (done) => {
       const localActions$ = TestBed.inject(LOCAL_ACTIONS);
       const emissions: Action[] = [];

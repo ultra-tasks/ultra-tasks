@@ -111,6 +111,7 @@ import { DeletedTaskIssueSidecarService } from '../issue/two-way-sync/deleted-ta
 import { TimeBlockDeleteSidecarService } from '../calendar-integration/time-block/time-block-delete-sidecar.service';
 import { getDeadlineAutoPlanFields } from './util/get-deadline-auto-plan-fields';
 import { TaskTimeSyncService } from './task-time-sync.service';
+import { TaskDoneOrderService } from './task-done-order.service';
 
 @Injectable({
   providedIn: 'root',
@@ -130,6 +131,7 @@ export class TaskService {
   private readonly _timeBlockDeleteSidecar = inject(TimeBlockDeleteSidecarService);
   private readonly _archiveTaskPromisesById = new Map<string, Promise<void>>();
   private readonly _taskTimeSync = inject(TaskTimeSyncService);
+  private readonly _doneOrder = inject(TaskDoneOrderService);
 
   currentTaskId$: Observable<string | null> = this._store.pipe(
     select(selectCurrentTaskId),
@@ -634,12 +636,12 @@ export class TaskService {
     parentId: string | null = null,
     isBacklog: boolean,
   ): Promise<void> {
+    if (!parentId && !isBacklog && this._doneOrder.moveRelative(id, 'up')) return;
     const allMainTaskIds = [
       ...(await this._workContextService.mainListTaskIds$.pipe(first()).toPromise()),
       ...(await this._workContextService.backlogTaskIds$.pipe(first()).toPromise()),
     ];
     const isSubTaskAsMain = parentId && allMainTaskIds.includes(id);
-
     if (parentId && !isSubTaskAsMain) {
       const parentTask = await this.getByIdOnce$(parentId).toPromise();
       if (parentTask.subTaskIds[0] === id) {
@@ -651,7 +653,6 @@ export class TaskService {
       const workContextId = this._workContextService.activeWorkContextId as string;
       const workContextType = this._workContextService
         .activeWorkContextType as WorkContextType;
-
       if (isBacklog) {
         const undoneBacklogTaskIds = await this._workContextService.undoneBacklogTaskIds$
           .pipe(take(1))
@@ -687,12 +688,12 @@ export class TaskService {
     parentId: string | null = null,
     isBacklog: boolean,
   ): Promise<void> {
+    if (!parentId && !isBacklog && this._doneOrder.moveRelative(id, 'down')) return;
     const allMainTaskIds = [
       ...(await this._workContextService.mainListTaskIds$.pipe(first()).toPromise()),
       ...(await this._workContextService.backlogTaskIds$.pipe(first()).toPromise()),
     ];
     const isSubTaskAsMain = parentId && allMainTaskIds.includes(id);
-
     if (parentId && !isSubTaskAsMain) {
       const parentTask = await this.getByIdOnce$(parentId).toPromise();
       if (parentTask.subTaskIds[parentTask.subTaskIds.length - 1] === id) {
@@ -704,7 +705,6 @@ export class TaskService {
       const workContextId = this._workContextService.activeWorkContextId as string;
       const workContextType = this._workContextService
         .activeWorkContextType as WorkContextType;
-
       if (isBacklog) {
         const undoneBacklogTaskIds = await this._workContextService.undoneBacklogTaskIds$
           .pipe(take(1))
@@ -736,13 +736,13 @@ export class TaskService {
   }
 
   moveToTop(id: string, parentId: string | null = null, isBacklog: boolean): void {
+    if (!parentId && !isBacklog && this._doneOrder.moveRelative(id, 'top')) return;
     if (parentId) {
       this._store.dispatch(moveSubTaskToTop({ id, parentId }));
     } else {
       const workContextId = this._workContextService.activeWorkContextId as string;
       const workContextType = this._workContextService
         .activeWorkContextType as WorkContextType;
-
       if (isBacklog) {
         this._workContextService.undoneBacklogTaskIds$
           .pipe(take(1))
@@ -776,13 +776,13 @@ export class TaskService {
   }
 
   moveToBottom(id: string, parentId: string | null = null, isBacklog: boolean): void {
+    if (!parentId && !isBacklog && this._doneOrder.moveRelative(id, 'bottom')) return;
     if (parentId) {
       this._store.dispatch(moveSubTaskToBottom({ id, parentId }));
     } else {
       const workContextId = this._workContextService.activeWorkContextId as string;
       const workContextType = this._workContextService
         .activeWorkContextType as WorkContextType;
-
       if (isBacklog) {
         this._workContextService.undoneBacklogTaskIds$
           .pipe(take(1))

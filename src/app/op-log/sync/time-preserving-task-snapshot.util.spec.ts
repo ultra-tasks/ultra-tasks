@@ -77,6 +77,20 @@ describe('source task snapshots preserve additive time', () => {
     expect(isTimePreservingTaskSnapshot(released)).toBeTrue();
   });
 
+  it('recognises older snapshots that do not know completed-task ordering', () => {
+    const [actual] = preserveTaskSnapshotTimes([resolution], []);
+    const payload = actual.localWinOp.payload as { clearedFields: string[] };
+    const released = {
+      ...actual.localWinOp,
+      payload: {
+        ...payload,
+        clearedFields: payload.clearedFields.filter((field) => field !== 'doneOrder'),
+      },
+    };
+    expect(payload.clearedFields).toContain('doneOrder');
+    expect(isTimePreservingTaskSnapshot(released)).toBeTrue();
+  });
+
   it('retains per-operation winners instead of choosing an aggregate winner', () => {
     const remote = { ...resolution, winner: 'remote' as const, localWinOp: undefined };
     const actual = preserveTaskSnapshotTimes([resolution, remote], []);

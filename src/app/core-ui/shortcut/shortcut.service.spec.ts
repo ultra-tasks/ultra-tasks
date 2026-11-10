@@ -13,6 +13,8 @@ import { Store } from '@ngrx/store';
 import { SearchDialogService } from '../../pages/search-page/search-dialog/search-dialog.service';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
 import { TaskShortcutService } from '../../features/tasks/task-shortcut.service';
+import { TaskUndoService } from '../../features/tasks/task-undo.service';
+import { TaskClipboardService } from '../../features/tasks/task-clipboard.service';
 import { DialogAddNoteComponent } from '../../features/note/dialog-add-note/dialog-add-note.component';
 import { DialogConfirmComponent } from '../../ui/dialog-confirm/dialog-confirm.component';
 import { DialogFullscreenMarkdownComponent } from '../../ui/dialog-fullscreen-markdown/dialog-fullscreen-markdown.component';
@@ -31,8 +33,20 @@ describe('ShortcutService', () => {
   let mockMatDialog: any;
   let mockPluginBridgeService: any;
   let mockLayoutService: any;
+  let mockUndo: {
+    canUndo: ReturnType<typeof signal<boolean>>;
+    canRedo: ReturnType<typeof signal<boolean>>;
+    undo: jasmine.Spy;
+    redo: jasmine.Spy;
+  };
 
   beforeEach(() => {
+    mockUndo = {
+      canUndo: signal(false),
+      canRedo: signal(false),
+      undo: jasmine.createSpy('undo'),
+      redo: jasmine.createSpy('redo'),
+    };
     mockMatDialog = {
       openDialogs: [],
       open: jasmine.createSpy('open'),
@@ -78,6 +92,8 @@ describe('ShortcutService', () => {
       providers: [
         ShortcutService,
         { provide: TaskShortcutService, useValue: mockTaskShortcutService },
+        { provide: TaskUndoService, useValue: mockUndo },
+        { provide: TaskClipboardService, useValue: { handleKeyDown: () => false } },
         { provide: SearchDialogService, useValue: mockSearchDialog },
         { provide: Router, useValue: mockRouter },
         { provide: GlobalConfigService, useValue: mockConfigService },
@@ -106,6 +122,95 @@ describe('ShortcutService', () => {
   });
 
   describe('handleKeyDown', () => {
+    it('uses a remapped undo shortcut and leaves the old key alone', async () => {
+      mockUndo.canUndo.set(true);
+      mockConfigService.cfg.set({ keyboard: { undo: 'Alt+Z' } });
+      const oldKey = new KeyboardEvent('keydown', {
+        code: 'KeyZ',
+        ctrlKey: true,
+        cancelable: true,
+      });
+      Object.defineProperty(oldKey, 'target', { value: document.body });
+      await service.handleKeyDown(oldKey);
+      expect(mockUndo.undo).not.toHaveBeenCalled();
+      const newKey = new KeyboardEvent('keydown', {
+        code: 'KeyZ',
+        altKey: true,
+        cancelable: true,
+      });
+      Object.defineProperty(newKey, 'target', { value: document.body });
+      await service.handleKeyDown(newKey);
+      expect(mockUndo.undo).toHaveBeenCalledTimes(1);
+      expect(newKey.defaultPrevented).toBeTrue();
+    });
+
+    it('undoes an available estimate change without invoking task shortcuts', async () => {
+      mockUndo.canUndo.set(true);
+      const ev = new KeyboardEvent('keydown', {
+        code: 'KeyZ',
+        ctrlKey: true,
+        cancelable: true,
+      });
+      Object.defineProperty(ev, 'target', { value: document.body });
+      await service.handleKeyDown(ev);
+      expect(mockUndo.undo).toHaveBeenCalledOnceWith();
+      expect(ev.defaultPrevented).toBeTrue();
+      expect(mockTaskShortcutService.handleTaskShortcuts).not.toHaveBeenCalled();
+    });
+
+    it('leaves undo in a text input to the editor', async () => {
+      mockUndo.canUndo.set(true);
+      const ev = new KeyboardEvent('keydown', {
+        code: 'KeyZ',
+        ctrlKey: true,
+        cancelable: true,
+      });
+      Object.defineProperty(ev, 'target', { value: document.createElement('input') });
+      await service.handleKeyDown(ev);
+      expect(mockUndo.undo).not.toHaveBeenCalled();
+      expect(ev.defaultPrevented).toBeFalse();
+    });
+    it('opens search with the new default and consumes a conflicting plugin shortcut', async () => {
+      mockConfigService.cfg.set({
+        keyboard: { showSearchBar: 'Ctrl+F', [PLUGIN_SHORTCUT_CFG_KEY]: 'Ctrl+F' },
+      });
+      mockConfigService.appFeatures.set({ isSearchEnabled: true });
+      mockPluginBridgeService.shortcuts.set([
+        { pluginId: 'automations', id: 'r1', label: 'Rule' },
+      ]);
+      const ev = new KeyboardEvent('keydown', {
+        code: 'KeyF',
+        ctrlKey: true,
+        cancelable: true,
+      });
+      Object.defineProperty(ev, 'target', { value: document.body });
+
+      await service.handleKeyDown(ev);
+
+      expect(mockSearchDialog.open).toHaveBeenCalled();
+      expect(ev.defaultPrevented).toBeTrue();
+      expect(mockPluginBridgeService.executeShortcut).not.toHaveBeenCalled();
+    });
+
+    it('leaves Meta shortcuts in text inputs to the editor', async () => {
+      const ev = new KeyboardEvent('keydown', { code: 'KeyF', metaKey: true });
+      Object.defineProperty(ev, 'target', { value: document.createElement('input') });
+
+      await service.handleKeyDown(ev);
+
+      expect(mockTaskShortcutService.handleTaskShortcuts).not.toHaveBeenCalled();
+      expect(mockSearchDialog.open).not.toHaveBeenCalled();
+    });
+
+    it('ignores shortcuts while composing text', async () => {
+      const ev = new KeyboardEvent('keydown', { code: 'KeyF', isComposing: true });
+      Object.defineProperty(ev, 'target', { value: document.body });
+
+      await service.handleKeyDown(ev);
+
+      expect(mockTaskShortcutService.handleTaskShortcuts).not.toHaveBeenCalled();
+    });
+
     it('should NOT navigate to schedule if TaskShortcutService handled Shift+S', () => {
       mockTaskShortcutService.handleTaskShortcuts.and.returnValue(true);
       const ev = new KeyboardEvent('keydown', {

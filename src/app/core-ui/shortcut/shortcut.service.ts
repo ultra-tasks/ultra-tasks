@@ -2,7 +2,7 @@ import { computed, inject, Injectable } from '@angular/core';
 import { SearchDialogService } from '../../pages/search-page/search-dialog/search-dialog.service';
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { IS_ELECTRON } from '../../app.constants';
-import { checkKeyCombo } from '../../util/check-key-combo';
+import { checkKeyCombo, checkStandardKeyCombo } from '../../util/check-key-combo';
 import { isInputElement } from '../../util/dom-element';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -23,6 +23,9 @@ import { first, mapTo, switchMap } from 'rxjs/operators';
 import { firstValueFrom, fromEvent, merge, Observable, of } from 'rxjs';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
 import { TaskShortcutService } from '../../features/tasks/task-shortcut.service';
+import { TaskUndoService } from '../../features/tasks/task-undo.service';
+import { TaskClipboardService } from '../../features/tasks/task-clipboard.service';
+import { IS_MAC } from '../../util/is-mac';
 import { TODAY_TAG } from '../../features/tag/tag.const';
 import { DialogConfirmComponent } from '../../ui/dialog-confirm/dialog-confirm.component';
 
@@ -71,6 +74,8 @@ export class ShortcutService {
   private _store = inject(Store);
   private _pluginBridgeService = inject(PluginBridgeService);
   private _taskShortcutService = inject(TaskShortcutService);
+  private _taskUndoService = inject(TaskUndoService);
+  private _taskClipboard = inject(TaskClipboardService);
   private _overlayContainer = inject(OverlayContainer);
   private _isNoteTaskHandoffPending = false;
 
@@ -208,13 +213,41 @@ export class ShortcutService {
     const hasBlockingOverlay =
       this._matDialog.openDialogs.length > 0 || this._hasOpenCdkOverlay();
 
-    // Skip handling if no special keys are used and inside input elements or overlays.
+    // Text editing, IME composition and overlays own their keyboard events.
     // Overlay detection intentionally keys off CDK CSS class names for now (see constants above).
     if (
-      !ev.metaKey &&
-      (isInputElement(el) || hasBlockingOverlay || this._isEventFromOverlay(ev))
+      ev.isComposing ||
+      isInputElement(el) ||
+      hasBlockingOverlay ||
+      this._isEventFromOverlay(ev)
     ) {
       return;
+    }
+
+    const isPrimaryModifier = IS_MAC
+      ? ev.metaKey && !ev.ctrlKey
+      : ev.ctrlKey && !ev.metaKey;
+    if (!ev.repeat) {
+      const undo = keys.undo === undefined ? 'Ctrl+Z' : keys.undo;
+      const redo = keys.redo === undefined ? 'Ctrl+Y' : keys.redo;
+      const isUndo = checkStandardKeyCombo(ev, undo, 'Ctrl+Z');
+      const isRedo =
+        (redo === 'Ctrl+Y' &&
+          isPrimaryModifier &&
+          !ev.altKey &&
+          ev.shiftKey &&
+          ev.code === 'KeyZ') ||
+        checkStandardKeyCombo(ev, redo, 'Ctrl+Y');
+      if (isUndo && this._taskUndoService.canUndo()) {
+        ev.preventDefault();
+        this._taskUndoService.undo();
+        return;
+      }
+      if (isRedo && this._taskUndoService.canRedo()) {
+        ev.preventDefault();
+        this._taskUndoService.redo();
+        return;
+      }
     }
 
     // Handle task-specific shortcuts first when a task is focused
@@ -222,10 +255,15 @@ export class ShortcutService {
       return;
     }
 
+    if (this._taskClipboard.handleKeyDown(ev, keys)) {
+      return;
+    }
+
     if (
       checkKeyCombo(ev, keys.toggleBacklog) &&
       this._workContextService.activeWorkContextType === WorkContextType.PROJECT
     ) {
+      ev.preventDefault();
       let backlogPos = 0;
       switch (this.backlogPos) {
         case 50:
@@ -241,29 +279,35 @@ export class ShortcutService {
         queryParams: { backlogPos },
       });
     } else if (checkKeyCombo(ev, keys.goToFocusMode) && this.isFocusModeEnabled()) {
+      ev.preventDefault();
       this._store.dispatch(showFocusOverlay());
     } else if (checkKeyCombo(ev, keys.goToWorkView)) {
+      ev.preventDefault();
       this._router.navigate(['/active/tasks']).then(() => {
         window.setTimeout(() => {
           this._taskService.focusFirstTaskIfVisible();
         });
       });
     } else if (checkKeyCombo(ev, keys.goToTimeline)) {
+      ev.preventDefault();
       this._router.navigate(['/tag/' + TODAY_TAG.id + '/tasks']);
-    } else if (checkKeyCombo(ev, keys.goToSettings)) {
+    } else if (checkStandardKeyCombo(ev, keys.goToSettings, 'Ctrl+,')) {
+      ev.preventDefault();
       this._router.navigate(['/config']);
     } else if (
       checkKeyCombo(ev, keys.goToScheduledView) &&
       this._configService.appFeatures().isSchedulerEnabled
     ) {
+      ev.preventDefault();
       this._router.navigate(['/schedule']);
     } else if (
       checkKeyCombo(ev, keys.goToPlanner) &&
       this._configService.appFeatures().isPlannerEnabled
     ) {
+      ev.preventDefault();
       this._router.navigate(['/planner']);
     } else if (
-      checkKeyCombo(ev, keys.showSearchBar) &&
+      checkStandardKeyCombo(ev, keys.showSearchBar, 'Ctrl+F') &&
       this._configService.appFeatures().isSearchEnabled
     ) {
       void this._searchDialog.open();
@@ -271,7 +315,7 @@ export class ShortcutService {
     } else if (checkKeyCombo(ev, keys.focusSideNav)) {
       this._focusSideNav();
       ev.preventDefault();
-    } else if (checkKeyCombo(ev, keys.toggleSideNavMode)) {
+    } else if (checkStandardKeyCombo(ev, keys.toggleSideNavMode, 'Ctrl+B')) {
       this._layoutService.toggleSideNavMode();
       ev.preventDefault();
     } else if (checkKeyCombo(ev, keys.addNewTask)) {
@@ -331,16 +375,26 @@ export class ShortcutService {
       return;
     }
 
+    // A built-in action has already claimed this event. Plugin bindings must
+    // not run a second action for the same key.
+    if (ev.defaultPrevented) {
+      return;
+    }
+
     // special hidden dev tools combo to use them for production
     if (IS_ELECTRON) {
       if (checkKeyCombo(ev, 'Ctrl+Shift+J')) {
         window.ea.openDevTools();
+        return;
       } else if (checkKeyCombo(ev, keys.zoomIn)) {
         this._uiHelperService.zoomBy(0.05);
+        return;
       } else if (checkKeyCombo(ev, keys.zoomOut)) {
         this._uiHelperService.zoomBy(-0.05);
+        return;
       } else if (checkKeyCombo(ev, keys.zoomDefault)) {
         this._uiHelperService.zoomTo(1);
+        return;
       }
     }
 

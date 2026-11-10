@@ -1,5 +1,6 @@
 import {
   checkKeyCombo,
+  checkStandardKeyCombo,
   KeyboardLayout,
   KEYS,
   prepareKeyCode,
@@ -191,6 +192,22 @@ const withLayouts = async (
 };
 
 describe('checkKeyCombo', () => {
+  it('adds the Mac equivalent only for the selected standard binding', () => {
+    const event = new KeyboardEvent('keydown', { code: 'KeyF', metaKey: true });
+    expect(checkStandardKeyCombo(event, 'Ctrl+F', 'Ctrl+F', true)).toBeTrue();
+    expect(checkStandardKeyCombo(event, 'Ctrl+F', 'Ctrl+F', false)).toBeFalse();
+    expect(checkStandardKeyCombo(event, 'Ctrl+G', 'Ctrl+F', true)).toBeFalse();
+  });
+
+  it('recognizes the settings shortcut with a comma key', () => {
+    const event = new KeyboardEvent('keydown', {
+      code: 'Comma',
+      key: ',',
+      ctrlKey: true,
+    });
+    expect(checkKeyCombo(event, 'Ctrl+,')).toBeTrue();
+  });
+
   afterEach(() => {
     // Restore original navigator after EACH test to prevent pollution
     Object.defineProperty(window, 'navigator', {

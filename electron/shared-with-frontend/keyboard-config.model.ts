@@ -25,7 +25,12 @@ export type KeyboardConfig = Readonly<{
   zoomOut?: string | null;
   zoomDefault?: string | null;
   triggerSync?: string | null;
+  undo?: string | null;
+  redo?: string | null;
 
+  taskCopy?: string | null;
+  taskCut?: string | null;
+  taskPaste?: string | null;
   taskEditTitle?: string | null;
   taskToggleDetailPanelOpen?: string | null;
   taskOpenNotesPanel?: string | null;
