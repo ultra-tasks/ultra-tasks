@@ -37,6 +37,11 @@ const openFreshApp = async (
     });
   }
   await page.goto('/');
+  if (withExamples) {
+    await expect(page.locator('first-run-setup')).toBeVisible();
+    await page.getByRole('button', { name: 'Skip setup' }).click();
+    await expect(page.locator('first-run-setup')).toHaveCount(0);
+  }
 };
 
 /** The last tip sits below the task's "Inbox" chip, its arrow pointing at it. */

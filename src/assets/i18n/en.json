@@ -361,6 +361,7 @@
       "GET_READY": "Get ready for your focus session!",
       "GO_TO_PROCRASTINATION": "Get help when procrastinating",
       "GOGOGO": "Go, go, go!!!",
+      "HIDE_FOCUS": "Hide focus",
       "LONG_BREAK": "Long Break",
       "LONG_BREAK_TITLE": "Long break",
       "ON": "on",
@@ -409,6 +410,8 @@
       "START_FOCUS_SESSION": "Start focus session",
       "START_NEXT_FOCUS_SESSION": "Start next focus session",
       "SWITCH_TASK": "Switch task",
+      "TIME_ELAPSED": "Elapsed",
+      "TIME_REMAINING": "Remaining",
       "WORKED_FOR": "You worked for",
       "END_SESSION": "End session",
       "CREATE_AND_SELECT_TASK": "Create and select task"
@@ -964,6 +967,8 @@
       "EDIT_REPEATED_TASK": "Edit recurring task \"{{taskName}}\"",
       "ITEMS_TOTAL": "Tasks and events: {{count}}",
       "NO_TASKS": "No tasks",
+      "NO_UNSCHEDULED_INBOX": "No unscheduled Inbox tasks",
+      "UNSCHEDULED_INBOX": "Unscheduled tasks",
       "PLANNED_LOAD": "Planned: {{planned}}",
       "PLAN_VIEW": {
         "NO_DEADLINES": "No deadlines",
@@ -1173,6 +1178,7 @@
       "INFO": "Start typing to search for tasks, notes, projects or tags",
       "NO_RESULTS": "No tasks, notes, projects or tags found matching your search",
       "PLACEHOLDER": "Search for tasks, notes, projects or tags",
+      "SUGGESTED_ACTIONS": "Suggested actions",
       "UNAVAILABLE_CONTEXT": "Unavailable context"
     },
     "SIMPLE_COUNTER": {
@@ -3396,6 +3402,22 @@
     "TASK_MARKED_DONE": "Task marked as done"
   },
   "ONBOARDING": {
+    "SETUP": {
+      "BRAND": "Ultra Tasks",
+      "CHOOSE_PATH": "Choose how to begin",
+      "CONTINUE": "Continue",
+      "IMPORT": "Import tasks",
+      "IMPORT_HINT": "Use a supported import",
+      "INTRO": "Your tasks stay on this device. No account needed.",
+      "LATER": "You can change these choices later in Settings.",
+      "OPTIONAL": "First launch · optional",
+      "RESTORE": "Restore backup",
+      "RESTORE_HINT": "Bring back your data",
+      "SKIP": "Skip setup",
+      "START_FRESH": "Start fresh",
+      "START_FRESH_HINT": "Open your workspace",
+      "TITLE": "A little room to focus."
+    },
     "HINTS": {
       "CREATE_TASK": "Click Add task to add your first task",
       "CREATE_TASK_TOUCH": "Tap Add task to add your first task",

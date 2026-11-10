@@ -5,10 +5,12 @@ import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { BehaviorSubject } from 'rxjs';
 import { DateService } from '../../core/date/date.service';
 import { LayoutService } from '../../core-ui/layout/layout.service';
-import { selectTaskFeatureState } from '../tasks/store/task.selectors';
+import { selectAllTasks, selectTaskFeatureState } from '../tasks/store/task.selectors';
+import { MatDialog } from '@angular/material/dialog';
 import { selectPlannerDayMap } from './store/planner.selectors';
 import { signal } from '@angular/core';
 import { PlannerDay } from './planner.model';
+import { Task } from '../tasks/task.model';
 
 describe('PlannerComponent', () => {
   let fixture: ComponentFixture<PlannerComponent>;
@@ -56,8 +58,10 @@ describe('PlannerComponent', () => {
         { provide: PlannerService, useValue: mockPlannerService },
         { provide: DateService, useValue: mockDateService },
         { provide: LayoutService, useValue: mockLayoutService },
+        { provide: MatDialog, useValue: { open: jasmine.createSpy('open') } },
         provideMockStore({
           selectors: [
+            { selector: selectAllTasks, value: [] },
             {
               selector: selectTaskFeatureState,
               value: { ids: ['task-1', 'task-2'], entities: {} },
@@ -86,6 +90,23 @@ describe('PlannerComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('offers only unfinished, unscheduled top-level Inbox tasks in the panel', () => {
+    const tasks = [
+      { id: 'available', projectId: 'INBOX_PROJECT', isDone: false },
+      { id: 'planned', projectId: 'INBOX_PROJECT', dueDay: '2026-02-17' },
+      { id: 'timed', projectId: 'INBOX_PROJECT', dueWithTime: 1234 },
+      { id: 'done', projectId: 'INBOX_PROJECT', isDone: true },
+      { id: 'child', projectId: 'INBOX_PROJECT', parentId: 'available' },
+      { id: 'project', projectId: 'project-1' },
+    ] as Task[];
+    TestBed.inject(MockStore).overrideSelector(selectAllTasks, tasks);
+    TestBed.inject(MockStore).refreshState();
+    fixture.detectChanges();
+    expect(component.unscheduledInboxTasks().map((task) => task.id)).toEqual([
+      'available',
+    ]);
   });
 
   describe('daysWithTasks', () => {

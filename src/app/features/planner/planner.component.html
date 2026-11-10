@@ -5,9 +5,70 @@
     (dayTapped)="planView.scrollToDay($event)"
   />
 }
-<planner-plan-view
-  #planView
-  [scope]="scope()"
+@if (!layoutService.isXs() && !scope()) {
+  <div class="planner-toolbar">
+    <button
+      type="button"
+      class="inbox-toggle"
+      [attr.aria-expanded]="isInboxOpen()"
+      (click)="isInboxOpen.set(!isInboxOpen())"
+    >
+      <mat-icon>inbox</mat-icon>
+      {{ T.G.INBOX_PROJECT_TITLE | translate }}
+    </button>
+  </div>
+}
+<div
+  class="planner-layout"
   cdkDropListGroup
-  cdkScrollable
-/>
+>
+  @if (!layoutService.isXs() && !scope() && isInboxOpen()) {
+    <aside class="inbox-panel">
+      <header>
+        <div>
+          <strong>{{ T.G.INBOX_PROJECT_TITLE | translate }}</strong>
+          <p>{{ T.F.PLANNER.UNSCHEDULED_INBOX | translate }}</p>
+        </div>
+        <button
+          type="button"
+          class="panel-close"
+          (click)="isInboxOpen.set(false)"
+          [attr.aria-label]="T.G.CLOSE | translate"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+      </header>
+      <div
+        cdkDropList
+        [cdkDropListData]="inboxPanelId"
+        [cdkDropListEnterPredicate]="rejectIncoming"
+        [cdkDropListSortingDisabled]="true"
+      >
+        @for (task of unscheduledInboxTasks(); track task.id) {
+          <div
+            class="inbox-task"
+            cdkDrag
+            [cdkDragData]="task"
+          >
+            <span>{{ task.title }}</span>
+            <button
+              type="button"
+              class="schedule-inbox-task"
+              (click)="openSchedule(task)"
+              [attr.aria-label]="T.F.TASK.CMP.SCHEDULE | translate"
+            >
+              <mat-icon>event</mat-icon>
+            </button>
+          </div>
+        } @empty {
+          <p class="inbox-empty">{{ T.F.PLANNER.NO_UNSCHEDULED_INBOX | translate }}</p>
+        }
+      </div>
+    </aside>
+  }
+  <planner-plan-view
+    #planView
+    [scope]="scope()"
+    cdkScrollable
+  />
+</div>

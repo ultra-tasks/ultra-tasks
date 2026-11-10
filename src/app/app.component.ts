@@ -93,6 +93,7 @@ import { TaskMultiSelectBarComponent } from './features/tasks/task-multi-select-
 import { TaskMultiSelectService } from './features/tasks/task-multi-select.service';
 import { OnboardingHintComponent } from './features/onboarding/onboarding-hint.component';
 import { OnboardingHintService } from './features/onboarding/onboarding-hint.service';
+import { FirstRunSetupService } from './features/onboarding/first-run-setup.service';
 import { QuickTourService } from './features/onboarding/quick-tour.service';
 import { MaterialIconsLoaderService } from './ui/material-icons-loader.service';
 import { BrowserTitleService } from './core/browser-title/browser-title.service';
@@ -166,6 +167,8 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   private _document = inject(DOCUMENT, { optional: true });
   private _certTrustService = inject(CertTrustService);
   private _startupService = inject(StartupService);
+  // Capture first-run eligibility before the example-task service writes its flag.
+  readonly firstRunSetup = inject(FirstRunSetupService);
   // Injected for side-effect: creates example tasks on first run
   private _exampleTasksService = inject(ExampleTasksService);
   // Injected for side-effect: loads per-instance task widget settings from

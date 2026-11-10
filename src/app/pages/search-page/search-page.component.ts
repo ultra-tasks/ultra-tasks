@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   inject,
   input,
@@ -13,7 +14,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { T } from '../../t.const';
 import { ReactiveFormsModule, UntypedFormControl } from '@angular/forms';
 import { BehaviorSubject, combineLatest, from, Observable } from 'rxjs';
-import { debounceTime, filter, map, startWith, switchMap } from 'rxjs/operators';
+import { debounceTime, filter, map, startWith, switchMap, take } from 'rxjs/operators';
 import { TaskService } from '../../features/tasks/task.service';
 import { DEFAULT_TAG, TODAY_TAG } from '../../features/tag/tag.const';
 import { NoteService } from '../../features/note/note.service';
@@ -42,6 +43,8 @@ import { Log } from '../../core/log';
 import { MenuTreeService } from '../../features/menu-tree/menu-tree.service';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { RecentlyDeletedService } from '../../features/tasks/recently-deleted/recently-deleted.service';
+import { GlobalConfigService } from '../../features/config/global-config.service';
+import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
 import {
   getRestoreTaskPayload,
   RecentlyDeletedEntry,
@@ -84,11 +87,15 @@ export class SearchPageComponent implements OnInit {
   private _menuTreeService = inject(MenuTreeService);
   private _recentlyDeletedService = inject(RecentlyDeletedService);
   private _translateService = inject(TranslateService);
+  private _globalConfig = inject(GlobalConfigService);
+  private _focusMode = inject(FocusModeService);
 
   /** Shown in a dialog over another page rather than as a page of its own. */
   readonly isPopup = input(false);
   /** The user picked a result (the popup closes itself then). */
   readonly itemChosen = output<void>();
+  readonly appFeatures = this._globalConfig.appFeatures;
+  readonly keyboard = computed(() => this._globalConfig.cfg()?.keyboard);
 
   readonly inputEl = viewChild.required<ElementRef>('inputEl');
   readonly resultBtns = viewChildren<ElementRef<HTMLButtonElement>>('resultBtn');
@@ -535,6 +542,32 @@ export class SearchPageComponent implements OnInit {
   clearSearch(): void {
     this.searchForm.setValue('');
     this.inputEl().nativeElement.focus();
+  }
+
+  runSuggestedAction(action: 'add' | 'focus' | 'shortcuts'): void {
+    const run = (): void => {
+      if (action === 'add') {
+        this._layoutService.showAddTaskBar();
+      } else if (action === 'focus') {
+        if (this.appFeatures().isFocusModeEnabled) this._focusMode.openOverlay();
+      } else {
+        void import('../../core-ui/shortcut/dialog-keyboard-shortcuts/dialog-keyboard-shortcuts.component').then(
+          ({ DialogKeyboardShortcutsComponent }) => {
+            this._matDialog.open(DialogKeyboardShortcutsComponent, {
+              restoreFocus: true,
+            });
+          },
+        );
+      }
+    };
+
+    const dialog = this.isPopup() ? this._matDialog.getDialogById('search-popup') : null;
+    if (dialog) {
+      dialog.afterClosed().pipe(take(1)).subscribe(run);
+      this.itemChosen.emit();
+    } else {
+      run();
+    }
   }
 
   async viewArchivedTaskDetails(item: SearchItem, event: MouseEvent): Promise<void> {

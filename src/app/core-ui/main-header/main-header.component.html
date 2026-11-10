@@ -1,6 +1,9 @@
 <div class="wrapper">
   @if (isDataLoaded()) {
     <page-title></page-title>
+    @if (!isXs() && !isVerticalActionBar()) {
+      <project-view-menu></project-view-menu>
+    }
   }
 
   <!-- The slack between the title and the actions, and the tracked task's
@@ -134,7 +137,9 @@
         ></plugin-work-context-header-btns>
         <plugin-header-btns class="secondary-header-action"></plugin-header-btns>
 
-        <project-view-menu class="secondary-header-action"></project-view-menu>
+        @if (isXs() || isVerticalActionBar()) {
+          <project-view-menu [compact]="true"></project-view-menu>
+        }
 
         <!-- One action, one home: below 600px the Browse drawer lists these,
              so the header must not render them as well. Rendering both put

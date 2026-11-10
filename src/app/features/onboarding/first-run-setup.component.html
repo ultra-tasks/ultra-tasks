@@ -1,0 +1,74 @@
+<div class="setup">
+  <header>
+    <strong>{{ T.ONBOARDING.SETUP.BRAND | translate }}</strong>
+    <button
+      type="button"
+      class="skip"
+      (click)="finish('skip')"
+    >
+      {{ T.ONBOARDING.SETUP.SKIP | translate }}
+    </button>
+  </header>
+
+  <main>
+    <p class="eyebrow">{{ T.ONBOARDING.SETUP.OPTIONAL | translate }}</p>
+    <h1>{{ T.ONBOARDING.SETUP.TITLE | translate }}</h1>
+    <p class="intro">{{ T.ONBOARDING.SETUP.INTRO | translate }}</p>
+
+    <div
+      class="choices"
+      role="group"
+      [attr.aria-label]="T.ONBOARDING.SETUP.CHOOSE_PATH | translate"
+    >
+      <button
+        type="button"
+        [attr.aria-pressed]="selected() === 'fresh'"
+        (click)="selected.set('fresh')"
+      >
+        <strong>{{ T.ONBOARDING.SETUP.START_FRESH | translate }}</strong>
+        <span>{{ T.ONBOARDING.SETUP.START_FRESH_HINT | translate }}</span>
+      </button>
+      <button
+        type="button"
+        [attr.aria-pressed]="selected() === 'restore'"
+        (click)="selected.set('restore')"
+      >
+        <strong>{{ T.ONBOARDING.SETUP.RESTORE | translate }}</strong>
+        <span>{{ T.ONBOARDING.SETUP.RESTORE_HINT | translate }}</span>
+      </button>
+      <button
+        type="button"
+        [attr.aria-pressed]="selected() === 'import'"
+        (click)="selected.set('import')"
+      >
+        <strong>{{ T.ONBOARDING.SETUP.IMPORT | translate }}</strong>
+        <span>{{ T.ONBOARDING.SETUP.IMPORT_HINT | translate }}</span>
+      </button>
+    </div>
+
+    <label class="appearance">
+      <span>
+        <strong>{{ T.PS.REFINEMENT.APPEARANCE | translate }}</strong>
+        <small>{{ T.PS.REDESIGN.MODE_HELP | translate }}</small>
+      </span>
+      <select
+        [value]="theme.darkMode()"
+        (change)="setAppearance($event)"
+      >
+        <option value="system">{{ T.GCF.MISC.DARK_MODE_SYSTEM | translate }}</option>
+        <option value="light">{{ T.GCF.MISC.DARK_MODE_LIGHT | translate }}</option>
+        <option value="dark">{{ T.GCF.MISC.DARK_MODE_DARK | translate }}</option>
+      </select>
+    </label>
+    <footer>
+      <span>{{ T.ONBOARDING.SETUP.LATER | translate }}</span>
+      <button
+        type="button"
+        class="continue"
+        (click)="finish(selected())"
+      >
+        {{ T.ONBOARDING.SETUP.CONTINUE | translate }}
+      </button>
+    </footer>
+  </main>
+</div>

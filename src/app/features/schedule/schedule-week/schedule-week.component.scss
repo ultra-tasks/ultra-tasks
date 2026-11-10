@@ -257,8 +257,8 @@
   min-width: 0;
   padding: 0 var(--s-quarter);
   box-sizing: border-box;
+  font: var(--type-body-strong);
   line-height: 32px;
-  font-size: 18px;
   @include extraBorder('-left');
 
   @include mq(xs, max) {
@@ -280,7 +280,8 @@
 }
 
 .day-day {
-  font-weight: 100;
+  color: var(--text-color-muted);
+  font: var(--type-meta);
 }
 
 .day-badges {

@@ -136,9 +136,45 @@
         <p>{{ T.F.SEARCH_BAR.NO_RESULTS | translate }}</p>
       </div>
     } @else {
-      <div class="empty-state">
-        <mat-icon>search</mat-icon>
-        <p>{{ T.F.SEARCH_BAR.INFO | translate }}</p>
+      <div class="suggested-actions">
+        <p class="suggested-heading">
+          {{ T.F.SEARCH_BAR.SUGGESTED_ACTIONS | translate }}
+        </p>
+        <button
+          #resultBtn
+          type="button"
+          (click)="runSuggestedAction('add')"
+        >
+          <mat-icon>add</mat-icon>
+          <span>{{ T.GCF.KEYBOARD.ADD_NEW_TASK | translate }}</span>
+          @if (keyboard()?.addNewTask; as shortcut) {
+            <kbd>{{ shortcut }}</kbd>
+          }
+        </button>
+        @if (appFeatures().isFocusModeEnabled) {
+          <button
+            #resultBtn
+            type="button"
+            (click)="runSuggestedAction('focus')"
+          >
+            <mat-icon>center_focus_strong</mat-icon>
+            <span>{{ T.GCF.KEYBOARD.GO_TO_FOCUS_MODE | translate }}</span>
+            @if (keyboard()?.goToFocusMode; as shortcut) {
+              <kbd>{{ shortcut }}</kbd>
+            }
+          </button>
+        }
+        <button
+          #resultBtn
+          type="button"
+          (click)="runSuggestedAction('shortcuts')"
+        >
+          <mat-icon>keyboard</mat-icon>
+          <span>{{ T.GCF.KEYBOARD.SHOW_HELP | translate }}</span>
+          @if (keyboard()?.showHelp; as shortcut) {
+            <kbd>{{ shortcut }}</kbd>
+          }
+        </button>
       </div>
     }
   </div>

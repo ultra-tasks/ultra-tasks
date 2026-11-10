@@ -5,6 +5,12 @@
   gap: var(--s3);
   container-type: inline-size;
 }
+
+.dark-mode-explanation {
+  margin-top: calc(-1 * var(--s2));
+  color: var(--text-color-muted);
+  font: var(--type-meta);
+}
 h3,
 h4,
 p {

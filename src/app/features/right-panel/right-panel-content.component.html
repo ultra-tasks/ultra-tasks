@@ -20,6 +20,8 @@
         [@taskDetailPanelTaskChange]="task.id"
         [@.disabled]="isDisableTaskPanelAni()"
         [task]="task"
+        [showCloseButton]="true"
+        (closeRequested)="closeRequested.emit()"
       ></task-detail-panel>
     }
   }

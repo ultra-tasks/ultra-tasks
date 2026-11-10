@@ -1,8 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, map } from 'rxjs/operators';
-import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatMenu, MatMenuItem, MatMenuTrigger } from '@angular/material/menu';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -19,7 +24,6 @@ import { T } from '../../../t.const';
   selector: 'project-view-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    MatIconButton,
     MatIcon,
     MatMenu,
     MatMenuItem,
@@ -28,16 +32,63 @@ import { T } from '../../../t.const';
     TranslatePipe,
     SelectOptionRowComponent,
   ],
-  styles: ':host { display: contents; }',
+  styles: `
+    :host {
+      display: contents;
+    }
+    .project-view-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-half);
+      min-height: var(--ctl-md);
+      padding: 0 var(--s);
+      border: 1px solid var(--divider-color);
+      border-radius: var(--r-md);
+      background: transparent;
+      color: var(--text-color);
+      font: var(--type-label);
+      cursor: pointer;
+    }
+    .project-view-trigger:hover {
+      background: var(--state-hover);
+    }
+    .project-view-trigger:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: var(--focus-ring-offset);
+    }
+    .project-view-trigger mat-icon {
+      width: var(--icon-md);
+      height: var(--icon-md);
+      font-size: var(--icon-md);
+    }
+    .project-view-trigger.is-compact .project-view-label,
+    .project-view-trigger.is-compact .project-view-chevron {
+      display: none;
+    }
+    @media (max-width: 599px) {
+      .project-view-label,
+      .project-view-chevron {
+        display: none;
+      }
+    }
+  `,
   template: `
     @if (isProjectView()) {
       <button
-        mat-icon-button
+        type="button"
+        class="project-view-trigger"
+        [class.is-compact]="compact()"
         [matMenuTriggerFor]="viewMenu"
         [matTooltip]="T.F.PROJECT.LAYOUT.LABEL | translate"
         [attr.aria-label]="T.F.PROJECT.LAYOUT.LABEL | translate"
       >
         <mat-icon [fontIcon]="activeOption().icon"></mat-icon>
+        <span class="project-view-label">{{ activeOption().labelKey | translate }}</span>
+        <mat-icon
+          class="project-view-chevron"
+          aria-hidden="true"
+          >expand_more</mat-icon
+        >
       </button>
       <mat-menu #viewMenu="matMenu">
         @for (option of options; track option.id) {
@@ -79,6 +130,7 @@ import { T } from '../../../t.const';
 })
 export class ProjectViewMenuComponent {
   readonly T = T;
+  readonly compact = input(false);
   private readonly _router = inject(Router);
   private readonly _layouts = inject(ProjectLayoutService);
   private readonly _project = toSignal(inject(ProjectService).currentProject$, {

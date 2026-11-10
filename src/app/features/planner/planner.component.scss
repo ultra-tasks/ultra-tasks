@@ -6,10 +6,97 @@
   // Phone: the calendar strip rests below the floating header, and the day list
   // below it scrolls behind the floating nav (both insets are 0 from 600px up).
   padding-top: var(--shell-inset-top);
+}
 
-  planner-plan-view {
+.planner-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--s-half) var(--page-gutter);
+}
+
+.planner-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+planner-plan-view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: var(--shell-inset-bottom);
+}
+
+.inbox-toggle,
+.panel-close,
+.schedule-inbox-task {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-half);
+  min-width: var(--ctl-md);
+  min-height: var(--ctl-md);
+  padding: 0 var(--s);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-color);
+  font: var(--type-label);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--state-hover);
+  }
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  mat-icon {
+    width: var(--icon-md);
+    height: var(--icon-md);
+    font-size: var(--icon-md);
+  }
+}
+
+.inbox-panel {
+  flex: 0 0 240px;
+  overflow: auto;
+  margin-inline-start: var(--page-gutter);
+  padding: var(--s);
+  border: 1px solid var(--divider-color);
+  border-radius: var(--r-md);
+  background: var(--card-bg);
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-inline-start: var(--s);
+    font: var(--type-body-strong);
+  }
+
+  header p,
+  .inbox-empty {
+    margin: var(--s-half) 0 var(--s);
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+  }
+}
+
+.inbox-task {
+  display: flex;
+  align-items: center;
+  gap: var(--s);
+  border-top: 1px solid var(--divider-color);
+  padding-inline-start: var(--s);
+  font: var(--type-body);
+  cursor: grab;
+
+  span {
     flex: 1;
-    min-height: 0;
-    padding-bottom: var(--shell-inset-bottom);
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }

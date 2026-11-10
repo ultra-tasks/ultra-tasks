@@ -5,6 +5,7 @@ import {
   effect,
   inject,
   OnDestroy,
+  output,
   signal,
   untracked,
 } from '@angular/core';
@@ -47,6 +48,7 @@ export type RightPanelContentPanelType = PanelContentType;
   imports: [NotesComponent, TaskDetailPanelComponent, PluginPanelContainerComponent],
 })
 export class RightPanelContentComponent implements OnDestroy {
+  readonly closeRequested = output<void>();
   taskService = inject(TaskService);
   layoutService = inject(LayoutService);
   pluginService = inject(PluginService);

@@ -47,7 +47,7 @@
 .day-title {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-width: 0;
   gap: var(--s-half);
   font: var(--type-heading);
@@ -71,7 +71,7 @@
   display: flex;
   flex-wrap: wrap;
   grid-column: 1 / -1;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   color: var(--text-color-muted);
   font: var(--type-meta);
@@ -85,7 +85,7 @@
 
   .day-load {
     min-width: 0;
-    text-align: center;
+    text-align: start;
   }
 }
 

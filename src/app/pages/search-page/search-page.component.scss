@@ -1,6 +1,50 @@
 // One column on the page anatomy: starts at the page gutter (the same left edge
 // as the header title and the task list) and keeps the content max width, with
 // the field and the results sharing it.
+.suggested-actions {
+  .suggested-heading {
+    margin: 0 0 var(--s-half);
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+  }
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: var(--s);
+    width: 100%;
+    min-height: var(--ctl-lg);
+    padding: var(--s) var(--s2);
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--text-color);
+    font: var(--type-body);
+    text-align: start;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--state-hover);
+    }
+    &:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: calc(-1 * var(--focus-ring-width));
+    }
+  }
+
+  mat-icon {
+    width: var(--icon-md);
+    height: var(--icon-md);
+    font-size: var(--icon-md);
+  }
+
+  kbd {
+    margin-inline-start: auto;
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+  }
+}
+
 .search-page {
   padding: var(--s) var(--page-gutter) 0;
   max-width: var(--component-max-width);

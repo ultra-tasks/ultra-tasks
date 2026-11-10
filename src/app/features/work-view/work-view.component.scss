@@ -80,7 +80,7 @@ h2 {
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: var(--s) var(--s3);
+  gap: var(--s) var(--s2);
   padding: 0;
   // Labels are meta and muted, values body-strong (below).
   font: var(--type-meta);
@@ -240,26 +240,15 @@ finish-day-btn,
   }
 }
 
-// The picture and its line are one composition (the line sits under the sun):
-// the block starts on the column's left edge and centres its content inside its
-// own width.
+// Keep the empty message aligned with the task column and its add action.
 .no-tasks-illu-wrapper {
-  position: relative;
-  margin-bottom: var(--s4);
-  width: min(500px, 100%);
-
-  img {
-    width: 100%;
-    display: block;
-    margin: 0;
-    border-radius: var(--r-md);
-  }
+  margin: var(--s4) 0 var(--s3);
 
   .no-tasks-label {
     font: var(--type-heading);
-    margin: var(--s2) 0 0;
-    text-align: center;
-    color: var(--text-color);
+    margin: 0;
+    text-align: start;
+    color: var(--text-color-muted);
   }
 }
 

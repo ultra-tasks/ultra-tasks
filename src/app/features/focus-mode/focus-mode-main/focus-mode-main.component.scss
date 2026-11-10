@@ -158,6 +158,16 @@
     var(--ani-enter-timing);
 }
 
+.clock-status {
+  position: absolute;
+  top: 61%;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-color-muted);
+  font: var(--type-meta);
+  white-space: nowrap;
+}
+
 // When the duration slider is showing (countdown prep), hide the clock digits —
 // the slider's own value display takes over. Toggled by a class bound to
 // isShowDurationSlider() in the template.
@@ -182,7 +192,7 @@
 // One step less intense than the clock time so it reads as a subtitle.
 .cycle-counter {
   position: absolute;
-  top: 65%;
+  top: 72%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -336,6 +346,48 @@
       font-size: 10px;
       font-weight: bold;
       line-height: 1;
+    }
+  }
+
+  .focus-action {
+    width: auto !important;
+    min-width: var(--ctl-lg);
+    height: var(--ctl-lg) !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-half);
+    padding: 0 var(--s);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: inherit;
+    font: var(--type-label);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--state-hover);
+    }
+
+    &:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: var(--focus-ring-offset);
+    }
+
+    mat-icon {
+      width: var(--icon-md) !important;
+      height: var(--icon-md) !important;
+      font-size: var(--icon-md) !important;
+    }
+  }
+
+  .pause-resume-btn {
+    border-color: var(--divider-color);
+  }
+
+  @include mq(xs, max) {
+    .action-label {
+      display: none;
     }
   }
 }

@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { TranslateService } from '@ngx-translate/core';
 import { filter, first, switchMap, tap } from 'rxjs/operators';
@@ -37,6 +37,8 @@ const TASK_CONTEXT = {
 
 @Injectable({ providedIn: 'root' })
 export class ExampleTasksService {
+  /** Only examples created in this boot; used to distinguish them from user data. */
+  readonly createdExampleTaskIds = signal<readonly string[]>([]);
   private _store = inject(Store);
   private _syncTriggerService = inject(SyncTriggerService);
   private _translateService = inject(TranslateService);
@@ -86,6 +88,7 @@ export class ExampleTasksService {
             additional: { notes: translations[def.notesKey] },
             ...TASK_CONTEXT,
           });
+          this.createdExampleTaskIds.update((ids) => [...ids, task.id]);
           this._store.dispatch(
             TaskSharedActions.addTask({
               task,

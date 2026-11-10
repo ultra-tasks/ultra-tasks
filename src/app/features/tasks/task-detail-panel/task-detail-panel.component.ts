@@ -11,6 +11,7 @@ import {
   input,
   OnDestroy,
   OnInit,
+  output,
   signal,
   viewChild,
   viewChildren,
@@ -136,6 +137,8 @@ import { TaskFocusService } from '../task-focus.service';
   ],
 })
 export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestroy {
+  readonly showCloseButton = input(false);
+  readonly closeRequested = output<void>();
   private readonly _elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
   // Services
   attachmentService = inject(TaskAttachmentService);

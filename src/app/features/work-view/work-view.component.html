@@ -113,19 +113,6 @@
               class="add-more-or-finish"
             >
               <div class="no-tasks-illu-wrapper">
-                <!-- Below the picture, not over its sun, so it stays readable. -->
-                <div class="inline-block-container">
-                  <img
-                    class="show-light-only"
-                    src="assets/illu/horizon.svg"
-                    alt=""
-                  />
-                  <img
-                    class="show-dark-only"
-                    src="assets/illu/horizon-dark.svg"
-                    alt=""
-                  />
-                </div>
                 <h2 class="no-tasks-label">
                   @if (
                     hasDoneTasks() || (workContextService.doneTodayArchived$ | async)

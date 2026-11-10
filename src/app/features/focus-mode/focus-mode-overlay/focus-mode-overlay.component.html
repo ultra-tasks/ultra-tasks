@@ -12,10 +12,11 @@
     <main>
       <button
         class="close-btn"
-        mat-icon-button
+        type="button"
         (click)="closeOverlay()"
-        [attr.aria-label]="T.G.CLOSE | translate"
+        [attr.aria-label]="T.F.FOCUS_MODE.HIDE_FOCUS | translate"
       >
+        <span>{{ T.F.FOCUS_MODE.HIDE_FOCUS | translate }}</span>
         <mat-icon>close</mat-icon>
       </button>
 

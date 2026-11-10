@@ -311,7 +311,7 @@ export class MainHeaderComponent implements OnDestroy {
   private _subs: Subscription = new Subscription();
 
   // Vertical action bar is desktop-only and opt-in via misc config.
-  private readonly _isVerticalActionBar = computed(
+  readonly isVerticalActionBar = computed(
     () => !this.isXs() && !!this.globalConfigService.misc()?.isVerticalActionBar,
   );
 
@@ -508,7 +508,7 @@ export class MainHeaderComponent implements OnDestroy {
     // also re-runs when data load fills in the nav's gated content (the nav
     // shell itself renders from first paint).
     effect(() => {
-      const enabled = this._isVerticalActionBar();
+      const enabled = this.isVerticalActionBar();
       this.isDataLoaded();
       this._syncTeleport(enabled);
     });

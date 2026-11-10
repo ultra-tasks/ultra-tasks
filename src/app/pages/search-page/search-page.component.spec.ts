@@ -20,6 +20,8 @@ import { TranslateModule } from '@ngx-translate/core';
 import { SearchItem } from './search-page.model';
 import { RecentlyDeletedService } from '../../features/tasks/recently-deleted/recently-deleted.service';
 import { RecentlyDeletedEntry } from '../../features/tasks/recently-deleted/recently-deleted.util';
+import { GlobalConfigService } from '../../features/config/global-config.service';
+import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
 
 // Minimal stub task matching the Task interface shape
 const createTask = (overrides: Partial<Task> = {}): Task =>
@@ -105,9 +107,13 @@ describe('SearchPageComponent', () => {
     recentlyDeletedSpy.getEntries.and.callFake(() => Promise.resolve(deletedEntries));
     recentlyDeletedSpy.restore.and.resolveTo();
 
-    layoutServiceSpy = jasmine.createSpyObj('LayoutService', ['toggleNotes'], {
-      isShowNotes: signal(false),
-    });
+    layoutServiceSpy = jasmine.createSpyObj(
+      'LayoutService',
+      ['toggleNotes', 'showAddTaskBar'],
+      {
+        isShowNotes: signal(false),
+      },
+    );
 
     await TestBed.configureTestingModule({
       imports: [SearchPageComponent, NoopAnimationsModule, TranslateModule.forRoot()],
@@ -126,6 +132,17 @@ describe('SearchPageComponent', () => {
         { provide: Router, useValue: routerSpy },
         { provide: LayoutService, useValue: layoutServiceSpy },
         { provide: RecentlyDeletedService, useValue: recentlyDeletedSpy },
+        {
+          provide: GlobalConfigService,
+          useValue: {
+            appFeatures: signal({ isFocusModeEnabled: true }),
+            cfg: signal({ keyboard: {} }),
+          },
+        },
+        {
+          provide: FocusModeService,
+          useValue: { openOverlay: jasmine.createSpy('openOverlay') },
+        },
         {
           provide: MenuTreeService,
           useValue: {
@@ -162,6 +179,16 @@ describe('SearchPageComponent', () => {
     component.searchForm.setValue(term);
     tick(150);
   };
+
+  it('opens the existing task composer from a suggested action', () => {
+    component.runSuggestedAction('add');
+    expect(layoutServiceSpy.showAddTaskBar).toHaveBeenCalled();
+  });
+
+  it('opens Focus without starting a session from a suggested action', () => {
+    component.runSuggestedAction('focus');
+    expect(TestBed.inject(FocusModeService).openOverlay).toHaveBeenCalled();
+  });
 
   // --- Behavioral tests ---
 

@@ -73,11 +73,11 @@
   @include extraBorder('-bottom');
 
   .title {
-    margin-left: auto;
+    min-width: 0;
+    margin-inline-end: auto;
     padding-right: var(--s);
-    font: var(--type-title);
-    letter-spacing: var(--track-title);
-    text-align: right;
+    font: var(--type-heading);
+    text-align: start;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -103,7 +103,7 @@
 
   .time-view-selector {
     display: flex;
-    margin-left: var(--s);
+    margin-inline-start: var(--s);
     border-radius: var(--r-md);
     overflow: hidden;
     border: 1px solid var(--separator);

@@ -35,7 +35,7 @@
         class="side-inner"
         [style.min-width.px]="panelWidth()"
       >
-        <right-panel-content></right-panel-content>
+        <right-panel-content (closeRequested)="close()"></right-panel-content>
       </div>
     </div>
   </div>

@@ -116,6 +116,18 @@
             }
           </div>
 
+          @if (isShowBottomControls()) {
+            <div class="clock-status">
+              @if (focusModeService.isSessionPaused()) {
+                {{ T.F.FOCUS_MODE.BROWSER_TITLE_PAUSED | translate }}
+              } @else if (isCountDown && !focusModeService.isInOvertime()) {
+                {{ T.F.FOCUS_MODE.TIME_REMAINING | translate }}
+              } @else {
+                {{ T.F.FOCUS_MODE.TIME_ELAPSED | translate }}
+              }
+            </div>
+          }
+
           <!-- Pomodoro cycle counter, sits below the clock digits -->
           @if (isPomodoro()) {
             <div class="cycle-counter">
@@ -244,48 +256,53 @@
     >
       <!-- Back to Planning (cancels the session + closes the focus overlay) -->
       <button
-        mat-icon-button
-        class="exit-session-btn"
+        type="button"
+        class="focus-action exit-session-btn"
         [matTooltip]="T.F.FOCUS_MODE.BACK_TO_PLANNING | translate"
         [attr.aria-label]="T.F.FOCUS_MODE.BACK_TO_PLANNING | translate"
         (click)="exitToPlanning()"
       >
         <mat-icon>arrow_back</mat-icon>
+        <span class="action-label">{{
+          T.F.FOCUS_MODE.BACK_TO_PLANNING | translate
+        }}</span>
       </button>
 
       <!-- Pause / resume the session (the task-row time stack is read-only). -->
       @if (focusModeService.isSessionPaused()) {
         <button
-          mat-icon-button
-          class="pause-resume-btn"
+          type="button"
+          class="focus-action pause-resume-btn"
           [matTooltip]="T.F.FOCUS_MODE.RESUME_SESSION | translate"
           [attr.aria-label]="T.F.FOCUS_MODE.RESUME_SESSION | translate"
           (click)="resumeSession()"
         >
           <mat-icon>play_arrow</mat-icon>
+          <span class="action-label">{{ T.F.FOCUS_MODE.B.RESUME | translate }}</span>
         </button>
       } @else {
         <button
-          mat-icon-button
-          class="pause-resume-btn"
+          type="button"
+          class="focus-action pause-resume-btn"
           [matTooltip]="T.F.FOCUS_MODE.PAUSE_SESSION | translate"
           [attr.aria-label]="T.F.FOCUS_MODE.PAUSE_SESSION | translate"
           (click)="pauseSession()"
         >
           <mat-icon>pause</mat-icon>
+          <span class="action-label">{{ T.F.FOCUS_MODE.B.PAUSE | translate }}</span>
         </button>
       }
 
       @if (isShowCompleteSessionButton()) {
         <button
-          mat-button
-          class="complete-session-btn"
+          type="button"
+          class="focus-action complete-session-btn"
           [matTooltip]="T.F.FOCUS_MODE.END_SESSION | translate"
           [attr.aria-label]="T.F.FOCUS_MODE.END_SESSION | translate"
           (click)="completeFocusSession()"
         >
           <mat-icon>stop_circle</mat-icon>
-          {{ T.F.FOCUS_MODE.END_SESSION | translate }}
+          <span class="action-label">{{ T.F.FOCUS_MODE.END_SESSION | translate }}</span>
         </button>
       }
 
@@ -332,8 +349,8 @@
 
         @if (displayed) {
           <button
-            mat-icon-button
-            class="ico-btn show-additional-info-btn show-notes-btn"
+            type="button"
+            class="focus-action ico-btn show-additional-info-btn show-notes-btn"
             [matTooltip]="T.F.FOCUS_MODE.SHOW_HIDE_NOTES_AND_ATTACHMENTS | translate"
             [attr.aria-label]="T.F.FOCUS_MODE.SHOW_HIDE_NOTES_AND_ATTACHMENTS | translate"
             (click)="isFocusNotes.set(!isFocusNotes())"
@@ -343,6 +360,7 @@
             } @else {
               <mat-icon>expand_more</mat-icon>
             }
+            <span class="action-label">{{ T.MH.NOTES | translate }}</span>
           </button>
         }
       }
