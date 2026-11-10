@@ -1,137 +1,89 @@
-name: Win Store File on Release
+name: Windows Store AppX
+
 on:
-  #  release:
-  #    types: [published]
   push:
-    branches: [test/git-actions]
     tags:
       - ultra-tasks-v*
   workflow_dispatch:
-    inputs: {}
 
 permissions:
   contents: read
+
+concurrency:
+  group: windows-store-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   windows-store-artifact:
     runs-on: windows-latest
     timeout-minutes: 45
+    # Public Partner Center identifiers; no signing certificate or Store credentials.
     env:
-      UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
-      UNSPLASH_CLIENT_ID: ${{ secrets.UNSPLASH_CLIENT_ID }}
-
-    if: '!github.event.release.prerelease'
-
+      WINDOWS_STORE_IDENTITY_NAME: ${{ vars.WINDOWS_STORE_IDENTITY_NAME }}
+      WINDOWS_STORE_PUBLISHER: ${{ vars.WINDOWS_STORE_PUBLISHER }}
+      WINDOWS_STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.WINDOWS_STORE_PUBLISHER_DISPLAY_NAME }}
+      WINDOWS_STORE_PACKAGE_FAMILY_NAME: ${{ vars.WINDOWS_STORE_PACKAGE_FAMILY_NAME }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
-      # required because setting via env.TZ does not work on windows
-      - name: Set timezone to Europe Standard Time
-        uses: szenius/set-timezone@1f9716b0f7120e344f0c62bb7b1ee98819aefd42 # v2.0
-        with:
-          timezoneWindows: 'W. Europe Standard Time'
-
-      - name: Check out Git repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
-        with:
-          node-version-file: .nvmrc
-      # work around for npm installs from git+https://github.com/johannesjo/J2M.git
-      - name: Reconfigure git to use HTTP authentication
-        run: >
-          git config --global url."https://github.com/".insteadOf
-          ssh://git@github.com/
-
-      - name: Get npm cache directory
-        id: npm-cache-dir
-        shell: bash
+      - uses: ./.github/actions/setup-electron-build
+      - name: Validate Store identity and release version
+        shell: pwsh
         run: |
-          echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
-        id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node22-
-
-      - name: Workaround for nx issue
-        run: npm install @nx/nx-win32-x64-msvc
-
-      - name: Install npm Packages
-        #  if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npm i
-
-      - run: npm run env # Generate env.generated.ts
-
-      - name: Build Frontend & Electron
-        run: npm run build
-
-      # `npm run build` checks the repository's Linux packaging config during lint.
-      - name: Load Electron Builder Windows Store Config
-        run: echo $WIN_STORE_ELECTRON_BUILDER_YML | base64 --decode > electron-builder.yaml
-        shell: bash
-        env:
-          WIN_STORE_ELECTRON_BUILDER_YML: ${{secrets.WIN_STORE_ELECTRON_BUILDER_YML}}
-
-      - name: Build/Release Electron app
-        uses: johannesjo/action-electron-builder@9ea9e2d991c97668843d57337848e3e2b1ffab3d # v1
-        with:
-          build_script_name: empty
-          release: false
-          github_token: ${{ secrets.github_token }}
-
-      - name: 'Upload Artifact'
+          npm run store:check-config
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            node tools/release-version.js
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - run: npm ci
+      - name: Validate packaging contracts
+        run: npm run quiet -- test:store
+      - run: npm run buildFrontend:prod:es6
+      - run: npm run electron:build
+      - name: Verify Store backup and identity behavior
+        run: npm run quiet -- test:electron:file electron/backup.test.cjs electron/windows-store-identity.test.cjs
+      - name: Package unsigned x64 and ARM64 AppX files
+        run: npm run dist:win:appx:only
+      - name: Verify packaged require targets
+        shell: pwsh
+        run: |
+          $archives = @(Get-ChildItem .tmp/store-builds -Filter app.asar -Recurse)
+          if ($archives.Count -ne 2) { throw 'Expected x64 and ARM64 app.asar archives' }
+          foreach ($archive in $archives) {
+            node tools/verify-electron-requires.js $archive.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Verify submission artifacts and write checksums
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem .tmp/store-builds -Filter *.appx)
+          if ($packages.Count -ne 2) { throw 'Expected exactly two AppX packages' }
+          foreach ($arch in @('x64', 'arm64')) {
+            $matching = @($packages | Where-Object Name -Match "-$arch[.]appx$")
+            if ($matching.Count -ne 1) {
+              throw "Missing $arch AppX package"
+            }
+            ./tools/verify-windows-store-package.ps1 -PackagePath $matching[0].FullName -Architecture $arch
+          }
+          $packages | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content .tmp/store-builds/SHA256SUMS.txt
+          @(
+            '## Windows Store packages prepared',
+            'Download WindowsStore-AppX and upload both .appx files to Partner Center.',
+            'These are unsigned Store submissions, not public sideload installers.',
+            'This workflow publishes neither a Store submission nor a GitHub release.',
+            'See docs/microsoft-store-publishing.md for certification and installation checks.'
+          ) | Add-Content $env:GITHUB_STEP_SUMMARY
+      - name: Upload packages for manual Partner Center submission
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: WinStoreRelease
-          path: .tmp/app-builds/*.appx
-
-      # Pull the GitHub release body for this tag so the maintainer can paste it
-      # into Partner Center's "What's new" field during the manual appx upload.
-      # The release may not exist yet when this job runs (parallel release workflow);
-      # in that case we leave a clear pointer and don't fail the build.
-      - name: Collect release notes for Partner Center upload
-        if: startsWith(github.ref, 'refs/tags/ultra-tasks-v')
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.github_token }}
-        run: |
-          tag="${GITHUB_REF_NAME}"
-          mkdir -p .tmp
-          notes_file=".tmp/RELEASE_NOTES.md"
-
-          if gh release view "$tag" --repo "${GITHUB_REPOSITORY}" --json body -q .body > "$notes_file" 2>/dev/null && [ -s "$notes_file" ]; then
-            echo "Found release notes for $tag ($(wc -c < "$notes_file") bytes)"
-          else
-            printf 'No GitHub release body for %s yet. Check %s/releases/tag/%s once it exists.\n' \
-              "$tag" "https://github.com/$GITHUB_REPOSITORY" "$tag" > "$notes_file"
-          fi
-
-          {
-            echo "## What's new for $tag - paste into Partner Center"
-            echo
-            echo "Partner Center's 'What's new' field accepts plain text up to ~1500 chars."
-            echo "Trim Markdown if needed."
-            echo
-            echo '```'
-            cat "$notes_file"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload release notes alongside appx
-        if: startsWith(github.ref, 'refs/tags/ultra-tasks-v')
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: WinStoreReleaseNotes
-          path: .tmp/RELEASE_NOTES.md
-#      - name: Upload to Microsoft Store
-#        if: startsWith(github.ref, 'refs/tags/ultra-tasks-v')
-#        uses: isaacrlevin/windows-store-action@1.0
-#        with:
-#          tenant-id: ${{ secrets.AZURE_AD_TENANT_ID }}
-#          client-id: ${{ secrets.AZURE_AD_CLIENT_ID }}
-#          client-secret: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
-#          app-id: ${{ secrets.MICROSOFT_STORE_APP_ID }}
-#          package-path: '.tmp/app-builds/*.appx'
-#          skip-polling: false
+          name: WindowsStore-AppX
+          path: |
+            .tmp/store-builds/*.appx
+            .tmp/store-builds/SHA256SUMS.txt
+          if-no-files-found: error

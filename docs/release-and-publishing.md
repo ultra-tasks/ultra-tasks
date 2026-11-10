@@ -214,10 +214,15 @@ git push --atomic origin HEAD "ultra-tasks-vX.Y.Z"
 | Android APKs and Play AAB                                   | `.github/workflows/build-android.yml`                         | Upload AAB to Play `internal` and attach APK    | Build/attach only          |
 | iOS App Store                                               | `.github/workflows/build-ios.yml`                             | Upload and submit for review                    | Upload only                |
 | Mac App Store                                               | `.github/workflows/build-publish-to-mac-store-on-release.yml` | Upload and submit for review                    | Upload only                |
-| Microsoft Store `.appx`                                     | `.github/workflows/build-create-windows-store-on-release.yml` | Build artifact for manual Partner Center upload | Build artifact             |
+| Microsoft Store `.appx`                                     | `.github/workflows/build-create-windows-store-on-release.yml` | Build artifact for manual Partner Center upload | Numeric versions only      |
 
 Apple's detailed submission behavior, API-key requirements, and recovery cases
 are in [Apple release automation](apple-release-automation.md).
+
+The Windows Store workflow builds unsigned x64 and ARM64 AppX artifacts for
+manual upload. Configure its public Partner Center identity values first; see
+[Microsoft Store publishing](microsoft-store-publishing.md). The Setup and Portable
+direct-download release workflows remain separate.
 
 For direct iPhone/iPad installation, manually dispatch `build-ios.yml` from
 `main` with `distribution=ad-hoc` (the manual default). This exports a signed IPA

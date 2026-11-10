@@ -86,13 +86,6 @@ portable:
   # portable covers both archs and halves what we submit for signing. The
   # release workflow creates the old architecture-specific names after signing.
   artifactName: ${name}.${ext}
-appx:
-  applicationId: UltraTasks
-  displayName: Ultra Tasks
-  publisherDisplayName: Adrian Chase
-  publisher: CN=___-___
-  identityName: UltraTasks
-
 linux:
   # Fix for issue #5259: Set executable name without spaces for snap compatibility
   executableName: ultratasks

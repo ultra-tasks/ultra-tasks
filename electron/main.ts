@@ -2,11 +2,17 @@ import { app } from 'electron';
 import { PROTOCOL_PREFIX } from './protocol-handler';
 import { startApp } from './start-app';
 import { applyLegacyForkUserDataDir, applySnapUserDataDir } from './user-data-dir';
+import { getWindowsStoreIdentity } from './windows-store-identity';
 
 const IS_MAC = process.platform === 'darwin';
 
 if (process.platform === 'win32') {
-  app.setAppUserModelId('app.ultratasks');
+  const storeIdentity = getWindowsStoreIdentity();
+  app.setAppUserModelId(
+    storeIdentity
+      ? `${storeIdentity.packageFamilyName}!${storeIdentity.applicationId}`
+      : 'app.ultratasks',
+  );
 }
 
 // Before the single-instance lock, which lives in the userData dir (#11049).

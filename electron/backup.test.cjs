@@ -8,15 +8,15 @@ require('ts-node/register/transpile-only');
 const originalModuleLoad = Module._load;
 const backupModulePath = path.resolve(__dirname, 'backup.ts');
 
-// Windows-shaped so the `.replace('Roaming', ...)` derivation actually fires on
-// Linux/macOS CI too — otherwise BACKUP_DIR_WINSTORE would equal BACKUP_DIR and
-// every assertion below would pass vacuously.
+// Windows-shaped so package redirection is exercised on Linux/macOS CI too.
 const USER_DATA = 'C:\\Users\\testuser\\AppData\\Roaming\\superProductivity';
+const ROAMING = 'C:\\Users\\testuser\\AppData\\Roaming';
+const PACKAGE_FAMILY = '12345.UltraTasks_abcde12345678';
 // path.join, like the module under test — the separator is the host's, not '\'.
 const BACKUP_DIR = path.join(USER_DATA, 'backups');
 const BACKUP_DIR_WINSTORE = BACKUP_DIR.replace(
   'Roaming',
-  'Local\\Packages\\53707johannesjo.SuperProductivity_ch45amy23cdv6\\LocalCache\\Roaming',
+  `Local\\Packages\\${PACKAGE_FAMILY}\\LocalCache\\Roaming`,
 );
 
 // what the mocked app.getPath('userData') returns; tests may change it after import
@@ -40,7 +40,7 @@ const installMocks = () => {
   Module._load = function patchedLoad(request, parent, isMain) {
     if (request === 'electron') {
       return {
-        app: { getPath: () => userDataPath },
+        app: { getPath: (name) => (name === 'appData' ? ROAMING : userDataPath) },
         ipcMain: {
           on: (channel, handler) => onHandlers.set(channel, handler),
           handle: (channel, handler) => handleHandlers.set(channel, handler),
@@ -50,6 +50,17 @@ const installMocks = () => {
 
     if (request === 'electron-log/main') {
       return { log: () => {}, error: () => {} };
+    }
+
+    if (request === './windows-store-identity' && parent?.filename === backupModulePath) {
+      return {
+        getWindowsStoreIdentity: () =>
+          process.windowsStore
+            ? { packageFamilyName: PACKAGE_FAMILY, applicationId: 'UltraTasks' }
+            : undefined,
+        getWindowsStoreUserDataDir: require('./windows-store-identity.ts')
+          .getWindowsStoreUserDataDir,
+      };
     }
 
     // Scoped to backup.ts so ts-node / node:test keep the real fs.
@@ -241,12 +252,26 @@ test('BACKUP_LOAD_DATA refuses paths outside the backup dirs without reading the
 });
 
 test('BACKUP_LOAD_DATA reads a backup from the Windows Store dir', () => {
+  process.windowsStore = true;
   const { initBackupAdapter } = loadBackupModule();
   initBackupAdapter();
   const storePath = path.join(BACKUP_DIR_WINSTORE, 'sp-backup.json');
   storedFiles.set(path.resolve(storePath), '{"from":"store"}');
 
   assert.equal(handleHandlers.get('BACKUP_LOAD_DATA')({}, storePath), '{"from":"store"}');
+});
+
+test('direct builds refuse Store package backup paths', () => {
+  const { initBackupAdapter } = loadBackupModule();
+  initBackupAdapter();
+  assert.throws(
+    () =>
+      handleHandlers.get('BACKUP_LOAD_DATA')(
+        {},
+        path.join(BACKUP_DIR_WINSTORE, 'sp-backup.json'),
+      ),
+    /refused path outside backup directory/,
+  );
 });
 
 test('a backup written by BACKUP restores through BACKUP_LOAD_DATA', () => {

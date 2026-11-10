@@ -19,6 +19,10 @@ import type { AppDataComplete } from '../src/app/op-log/model/model-config';
 import { getBackupTimestamp } from './shared-with-frontend/get-backup-timestamp';
 import { isPathInsideDir } from './file-path-guard';
 import {
+  getWindowsStoreIdentity,
+  getWindowsStoreUserDataDir,
+} from './windows-store-identity';
+import {
   DEFAULT_MAX_BACKUP_FILES,
   selectBackupFilesToDelete,
 } from './shared-with-frontend/backup-file-cleanup.util';
@@ -37,18 +41,20 @@ const getBackupDir = (): string => path.join(app.getPath('userData'), `backups`)
  * pointed at them. Display-oriented but not inert: `BACKUP_LOAD_DATA` below
  * also accepts it as an allow-listed read root.
  *
- * shortcut: the package family name is hardcoded and nothing in CI would notice
- * it drifting (the appx config lives in the WIN_STORE_ELECTRON_BUILDER_YML
- * secret); drift just fails the probe and we show getBackupDir(). Verified against
- * the shipped v18.15.1 appx on 2026-07-21 — it is `<Identity Name>_<PublisherId>`,
- * PublisherId being base32(SHA-256(UTF-16LE Publisher)[0..8]), so any release
- * artifact re-checks it without a Windows machine.
+ * The dedicated Store build embeds its own package family name. Direct builds
+ * must never admit another application's Store package as a backup read root.
  */
-const getBackupDirWinStore = (): string =>
-  getBackupDir().replace(
-    'Roaming',
-    `Local\\Packages\\53707johannesjo.SuperProductivity_ch45amy23cdv6\\LocalCache\\Roaming`,
-  );
+const getBackupDirWinStore = (): string => {
+  const identity = getWindowsStoreIdentity();
+  const storeUserData =
+    identity &&
+    getWindowsStoreUserDataDir(
+      app.getPath('userData'),
+      app.getPath('appData'),
+      identity.packageFamilyName,
+    );
+  return storeUserData ? path.join(storeUserData, 'backups') : getBackupDir();
+};
 
 /**
  * The backup location to *show* the user, which is not always the one we write
