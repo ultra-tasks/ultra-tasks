@@ -1,7 +1,31 @@
 // Karma configuration file, see link for more information
 // https://karma-runner.github.io/1.0/config/configuration-file.html
 
+const fs = require('node:fs');
 const path = require('node:path');
+
+// karma-chrome-launcher only looks for Google Chrome. On Windows machines without
+// it, fall back to Brave (Chromium) unless CHROME_BIN is already set. Edge is not
+// used: its msedge.exe exits right after spawning, which Karma reads as a crash.
+const ensureChromiumBinary = () => {
+  if (process.env.CHROME_BIN || process.platform !== 'win32') {
+    return;
+  }
+  const roots = [
+    process.env['PROGRAMFILES'],
+    process.env['PROGRAMFILES(X86)'],
+    process.env['LOCALAPPDATA'],
+  ].filter(Boolean);
+  const candidates = roots.flatMap((root) => [
+    path.join(root, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    path.join(root, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+  ]);
+  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  if (found) {
+    process.env.CHROME_BIN = found;
+  }
+};
+ensureChromiumBinary();
 
 module.exports = function (config) {
   // NOTE: necessary to fix some of the unit tests with a timezone in them
