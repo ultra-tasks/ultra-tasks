@@ -1302,6 +1302,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
         today: this._dateService.todayStr(),
         startOfNextDayDiffMs: this._dateService.getStartOfNextDayDiffMs(),
         parentTaskMap: { [task.id]: task.parentId },
+        plannedTask: task,
       }),
     );
   }

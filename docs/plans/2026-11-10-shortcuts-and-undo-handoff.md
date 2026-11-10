@@ -73,6 +73,46 @@ compensation. Prove convergence and content preservation before extending the
 queue. The new `doneOrder` field and its old-client behavior also need real
 released-client/protocol compatibility verification.
 
+## Stage 1 findings (2026-11-10): Add to Today against a field edit
+
+Reproduced through `SyncFuzzHarness` with a plain, unscheduled task: device A
+edits the title, device B runs `planTasksForToday` for that task, both offline,
+then two sync rounds each (no undo involved):
+
+| Upload first | Plan  | Title on A / B      | `dueDay` on A / B | Outcome                        |
+| ------------ | ----- | ------------------- | ----------------- | ------------------------------ |
+| A            | older | edited / edited     | none / today      | **diverged** (plan lost on A)  |
+| A            | newer | original / original | today / today     | title edit lost                |
+| B            | older | edited / edited     | none / none       | plan lost                      |
+| B            | newer | edited / original   | today / today     | **diverged** (title lost on B) |
+
+Cause: `planTasksForToday` is an opaque op. `isFieldPatchEligible` and
+`sideNonNoiseKeys` refuse any side holding one, so the conflict falls to
+whole-task LWW (`lww-field-level-resolution.md`, Decision 6). The same path
+explains the delete/restore and planner-staleness failures: the plan reducer
+also removes the task from `planner.days`, and LWW patch rows do not (the LWW
+reducer only reconciles `TODAY_TAG`).
+
+Fix (implemented, uncommitted until the checks below finish): the single-task
+plan keeps its action, effects and Today ordering but now also carries a
+readable `{ id, changes }` (`declarePlanForToday` in `task-shared.actions.ts`,
+passed as `plannedTask` by the four single-task dispatchers). The field-patch and
+disjoint-merge paths read it like an `updateTask`, so the plan and an unrelated
+edit both survive, in both upload orders and both timestamp winners. The LWW
+reducer also reconciles `planner.days` when a patch or snapshot changes
+`dueDay` (`syncPlannerDays`), which fixes the stale-planner failure.
+
+Deliberately not declared, so these still fall back to whole-task LWW: bulk
+plans, subtasks (the reducer skips one whose parent is in Today, which the
+action cannot know), no-op plans, and the reminder dialogs, automatic plans
+and other dispatchers that do not pass `plannedTask`. A plan that clears a
+reminder or a time still loses to a concurrent write of that same field
+(`REMINDER_FIELDS` keeps the overlap path whole-task by design). Today's
+order can differ between devices (native replay prepends, a patch appends).
+
+Still open in stage 1: delete/restore overwriting a concurrent title edit, and
+project-list order after a concurrent move and add.
+
 ## Validation completed
 
 - The previous combined Karma run passed 323 tests for the queue, supported

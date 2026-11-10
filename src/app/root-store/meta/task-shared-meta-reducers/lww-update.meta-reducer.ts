@@ -31,8 +31,10 @@ import { appStateFeatureKey } from '../../app-state/app-state.reducer';
 import { getDbDateStr, isDBDateStr } from '../../../util/get-db-date-str';
 import { isTodayWithOffset } from '../../../util/is-today.util';
 import {
+  addTaskToPlannerDay,
   getProjectOrUndefined,
   parseMoveFootprint,
+  removeTaskFromPlannerDays,
   repairTaskProjectForLww,
 } from './task-shared-helpers';
 import { withLocalOnlySyncSettings } from '../../../features/config/local-only-sync-settings.util';
@@ -226,6 +228,35 @@ const syncTagTaskIds = (
     ...state,
     [TAG_FEATURE_NAME]: tagState,
   };
+};
+
+/**
+ * Keeps `planner.days` consistent with a task's `dueDay` after an LWW Update.
+ *
+ * `planner.days` is an ordering list for future days; the task's `dueDay` is
+ * the fact. The ordinary `updateTask` reducer maintains the list when `dueDay`
+ * changes, but an LWW patch or snapshot only writes task fields, so a task
+ * moved by a resolution (or by a plan another device built) stayed listed
+ * under its old day on the receiving device. Mirrors that reducer: drop the
+ * task from every day, then list it under the new future day. Today is virtual
+ * (`TODAY_TAG`, see `syncTodayTagTaskIds`) and done tasks are not planned.
+ */
+const syncPlannerDays = (
+  state: RootState,
+  taskId: string,
+  oldDueDay: string | null | undefined,
+  newDueDay: string | null | undefined,
+  isDone: boolean,
+): RootState => {
+  // `null` and `undefined` both mean "no day" (Task.dueDay allows null).
+  if ((oldDueDay ?? undefined) === (newDueDay ?? undefined) || !state.planner?.days) {
+    return state;
+  }
+  const todayStr = state[appStateFeatureKey]?.todayStr ?? getDbDateStr();
+  const withoutTask = removeTaskFromPlannerDays(state, taskId);
+  return newDueDay && newDueDay !== todayStr && !isDone
+    ? addTaskToPlannerDay(withoutTask, taskId, newDueDay, Infinity)
+    : withoutTask;
 };
 
 /**
@@ -1105,6 +1136,13 @@ export const lwwUpdateMetaReducer: MetaReducer = (
         newDueDay,
         oldDueWithTime,
         newDueWithTime,
+      );
+      updatedState = syncPlannerDays(
+        updatedState,
+        entityId,
+        oldDueDay,
+        newDueDay,
+        updatedEntity.isDone === true,
       );
 
       // Sync parent.subTaskIds when parentId changes

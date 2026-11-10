@@ -458,6 +458,7 @@ export class TaskService {
         taskIds: [task.id],
         today: this._dateService.todayStr(),
         startOfNextDayDiffMs: this._dateService.getStartOfNextDayDiffMs(),
+        plannedTask: task,
       }),
     );
   }
@@ -476,6 +477,7 @@ export class TaskService {
         today: this._dateService.todayStr(),
         startOfNextDayDiffMs: this._dateService.getStartOfNextDayDiffMs(),
         parentTaskMap: task ? { [taskId]: task.parentId } : undefined,
+        plannedTask: task,
       }),
     );
   }

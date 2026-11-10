@@ -8,6 +8,7 @@ import { BatchOperation } from '@super-productivity/plugin-api';
 import { PersistentActionMeta } from '../../op-log/core/persistent-action.interface';
 import { OpType } from '../../op-log/core/operation.types';
 import { shouldClearDueTimeForToday } from '../../util/is-today.util';
+import { clearedFieldsProps } from '../../util/cleared-update-fields';
 
 /**
  * Payload marker stamped on every new `deleteProject` operation so the LWW
@@ -17,6 +18,58 @@ import { shouldClearDueTimeForToday } from '../../util/is-today.util';
  * empty project (see ARCHITECTURE-DECISIONS.md #7).
  */
 export const PROJECT_DELETE_WINS_MARKER = 'projectDeleteWins';
+
+/** The task fields `planTasksForToday` reads and may change. */
+export type PlannedTaskSlice = Pick<
+  Task,
+  'id' | 'parentId' | 'dueDay' | 'dueWithTime' | 'remindAt'
+>;
+
+/**
+ * The readable `{ id, changes }` a single-root-task `planTasksForToday` carries
+ * beside its ids (the shape `updateTask` uses, so conflict resolution reads it
+ * without a per-action rule). It lists only what this plan changes, mirroring
+ * `handlePlanTasksForToday`: `dueDay`, a reminder only when one is set, and a
+ * time that belongs to another day (or any time when `isClearScheduledTime`).
+ * Cleared keys travel as `clearedFields` because `undefined` does not survive
+ * the wire (#9776). Nothing is declared for subtasks (the reducer skips one whose
+ * parent is already in Today, which the action cannot know), for bulk plans, or
+ * when the plan changes nothing.
+ */
+const declarePlanForToday = (
+  task: PlannedTaskSlice | undefined,
+  props: {
+    taskIds: string[];
+    today?: string;
+    startOfNextDayDiffMs?: number;
+    isClearScheduledTime?: boolean;
+  },
+): { task?: Update<Task>; clearedFields?: string[] } => {
+  const { taskIds, today, startOfNextDayDiffMs, isClearScheduledTime } = props;
+  if (
+    !task ||
+    !today ||
+    task.parentId ||
+    taskIds.length !== 1 ||
+    taskIds[0] !== task.id
+  ) {
+    return {};
+  }
+  const shouldClearTime = isClearScheduledTime
+    ? !!task.dueWithTime
+    : shouldClearDueTimeForToday(task.dueWithTime, today, startOfNextDayDiffMs ?? 0);
+  const changes: Partial<Task> = {
+    ...(task.dueDay !== today ? { dueDay: today } : {}),
+    ...(task.remindAt !== undefined && task.remindAt !== null
+      ? { remindAt: undefined }
+      : {}),
+    ...(shouldClearTime ? { dueWithTime: undefined } : {}),
+  };
+  if (Object.keys(changes).length === 0) {
+    return {};
+  }
+  return { task: { id: task.id, changes }, ...clearedFieldsProps<Task>(changes) };
+};
 
 export interface CalendarAutoImportDismissal {
   issueProviderId: string;
@@ -457,16 +510,27 @@ export const TaskSharedActions = createActionGroup({
       isShowSnack?: boolean;
       isSkipRemoveReminder?: boolean;
       isClearScheduledTime?: boolean;
-    }) => ({
-      ...taskProps,
-      meta: {
-        isPersistent: true,
-        entityType: 'TASK',
-        entityIds: taskProps.taskIds,
-        opType: OpType.Update,
-        isBulk: true,
-      } satisfies PersistentActionMeta,
-    }),
+      /**
+       * Pass the planned root task (single-task intents only) to also state the
+       * fields this plan writes as a readable `{ id, changes }`. The reducer
+       * ignores it; conflict resolution reads it, so a concurrent edit of other
+       * fields of the same task survives instead of losing to whole-task LWW.
+       */
+      plannedTask?: PlannedTaskSlice;
+    }) => {
+      const { plannedTask, ...props } = taskProps;
+      return {
+        ...props,
+        ...declarePlanForToday(plannedTask, props),
+        meta: {
+          isPersistent: true,
+          entityType: 'TASK',
+          entityIds: taskProps.taskIds,
+          opType: OpType.Update,
+          isBulk: true,
+        } satisfies PersistentActionMeta,
+      };
+    },
 
     removeTasksFromTodayTag: (taskProps: { taskIds: string[] }) => ({
       ...taskProps,

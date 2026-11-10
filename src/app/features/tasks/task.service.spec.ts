@@ -314,8 +314,17 @@ describe('TaskService', () => {
           taskIds: ['task-1'],
           today: '2026-01-05',
           startOfNextDayDiffMs: 0,
+          plannedTask: task,
         }),
       );
+    });
+
+    it('states the fields the plan writes so a concurrent edit is not lost', () => {
+      service.addToToday(createMockTaskWithSubTasks(createMockTask('task-1')));
+
+      const action = (store.dispatch as jasmine.Spy).calls.mostRecent()
+        .args[0] as ReturnType<typeof TaskSharedActions.planTasksForToday>;
+      expect(action.task).toEqual({ id: 'task-1', changes: { dueDay: '2026-01-05' } });
     });
   });
 

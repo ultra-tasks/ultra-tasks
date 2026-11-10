@@ -874,6 +874,7 @@ describe('TaskComponent shortcut handling', () => {
           startOfNextDayDiffMs: 0,
           // computed key: a quoted 'top-1' trips the naming-convention rule
           parentTaskMap: { ['top-1']: undefined },
+          plannedTask: component.task(),
         }),
       );
 

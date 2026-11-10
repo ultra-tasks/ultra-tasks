@@ -751,6 +751,7 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
         startOfNextDayDiffMs: this._dateService.getStartOfNextDayDiffMs(),
         parentTaskMap: { [this.task.id]: this.task.parentId },
         isShowSnack: true,
+        plannedTask: this.task,
       }),
     );
   }

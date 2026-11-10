@@ -4215,6 +4215,114 @@ describe('lwwUpdateMetaReducer', () => {
     });
   });
 
+  describe('planner.days sync on task dueDay change', () => {
+    const TODAY_STR = '2025-12-31';
+    const DAY_A = '2026-01-02';
+    const DAY_B = '2026-01-03';
+
+    const createState = (
+      taskOverrides: Partial<Task>,
+      days: Record<string, string[]>,
+    ): Partial<RootState> =>
+      ({
+        [TASK_FEATURE_NAME]: {
+          ids: [TASK_ID],
+          entities: { [TASK_ID]: createMockTask(taskOverrides) },
+          currentTaskId: null,
+          selectedTaskId: null,
+          taskDetailTargetPanel: null,
+          isDataLoaded: true,
+          lastCurrentTaskId: null,
+        },
+        [PROJECT_FEATURE_NAME]: { ids: [], entities: {} },
+        [TAG_FEATURE_NAME]: {
+          ids: [TODAY_TAG.id],
+          entities: {
+            [TODAY_TAG.id]: createMockTag({
+              id: TODAY_TAG.id,
+              title: TODAY_TAG.title,
+              taskIds: [],
+            }),
+          },
+        },
+        planner: { days, addPlannedTasksDialogLastShown: undefined },
+        [appStateFeatureKey]: { todayStr: TODAY_STR, startOfNextDayDiffMs: 0 },
+      }) as unknown as Partial<RootState>;
+
+    const lwwPatch = (fields: Record<string, unknown>): Action =>
+      ({
+        type: '[TASK] LWW Update',
+        id: TASK_ID,
+        ...fields,
+        meta: {
+          isPersistent: true,
+          entityType: 'TASK',
+          entityId: TASK_ID,
+          lwwUpdateMode: 'patch',
+        },
+      }) as unknown as Action;
+
+    const daysAfter = (): Record<string, string[]> =>
+      (
+        mockReducer.calls.mostRecent().args[0] as unknown as {
+          planner: { days: Record<string, string[]> };
+        }
+      ).planner.days;
+
+    it('removes the task from its old planner day when moved to today', () => {
+      const state = createState({ dueDay: DAY_A }, { [DAY_A]: [TASK_ID, 'other'] });
+
+      reducer(state, lwwPatch({ dueDay: TODAY_STR }));
+
+      expect(daysAfter()[DAY_A]).toEqual(['other']);
+    });
+
+    it('moves the task between future planner days', () => {
+      const state = createState(
+        { dueDay: DAY_A },
+        { [DAY_A]: [TASK_ID], [DAY_B]: ['other'] },
+      );
+
+      reducer(state, lwwPatch({ dueDay: DAY_B }));
+
+      expect(daysAfter()[DAY_A]).toEqual([]);
+      expect(daysAfter()[DAY_B]).toEqual(['other', TASK_ID]);
+    });
+
+    it('lists an unscheduled task under a future day it is planned for', () => {
+      const state = createState({ dueDay: undefined }, { [DAY_A]: ['other'] });
+
+      reducer(state, lwwPatch({ dueDay: DAY_A }));
+
+      expect(daysAfter()[DAY_A]).toEqual(['other', TASK_ID]);
+    });
+
+    it('does not list a done task under a future day', () => {
+      const state = createState({ dueDay: DAY_A }, { [DAY_A]: [TASK_ID] });
+
+      reducer(state, lwwPatch({ dueDay: DAY_B, isDone: true }));
+
+      expect(daysAfter()[DAY_A]).toEqual([]);
+      expect(daysAfter()[DAY_B]).toBeUndefined();
+    });
+
+    it('leaves planner.days alone when dueDay is unchanged', () => {
+      const state = createState({ dueDay: DAY_A }, { [DAY_A]: ['other', TASK_ID] });
+
+      reducer(state, lwwPatch({ title: 'Only the title' }));
+
+      expect(daysAfter()).toEqual({ [DAY_A]: ['other', TASK_ID] });
+    });
+
+    it('leaves planner.days alone when only the null/undefined form of "no day" changes', () => {
+      const state = createState({ dueDay: null as unknown as undefined }, {});
+
+      reducer(state, lwwPatch({ dueDay: undefined }));
+
+      expect(daysAfter()).toEqual({});
+    });
+  });
+
   describe('TODAY_TAG.taskIds sync on task dueWithTime change', () => {
     const TODAY_STR = '2025-12-31';
     const TODAY_TIMESTAMP = new Date(2025, 11, 31, 14, 0, 0).getTime();
