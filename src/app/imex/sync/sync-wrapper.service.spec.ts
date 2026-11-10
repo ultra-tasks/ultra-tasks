@@ -871,7 +871,7 @@ describe('SyncWrapperService', () => {
   });
 
   describe('_sync() - Provider switch detection', () => {
-    it('downloads from the beginning after leaving UltraSync, even for the previous file provider', async () => {
+    it('downloads from the beginning after leaving UltraTasks Account, even for the previous file provider', async () => {
       mockProviderManager.hasPendingSwitchFromNative.and.returnValue(true);
       mockProviderManager.getLastSyncedProviderId.and.returnValue(
         SyncProviderId.SuperSync,

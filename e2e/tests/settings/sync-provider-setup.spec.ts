@@ -1,6 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 
-test('new sync setup defaults to UltraSync and offers personal-only alternatives', async ({
+test('new sync setup defaults to UltraTasks Account and offers personal-only alternatives', async ({
   page,
   syncPage,
 }) => {
@@ -8,10 +8,10 @@ test('new sync setup defaults to UltraSync and offers personal-only alternatives
   await syncPage.clickSyncBtn();
   const dialog = page.locator('dialog-sync-cfg');
   await expect(
-    dialog.getByRole('button', { name: 'Continue with UltraSync', exact: true }),
+    dialog.getByRole('button', { name: 'Continue with UltraTasks Account', exact: true }),
   ).toBeVisible();
   const provider = dialog.getByRole('combobox');
-  await expect(provider).toContainText('UltraSync');
+  await expect(provider).toContainText('UltraTasks Account');
   await provider.click();
   await expect(
     page.getByRole('option', { name: /SuperSync|Dropbox|Nextcloud|Local file/ }),
@@ -26,11 +26,13 @@ test('new sync setup defaults to UltraSync and offers personal-only alternatives
   await expect(dialog).toBeHidden();
   await syncPage.clickSyncBtn();
   await expect(page.locator('dialog-sync-cfg').getByRole('combobox')).toContainText(
-    'UltraSync',
+    'UltraTasks Account',
   );
 });
 
-test('UltraSync setup opens account sign-in on a narrow screen', async ({ page }) => {
+test('UltraTasks Account setup opens account sign-in on a narrow screen', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/#/account');
   await page.getByRole('button', { name: 'Set up sync', exact: true }).click();
@@ -39,7 +41,7 @@ test('UltraSync setup opens account sign-in on a narrow screen', async ({ page }
     await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
   await dialog
-    .getByRole('button', { name: 'Continue with UltraSync', exact: true })
+    .getByRole('button', { name: 'Continue with UltraTasks Account', exact: true })
     .click();
   await expect(page).toHaveURL(/native-sync/);
   await expect(

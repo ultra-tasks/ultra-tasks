@@ -8,7 +8,7 @@
       [value]="setupProvider()"
       (selectionChange)="selectSetupProvider($event.value)"
     >
-      <mat-option [value]="ultraSync">UltraSync</mat-option>
+      <mat-option [value]="ultraSync">UltraTasks Account</mat-option>
       @for (option of setupOptions(); track option.value) {
         <mat-option [value]="option.value">
           {{ option.label | translate }}

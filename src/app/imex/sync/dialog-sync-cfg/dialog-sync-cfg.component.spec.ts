@@ -141,7 +141,7 @@ describe('DialogSyncCfgComponent', () => {
     component = fixture.componentInstance;
   });
 
-  describe('UltraSync setup', () => {
+  describe('UltraTasks Account setup', () => {
     it('waits for initial sync settings before accepting a provider choice', () => {
       const settings = new Subject<SyncConfig>();
       (
@@ -209,12 +209,12 @@ describe('DialogSyncCfgComponent', () => {
       ).toBeFalse();
       expect(saved.setupProvider()).toBe(ULTRA_SYNC_SETUP);
     }));
-    it('closes the underlying Account window when continuing to UltraSync', () => {
+    it('closes the underlying Account window when continuing to UltraTasks Account', () => {
       component.openUltraSync();
       expect(mockMatDialog.closeAll).toHaveBeenCalled();
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
     });
-    it('defaults new setup to UltraSync without persisting a legacy target', () => {
+    it('defaults new setup to UltraTasks Account without persisting a legacy target', () => {
       expect(component.setupProvider()).toBe(ULTRA_SYNC_SETUP);
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
       expect(
@@ -250,7 +250,7 @@ describe('DialogSyncCfgComponent', () => {
       expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
     }));
 
-    it('ignores a pending provider load after switching to UltraSync', fakeAsync(() => {
+    it('ignores a pending provider load after switching to UltraTasks Account', fakeAsync(() => {
       let finishLoad!: (value: { encryptKey: string }) => void;
       const load = new Promise<{ encryptKey: string }>(
         (resolve) => (finishLoad = resolve),
@@ -1087,7 +1087,7 @@ describe('DialogSyncCfgComponent', () => {
   });
 
   describe('save() — provider without auth requirement', () => {
-    it('disconnects an unlocked UltraSync session before it is locked', async () => {
+    it('disconnects an unlocked UltraTasks Account session before it is locked', async () => {
       let unlocked = true;
       const disconnect = jasmine.createSpy('disconnect').and.callFake(async () => {
         expect(unlocked).toBeTrue();

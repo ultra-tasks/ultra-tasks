@@ -11,7 +11,7 @@ import { DateService } from '../../core/date/date.service';
 import { getAllEnv } from '../../util/env';
 import { environment as appEnvironment } from '../../../environments/environment';
 
-describe('UltraSync server selection', () => {
+describe('UltraTasks Account server selection', () => {
   const official = 'https://accounts.example.test';
   const custom = 'https://self-host.example.test';
   const environment = getAllEnv() as Record<string, string | undefined>;

@@ -44,7 +44,7 @@ test('a delayed initial settings load cannot replace the chosen provider', async
       await expect(save).toBeEnabled();
     } else {
       await expect(
-        dialog.getByRole('button', { name: 'Continue with UltraSync' }),
+        dialog.getByRole('button', { name: 'Continue with UltraTasks Account' }),
       ).toBeDisabled();
       await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     }
