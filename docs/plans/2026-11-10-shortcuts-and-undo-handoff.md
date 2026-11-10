@@ -93,7 +93,9 @@ explains the delete/restore and planner-staleness failures: the plan reducer
 also removes the task from `planner.days`, and LWW patch rows do not (the LWW
 reducer only reconciles `TODAY_TAG`).
 
-Fix (implemented, uncommitted until the checks below finish): the single-task
+Fix (committed 65090c5561; `sync-fuzz:compare` against the prior HEAD showed 0
+newly failing and 120 of 120 seeds executing identical steps, but the fuzz
+actions never pass `plannedTask`, so it does not exercise the new path): the single-task
 plan keeps its action, effects and Today ordering but now also carries a
 readable `{ id, changes }` (`declarePlanForToday` in `task-shared.actions.ts`,
 passed as `plannedTask` by the four single-task dispatchers). The field-patch and
