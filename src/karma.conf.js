@@ -27,6 +27,13 @@ const ensureChromiumBinary = () => {
 };
 ensureChromiumBinary();
 
+// Brave randomises canvas pixel reads (farbling), which breaks specs that assert
+// exact pixel values. Turn it off when Brave is the test browser.
+const disabledFeatures = ['VizDisplayCompositor'];
+if (/brave(\.exe)?$/i.test(process.env.CHROME_BIN || '')) {
+  disabledFeatures.push('BraveFarbling');
+}
+
 module.exports = function (config) {
   // NOTE: necessary to fix some of the unit tests with a timezone in them
   // NOTE2: won't work for wallaby, but that's maybe ok for now
@@ -110,7 +117,7 @@ module.exports = function (config) {
           '--disable-logging',
           '--disable-background-networking',
           '--disable-sync',
-          '--disable-features=VizDisplayCompositor', // Disable GPU compositor
+          `--disable-features=${disabledFeatures.join(',')}`, // VizDisplayCompositor: disable GPU compositor
           '--enable-features=NetworkService,NetworkServiceInProcess',
         ],
         debug: true,

@@ -16,6 +16,7 @@ import { LayoutService } from '../layout/layout.service';
 import { TaskService } from '../../features/tasks/task.service';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import { TaskExternalDragService } from '../../features/tasks/task-external-drag.service';
+import { GlobalConfigService } from '../../features/config/global-config.service';
 import { NavActionItem, NavConfig, NavItem, NavPluginItem } from './magic-side-nav.model';
 
 describe('MagicSideNavComponent', () => {
@@ -126,6 +127,10 @@ describe('MagicSideNavComponent', () => {
         {
           provide: DataInitStateService,
           useValue: { isAllDataLoadedInitially$: of(false) },
+        },
+        {
+          provide: GlobalConfigService,
+          useValue: { cfg: signal({ keyboard: { showSearchBar: 'Ctrl+F' } }) },
         },
         provideRouter([]),
         { provide: DragDropRegistry, useValue: { pointerUp: EMPTY } },

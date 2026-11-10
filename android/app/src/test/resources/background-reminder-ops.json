@@ -380,6 +380,7 @@
           "issuePoints",
           "issueLastSyncedValues",
           "priority",
+          "doneOrder",
           "dueDay",
           "hasPlannedTime",
           "deadlineDay",
