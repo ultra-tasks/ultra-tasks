@@ -81,6 +81,19 @@ Pages project. After configuring hosting and its credentials, set the repository
 variable `ULTRA_TASKS_WEB_DEPLOY=true` to enable it. The domain is a planned
 website until DNS and hosting are connected.
 
+That preview is the **standalone web build** (`npm run buildFrontend:prodWebStandalone`,
+Angular configuration `productionWebStandalone`). It sets `environment.syncAvailable`
+to `false`, so the browser build is local-only: the sync header button, the
+Account page and its navigation entry, the `/account` and `/native-sync` routes,
+and the sync provider engine are all inactive, even for an imported backup whose
+settings enable sync. Data stays in the browser's IndexedDB; export a backup from
+Settings to move it. The service worker updates the app on the next visit after
+each deploy. Android, iOS and Electron keep the sync-enabled `productionWeb` and
+`production` builds. Browser account sync is a separate, later step; remove the
+flag from the standalone configuration when it is ready. The release workflow
+`build-update-web-app-on-release.yml` still builds the sync-enabled web bundle
+and is not part of this deployment.
+
 ## Release boundaries
 
 ### GitHub-only desktop releases

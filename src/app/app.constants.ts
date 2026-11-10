@@ -1,6 +1,10 @@
 import { InjectionToken } from '@angular/core';
 import { IS_ANDROID_WEB_VIEW } from './util/is-android-web-view';
 import { IS_IOS_NATIVE } from './util/is-native-platform';
+import { environment } from '../environments/environment';
+
+/** False in the standalone web build: no sync UI, routes or provider engine. */
+export const IS_SYNC_AVAILABLE = environment.syncAvailable;
 
 // Other Electron apps can embed the web app without our preload bridge.
 export const IS_ELECTRON =

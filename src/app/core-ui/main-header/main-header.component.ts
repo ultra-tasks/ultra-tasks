@@ -22,6 +22,7 @@ import { WorkContextService } from '../../features/work-context/work-context.ser
 import { SimpleCounterService } from '../../features/simple-counter/simple-counter.service';
 import { SimpleCounter } from '../../features/simple-counter/simple-counter.model';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
+import { IS_SYNC_AVAILABLE } from '../../app.constants';
 import { SnackService } from '../../core/snack/snack.service';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { KeyboardConfig, keyboardConfigOrEmpty } from '@sp/keyboard-config';
@@ -262,7 +263,7 @@ export class MainHeaderComponent implements OnDestroy {
     () => this.globalConfigService.appFeatures().isFocusModeEnabled,
   );
   readonly isSyncIconEnabled = computed(
-    () => this.globalConfigService.appFeatures().isSyncIconEnabled,
+    () => IS_SYNC_AVAILABLE && this.globalConfigService.appFeatures().isSyncIconEnabled,
   );
   /**
    * The desktop panel buttons and the plugin side-panel buttons are absent below

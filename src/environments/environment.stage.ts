@@ -6,5 +6,7 @@ import { version } from '../../package.json';
 export const environment = {
   production: true,
   stage: true,
+  // Build-time switch: standalone web builds ship without any sync UI or engine.
+  syncAvailable: true,
   version,
 };

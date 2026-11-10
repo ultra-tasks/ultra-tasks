@@ -14,6 +14,7 @@ import { DataInitStateService } from '../../core/data-init/data-init-state.servi
 import { SyncLog } from '../../core/log';
 import { SnackService } from '../../core/snack/snack.service';
 import { T } from '../../t.const';
+import { IS_SYNC_AVAILABLE } from '../../app.constants';
 import { SyncProviderId, toSyncProviderId } from './provider.const';
 import { SyncProviderBase } from './provider.interface';
 import {
@@ -224,7 +225,9 @@ export class SyncProviderManager {
     // Listen to sync config changes and update active provider
     this._syncConfig$.subscribe((cfg) => {
       try {
-        const newProviderId = cfg.isEnabled ? toSyncProviderId(cfg.syncProvider) : null;
+        // Standalone web build: a synced config (e.g. from an imported backup) stays inert.
+        const newProviderId =
+          IS_SYNC_AVAILABLE && cfg.isEnabled ? toSyncProviderId(cfg.syncProvider) : null;
 
         this._setActiveProvider(newProviderId);
 
