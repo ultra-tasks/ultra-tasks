@@ -283,8 +283,9 @@ export const createWindow = async ({
     // Wayland compatibility: disable transparent/frameless features that can cause issues
     transparent: false,
     // frame: true,
-    // macOS vibrancy / Windows acrylic while Glass appearance is on. Neither
-    // needs `transparent`, so shadow, resizing and maximize stay native.
+    // macOS vibrancy (always, see native-glass.ts) / Windows acrylic while Glass
+    // appearance is on. Neither needs `transparent`, so shadow, resizing and
+    // maximize stay native.
     ...getNativeGlassWindowOptions(nativeGlassMaterial, persistedNativeGlass),
   });
   initNativeGlassIpc({

@@ -83,13 +83,27 @@ test('getWindowsBuild reads the third version part', () => {
   assert.equal(getWindowsBuild('10.0'), 0);
 });
 
-test('window options start with the material only when it was on', () => {
-  const on = { isEnabled: true, themeSource: 'dark' };
-  const off = { isEnabled: false, themeSource: 'system' };
-  assert.deepEqual(getNativeGlassWindowOptions('vibrancy', on), {
+test('macOS always creates the window with vibrancy', () => {
+  // Nothing saved yet (a fresh install, Glass defaults to on), saved on, saved
+  // off: vibrancy is never switched on after the window exists on macOS.
+  const options = {
     vibrancy: 'under-window',
     visualEffectState: 'followWindow',
-  });
+  };
+  assert.deepEqual(getNativeGlassWindowOptions('vibrancy', null), options);
+  assert.deepEqual(
+    getNativeGlassWindowOptions('vibrancy', { isEnabled: true, themeSource: 'dark' }),
+    options,
+  );
+  assert.deepEqual(
+    getNativeGlassWindowOptions('vibrancy', { isEnabled: false, themeSource: 'system' }),
+    options,
+  );
+});
+
+test('Windows starts with acrylic only when it was on', () => {
+  const on = { isEnabled: true, themeSource: 'dark' };
+  const off = { isEnabled: false, themeSource: 'system' };
   assert.deepEqual(getNativeGlassWindowOptions('acrylic', on), {
     backgroundMaterial: 'acrylic',
   });
@@ -132,7 +146,7 @@ test('the renderer reads the material from its startup argument', () => {
   assert.equal(parseNativeGlassMaterialArg(undefined), null);
 });
 
-test('applyNativeGlass on macOS toggles vibrancy and the transparent background', () => {
+test('applyNativeGlass on macOS only follows the theme and leaves the window alone', () => {
   const win = fakeWindow();
   const theme = { themeSource: 'system' };
   applyNativeGlass(
@@ -142,11 +156,6 @@ test('applyNativeGlass on macOS toggles vibrancy and the transparent background'
     theme,
   );
   assert.equal(theme.themeSource, 'dark');
-  assert.deepEqual(win.calls, [
-    ['setVibrancy', 'under-window'],
-    ['setBackgroundColor', '#00000000'],
-  ]);
-  win.calls.length = 0;
   applyNativeGlass(
     win,
     'vibrancy',
@@ -154,10 +163,9 @@ test('applyNativeGlass on macOS toggles vibrancy and the transparent background'
     theme,
   );
   assert.equal(theme.themeSource, 'system');
-  assert.deepEqual(win.calls, [
-    ['setVibrancy', null],
-    ['setBackgroundColor', '#131314'],
-  ]);
+  // No setVibrancy / setBackgroundColor at runtime: the renderer's opaque
+  // surfaces cover the vibrancy view while Glass is off.
+  assert.deepEqual(win.calls, []);
 });
 
 test('applyNativeGlass on Windows repaints after removing the material', () => {
@@ -185,7 +193,7 @@ test('applyNativeGlass on Windows repaints after removing the material', () => {
   ]);
 });
 
-test('IPC applies changes, repaints palette edits and persists only mode changes', () => {
+test('IPC on Windows applies changes, repaints palette edits and persists only mode changes', () => {
   const ipc = fakeIpc();
   const win = fakeWindow();
   const theme = { themeSource: 'system' };
@@ -193,7 +201,7 @@ test('IPC applies changes, repaints palette edits and persists only mode changes
   initNativeGlassIpc({
     ipcMain: ipc,
     win,
-    material: 'vibrancy',
+    material: 'acrylic',
     persisted: { isEnabled: true, themeSource: 'system' },
     theme,
     save: (value) => saved.push(value),
@@ -201,10 +209,7 @@ test('IPC applies changes, repaints palette edits and persists only mode changes
   const send = (payload) => ipc.handlers[IPC.SET_NATIVE_GLASS]({}, payload);
 
   send({ isEnabled: true, themeSource: 'system', solidColor: '#f8f8f7' });
-  assert.deepEqual(win.calls, [
-    ['setVibrancy', 'under-window'],
-    ['setBackgroundColor', '#00000000'],
-  ]);
+  assert.deepEqual(win.calls, [['setBackgroundMaterial', 'acrylic']]);
   assert.deepEqual(saved, []);
 
   win.calls.length = 0;
@@ -223,6 +228,40 @@ test('IPC applies changes, repaints palette edits and persists only mode changes
   win.calls.length = 0;
   send({ isEnabled: true, themeSource: 'neon', solidColor: '#dddddd' });
   send('true');
+  assert.deepEqual(win.calls, []);
+});
+
+test('IPC on macOS follows the theme and persists, but never touches the window', () => {
+  const ipc = fakeIpc();
+  const win = fakeWindow();
+  const theme = { themeSource: 'system' };
+  const saved = [];
+  // A fresh install: nothing saved yet.
+  initNativeGlassIpc({
+    ipcMain: ipc,
+    win,
+    material: 'vibrancy',
+    persisted: null,
+    theme,
+    save: (value) => saved.push(value),
+  });
+  const send = (payload) => ipc.handlers[IPC.SET_NATIVE_GLASS]({}, payload);
+
+  send({ isEnabled: true, themeSource: 'dark', solidColor: '#131314' });
+  assert.equal(theme.themeSource, 'dark');
+  assert.deepEqual(saved, [{ isEnabled: true, themeSource: 'dark' }]);
+
+  send({ isEnabled: false, themeSource: 'dark', solidColor: '#131314' });
+  assert.equal(theme.themeSource, 'system');
+  // A palette edit with glass off repaints in the renderer, not the window.
+  send({ isEnabled: false, themeSource: 'dark', solidColor: '#222222' });
+  send({ isEnabled: true, themeSource: 'dark', solidColor: '#222222' });
+  assert.equal(theme.themeSource, 'dark');
+  assert.deepEqual(saved, [
+    { isEnabled: true, themeSource: 'dark' },
+    { isEnabled: false, themeSource: 'dark' },
+    { isEnabled: true, themeSource: 'dark' },
+  ]);
   assert.deepEqual(win.calls, []);
 });
 
