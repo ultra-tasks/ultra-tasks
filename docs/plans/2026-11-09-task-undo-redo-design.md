@@ -114,14 +114,20 @@ Each supported command checks the fields and parent identity it reverses;
 unknown changes are barriers. A command stores no unrelated task snapshot and
 never records automatic or provider-originated updates.
 
-Add to Today remains a barrier. Even for a previously unscheduled task, a
-date-field update as an inverse can leave stale Today ordering when replayed on
-a later logical day. The existing unschedule action removes that ordering, but
-also triggers calendar-block deletion. More fundamentally, plan and unschedule
-actions are opaque to the field-level conflict path and fall back to whole-task
-last-write-wins: an offline concurrent edit can lose unrelated task content.
-A safe expansion needs a generic conflict-resolution path and two-client tests
-in both directions, as well as reminder, ordering and provider coverage.
+Adding one task to Today enters the queue only for a task with no schedule at
+all (2026-11-11). Undo takes it off Today with `updateTask { dueDay: null }`,
+which the existing reducer reconciles with the Today list and `planner.days`
+(and an LWW patch does the same, `syncPlannerDays`); redo dispatches the original
+plan again, only on the same logical day, so it never schedules a day the user did
+not choose. The earlier objections no longer hold for this case: the plan now
+declares the fields it writes, so it resolves per field against a concurrent edit
+or completion in either upload order, and an unscheduled root task has no reminder,
+time or earlier planner day that the plan would have cleared and the inverse could
+not restore. A task that already has a day, a reminder or a time, a subtask, a
+repeating or finished task, and a linked task keep the existing path. Every other
+scheduling action (a date or time from the dialog, Tomorrow and later, unscheduling,
+deadlines) stays a barrier. The older prototype below that used field patches for
+planning is superseded for this case.
 
 A narrower prototype used only `updateTask` field patches for planning,
 undo and redo. Eight two-device tests ran through the real operation capture,
@@ -165,7 +171,8 @@ is needed before adding grouped history.
 | Estimate, priority, notes, ordinary title                            | Supported for eligible single-task edits      | Support other inputs only after accounting for short syntax, recurrence, parent recalculation and provider side effects. |
 | Completion or reopen                                                 | Supported for one ordinary local task         | Reminders, recurrence, integrations, bulk completion and drag into Done stay barriers until each effect has an inverse.  |
 | Completed-task reorder                                               | Supported for a single root task in a project | Multi-task moves and other list ordering need an atomic inverse.                                                         |
-| Scheduling, tags, project moves, tracking                            | Barrier                                       | Model the full intent, related entities and side effects; prove a safe inverse.                                          |
+| Add to Today of an unscheduled task                                  | Supported for one ordinary local root task    | A task with a day, reminder or time keeps the existing path until its earlier state has a faithful inverse.              |
+| Other scheduling, tags, project moves, tracking                      | Barrier                                       | Model the full intent, related entities and side effects; prove a safe inverse.                                          |
 | Single delete and restore                                            | Existing time-limited snackbar only           | Coordinate one-shot capture, trash, provider deletion grace, and queue ownership.                                        |
 | Bulk actions, including delete                                       | Barrier initially                             | Atomic inverse for all affected entities and ordering; bulk delete currently has no undo.                                |
 | Linked-task priority and fields on read-only or stopped integrations | Supported as local field edits                | Provider push ignores priority, and read-only/stopped tasks do not make provider requests.                               |

@@ -13,8 +13,9 @@ import { selectEnabledIssueProviders } from '../issue/store/issue-provider.selec
 import { allowsIntegrationWrites } from '../integrations/integration.model';
 import { LocalExternalSyncSuppressionService } from '../integrations/local-external-sync-suppression.service';
 import { hasManualDoneTaskOrder } from './done-task-order';
+import { DateService } from '../../core/date/date.service';
 
-type UndoField = 'timeEstimate' | 'notes' | 'priority' | 'title' | 'isDone';
+type UndoField = 'timeEstimate' | 'notes' | 'priority' | 'title' | 'isDone' | 'dueDay';
 type UndoValue = number | string | boolean | null;
 
 interface TaskFieldChange {
@@ -25,6 +26,9 @@ interface TaskFieldChange {
   integrationIdentity?: string;
   before: UndoValue;
   after: UndoValue;
+  /** Only for `dueDay`: what redo needs to plan the task for the same day again. */
+  startOfNextDayDiffMs?: number;
+  isShowSnack?: boolean;
 }
 
 type DoneOrder = NonNullable<Task['doneOrder']>;
@@ -59,6 +63,7 @@ export class TaskUndoService {
   // entries are created only by the explicit user-intent methods below.
   private readonly _actions = inject(ALL_ACTIONS);
   private readonly _destroyRef = inject(DestroyRef);
+  private readonly _date = inject(DateService);
   private readonly _externalSyncSuppression = inject(LocalExternalSyncSuppressionService);
   private readonly _tasks = this._store.selectSignal(selectTaskEntities);
   private readonly _issueProviders = this._store.selectSignal(
@@ -125,6 +130,28 @@ export class TaskUndoService {
    */
   updateDone(id: string, expected: boolean, value: boolean): boolean {
     return this._record({ id, field: 'isDone', before: expected, after: value });
+  }
+
+  /**
+   * Handles only adding one unscheduled, unfinished root task to Today. Undo takes
+   * it off Today again (`updateTask` with `dueDay: null`, which the reducer
+   * reconciles with the Today list and the planner); redo plans it again, for the
+   * same day only. False means the caller must dispatch the plan itself.
+   */
+  addToToday(
+    task: Task,
+    today: string,
+    startOfNextDayDiffMs: number,
+    isShowSnack = false,
+  ): boolean {
+    return this._record({
+      id: task.id,
+      field: 'dueDay',
+      before: task.dueDay ?? null,
+      after: today,
+      startOfNextDayDiffMs,
+      isShowSnack,
+    });
   }
 
   /** Records the manual order of one completed project task. */
@@ -244,6 +271,11 @@ export class TaskUndoService {
       this.clear();
       return false;
     }
+    // Planning again on a later day would schedule it for a day the user never chose.
+    if (entry.field === 'dueDay' && entry.after !== this._date.todayStr()) {
+      this.clear();
+      return false;
+    }
     const generation = this._generation;
     this._dispatch(entry, entry.after);
     if (this._generation !== generation || !this._matches(entry, entry.after)) {
@@ -276,6 +308,21 @@ export class TaskUndoService {
   private _matches(entry: UndoEntry, expected: EntryValue): boolean {
     const task = this._tasks()[entry.id];
     const isLocalOnlyField = entry.field === 'priority' || entry.field === 'doneOrder';
+    // Planning for Today is only reversible for a task that had no schedule at all:
+    // the plan also clears a reminder and a time for another day, which cannot be
+    // restored, and an earlier planner day would return at the end of its list.
+    if (entry.field === 'dueDay') {
+      if (entry.before !== null) return false;
+      if (
+        task &&
+        (task.isDone ||
+          task.parentId ||
+          task.repeatCfgId ||
+          task.remindAt ||
+          task.dueWithTime != null)
+      )
+        return false;
+    }
     // Completing can start a recurrence, dismiss a reminder and finish the task
     // for an integration, and a won't-do mark is a different intent than done.
     if (
@@ -369,12 +416,24 @@ export class TaskUndoService {
   }
 
   private _dispatch(entry: UndoEntry, value: EntryValue): void {
-    const changes: Partial<Task> = { [entry.field]: value };
-    const action = TaskSharedActions.updateTask({
-      task: { id: entry.id, changes },
-      isIgnoreShortSyntax: true,
-    });
-    this._suppressExternalSyncForReadOnly(action, this._tasks()[entry.id]);
+    const task = this._tasks()[entry.id];
+    // Planning is the original Today action (it also orders the Today list and
+    // declares the fields it writes); only taking the task off Today is an update.
+    const action =
+      entry.field === 'dueDay' && typeof value === 'string' && task
+        ? TaskSharedActions.planTasksForToday({
+            taskIds: [entry.id],
+            today: value,
+            startOfNextDayDiffMs: entry.startOfNextDayDiffMs,
+            parentTaskMap: { [entry.id]: undefined },
+            isShowSnack: entry.isShowSnack,
+            plannedTask: task,
+          })
+        : TaskSharedActions.updateTask({
+            task: { id: entry.id, changes: { [entry.field]: value } as Partial<Task> },
+            isIgnoreShortSyntax: true,
+          });
+    this._suppressExternalSyncForReadOnly(action, task);
     this._ownActions.add(action);
     this._store.dispatch(action);
   }

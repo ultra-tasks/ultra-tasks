@@ -1297,11 +1297,14 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
 
   addToMyDay(): void {
     const task = this.task();
+    const today = this._dateService.todayStr();
+    const startOfNextDayDiffMs = this._dateService.getStartOfNextDayDiffMs();
+    if (this._taskUndoService.addToToday(task, today, startOfNextDayDiffMs)) return;
     this._store.dispatch(
       TaskSharedActions.planTasksForToday({
         taskIds: [task.id],
-        today: this._dateService.todayStr(),
-        startOfNextDayDiffMs: this._dateService.getStartOfNextDayDiffMs(),
+        today,
+        startOfNextDayDiffMs,
         parentTaskMap: { [task.id]: task.parentId },
         plannedTask: task,
       }),

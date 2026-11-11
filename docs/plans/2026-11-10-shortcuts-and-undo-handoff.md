@@ -225,12 +225,33 @@ guard now ties an order to its completion within 10 seconds
 (`SAME_COMPLETION_WINDOW_MS` in `done-task-order.ts`); a test fails without it.
 The millisecond drift itself is unchanged and cosmetic.
 
-Not done: scheduling. An Add to Today inverse is not a plain field restore (it
-clears `remindAt` and a time for another day, which cannot be restored, and a
-previous planner day returns at the end of that day's list), so eligibility would
-be limited to a task with no reminder or time. `dueDay: null` reconciles the Today
-list and `planner.days` through the existing `updateTask` reducer. No code was
-written for it.
+## Stage 3b: Add to Today in the undo queue (2026-11-11)
+
+`TaskUndoService.addToToday` records adding one task to Today, from the task row
+(hover button, shortcut) and the context menu. It is eligible only for an
+unfinished root task with no day, reminder or time, no repeat configuration and no
+integration link: the plan also clears a reminder and a time for another day, which
+an inverse could not restore, and an earlier planner day would come back at the end
+of its list. Undo dispatches `updateTask { dueDay: null }`; the reducer removes the
+task from the Today list and `planner.days`, and an LWW patch reconciles both
+the same way (`syncPlannerDays`). Redo dispatches the original plan with its
+field declaration, and only on the same logical day (`DateService.todayStr()` must
+equal the stored day), so it can never schedule a day the user did not pick.
+Undo still works after the day changed.
+
+Evidence: `undo-today-sync` (11 cases) runs the exact actions the queue dispatches
+against a concurrent title edit (newer and older, both upload orders, with and
+without redo) and a concurrent completion, and checks the task, the Today list and
+`planner.days` on both devices and after a restart; 8 of the 11 fail without the
+plan's declaration. 8 unit cases cover eligibility, the actions dispatched, the
+same-day rule and staleness. `undo-add-to-today.spec.ts` (browser) presses Alt+T,
+undoes and redoes it and watches the Remove from My Day button.
+
+Still barriers: every other scheduling action (dialog date or time, Tomorrow and
+later, unscheduling, deadlines), a task that already has a day, reminder or time,
+and an Add to Today that does not declare its fields (subtask, bulk, reminder
+dialog). Position within the Today list after redo follows the plan (top), as the
+original did.
 
 ## Validation completed
 

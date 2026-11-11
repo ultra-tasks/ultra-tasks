@@ -2972,6 +2972,8 @@
       "REDO_DONE_ORDER": "Redo completed task reorder",
       "UNDO_DONE": "Undo completion change",
       "REDO_DONE": "Redo completion change",
+      "UNDO_SCHEDULE": "Undo adding to Today",
+      "REDO_SCHEDULE": "Redo adding to Today",
       "FIXED_SHORTCUTS": "Navigation and selection",
       "FIXED_TASK_NAVIGATION": "Navigate focused tasks",
       "FIXED_TASK_EXPAND": "Collapse or expand a task",

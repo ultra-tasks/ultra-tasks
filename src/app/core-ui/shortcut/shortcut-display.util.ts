@@ -36,6 +36,8 @@ export const taskHistoryLabel = (field: string | null, isRedo: boolean): string 
   if (!field) return isRedo ? T.GCF.KEYBOARD.REDO : T.GCF.KEYBOARD.UNDO;
   if (field === 'isDone')
     return isRedo ? T.GCF.KEYBOARD.REDO_DONE : T.GCF.KEYBOARD.UNDO_DONE;
+  if (field === 'dueDay')
+    return isRedo ? T.GCF.KEYBOARD.REDO_SCHEDULE : T.GCF.KEYBOARD.UNDO_SCHEDULE;
   if (field === 'doneOrder')
     return isRedo ? T.GCF.KEYBOARD.REDO_DONE_ORDER : T.GCF.KEYBOARD.UNDO_DONE_ORDER;
   if (field === 'title')

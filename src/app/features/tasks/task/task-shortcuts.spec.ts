@@ -134,6 +134,8 @@ describe('TaskComponent shortcut handling', () => {
           useValue: {
             updateNotes: () => false,
             updateTitle: () => false,
+            updateDone: () => false,
+            addToToday: () => false,
           },
         },
         {

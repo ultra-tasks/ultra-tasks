@@ -12,6 +12,7 @@ import { selectTaskEntities } from './store/task.selectors';
 import { IssueProvider } from '../issue/issue.model';
 import { selectEnabledIssueProviders } from '../issue/store/issue-provider.selectors';
 import { LocalExternalSyncSuppressionService } from '../integrations/local-external-sync-suppression.service';
+import { DateService } from '../../core/date/date.service';
 
 describe('TaskUndoService', () => {
   const actions = new Subject<Action>();
@@ -19,6 +20,7 @@ describe('TaskUndoService', () => {
   let service: TaskUndoService;
   let dispatch: jasmine.Spy;
   let issueProviders: ReturnType<typeof signal<IssueProvider[]>>;
+  let todayStr: string;
 
   const task = (id: string, timeEstimate: number): Task => ({
     ...DEFAULT_TASK,
@@ -28,6 +30,7 @@ describe('TaskUndoService', () => {
   });
 
   beforeEach(() => {
+    todayStr = '2026-11-10';
     tasks = signal({ a: task('a', 10), b: task('b', 20) });
     issueProviders = signal<IssueProvider[]>([]);
     dispatch = jasmine.createSpy('dispatch').and.callFake((action: Action) => {
@@ -42,11 +45,19 @@ describe('TaskUndoService', () => {
           },
         }));
       }
+      if (action.type === TaskSharedActions.planTasksForToday.type) {
+        const plan = action as ReturnType<typeof TaskSharedActions.planTasksForToday>;
+        tasks.update((current) => ({
+          ...current,
+          [plan.taskIds[0]]: { ...current[plan.taskIds[0]], dueDay: plan.today },
+        }));
+      }
       actions.next(action);
     });
     TestBed.configureTestingModule({
       providers: [
         TaskUndoService,
+        { provide: DateService, useValue: { todayStr: () => todayStr } },
         {
           provide: Store,
           useValue: {
@@ -560,6 +571,114 @@ describe('TaskUndoService', () => {
     it('refuses to undo after the done state changed elsewhere', () => {
       expect(service.updateDone('a', false, true)).toBeTrue();
       tasks.update((current) => ({ ...current, a: { ...current.a, isDone: false } }));
+
+      expect(service.undo()).toBeFalse();
+      expect(service.canUndo()).toBeFalse();
+    });
+  });
+
+  describe('adding an unscheduled task to Today', () => {
+    const add = (id = 'a', isShowSnack = false): boolean =>
+      service.addToToday(tasks()[id], todayStr, 0, isShowSnack);
+
+    it('dispatches the Today plan with its declaration, then undoes and redoes it', () => {
+      expect(add('a', true)).toBeTrue();
+      expect(tasks().a.dueDay).toBe(todayStr);
+      expect(service.undoField()).toBe('dueDay');
+      const plan = dispatch.calls.mostRecent().args[0] as ReturnType<
+        typeof TaskSharedActions.planTasksForToday
+      >;
+      expect(plan.type).toBe(TaskSharedActions.planTasksForToday.type);
+      expect(plan.taskIds).toEqual(['a']);
+      expect(plan.today).toBe(todayStr);
+      expect(plan.isShowSnack).toBeTrue();
+      expect(plan.task).toEqual({ id: 'a', changes: { dueDay: todayStr } });
+
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.dueDay).toBeNull();
+      expect(dispatch.calls.mostRecent().args[0]).toEqual(
+        TaskSharedActions.updateTask({
+          task: { id: 'a', changes: { dueDay: null } },
+          isIgnoreShortSyntax: true,
+        }),
+      );
+      expect(service.redo()).toBeTrue();
+      expect(tasks().a.dueDay).toBe(todayStr);
+      expect(dispatch.calls.mostRecent().args[0].type).toBe(
+        TaskSharedActions.planTasksForToday.type,
+      );
+    });
+
+    it('keeps its place among other edits', () => {
+      expect(service.updateEstimate('a', 10, 11)).toBeTrue();
+      expect(add()).toBeTrue();
+
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.dueDay).toBeNull();
+      expect(tasks().a.timeEstimate).toBe(11);
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.timeEstimate).toBe(10);
+    });
+
+    it('leaves a task that already has a schedule, a reminder or a time to the existing path', () => {
+      tasks.update((current) => ({
+        ...current,
+        a: { ...current.a, dueDay: '2026-11-20' },
+        b: { ...current.b, remindAt: 1000 },
+        c: { ...task('c', 30), dueWithTime: 5000 },
+      }));
+
+      for (const id of ['a', 'b', 'c']) {
+        expect(add(id)).withContext(id).toBeFalse();
+      }
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    it('leaves finished, child, repeating and linked tasks to the existing path', () => {
+      tasks.update((current) => ({
+        ...current,
+        a: { ...current.a, isDone: true },
+        b: { ...current.b, parentId: 'a' },
+        c: { ...task('c', 30), repeatCfgId: 'repeat' },
+        d: { ...task('d', 40), issueId: 'issue' },
+      }));
+
+      for (const id of ['a', 'b', 'c', 'd']) {
+        expect(add(id)).withContext(id).toBeFalse();
+      }
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    it('leaves a task that is already planned for today', () => {
+      tasks.update((current) => ({ ...current, a: { ...current.a, dueDay: todayStr } }));
+
+      expect(add()).toBeFalse();
+    });
+
+    it('does not redo on a later day, so it never schedules a day the user did not pick', () => {
+      expect(add()).toBeTrue();
+      expect(service.undo()).toBeTrue();
+      todayStr = '2026-11-11';
+
+      expect(service.redo()).toBeFalse();
+      expect(tasks().a.dueDay).toBeNull();
+      expect(service.canRedo()).toBeFalse();
+    });
+
+    it('still undoes after the logical day changed', () => {
+      expect(add()).toBeTrue();
+      todayStr = '2026-11-11';
+
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.dueDay).toBeNull();
+    });
+
+    it('refuses to undo after the task was scheduled elsewhere', () => {
+      expect(add()).toBeTrue();
+      tasks.update((current) => ({
+        ...current,
+        a: { ...current.a, dueDay: '2026-11-20' },
+      }));
 
       expect(service.undo()).toBeFalse();
       expect(service.canUndo()).toBeFalse();

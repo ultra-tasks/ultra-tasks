@@ -108,6 +108,8 @@ describe('TaskContextMenuInnerComponent', () => {
             updateNotes: () => false,
             updateEstimate: () => false,
             updatePriority: () => false,
+            updateDone: () => false,
+            addToToday: () => false,
           },
         },
         provideMockStore(),
