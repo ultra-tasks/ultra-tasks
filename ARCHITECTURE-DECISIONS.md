@@ -653,9 +653,9 @@ Sync rule 15 (evidence of harm) still applies.
 - Setup labels OneDrive and WebDAV "Personal sync only — no team collaboration"
   ([0.3.0 plan](docs/plans/2026-11-07-ultrasync-0.3.0-release.md)).
 
-**Open item**: the 0.3.0 plan schedules a **Google Drive** provider after 0.3.0.
-A new provider adapter is new provider-engine work, so it needs an explicit
-maintainer exception to this decision or should be declined.
+**No new providers**: the **Google Drive** provider that the 0.3.0 plan scheduled
+after 0.3.0 is dropped for now (maintainer, 2026-11-11). A new provider adapter is
+new provider-engine work under this decision.
 
 **When to Update This Pattern**:
 
