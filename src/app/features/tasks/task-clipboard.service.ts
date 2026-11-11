@@ -161,7 +161,10 @@ export class TaskClipboardService {
 
   private _makeEntry(target: EventTarget | null, cut: boolean): ClipboardEntry | null {
     if (!this._canUseClipboard(target)) return null;
-    const taskId = target.closest<HTMLElement>('task[data-task-id]')?.dataset.taskId;
+    // Upcoming and Boards render their cards as <planner-task>.
+    const taskId = target.closest<HTMLElement>(
+      'task[data-task-id], planner-task[data-task-id]',
+    )?.dataset.taskId;
     if (!taskId) return null;
     const ids =
       this._selection.isActive() && this._selection.has(taskId)
@@ -318,6 +321,12 @@ export class TaskClipboardService {
     entry: NonNullable<TaskClipboardService['_entry']>,
     target: EventTarget | null,
   ): Promise<void> {
+    // Upcoming and Boards cards have no list position, and falling back to
+    // whichever project was last active would drop the task somewhere unseen.
+    if (target instanceof HTMLElement && target.closest('planner-task')) {
+      this._snack.open(T.GCF.KEYBOARD.CLIPBOARD_NEED_PROJECT);
+      return;
+    }
     const targetId =
       target instanceof HTMLElement
         ? target.closest<HTMLElement>('task[data-task-id]')?.dataset.taskId
@@ -335,8 +344,31 @@ export class TaskClipboardService {
       this._snack.open(T.GCF.KEYBOARD.CLIPBOARD_NEED_PROJECT);
       return;
     }
+    // Root items (copies and cut parents) go after the focused task, or after the
+    // parent of a focused subtask; with nothing focused they go to the top.
+    const rootEl = await this._rootTargetElement(target, targetTask);
+    const rootTask =
+      rootEl && rootEl.dataset.taskId !== targetId
+        ? await firstValueFrom(this._tasks.getByIdOnce$(rootEl.dataset.taskId!))
+        : targetTask?.parentId
+          ? null
+          : targetTask;
+    if (this._entry !== entry) return;
     if (!entry.cut) {
-      for (const task of entry.tasks) this._duplicate.duplicate(task, projectId, true);
+      const created: TaskWithSubTasks[] = [];
+      for (const task of entry.tasks) {
+        const id = this._duplicate.duplicate(task, projectId, true);
+        const copy = id
+          ? await firstValueFrom(this._tasks.getByIdWithSubTaskData$(id))
+          : null;
+        if (copy) created.push(copy);
+      }
+      // A copy is created at the top, which is already right for one copy with
+      // nothing focused; several are placed to keep their order. A failed
+      // placement keeps the copies there rather than reporting an error.
+      if ((rootTask || created.length > 1) && this._entry === entry) {
+        await this._placeInProject(entry, created, rootEl, rootTask, projectId, true);
+      }
       return;
     }
     // Re-read all sources before any move: sync or another edit may have
@@ -365,7 +397,9 @@ export class TaskClipboardService {
         return;
       }
       if (!targetTask) {
-        if (current.some((task) => task.projectId !== projectId)) {
+        // A subtask of a repeating task keeps the old refusal: moving it out
+        // could need the recurring-task confirmation after it was already promoted.
+        if (current.some((task) => task.projectId !== projectId && task.repeatCfgId)) {
           this._snack.open(T.GCF.KEYBOARD.CLIPBOARD_SUBTASK_OTHER_PROJECT);
           return;
         }
@@ -377,22 +411,45 @@ export class TaskClipboardService {
           return;
         }
         // Conversion removes the child and inserts the parent task in one
-        // replayable operation. With no focused row, insert at the top.
+        // replayable operation. With no focused row, insert at the top. A
+        // subtask from another project is promoted where it is, moved, then
+        // placed at the top of the destination.
         let afterTaskId: string | null = null;
+        const promotedElsewhere: string[] = [];
         for (const task of current) {
           const parent = await firstValueFrom(this._tasks.getByIdOnce$(task.parentId!));
           if (this._entry !== entry || !parent || parent.parentId) return;
+          const isOtherProject = task.projectId !== projectId;
           this._store.dispatch(
             TaskSharedActions.convertToMainTask({
               task,
               parentTagIds: parent.tagIds,
-              afterTaskId,
+              afterTaskId: isOtherProject ? null : afterTaskId,
               today: this._date.todayStr(),
               modified: Date.now(),
             }),
           );
-          afterTaskId = task.id;
+          if (isOtherProject) {
+            const promoted = await firstValueFrom(
+              this._tasks.getByIdWithSubTaskData$(task.id),
+            );
+            if (this._entry !== entry || !promoted) return;
+            if (!(await this._move.moveToProject(promoted, projectId))) return;
+            promotedElsewhere.push(task.id);
+          } else {
+            afterTaskId = task.id;
+          }
           entry.tasks = entry.tasks.filter((item) => item.id !== task.id);
+        }
+        if (promotedElsewhere.length && this._entry === entry) {
+          const moved: TaskWithSubTasks[] = [];
+          for (const id of promotedElsewhere) {
+            const task = await firstValueFrom(this._tasks.getByIdWithSubTaskData$(id));
+            if (task?.projectId === projectId) moved.push(task);
+          }
+          if (moved.length) {
+            await this._placeInProject(entry, moved, null, null, projectId, true);
+          }
         }
         if (this._entry === entry) this._entry = null;
         return;
@@ -428,185 +485,240 @@ export class TaskClipboardService {
       return;
     }
     if (current.some((task) => task.projectId === projectId)) {
-      const isSameProject = current.every((task) => task.projectId === projectId);
-      const list =
-        target instanceof HTMLElement
-          ? target.closest<HTMLElement>('.task-list-inner')
-          : null;
-      const listId =
-        list?.dataset.id ?? (current.every((task) => task.isDone) ? 'DONE' : 'UNDONE');
-      if (
-        !isSameProject ||
-        (!targetTask &&
-          current.some((task) => task.isDone) &&
-          current.some((task) => !task.isDone)) ||
-        (targetTask && (targetTask.parentId || list?.dataset.listId !== 'PARENT')) ||
-        this._context.activeWorkContextType !== WorkContextType.PROJECT ||
-        this._context.activeWorkContextId !== projectId
-      ) {
-        this._snack.open(T.GCF.KEYBOARD.CLIPBOARD_CANNOT_MOVE);
-        return;
-      }
-      const [projects, sections] = await Promise.all([
-        firstValueFrom(this._store.select(selectProjectFeatureState)),
-        firstValueFrom(this._sections.getSectionsByContextId$(projectId)),
-      ]);
-      const project = projects.entities[projectId];
-      const sourceSections = getTaskSectionMap(sections);
-      const targetSection = sections.find((section) => section.id === listId);
-      if (
-        this._entry !== entry ||
-        !project ||
-        !current.every(
-          (task) =>
-            project.taskIds.includes(task.id) ||
-            project.backlogTaskIds?.includes(task.id),
-        ) ||
-        (targetTask &&
-          ![...project.taskIds, ...(project.backlogTaskIds ?? [])].includes(
-            targetTask.id,
-          )) ||
-        (!['UNDONE', 'DONE', 'BACKLOG'].includes(listId) && !targetSection) ||
-        (targetTask &&
-          listId === 'BACKLOG' &&
-          !project.backlogTaskIds?.includes(targetTask.id)) ||
-        (targetTask &&
-          targetSection &&
-          (sourceSections.get(targetTask.id) ?? null) !== targetSection.id) ||
-        (targetTask && listId === 'UNDONE' && sourceSections.has(targetTask.id))
-      ) {
-        this._snack.open(T.GCF.KEYBOARD.CLIPBOARD_CANNOT_MOVE);
-        return;
-      }
-      if (
-        listId === 'DONE' &&
-        current.every((task) => task.isDone && project.taskIds.includes(task.id))
-      ) {
-        await this._reorderDoneTasks(entry, current, targetTask, project);
-        return;
-      }
-      // Existing drag operations also reject direct section/backlog crossings.
-      if (
-        (listId === 'BACKLOG' && current.some((task) => sourceSections.has(task.id))) ||
-        (targetSection &&
-          current.some((task) => project.backlogTaskIds?.includes(task.id)))
-      ) {
-        this._snack.open(T.GCF.KEYBOARD.CLIPBOARD_SECTION_BACKLOG);
-        return;
-      }
-      if (
-        (listId === 'BACKLOG' && !project.isEnableBacklog) ||
-        (targetSection && current.some((task) => task.isDone)) ||
-        (listId === 'UNDONE' &&
-          current.some((task) => task.isDone && sourceSections.has(task.id))) ||
-        (listId === 'DONE' && current.some((task) => sourceSections.has(task.id)))
-      ) {
-        this._snack.open(T.GCF.KEYBOARD.CLIPBOARD_CANNOT_MOVE);
-        return;
-      }
-      let afterTaskId: string | null = targetTask?.id ?? null;
-      for (const task of current) {
-        const sourceSectionId = sourceSections.get(task.id) ?? null;
-        const isBacklog = !!project.backlogTaskIds?.includes(task.id);
-        if (targetSection) {
-          this._sections.addTaskToSection(
-            targetSection.id,
-            task.id,
-            afterTaskId,
-            sourceSectionId,
-          );
-        } else if (listId === 'BACKLOG') {
-          this._store.dispatch(
-            isBacklog
-              ? moveProjectTaskInBacklogList({
-                  taskId: task.id,
-                  afterTaskId,
-                  workContextId: projectId,
-                })
-              : moveProjectTaskToBacklogList({
-                  taskId: task.id,
-                  afterTaskId,
-                  workContextId: projectId,
-                }),
-          );
-        } else if (isBacklog) {
-          this._store.dispatch(
-            moveProjectTaskToRegularList({
-              taskId: task.id,
-              afterTaskId,
-              workContextId: projectId,
-              src: 'BACKLOG',
-              target: listId as 'DONE' | 'UNDONE',
-            }),
-          );
-        } else if (sourceSectionId) {
-          this._sections.removeTaskFromSection(
-            sourceSectionId,
-            task.id,
-            projectId,
-            WorkContextType.PROJECT,
-            afterTaskId,
-          );
-        } else {
-          this._store.dispatch(
-            moveTaskInTodayList({
-              taskId: task.id,
-              afterTaskId,
-              src: task.isDone ? 'DONE' : 'UNDONE',
-              target: listId as 'DONE' | 'UNDONE',
-              workContextId: projectId,
-              workContextType: WorkContextType.PROJECT,
-            }),
-          );
-        }
-        afterTaskId = task.id;
-      }
-      if (listId === 'DONE') {
-        // Crossing into Done also changes completion in the existing effects.
-        // Re-read both models after those actions before assigning a position;
-        // a previous completion timestamp must never be reused for the rank.
-        const [updatedProjects, entities] = await Promise.all([
-          firstValueFrom(this._store.select(selectProjectFeatureState)),
-          firstValueFrom(this._store.select(selectTaskEntities)),
-        ]);
-        const updatedProject = updatedProjects.entities[projectId];
-        const completed = current.map((task) => entities[task.id]);
-        if (
-          this._entry === entry &&
-          updatedProject &&
-          completed.every(
-            (task): task is Task =>
-              !!task && task.isDone && updatedProject.taskIds.includes(task.id),
-          )
-        ) {
-          // This placement is part of a larger move, so don't present the
-          // ordering alone as an undo of the whole operation.
-          await this._reorderDoneTasks(
-            entry,
-            completed,
-            targetTask,
-            updatedProject,
-            false,
-          );
-        }
-      }
-      if (this._entry === entry) this._entry = null;
+      await this._placeInProject(entry, current, rootEl, rootTask, projectId, false);
       return;
     }
     // Cross-project parent moves keep the existing recurring-task confirmation.
+    const movedIds: string[] = [];
     for (const captured of [...entry.tasks]) {
       if (!entry.tasks.some((item) => item.id === captured.id)) continue;
       const task = await firstValueFrom(this._tasks.getByIdWithSubTaskData$(captured.id));
-      if (this._entry !== entry || !task || task.projectId !== captured.projectId) return;
-      if (!(await this._move.moveToProject(task, projectId))) return;
+      if (this._entry !== entry || !task || task.projectId !== captured.projectId) break;
+      if (!(await this._move.moveToProject(task, projectId))) break;
       if (this._entry !== entry) return;
+      movedIds.push(captured.id);
       entry.tasks = entry.tasks.filter(
         (item) =>
           item.id !== captured.id &&
           (!captured.repeatCfgId || item.repeatCfgId !== captured.repeatCfgId),
       );
     }
-    if (this._entry === entry) this._entry = null;
+    // The move appends to the destination; apply the same placement as any
+    // other paste. A failed placement leaves the task where the move put it.
+    const moved: TaskWithSubTasks[] = [];
+    for (const id of movedIds) {
+      const task = await firstValueFrom(this._tasks.getByIdWithSubTaskData$(id));
+      if (task?.projectId === projectId) moved.push(task);
+    }
+    if (moved.length && this._entry === entry) {
+      await this._placeInProject(entry, moved, rootEl, rootTask, projectId, true);
+    }
+    if (movedIds.length === 0 || entry.tasks.length === 0) {
+      if (this._entry === entry) this._entry = null;
+    }
+  }
+
+  /**
+   * The row a root-level paste is placed after: the focused task, or the parent
+   * of a focused subtask, or null with nothing focused.
+   */
+  private async _rootTargetElement(
+    target: EventTarget | null,
+    targetTask: Task | null,
+  ): Promise<HTMLElement | null> {
+    const element =
+      target instanceof HTMLElement
+        ? target.closest<HTMLElement>('task[data-task-id]')
+        : null;
+    if (!element || !targetTask) return null;
+    if (!targetTask.parentId) return element;
+    const parentElement =
+      element.parentElement?.closest<HTMLElement>('task[data-task-id]') ?? null;
+    return parentElement?.dataset.taskId === targetTask.parentId ? parentElement : null;
+  }
+
+  /**
+   * Places root tasks that are already in `projectId` after `targetTask` (or at
+   * the top of the no-section list), through the same actions a drag uses.
+   * Returns false when the placement is not possible. With `isSilent` that is
+   * not reported and the tasks stay where they are (copies, cross-project
+   * moves); otherwise the user is told why nothing moved.
+   */
+  private async _placeInProject(
+    entry: ClipboardEntry,
+    current: TaskWithSubTasks[],
+    targetElement: HTMLElement | null,
+    targetTask: Task | null,
+    projectId: string,
+    isSilent: boolean,
+  ): Promise<boolean> {
+    const reject = (message: string): false => {
+      if (!isSilent) this._snack.open(message);
+      return false;
+    };
+    const isSameProject = current.every((task) => task.projectId === projectId);
+    const list = targetElement?.closest<HTMLElement>('.task-list-inner') ?? null;
+    const listId =
+      list?.dataset.id ?? (current.every((task) => task.isDone) ? 'DONE' : 'UNDONE');
+    if (
+      !isSameProject ||
+      (!targetTask &&
+        current.some((task) => task.isDone) &&
+        current.some((task) => !task.isDone)) ||
+      (targetTask && (targetTask.parentId || list?.dataset.listId !== 'PARENT')) ||
+      this._context.activeWorkContextType !== WorkContextType.PROJECT ||
+      this._context.activeWorkContextId !== projectId
+    ) {
+      return reject(T.GCF.KEYBOARD.CLIPBOARD_CANNOT_MOVE);
+    }
+    const [projects, sections] = await Promise.all([
+      firstValueFrom(this._store.select(selectProjectFeatureState)),
+      firstValueFrom(this._sections.getSectionsByContextId$(projectId)),
+    ]);
+    const project = projects.entities[projectId];
+    const sourceSections = getTaskSectionMap(sections);
+    const targetSection = sections.find((section) => section.id === listId);
+    if (
+      this._entry !== entry ||
+      !project ||
+      !current.every(
+        (task) =>
+          project.taskIds.includes(task.id) || project.backlogTaskIds?.includes(task.id),
+      ) ||
+      (targetTask &&
+        ![...project.taskIds, ...(project.backlogTaskIds ?? [])].includes(
+          targetTask.id,
+        )) ||
+      (!['UNDONE', 'DONE', 'BACKLOG'].includes(listId) && !targetSection) ||
+      (targetTask &&
+        listId === 'BACKLOG' &&
+        !project.backlogTaskIds?.includes(targetTask.id)) ||
+      (targetTask &&
+        targetSection &&
+        (sourceSections.get(targetTask.id) ?? null) !== targetSection.id) ||
+      (targetTask && listId === 'UNDONE' && sourceSections.has(targetTask.id))
+    ) {
+      return reject(T.GCF.KEYBOARD.CLIPBOARD_CANNOT_MOVE);
+    }
+    if (
+      listId === 'DONE' &&
+      current.every((task) => task.isDone && project.taskIds.includes(task.id))
+    ) {
+      await this._reorderDoneTasks(
+        entry,
+        current,
+        targetTask,
+        project,
+        !isSilent,
+        !isSilent,
+      );
+      return true;
+    }
+    // Existing drag operations also reject direct section/backlog crossings.
+    if (
+      (listId === 'BACKLOG' && current.some((task) => sourceSections.has(task.id))) ||
+      (targetSection && current.some((task) => project.backlogTaskIds?.includes(task.id)))
+    ) {
+      return reject(T.GCF.KEYBOARD.CLIPBOARD_SECTION_BACKLOG);
+    }
+    if (
+      (listId === 'BACKLOG' && !project.isEnableBacklog) ||
+      (targetSection && current.some((task) => task.isDone)) ||
+      (listId === 'UNDONE' &&
+        current.some((task) => task.isDone && sourceSections.has(task.id))) ||
+      (listId === 'DONE' && current.some((task) => sourceSections.has(task.id)))
+    ) {
+      return reject(T.GCF.KEYBOARD.CLIPBOARD_CANNOT_MOVE);
+    }
+    let afterTaskId: string | null = targetTask?.id ?? null;
+    for (const task of current) {
+      const sourceSectionId = sourceSections.get(task.id) ?? null;
+      const isBacklog = !!project.backlogTaskIds?.includes(task.id);
+      if (targetSection) {
+        this._sections.addTaskToSection(
+          targetSection.id,
+          task.id,
+          afterTaskId,
+          sourceSectionId,
+        );
+      } else if (listId === 'BACKLOG') {
+        this._store.dispatch(
+          isBacklog
+            ? moveProjectTaskInBacklogList({
+                taskId: task.id,
+                afterTaskId,
+                workContextId: projectId,
+              })
+            : moveProjectTaskToBacklogList({
+                taskId: task.id,
+                afterTaskId,
+                workContextId: projectId,
+              }),
+        );
+      } else if (isBacklog) {
+        this._store.dispatch(
+          moveProjectTaskToRegularList({
+            taskId: task.id,
+            afterTaskId,
+            workContextId: projectId,
+            src: 'BACKLOG',
+            target: listId as 'DONE' | 'UNDONE',
+          }),
+        );
+      } else if (sourceSectionId) {
+        this._sections.removeTaskFromSection(
+          sourceSectionId,
+          task.id,
+          projectId,
+          WorkContextType.PROJECT,
+          afterTaskId,
+        );
+      } else {
+        this._store.dispatch(
+          moveTaskInTodayList({
+            taskId: task.id,
+            afterTaskId,
+            src: task.isDone ? 'DONE' : 'UNDONE',
+            target: listId as 'DONE' | 'UNDONE',
+            workContextId: projectId,
+            workContextType: WorkContextType.PROJECT,
+          }),
+        );
+      }
+      afterTaskId = task.id;
+    }
+    if (listId === 'DONE') {
+      // Crossing into Done also changes completion in the existing effects.
+      // Re-read both models after those actions before assigning a position;
+      // a previous completion timestamp must never be reused for the rank.
+      const [updatedProjects, entities] = await Promise.all([
+        firstValueFrom(this._store.select(selectProjectFeatureState)),
+        firstValueFrom(this._store.select(selectTaskEntities)),
+      ]);
+      const updatedProject = updatedProjects.entities[projectId];
+      const completed = current.map((task) => entities[task.id]);
+      if (
+        this._entry === entry &&
+        updatedProject &&
+        completed.every(
+          (task): task is Task =>
+            !!task && task.isDone && updatedProject.taskIds.includes(task.id),
+        )
+      ) {
+        // This placement is part of a larger move, so don't present the
+        // ordering alone as an undo of the whole operation.
+        await this._reorderDoneTasks(
+          entry,
+          completed,
+          targetTask,
+          updatedProject,
+          false,
+          !isSilent,
+        );
+      }
+    }
+    if (!isSilent && this._entry === entry) this._entry = null;
+    return true;
   }
 
   private async _reorderDoneTasks(
@@ -615,6 +727,7 @@ export class TaskClipboardService {
     target: Task | null,
     project: Project,
     recordHistory = true,
+    isConsumingEntry = true,
   ): Promise<void> {
     const entities = await firstValueFrom(this._store.select(selectTaskEntities));
     if (this._entry !== entry) return;
@@ -649,6 +762,6 @@ export class TaskClipboardService {
       }
       lower = key;
     }
-    if (this._entry === entry) this._entry = null;
+    if (isConsumingEntry && this._entry === entry) this._entry = null;
   }
 }

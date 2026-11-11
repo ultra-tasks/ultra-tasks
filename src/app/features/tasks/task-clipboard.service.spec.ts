@@ -26,6 +26,7 @@ import { DateService } from '../../core/date/date.service';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
 import { selectProjectFeatureState } from '../project/store/project.selectors';
 import { TaskUndoService } from './task-undo.service';
+import { T } from '../../t.const';
 
 describe('TaskClipboardService', () => {
   let service: TaskClipboardService;
@@ -268,6 +269,176 @@ describe('TaskClipboardService', () => {
     list.remove();
   }));
 
+  describe('placing copies and cross-project moves like any other paste', () => {
+    let list: HTMLElement;
+    let destination: HTMLElement;
+    let dispatch: jasmine.Spy;
+    let snack: jasmine.Spy;
+
+    const taskIn = (id: string, extra: Record<string, unknown> = {}): TaskWithSubTasks =>
+      ({ ...task, id, projectId: 'source', ...extra }) as TaskWithSubTasks;
+
+    const mount = (listId = 'UNDONE'): void => {
+      destination = document.createElement('task');
+      destination.dataset.taskId = 'two';
+      list = document.createElement('div');
+      list.className = 'task-list-inner';
+      list.dataset.listId = 'PARENT';
+      list.dataset.id = listId;
+      list.append(destination);
+      document.body.append(list);
+    };
+
+    beforeEach(() => {
+      dispatch = TestBed.inject(Store).dispatch as jasmine.Spy;
+      snack = TestBed.inject(SnackService).open as jasmine.Spy;
+      const context = TestBed.inject(WorkContextService);
+      Object.defineProperty(context, 'activeWorkContextId', { value: 'source' });
+      spyOn(TestBed.inject(Store), 'select').and.returnValue(
+        of({
+          entities: { source: { taskIds: ['copy-1', 'copy-2', 'two', 'one'] } },
+        }) as any,
+      );
+    });
+    afterEach(() => list?.remove());
+
+    const copyAndPaste = (at: HTMLElement, cut = false): void => {
+      const data = new DataTransfer();
+      service.copy(clipboardEvent(cut ? 'cut' : 'copy', host, data), cut);
+      service.paste(clipboardEvent('paste', at, data));
+      tick();
+    };
+
+    it('puts a copy after the focused task and keeps the clipboard', fakeAsync(() => {
+      mount();
+      duplicate.and.returnValue('copy-1');
+      const tasks = TestBed.inject(TaskService);
+      spyOn(tasks, 'getByIdOnce$').and.returnValue(of(taskIn('two')));
+      spyOn(tasks, 'getByIdWithSubTaskData$').and.callFake((id) =>
+        of(id === 'copy-1' ? taskIn('copy-1') : taskIn('one')),
+      );
+
+      const data = new DataTransfer();
+      service.copy(clipboardEvent('copy', host, data), false);
+      service.paste(clipboardEvent('paste', destination, data));
+      tick();
+      service.paste(clipboardEvent('paste', destination, data));
+      tick();
+
+      expect(dispatch).toHaveBeenCalledWith(
+        moveTaskInTodayList({
+          taskId: 'copy-1',
+          afterTaskId: 'two',
+          src: 'UNDONE',
+          target: 'UNDONE',
+          workContextId: 'source',
+          workContextType: WorkContextType.PROJECT,
+        }),
+      );
+      expect(duplicate).toHaveBeenCalledTimes(2);
+    }));
+
+    it('puts a copy after the parent of a focused subtask', fakeAsync(() => {
+      mount();
+      const subtask = document.createElement('task');
+      subtask.dataset.taskId = 'sub';
+      destination.append(subtask);
+      duplicate.and.returnValue('copy-1');
+      const tasks = TestBed.inject(TaskService);
+      spyOn(tasks, 'getByIdOnce$').and.callFake((id) =>
+        of(id === 'sub' ? taskIn('sub', { parentId: 'two' }) : taskIn('two')),
+      );
+      spyOn(tasks, 'getByIdWithSubTaskData$').and.callFake((id) =>
+        of(id === 'copy-1' ? taskIn('copy-1') : taskIn('one')),
+      );
+
+      copyAndPaste(subtask);
+
+      expect(dispatch).toHaveBeenCalledWith(
+        jasmine.objectContaining({ taskId: 'copy-1', afterTaskId: 'two' }),
+      );
+    }));
+
+    it('leaves a single copy at the top when nothing is focused', fakeAsync(() => {
+      duplicate.and.returnValue('copy-1');
+
+      copyAndPaste(document.body);
+
+      expect(duplicate).toHaveBeenCalledTimes(1);
+      expect(dispatch).not.toHaveBeenCalledWith(
+        jasmine.objectContaining({ taskId: 'copy-1' }),
+      );
+    }));
+
+    it('keeps several copies in order at the top when nothing is focused', fakeAsync(() => {
+      const tasks = TestBed.inject(TaskService);
+      duplicate.and.returnValues('copy-1', 'copy-2');
+      const selection = TestBed.inject(TaskMultiSelectService);
+      spyOn(selection, 'isActive').and.returnValue(true);
+      spyOn(selection, 'has').and.returnValue(true);
+      spyOn(selection, 'selectedIdsInDomOrder').and.returnValue(['one', 'other']);
+      spyOn(tasks, 'getByIdWithSubTaskData$').and.callFake((id) => of(taskIn(id)));
+
+      copyAndPaste(document.body);
+
+      expect(dispatch).toHaveBeenCalledWith(
+        jasmine.objectContaining({ taskId: 'copy-1', afterTaskId: null }),
+      );
+      expect(dispatch).toHaveBeenCalledWith(
+        jasmine.objectContaining({ taskId: 'copy-2', afterTaskId: 'copy-1' }),
+      );
+    }));
+
+    it('keeps a copy at the top, without an error, when the target list cannot take it', fakeAsync(() => {
+      mount('unknown-section');
+      duplicate.and.returnValue('copy-1');
+      const tasks = TestBed.inject(TaskService);
+      spyOn(tasks, 'getByIdOnce$').and.returnValue(of(taskIn('two')));
+      spyOn(tasks, 'getByIdWithSubTaskData$').and.callFake((id) =>
+        of(id === 'copy-1' ? taskIn('copy-1') : taskIn('one')),
+      );
+
+      copyAndPaste(destination);
+
+      expect(dispatch).not.toHaveBeenCalledWith(
+        jasmine.objectContaining({ taskId: 'copy-1' }),
+      );
+      expect(snack).not.toHaveBeenCalled();
+    }));
+
+    it('puts a task cut from another project after the focused task', fakeAsync(() => {
+      mount();
+      let isMoved = false;
+      move.and.callFake(async () => {
+        isMoved = true;
+        return true;
+      });
+      const tasks = TestBed.inject(TaskService);
+      spyOn(tasks, 'getByIdOnce$').and.returnValue(of(taskIn('two')));
+      spyOn(tasks, 'getByIdWithSubTaskData$').and.callFake((id) =>
+        of(
+          id === 'one' && !isMoved
+            ? taskIn('one', { projectId: 'elsewhere' })
+            : taskIn(id),
+        ),
+      );
+
+      copyAndPaste(destination, true);
+
+      expect(move).toHaveBeenCalledTimes(1);
+      expect(dispatch).toHaveBeenCalledWith(
+        moveTaskInTodayList({
+          taskId: 'one',
+          afterTaskId: 'two',
+          src: 'UNDONE',
+          target: 'UNDONE',
+          workContextId: 'source',
+          workContextType: WorkContextType.PROJECT,
+        }),
+      );
+    }));
+  });
+
   it('moves a cut task between project sections using the normal section action', fakeAsync(() => {
     const destination = document.createElement('task');
     destination.dataset.taskId = 'two';
@@ -453,6 +624,68 @@ describe('TaskClipboardService', () => {
     );
   }));
 
+  it('promotes a cut subtask into another project and places it at the top', fakeAsync(() => {
+    task = { ...task, parentId: 'parent' };
+    const parent = { ...task, id: 'parent', parentId: undefined, tagIds: ['tag'] };
+    let isMoved = false;
+    move.and.callFake(async () => {
+      isMoved = true;
+      return true;
+    });
+    const tasks = TestBed.inject(TaskService);
+    spyOn(tasks, 'getByIdOnce$').and.returnValue(of(parent));
+    spyOn(tasks, 'getByIdWithSubTaskData$').and.callFake(() =>
+      of(
+        isMoved
+          ? { ...task, parentId: undefined, projectId: 'target' }
+          : { ...task, parentId: isMoved ? undefined : task.parentId },
+      ),
+    );
+    spyOn(TestBed.inject(Store), 'select').and.returnValue(
+      of({ entities: { target: { id: 'target', taskIds: ['one'] } } }) as any,
+    );
+    const data = new DataTransfer();
+    service.copy(clipboardEvent('cut', host, data), true);
+    service.paste(clipboardEvent('paste', document.body, data));
+    tick();
+    const dispatch = TestBed.inject(Store).dispatch as jasmine.Spy;
+    expect(dispatch).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        type: TaskSharedActions.convertToMainTask.type,
+        parentTagIds: ['tag'],
+        afterTaskId: null,
+      }),
+    );
+    expect(move).toHaveBeenCalledOnceWith(
+      jasmine.objectContaining({ id: 'one' }),
+      'target',
+    );
+    expect(dispatch).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        taskId: 'one',
+        afterTaskId: null,
+        workContextId: 'target',
+      }),
+    );
+    const snack = TestBed.inject(SnackService).open as jasmine.Spy;
+    expect(snack).not.toHaveBeenCalledWith(T.GCF.KEYBOARD.CLIPBOARD_CANNOT_MOVE);
+    expect(snack).not.toHaveBeenCalledWith(
+      T.GCF.KEYBOARD.CLIPBOARD_SUBTASK_OTHER_PROJECT,
+    );
+  }));
+
+  it('still refuses to move a repeating task subtask into another project', fakeAsync(() => {
+    task = { ...task, parentId: 'parent', repeatCfgId: 'repeat' };
+    const data = new DataTransfer();
+    service.copy(clipboardEvent('cut', host, data), true);
+    service.paste(clipboardEvent('paste', document.body, data));
+    tick();
+    expect(move).not.toHaveBeenCalled();
+    expect(TestBed.inject(SnackService).open).toHaveBeenCalledWith(
+      T.GCF.KEYBOARD.CLIPBOARD_SUBTASK_OTHER_PROJECT,
+    );
+  }));
+
   it('reorders completed tasks without changing their completion timestamps', fakeAsync(() => {
     task = { ...task, isDone: true, doneOn: 3000 };
     const destinationTask = { ...task, id: 'two', doneOn: 2000 };
@@ -500,6 +733,40 @@ describe('TaskClipboardService', () => {
     );
     list.remove();
   }));
+
+  describe('Upcoming and Boards cards', () => {
+    let card: HTMLElement;
+
+    beforeEach(() => {
+      card = document.createElement('planner-task');
+      card.dataset.taskId = 'one';
+      document.body.append(card);
+    });
+    afterEach(() => card.remove());
+
+    it('copies a focused planner card as Markdown', () => {
+      const data = new DataTransfer();
+      const copy = clipboardEvent('copy', card, data);
+
+      service.copy(copy, false);
+
+      expect(copy.defaultPrevented).toBeTrue();
+      expect(data.getData('text/plain')).toBe('- [ ] One');
+    });
+
+    it('tells the user to open a project instead of pasting from a planner card', fakeAsync(() => {
+      const data = new DataTransfer();
+      service.copy(clipboardEvent('copy', host, data), false);
+
+      service.paste(clipboardEvent('paste', card, data));
+      tick();
+
+      expect(duplicate).not.toHaveBeenCalled();
+      expect(TestBed.inject(SnackService).open).toHaveBeenCalledWith(
+        T.GCF.KEYBOARD.CLIPBOARD_NEED_PROJECT,
+      );
+    }));
+  });
 
   it('stops taking over native copy when the task shortcut is unassigned', () => {
     spyOn(TestBed.inject(GlobalConfigService), 'cfg').and.returnValue({

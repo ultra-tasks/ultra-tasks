@@ -50,6 +50,11 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { RecentlyDeletedService } from '../../features/tasks/recently-deleted/recently-deleted.service';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
+import { TaskUndoService } from '../../features/tasks/task-undo.service';
+import {
+  displayShortcut,
+  taskHistoryLabel,
+} from '../../core-ui/shortcut/shortcut-display.util';
 import {
   getRestoreTaskPayload,
   RecentlyDeletedEntry,
@@ -94,6 +99,7 @@ export class SearchPageComponent implements OnInit {
   private _translateService = inject(TranslateService);
   private _globalConfig = inject(GlobalConfigService);
   private _focusMode = inject(FocusModeService);
+  private _taskUndo = inject(TaskUndoService);
 
   /** Shown in a dialog over another page rather than as a page of its own. */
   readonly isPopup = input(false);
@@ -102,7 +108,16 @@ export class SearchPageComponent implements OnInit {
   readonly appFeatures = this._globalConfig.appFeatures;
   readonly keyboard = computed(() => this._globalConfig.cfg()?.keyboard);
   /** Places and actions Search offers next to tasks; only those the user can reach. */
-  readonly commands = computed(() => buildSearchCommands(this.appFeatures()));
+  readonly commands = computed(() =>
+    buildSearchCommands(this.appFeatures(), {
+      undoLabelKey: this._taskUndo.canUndo()
+        ? taskHistoryLabel(this._taskUndo.undoField(), false)
+        : undefined,
+      redoLabelKey: this._taskUndo.canRedo()
+        ? taskHistoryLabel(this._taskUndo.redoField(), true)
+        : undefined,
+    }),
+  );
   private _commands$ = toObservable(this.commands);
 
   readonly inputEl = viewChild.required<ElementRef>('inputEl');
@@ -635,7 +650,11 @@ export class SearchPageComponent implements OnInit {
 
   /** The user's shortcut for a command, when it has one. */
   shortcutFor(command: SearchCommand): string | null {
-    return (command.shortcut && this.keyboard()?.[command.shortcut]) || null;
+    return (
+      (command.shortcut &&
+        displayShortcut(command.shortcut, this.keyboard()?.[command.shortcut])) ||
+      null
+    );
   }
 
   /** Only a live task can be previewed; projects, tags, notes, archived and deleted items cannot. */
@@ -688,6 +707,12 @@ export class SearchPageComponent implements OnInit {
               this._matDialog.open(DialogSyncCfgComponent);
             },
           );
+          break;
+        case 'undo':
+          this._taskUndo.undo();
+          break;
+        case 'redo':
+          this._taskUndo.redo();
           break;
         case 'shortcuts':
           void import('../../core-ui/shortcut/dialog-keyboard-shortcuts/dialog-keyboard-shortcuts.component').then(

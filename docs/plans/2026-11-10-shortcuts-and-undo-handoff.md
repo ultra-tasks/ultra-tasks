@@ -28,20 +28,32 @@ sync.
   read-only/stopped integration edits and linked-task priority are supported;
   local suppression prevents delayed writes to an external provider.
 
-## Current paste behavior
+## Paste behavior
 
-In a project or Inbox, a same-project cut of a parent task goes after the
-focused parent task; with no focused task, an unfinished task goes to the top
-of the no-section list and a completed task goes to the top of Done. A copied
-task is duplicated at the top of the destination regular list regardless of the
-focused row. A parent task cut from another project is appended to the
-destination's regular list, also ignoring the focused row. A cut subtask pasted
-onto a parent becomes its child; pasted onto a subtask it goes after that
-sibling. Placement depends on keyboard focus, not selection highlighting alone.
+One rule covers copies, cut parent tasks and cut parents from another project:
+the task goes after the focused parent task, or after the parent of a focused
+subtask, and with nothing focused it goes to the top of the no-section list (a
+completed task to the top of Done). Several copies keep their order. A cut
+subtask pasted onto a parent becomes its child; pasted onto a subtask it goes
+after that sibling; with nothing focused it is promoted to a task at the top of
+the project being viewed, including from another project (a subtask of a
+repeating task keeps the refusal, because moving it could need the
+recurring-task confirmation after it was already promoted). Placement lives in
+`TaskClipboardService._placeInProject`; a copy or cross-project move whose
+placement is not possible stays where it was created or moved, without an error.
+Copy and cut work from a focused Upcoming or Boards card; paste there asks the
+user to open a project or focus a task, because those cards have no list
+position. Undo and Redo are also offered in the search page's suggested actions
+while one is available.
 
-The user's proposed rule—after the focused item, otherwise at the top of the
-no-section list—is therefore **not universal** yet. Direct cross-project
-subtask promotion and direct section-to-backlog moves are also unsupported.
+Deliberately unchanged: direct section-to-backlog moves stay unsupported, as
+dragging rejects the same crossing; making paste more permissive than drag would
+create a second set of rules.
+
+Verification note: the E2E test `reorders completed project tasks without
+changing completion time` fails after a page reload on this Windows machine
+both with and without these changes (checked 2026-11-11 by running it against
+the old clipboard service); the in-session paste, undo and redo steps pass.
 
 ## Remaining undo and sync work
 

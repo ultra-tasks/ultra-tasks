@@ -21,7 +21,7 @@ const readCompletionTime = (page: Page, id: string): Promise<number | undefined>
     return value;
   }, id);
 
-test('uses the current placement rules for copy and cut', async ({
+test('places copies and cut tasks after the focused task', async ({
   page,
   workViewPage,
   projectPage,
@@ -54,8 +54,8 @@ test('uses the current placement rules for copy and cut', async ({
   await page.keyboard.press('Control+C');
   await first.focus();
   await page.keyboard.press('Control+V');
-  await expect(rows.first()).toContainText(`${secondName} (copy)`);
-  await expect(rows.nth(1)).toHaveAttribute('data-task-id', firstId!);
+  await expect(rows.first()).toHaveAttribute('data-task-id', firstId!);
+  await expect(rows.nth(1)).toContainText(`${secondName} (copy)`);
 
   await projectPage.createProject('Clipboard placement destination');
   await projectPage.navigateToProjectByName('Clipboard placement destination');
@@ -71,8 +71,8 @@ test('uses the current placement rules for copy and cut', async ({
   await taskPage.getTaskByText(destinationFirst).focus();
   await page.keyboard.press('Control+V');
   await expect(rows.nth(0)).toContainText(destinationFirst);
-  await expect(rows.nth(1)).toContainText(destinationLast);
-  await expect(rows.nth(2)).toHaveAttribute('data-task-id', secondId!);
+  await expect(rows.nth(1)).toHaveAttribute('data-task-id', secondId!);
+  await expect(rows.nth(2)).toContainText(destinationLast);
 });
 
 test('reorders completed project tasks without changing completion time', async ({
