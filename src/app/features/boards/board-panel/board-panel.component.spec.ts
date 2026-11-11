@@ -3,6 +3,7 @@ import { BoardPanelComponent } from './board-panel.component';
 import { BoardPanelCfg, BoardPanelCfgTaskTypeFilter } from '../boards.model';
 import { TaskCopy } from '../../tasks/task.model';
 import { Store } from '@ngrx/store';
+import { TaskUndoService } from '../../tasks/task-undo.service';
 import { TaskService } from '../../tasks/task.service';
 import { MatDialog } from '@angular/material/dialog';
 import { of, ReplaySubject } from 'rxjs';
@@ -151,6 +152,7 @@ describe('BoardPanelComponent - Backlog Feature', () => {
         provideMockStore({}),
         provideMockActions(() => actions$),
         { provide: Store, useValue: storeMock },
+        { provide: TaskUndoService, useValue: { updateDone: () => false } },
         { provide: TaskService, useValue: { currentTaskId: signal(null) } },
         { provide: MatDialog, useValue: {} },
         { provide: WorkContextService, useValue: workContextServiceMock },
@@ -346,6 +348,7 @@ describe('BoardPanelComponent - Hidden Project Backlog', () => {
         provideMockStore({}),
         provideMockActions(() => actions$),
         { provide: Store, useValue: storeMock },
+        { provide: TaskUndoService, useValue: { updateDone: () => false } },
         { provide: TaskService, useValue: { currentTaskId: signal(null) } },
         { provide: MatDialog, useValue: {} },
         { provide: WorkContextService, useValue: {} },
@@ -440,6 +443,7 @@ describe('BoardPanelComponent - Tag match mode, sort, inline-create computeds', 
         provideMockStore({}),
         provideMockActions(() => actions$),
         { provide: Store, useValue: storeMock },
+        { provide: TaskUndoService, useValue: { updateDone: () => false } },
         { provide: TaskService, useValue: { currentTaskId: signal(null) } },
         { provide: MatDialog, useValue: {} },
         { provide: WorkContextService, useValue: {} },
@@ -881,6 +885,7 @@ describe('BoardPanelComponent - drop()', () => {
         provideMockStore({}),
         provideMockActions(() => actions$),
         { provide: Store, useValue: storeMock },
+        { provide: TaskUndoService, useValue: { updateDone: () => false } },
         {
           provide: TaskService,
           useValue: {

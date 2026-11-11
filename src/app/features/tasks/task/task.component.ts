@@ -1197,6 +1197,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
       task.id,
       task.isDone,
       (v) => this.showDoneAnimation.set(v),
+      (expected, value) => this._taskUndoService.updateDone(task.id, expected, value),
     );
   }
 

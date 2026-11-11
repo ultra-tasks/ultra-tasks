@@ -1233,22 +1233,23 @@ export class TaskService {
   }
 
   /**
-   * Toggle done state with checkmark animation.
+   * Toggle done state with checkmark animation. `record` lets a user gesture enter
+   * a history; when it declines (returns false) the ordinary update runs.
    * Returns the timeout handle so callers can clear it on destroy.
    */
   toggleDoneWithAnimation(
     taskId: string,
     isDone: boolean,
     setAnimation: (animate: boolean) => void,
+    record?: (expected: boolean, value: boolean) => boolean,
   ): number | undefined {
     if (isDone) {
       setAnimation(false);
-      this.setUnDone(taskId);
+      if (!record?.(true, false)) this.setUnDone(taskId);
       return undefined;
-    } else {
-      setAnimation(true);
-      return window.setTimeout(() => this.setDone(taskId), 200);
     }
+    setAnimation(true);
+    return window.setTimeout(() => record?.(false, true) || this.setDone(taskId), 200);
   }
 
   showSubTasks(id: string): void {

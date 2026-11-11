@@ -731,10 +731,12 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleTaskDone(): void {
-    if (this.task.isDone) {
-      this._taskService.setUnDone(this.task.id);
+    const { id, isDone } = this.task;
+    if (this._taskUndoService.updateDone(id, !!isDone, !isDone)) return;
+    if (isDone) {
+      this._taskService.setUnDone(id);
     } else {
-      this._taskService.setDone(this.task.id);
+      this._taskService.setDone(id);
     }
   }
 

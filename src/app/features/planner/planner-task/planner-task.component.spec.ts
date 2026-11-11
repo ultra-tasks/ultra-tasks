@@ -12,6 +12,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { GlobalConfigService } from '../../config/global-config.service';
 import { MatDialog } from '@angular/material/dialog';
 import { Store } from '@ngrx/store';
+import { TaskUndoService } from '../../tasks/task-undo.service';
 import { DateService } from '../../../core/date/date.service';
 import { DateAdapter } from '@angular/material/core';
 import { TaskMultiSelectService } from '../../tasks/task-multi-select.service';
@@ -120,6 +121,7 @@ describe('PlannerTaskComponent', () => {
         },
         { provide: MatDialog, useValue: matDialogMock },
         { provide: Store, useValue: storeMock },
+        { provide: TaskUndoService, useValue: { updateDone: () => false } },
         {
           provide: DateService,
           useValue: {

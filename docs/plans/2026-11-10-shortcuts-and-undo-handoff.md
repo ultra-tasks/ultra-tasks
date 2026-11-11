@@ -194,6 +194,44 @@ v0.1.0, v0.2.0 or v0.3.0 contains the field, so those are the clients to protect
   server-side payload validation of task fields is unchecked. This repo's shared
   schema package has migrations only and never mentions the field.
 
+## Stage 3: completion in the undo queue (2026-11-11)
+
+Completing or reopening one ordinary task now enters the queue
+(`TaskUndoService.updateDone`). The gesture sites record it:
+`TaskService.toggleDoneWithAnimation` takes an optional `record` callback (the
+service sits exactly at its line cap, so the change is line-neutral) used by the
+task row and the planner card, and the context menu calls the queue directly.
+Widget taps, bulk completion, carry-over and drag into Done keep the barrier.
+Eligible: a local, non-repeating task with no reminder, won't-do mark or
+integration link, and not a timed task while an enabled integration can write
+calendar blocks. A completion whose effects dispatch another persistent action
+(reminder dismissal, a parent completing with its last subtask) clears the
+history instead of being recorded. Redo stamps a new completion time.
+
+Evidence: `undo-completion-scheduling-sync` (8 cases) now asserts that a
+concurrent Add to Today and a complete, undo or redo both survive in either
+upload and timestamp order, and fails without the plan declaration (6 of 8);
+`undo-completion-sync` (11 cases) covers a concurrent title edit and a concurrent
+completion in both upload orders, with restart; 9 new unit cases cover the
+eligibility rules; `undo-completion.spec.ts` (browser) completes, undoes the
+completion and then the earlier rename, and redoes both.
+
+Found on the way and fixed: the completing device stamps `doneOn` in the reducer,
+but every other device derives it from the operation timestamp, so one completion
+carries `doneOn` values a few milliseconds apart (reproduced with a single plain
+completion). `hasManualDoneTaskOrder` compared them exactly, so a manual
+completed order written on one device was silently ignored on the other. The
+guard now ties an order to its completion within 10 seconds
+(`SAME_COMPLETION_WINDOW_MS` in `done-task-order.ts`); a test fails without it.
+The millisecond drift itself is unchanged and cosmetic.
+
+Not done: scheduling. An Add to Today inverse is not a plain field restore (it
+clears `remindAt` and a time for another day, which cannot be restored, and a
+previous planner day returns at the end of that day's list), so eligibility would
+be limited to a task with no reminder or time. `dueDay: null` reconciles the Today
+list and `planner.days` through the existing `updateTask` reducer. No code was
+written for it.
+
 ## Validation completed
 
 - The previous combined Karma run passed 323 tests for the queue, supported

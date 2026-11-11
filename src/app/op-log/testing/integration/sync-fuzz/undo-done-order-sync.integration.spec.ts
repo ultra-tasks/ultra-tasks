@@ -83,14 +83,15 @@ describe('completed-task order undo across two clients', () => {
         await update({ doneOrder: ORDER });
       });
       harness.tick();
-      await harness.as(b, () => update({ isDone: true, doneOn: 4000 }));
+      // Later than the order's completion by more than the same-completion window.
+      await harness.as(b, () => update({ isDone: true, doneOn: 60_000 }));
       const devices = uploadFirst === 'A' ? [a, b] : [b, a];
       for (let round = 0; round < 2; round++) {
         for (const device of devices) expect(await harness.sync(device)).toBeTrue();
       }
       for (const device of devices) {
         const task = await taskOn(device);
-        expect(task.doneOn).toBe(4000);
+        expect(task.doneOn).toBe(60_000);
         expect(hasManualDoneTaskOrder(task)).toBeFalse();
       }
     }, 60_000);

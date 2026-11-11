@@ -14,8 +14,8 @@ import { allowsIntegrationWrites } from '../integrations/integration.model';
 import { LocalExternalSyncSuppressionService } from '../integrations/local-external-sync-suppression.service';
 import { hasManualDoneTaskOrder } from './done-task-order';
 
-type UndoField = 'timeEstimate' | 'notes' | 'priority' | 'title';
-type UndoValue = number | string | null;
+type UndoField = 'timeEstimate' | 'notes' | 'priority' | 'title' | 'isDone';
+type UndoValue = number | string | boolean | null;
 
 interface TaskFieldChange {
   id: string;
@@ -115,6 +115,16 @@ export class TaskUndoService {
       before: expected ?? null,
       after: value ?? null,
     });
+  }
+
+  /**
+   * Handles only completing or reopening one ordinary local task. False means the
+   * caller must use the existing path. A completion whose other effects write
+   * more state (a reminder dismissal, a parent completed with its last subtask)
+   * dispatches further persistent actions, which clear the history instead.
+   */
+  updateDone(id: string, expected: boolean, value: boolean): boolean {
+    return this._record({ id, field: 'isDone', before: expected, after: value });
   }
 
   /** Records the manual order of one completed project task. */
@@ -266,6 +276,14 @@ export class TaskUndoService {
   private _matches(entry: UndoEntry, expected: EntryValue): boolean {
     const task = this._tasks()[entry.id];
     const isLocalOnlyField = entry.field === 'priority' || entry.field === 'doneOrder';
+    // Completing can start a recurrence, dismiss a reminder and finish the task
+    // for an integration, and a won't-do mark is a different intent than done.
+    if (
+      entry.field === 'isDone' &&
+      task &&
+      (task.repeatCfgId || task.remindAt || task.wontDoOn)
+    )
+      return false;
     const isReadOnlyIntegration = !!task?.integration && !allowsIntegrationWrites(task);
     if (
       !task ||
@@ -280,7 +298,9 @@ export class TaskUndoService {
     // Timed title and estimate updates can write an external calendar block.
     if (
       task.dueWithTime != null &&
-      (entry.field === 'title' || entry.field === 'timeEstimate') &&
+      (entry.field === 'title' ||
+        entry.field === 'timeEstimate' ||
+        entry.field === 'isDone') &&
       allowsIntegrationWrites(task) &&
       this._issueProviders().some(
         (provider) =>

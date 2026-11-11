@@ -1,7 +1,8 @@
 # Task undo and redo: design for implementation
 
 Status: a limited session queue is implemented for eligible single-task estimates,
-priority, notes, ordinary title edits, and a single completed-task reorder. The
+priority, notes, ordinary title edits, completing or reopening one ordinary task, and
+a single completed-task reorder. The
 app does not have general task undo. Expand coverage only after each action is
 safe end-to-end.
 
@@ -82,12 +83,22 @@ confirms no derived changes; syntax that changes tags, scheduling,
 projects, attachments or another field is a barrier. History is temporarily
 unavailable while parsing is pending and is cleared if parsing does not finish.
 
-Completion and reopening are history barriers. A two-device replay control
-showed that completing an initially unscheduled task can race with another
-device adding it to Today: a newer completion can lose the plan, and a newer
-plan can lose the redone completion. Some upload orders leave the devices with
-different results. Ordinary completion keeps its existing behavior; adding it
-to this queue requires a compatible fix for the underlying conflict path.
+Completing and reopening one ordinary task enters the queue (2026-11-11). A
+two-device control had shown that completing an initially unscheduled task could
+race with another device adding it to Today, because the plan was an opaque
+operation that fell back to whole-task LWW. A single-task Add to Today now
+declares the fields it writes, so the plan and the completion (or its undo and
+redo) both survive in either upload order and either timestamp order. The
+eligible set is deliberately narrow: a local, non-repeating task without a
+reminder, won't-do mark or integration link, and not a timed task while an
+enabled integration can write calendar blocks. Completion effects that write more
+state (a reminder dismissal, a parent that completes with its last subtask)
+dispatch their own persistent action, which clears the history instead of being
+recorded. The gesture sites record the change (`TaskService.toggleDoneWithAnimation`
+callers and the context menu); programmatic callers, bulk completion and drag into
+Done stay barriers. Redo stamps a new completion time. An Add to Today that does
+not declare its fields (a subtask, a bulk plan, an older client) still falls
+back to whole-task LWW against a concurrent completion.
 
 The same existing whole-task conflict also affects title, notes, priority and
 completed-task ordering when Add to Today races on another device. Matched
@@ -152,7 +163,7 @@ is needed before adding grouped history.
 | Action                                                               | Queue status                                  | Requirement before adding more coverage                                                                                  |
 | -------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Estimate, priority, notes, ordinary title                            | Supported for eligible single-task edits      | Support other inputs only after accounting for short syntax, recurrence, parent recalculation and provider side effects. |
-| Completion or reopen                                                 | Barrier                                       | Preserve concurrent scheduling and model reminders, tracking, recurrence, parent/child effects and ordering.             |
+| Completion or reopen                                                 | Supported for one ordinary local task         | Reminders, recurrence, integrations, bulk completion and drag into Done stay barriers until each effect has an inverse.  |
 | Completed-task reorder                                               | Supported for a single root task in a project | Multi-task moves and other list ordering need an atomic inverse.                                                         |
 | Scheduling, tags, project moves, tracking                            | Barrier                                       | Model the full intent, related entities and side effects; prove a safe inverse.                                          |
 | Single delete and restore                                            | Existing time-limited snackbar only           | Coordinate one-shot capture, trash, provider deletion grace, and queue ownership.                                        |

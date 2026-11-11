@@ -2970,6 +2970,8 @@
       "REDO_TITLE": "Redo title change",
       "UNDO_DONE_ORDER": "Undo completed task reorder",
       "REDO_DONE_ORDER": "Redo completed task reorder",
+      "UNDO_DONE": "Undo completion change",
+      "REDO_DONE": "Redo completion change",
       "FIXED_SHORTCUTS": "Navigation and selection",
       "FIXED_TASK_NAVIGATION": "Navigate focused tasks",
       "FIXED_TASK_EXPAND": "Collapse or expand a task",

@@ -444,4 +444,125 @@ describe('TaskUndoService', () => {
     expect(service.updateEstimate('c', 30, 31)).toBeFalse();
     expect(dispatch).not.toHaveBeenCalled();
   });
+
+  describe('completing and reopening one task', () => {
+    it('undoes and redoes a completion through ordinary persistent updates', () => {
+      expect(service.updateDone('a', false, true)).toBeTrue();
+      expect(tasks().a.isDone).toBeTrue();
+      expect(service.undoField()).toBe('isDone');
+
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.isDone).toBeFalse();
+      expect(service.redoField()).toBe('isDone');
+      expect(service.redo()).toBeTrue();
+      expect(tasks().a.isDone).toBeTrue();
+      expect(dispatch.calls.mostRecent().args[0]).toEqual(
+        TaskSharedActions.updateTask({
+          task: { id: 'a', changes: { isDone: true } },
+          isIgnoreShortSyntax: true,
+        }),
+      );
+    });
+
+    it('undoes reopening a completed task', () => {
+      tasks.update((current) => ({ ...current, a: { ...current.a, isDone: true } }));
+
+      expect(service.updateDone('a', true, false)).toBeTrue();
+      expect(service.undo()).toBeTrue();
+
+      expect(tasks().a.isDone).toBeTrue();
+    });
+
+    it('keeps completion in order with other task edits', () => {
+      expect(service.updateEstimate('a', 10, 11)).toBeTrue();
+      expect(service.updateDone('a', false, true)).toBeTrue();
+
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.isDone).toBeFalse();
+      expect(tasks().a.timeEstimate).toBe(11);
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.timeEstimate).toBe(10);
+    });
+
+    it('refuses a change the task does not show', () => {
+      expect(service.updateDone('a', true, false)).toBeFalse();
+      expect(service.updateDone('missing', false, true)).toBeFalse();
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    it('leaves tasks whose completion does more to the existing path', () => {
+      tasks.update((current) => ({
+        ...current,
+        a: { ...current.a, repeatCfgId: 'repeat' },
+        b: { ...current.b, remindAt: 1000 },
+        c: { ...task('c', 30), wontDoOn: 5 },
+        d: { ...task('d', 40), issueId: 'issue' },
+      }));
+
+      for (const id of ['a', 'b', 'c', 'd']) {
+        expect(service.updateDone(id, false, true))
+          .withContext(id)
+          .toBeFalse();
+      }
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    it('leaves a timed task to the existing path while a calendar block provider can write', () => {
+      tasks.update((current) => ({
+        ...current,
+        a: { ...current.a, dueWithTime: 5000 },
+      }));
+      issueProviders.set([
+        {
+          id: 'p',
+          issueProviderKey: 'plugin:calendar',
+          isEnabled: true,
+          pluginConfig: { isAutoTimeBlock: true },
+        } as unknown as IssueProvider,
+      ]);
+
+      expect(service.updateDone('a', false, true)).toBeFalse();
+    });
+
+    it('records a subtask of an ordinary parent', () => {
+      tasks.update((current) => ({
+        ...current,
+        a: { ...current.a, parentId: 'b' },
+      }));
+
+      expect(service.updateDone('a', false, true)).toBeTrue();
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a.isDone).toBeFalse();
+    });
+
+    it('does not record a completion that also dispatched another persistent action', () => {
+      dispatch.and.callFake((action: Action) => {
+        const update = action as ReturnType<typeof TaskSharedActions.updateTask>;
+        tasks.update((current) => ({
+          ...current,
+          a: { ...current.a, ...update.task.changes },
+        }));
+        actions.next(action);
+        // For example the parent that completes with its last subtask.
+        actions.next(
+          TaskSharedActions.updateTask({
+            task: { id: 'b', changes: { isDone: true } },
+          }),
+        );
+      });
+      service.updateEstimate('b', 20, 21);
+
+      expect(service.updateDone('a', false, true)).toBeTrue();
+
+      expect(service.canUndo()).toBeFalse();
+    });
+
+    it('refuses to undo after the done state changed elsewhere', () => {
+      expect(service.updateDone('a', false, true)).toBeTrue();
+      tasks.update((current) => ({ ...current, a: { ...current.a, isDone: false } }));
+
+      expect(service.undo()).toBeFalse();
+      expect(service.canUndo()).toBeFalse();
+    });
+  });
 });
