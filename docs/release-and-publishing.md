@@ -81,7 +81,7 @@ Pages project. After configuring hosting and its credentials, set the repository
 variable `ULTRA_TASKS_WEB_DEPLOY=true` to enable it. The domain is a planned
 website until DNS and hosting are connected.
 
-That preview is the **standalone web build** (`npm run buildFrontend:prodWebStandalone`,
+The preview is the **standalone web build** (`npm run buildFrontend:prodWebStandalone`,
 Angular configuration `productionWebStandalone`). It sets `environment.syncAvailable`
 to `false`, so the browser build is local-only: the sync header button, the
 Account page and its navigation entry, the `/account` and `/native-sync` routes,
@@ -91,8 +91,11 @@ Settings to move it. The service worker updates the app on the next visit after
 each deploy. Android, iOS and Electron keep the sync-enabled `productionWeb` and
 `production` builds. Browser account sync is a separate, later step; remove the
 flag from the standalone configuration when it is ready. The release workflow
-`build-update-web-app-on-release.yml` still builds the sync-enabled web bundle
-and is not part of this deployment.
+`build-update-web-app-on-release.yml` builds the same standalone bundle and
+attaches `ultra-tasks-web-<version>.tar.gz` and a checksum to the release; the
+account server operator installs it with `scripts/install-web.sh` (see the
+server repository's `deploy/README.md`). That is separate from the Pages
+preview. Pages is a preview host only (`ultra-tasks-preview.pages.dev`); the production web app belongs at the root of `https://app.ultratasks.app`, served by the account server's Caddy. Local data is stored per origin, so do not point users at the preview. See the [hosted web app and account origin plan](plans/2026-11-10-hosted-web-app-and-account-origin.md).
 
 ## Release boundaries
 
@@ -275,7 +278,7 @@ For a non-prerelease release, publishing the draft starts:
 | ----------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
 | Google Play | `.github/workflows/auto-publish-google-play-on-release.yml` | Promote `internal` to `production`                              |
 | Snap Store  | `.github/workflows/build-publish-to-snap-on-release.yml`    | Publish the release Snap to `edge` and `stable`                 |
-| Web app     | `.github/workflows/build-update-web-app-on-release.yml`     | Build and deploy production web assets                          |
+| Web app     | `.github/workflows/build-update-web-app-on-release.yml`     | Build the standalone web bundle and attach it to the release    |
 | Docker Hub  | `.github/workflows/publish-to-hub-docker.yml`               | Build and publish the application image                         |
 | SuperSync   | `.github/workflows/supersync-docker.yml` (`release-image`)  | Build and publish `ghcr.io/super-productivity/supersync:vX.Y.Z` |
 

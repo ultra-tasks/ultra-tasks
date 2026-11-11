@@ -143,6 +143,38 @@ const interceptVersionedRequests = (request, response) => {
     return;
   }
 
+  // Paths the account server (or its proxy) owns in production. The service
+  // worker must leave them to the network instead of answering with index.html.
+  if (request.method === 'GET' && pathname === '/account') {
+    sendBuffer(
+      request,
+      response,
+      'text/html; charset=utf-8',
+      Buffer.from(
+        '<!doctype html><title>Account</title><p>PWA_E2E_ACCOUNT_DASHBOARD</p>',
+      ),
+    );
+    return;
+  }
+  if (request.method === 'GET' && pathname.startsWith('/oauth/callback/')) {
+    sendBuffer(
+      request,
+      response,
+      'text/html; charset=utf-8',
+      Buffer.from('<!doctype html><title>OAuth</title><p>PWA_E2E_OAUTH_CALLBACK</p>'),
+    );
+    return;
+  }
+  if (request.method === 'GET' && pathname === '/api/v2/accounts/ping') {
+    sendBuffer(
+      request,
+      response,
+      'application/json; charset=utf-8',
+      Buffer.from(JSON.stringify({ owner: 'server' })),
+    );
+    return;
+  }
+
   response.emit('next');
 };
 
