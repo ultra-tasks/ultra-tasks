@@ -99,6 +99,39 @@ describe('completed task project ordering', () => {
     expect(sortDoneTasksByProjectOrder([older, moved])).toEqual([older, moved]);
   });
 
+  it('orders tasks from a client that does not know the field by completion time', () => {
+    // A released client never writes doneOrder, so the key is absent rather than null.
+    const older = { id: 'older', projectId: 'p', doneOn: 1000 } as Task;
+    const newer = { id: 'newer', projectId: 'p', doneOn: 2000 } as Task;
+
+    expect(hasManualDoneTaskOrder(older)).toBeFalse();
+    expect(sortDoneTasksByProjectOrder([older, newer])).toEqual([newer, older]);
+  });
+
+  it('treats a malformed order from another client as no manual order', () => {
+    const base = { id: 'one', projectId: 'p', doneOn: 1000 };
+    const malformed: unknown[] = [
+      'aV',
+      42,
+      [],
+      {},
+      { projectId: 'p', doneOn: 1000 },
+      { projectId: 'p', doneOn: 1000, key: 5 },
+      { projectId: 'p', doneOn: 1000, key: 'no-suffix-marker' },
+      { projectId: 'p', doneOn: 1000, key: '' },
+    ];
+
+    for (const doneOrder of malformed) {
+      const received = { ...base, doneOrder } as unknown as Task;
+      expect(hasManualDoneTaskOrder(received))
+        .withContext(JSON.stringify(doneOrder))
+        .toBeFalse();
+      expect(doneTaskOrderKey(received)).toBe(
+        doneTaskOrderKey({ ...base, doneOrder: null } as Task),
+      );
+    }
+  });
+
   it('can repeatedly insert before, after, and between keys', () => {
     const keys: string[] = [];
     let random = 9341;

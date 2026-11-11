@@ -82,8 +82,8 @@ especially its proposed architecture, for the recommended approach: atomic
 intent commands, version-aware compensating operations, field-level causal
 merge, deletion tombstones, deterministic placement and explicit provider
 compensation. Prove convergence and content preservation before extending the
-queue. The new `doneOrder` field and its old-client behavior also need real
-released-client/protocol compatibility verification.
+queue. The `doneOrder` field's released-client compatibility was verified on
+2026-11-11; see below.
 
 ## Stage 1 findings (2026-11-10): Add to Today against a field edit
 
@@ -157,6 +157,42 @@ history barrier, so the current undo queue is unaffected; the question returns
 if undo of a move is added.
 
 Stage 1 is otherwise done.
+
+## `doneOrder` compatibility (verified 2026-11-11)
+
+**Verdict: compatible; the only effect on a released client is that it ignores
+the manual order.** `git tag --contains 8ac83b6519` prints nothing: none of
+v0.1.0, v0.2.0 or v0.3.0 contains the field, so those are the clients to protect.
+
+- **Released client receiving the field.** A throwaway worktree of
+  `ultra-tasks-v0.3.0` (shared `node_modules`; `package-lock.json` is identical)
+  ran five `SyncFuzzHarness` specs, with one device writing `doneOrder` and one
+  device running v0.3.0 code: the update replays, the field is kept, the v0.3.0
+  typia validator accepts the state, and it survives a restart; a concurrent
+  title edit resolves with both kept in either upload order; a concurrent
+  reopen of the task converges in either upload order. No validation, stop,
+  dev-error or retry event was recorded. The spec was not kept in the tree
+  (it exercises v0.3.0 code); to repeat it, add a worktree of the tag and a
+  spec that dispatches `updateTask` with `changes: { doneOrder }`.
+- **New client receiving a released client's data.** A task without the key
+  orders by completion time (`done-task-order.spec.ts`, new case). A released
+  client that completes the task again changes `doneOn`, and the stored order
+  is then ignored because its `doneOn` no longer matches (existing case). A
+  malformed value from any client is treated as no manual order and never throws
+  (new case, eight shapes).
+- **Whole-task snapshots.** A released client's opaque ops (for example Add to
+  Today, which does not declare its fields) resolve by whole-task LWW and its
+  snapshot has no `doneOrder`, so receivers clear it and the order falls back to
+  completion time. `OPTIONAL_TASK_FIELDS_AFTER_V19_2` already lists the field so
+  such snapshots are accepted. This is the same pre-existing opaque-op gap that
+  applies to every field, not a new class of loss.
+- **Model rules.** The field is optional (`?`, nullable), no schema version is
+  bumped, and `frozen-state.spec.ts` passes. Android reads named fields from the
+  op JSON, so an extra key is ignored; the Android fixture lists the key and is
+  pinned by a TypeScript spec, but I did not run the Gradle tests here.
+- **Not verified.** The SuperSync server is not in this repository, so any
+  server-side payload validation of task fields is unchecked. This repo's shared
+  schema package has migrations only and never mentions the field.
 
 ## Validation completed
 
