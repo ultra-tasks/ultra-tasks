@@ -25,7 +25,10 @@ test('dedicated settings categories reveal themes, shortcuts, sound and date exa
   await page.goto('/#/config');
   const dialog = page.getByRole('dialog', { name: 'Settings', exact: true });
   const nav = dialog.locator('.settings-categories');
-  await expect(nav.locator('button mat-icon')).toHaveCount(7);
+  // Seven categories. The rows after them (Plugins & integrations, and Account on
+  // a phone) open windows of their own and are not categories.
+  await expect(nav.locator('button:not(.window-link) mat-icon')).toHaveCount(7);
+  await expect(nav.locator('button.window-link')).toHaveCount(1);
   await expect(dialog.locator('.date-examples')).toContainText('Task date labels');
   await dialog.locator('.date-examples').scrollIntoViewIfNeeded();
   await page.screenshot({ path: '.tmp/settings-dates-refinement.png' });
