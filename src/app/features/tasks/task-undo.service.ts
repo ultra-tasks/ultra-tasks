@@ -1,4 +1,11 @@
-import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
+import {
+  computed,
+  DestroyRef,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Store } from '@ngrx/store';
 import { ALL_ACTIONS } from '../../util/local-actions.token';
@@ -7,7 +14,14 @@ import { bulkApplyOperations } from '../../op-log/apply/bulk-hydration.action';
 import { loadAllData } from '../../root-store/meta/load-all-data.action';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
 import { selectTaskEntities } from './store/task.selectors';
-import { Task } from './task.model';
+import { Task, TaskWithSubTasks } from './task.model';
+import { TaskService } from './task.service';
+import { selectAllSections } from '../section/store/section.selectors';
+import {
+  peekLastDeletePayload,
+  RestoreDeletedTaskPayload,
+} from '../../root-store/meta/undo-task-delete.meta-reducer';
+import { isDeleteUndoable, toRestorePayload } from './task-delete-undo';
 import { isPluginIssueProvider } from '../issue/issue.model';
 import { selectEnabledIssueProviders } from '../issue/store/issue-provider.selectors';
 import { allowsIntegrationWrites } from '../integrations/integration.model';
@@ -45,7 +59,15 @@ interface TaskDoneOrderChange {
   after: DoneOrder | null;
 }
 
-type UndoEntry = TaskFieldChange | TaskDoneOrderChange;
+/** Deleting one ordinary root task; undo restores it from the captured payload. */
+interface TaskDeleteChange {
+  id: string;
+  field: 'delete';
+  payload: RestoreDeletedTaskPayload;
+}
+
+type ValueEntry = TaskFieldChange | TaskDoneOrderChange;
+type UndoEntry = ValueEntry | TaskDeleteChange;
 type EntryValue = UndoValue | DoneOrder;
 interface PendingTitle {
   action: ReturnType<typeof TaskSharedActions.updateTask>;
@@ -63,16 +85,21 @@ export class TaskUndoService {
   // entries are created only by the explicit user-intent methods below.
   private readonly _actions = inject(ALL_ACTIONS);
   private readonly _destroyRef = inject(DestroyRef);
+  private readonly _injector = inject(Injector);
   private readonly _date = inject(DateService);
   private readonly _externalSyncSuppression = inject(LocalExternalSyncSuppressionService);
   private readonly _tasks = this._store.selectSignal(selectTaskEntities);
   private readonly _issueProviders = this._store.selectSignal(
     selectEnabledIssueProviders,
   );
+  private readonly _sections = this._store.selectSignal(selectAllSections);
   private readonly _undo = signal<UndoEntry[]>([]);
   private readonly _redo = signal<UndoEntry[]>([]);
   private readonly _pendingTitle = signal<PendingTitle | null>(null);
   private readonly _ownActions = new WeakSet<object>();
+  // Ids of the tasks this service is deleting right now (the delete action is
+  // created by TaskService, so it cannot be marked in advance).
+  private readonly _ownDeletes = new Set<string>();
   private _pendingTitleTimeout?: number;
   private _generation = 0;
 
@@ -86,6 +113,11 @@ export class TaskUndoService {
     this._actions.pipe(takeUntilDestroyed(this._destroyRef)).subscribe((action) => {
       if (this._ownActions.has(action)) {
         this._ownActions.delete(action);
+      } else if (
+        action.type === TaskSharedActions.deleteTask.type &&
+        this._ownDeletes.has((action as unknown as { task: { id: string } }).task.id)
+      ) {
+        // Recorded by removeTask below.
       } else if (
         isPersistentAction(action) ||
         action.type === bulkApplyOperations.type ||
@@ -152,6 +184,35 @@ export class TaskUndoService {
       startOfNextDayDiffMs,
       isShowSnack,
     });
+  }
+
+  /**
+   * Deletes one ordinary root task through `remove` (the existing path) and records
+   * it, so undo restores it exactly as the snackbar's Undo would and redo deletes
+   * it again. False means the task has side effects a restore cannot return and
+   * the caller must delete it without history.
+   */
+  removeTask(task: TaskWithSubTasks, remove: () => void): boolean {
+    if (this._pendingTitle()) this.clear();
+    if (!this._isUndoableDelete(task.id)) return false;
+    const generation = this._generation;
+    this._ownDeletes.add(task.id);
+    try {
+      remove();
+    } finally {
+      this._ownDeletes.delete(task.id);
+    }
+    const payload = peekLastDeletePayload();
+    if (
+      this._generation === generation &&
+      payload?.task.id === task.id &&
+      this._isDeleted(task.id, payload.deletedTaskEntities)
+    ) {
+      this._push({ id: task.id, field: 'delete', payload: toRestorePayload(payload) });
+    } else {
+      this.clear();
+    }
+    return true;
   }
 
   /** Records the manual order of one completed project task. */
@@ -222,7 +283,7 @@ export class TaskUndoService {
     this._push(pending.entry);
   }
 
-  private _record(entry: UndoEntry): boolean {
+  private _record(entry: ValueEntry): boolean {
     if (this._pendingTitle()) this.clear();
     entry = {
       ...entry,
@@ -248,6 +309,7 @@ export class TaskUndoService {
     if (this._pendingTitle()) return false;
     const entry = this._undo().at(-1);
     if (!entry) return false;
+    if (entry.field === 'delete') return this._undoDelete(entry);
     if (!this._matches(entry, entry.after)) {
       this.clear();
       return false;
@@ -267,6 +329,7 @@ export class TaskUndoService {
     if (this._pendingTitle()) return false;
     const entry = this._redo().at(-1);
     if (!entry) return false;
+    if (entry.field === 'delete') return this._redoDelete(entry);
     if (!this._matches(entry, entry.before)) {
       this.clear();
       return false;
@@ -305,7 +368,66 @@ export class TaskUndoService {
     this._redo.set([]);
   }
 
-  private _matches(entry: UndoEntry, expected: EntryValue): boolean {
+  private _isUndoableDelete(id: string): boolean {
+    const sectionTaskIds = new Set(
+      this._sections().flatMap((section) => section.taskIds),
+    );
+    return isDeleteUndoable(this._tasks()[id], this._tasks(), sectionTaskIds);
+  }
+
+  private _isDeleted(id: string, family: Record<string, unknown>): boolean {
+    const tasks = this._tasks();
+    return Object.keys({ ...family, [id]: true }).every((taskId) => !tasks[taskId]);
+  }
+
+  private _undoDelete(entry: TaskDeleteChange): boolean {
+    if (!this._isDeleted(entry.id, entry.payload.deletedTaskEntities)) {
+      this.clear();
+      return false;
+    }
+    const generation = this._generation;
+    const action = TaskSharedActions.restoreDeletedTask(entry.payload);
+    this._ownActions.add(action);
+    this._store.dispatch(action);
+    if (this._generation !== generation || !this._isUndoableDelete(entry.id)) {
+      this.clear();
+      return false;
+    }
+    this._undo.update((items) => items.slice(0, -1));
+    this._redo.update((items) => [...items, entry]);
+    return true;
+  }
+
+  private _redoDelete(entry: TaskDeleteChange): boolean {
+    const task = this._tasks()[entry.id];
+    if (!task || !this._isUndoableDelete(entry.id)) {
+      this.clear();
+      return false;
+    }
+    const generation = this._generation;
+    const withSubTasks: TaskWithSubTasks = {
+      ...task,
+      subTasks: task.subTaskIds.map((id) => this._tasks()[id] as Task),
+    };
+    this._ownDeletes.add(entry.id);
+    try {
+      this._injector.get(TaskService).remove(withSubTasks);
+    } finally {
+      this._ownDeletes.delete(entry.id);
+    }
+    if (
+      this._generation !== generation ||
+      !this._isDeleted(entry.id, entry.payload.deletedTaskEntities)
+    ) {
+      this.clear();
+      return false;
+    }
+    this._redo.update((items) => items.slice(0, -1));
+    this._undo.update((items) => [...items, entry]);
+    return true;
+  }
+
+  private _matches(entry: ValueEntry, expected: EntryValue): boolean {
     const task = this._tasks()[entry.id];
     const isLocalOnlyField = entry.field === 'priority' || entry.field === 'doneOrder';
     // Planning for Today is only reversible for a task that had no schedule at all:
@@ -415,7 +537,7 @@ export class TaskUndoService {
     }
   }
 
-  private _dispatch(entry: UndoEntry, value: EntryValue): void {
+  private _dispatch(entry: ValueEntry, value: EntryValue): void {
     const task = this._tasks()[entry.id];
     // Planning is the original Today action (it also orders the Today list and
     // declares the fields it writes); only taking the task off Today is an update.

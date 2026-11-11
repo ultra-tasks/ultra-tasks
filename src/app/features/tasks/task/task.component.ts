@@ -842,7 +842,9 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
     }
 
     this._isTaskDeleteTriggered = true;
-    this._taskService.remove(this.task());
+    const task = this.task();
+    const remove = (): void => this._taskService.remove(task);
+    if (!this._taskUndoService.removeTask(task, remove)) remove();
   }
 
   startTask(): void {

@@ -23,7 +23,11 @@ import { Action } from '@ngrx/store';
 import { LayoutService } from '../../../core-ui/layout/layout.service';
 import { DateService } from '../../../core/date/date.service';
 import { HydrationStateService } from '../../../op-log/apply/hydration-state.service';
-import { selectUnplannedDeadlineTasksForToday } from './task.selectors';
+import {
+  selectTaskEntities,
+  selectUnplannedDeadlineTasksForToday,
+} from './task.selectors';
+import { undoTaskDeleteMetaReducer } from '../../../root-store/meta/undo-task-delete.meta-reducer';
 import { Banner } from '../../../core/banner/banner.model';
 import { TaskMultiSelectService } from '../task-multi-select.service';
 
@@ -393,6 +397,50 @@ describe('TaskUiEffects', () => {
 
       expect(snackServiceMock.open).toHaveBeenCalled();
       sub.unsubscribe();
+    });
+
+    describe('the snack Undo', () => {
+      const deletedTask = (): TaskWithSubTasks =>
+        createMockTaskWithSubTasks({ id: 'snack-task', title: 'Real task' });
+      const openSnackFor = (task: TaskWithSubTasks): SnackParams => {
+        // The store's meta-reducer captures the payload the snack restores from.
+        undoTaskDeleteMetaReducer((state) => state)(
+          {
+            tasks: { entities: { [task.id]: task } },
+            projects: { entities: {} },
+            tag: { entities: {} },
+          } as never,
+          TaskSharedActions.deleteTask({ task }),
+        );
+        const sub = effects.snackDelete$.subscribe();
+        actions$.next(TaskSharedActions.deleteTask({ task }));
+        sub.unsubscribe();
+        return snackServiceMock.open.calls.mostRecent().args[0] as SnackParams;
+      };
+
+      it('restores a task that is still deleted', () => {
+        const store = TestBed.inject(MockStore);
+        store.overrideSelector(selectTaskEntities, {});
+        const dispatchSpy = spyOn(store, 'dispatch');
+
+        openSnackFor(deletedTask()).actionFn?.();
+
+        expect(dispatchSpy).toHaveBeenCalledTimes(1);
+        expect(
+          ((dispatchSpy.calls.mostRecent().args as unknown[])[0] as Action).type,
+        ).toBe(TaskSharedActions.restoreDeletedTask.type);
+      });
+
+      it('does nothing when the task is already back, for example from the task history', () => {
+        const task = deletedTask();
+        const store = TestBed.inject(MockStore);
+        store.overrideSelector(selectTaskEntities, { [task.id]: task });
+        const dispatchSpy = spyOn(store, 'dispatch');
+
+        openSnackFor(task).actionFn?.();
+
+        expect(dispatchSpy).not.toHaveBeenCalled();
+      });
     });
 
     const deletedSnackMsg = (task: TaskWithSubTasks): string => {

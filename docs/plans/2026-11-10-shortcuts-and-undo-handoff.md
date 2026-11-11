@@ -253,6 +253,35 @@ and an Add to Today that does not declare its fields (subtask, bulk, reminder
 dialog). Position within the Today list after redo follows the plan (top), as the
 original did.
 
+## Stage 3c: delete and restore in the undo queue (2026-11-11)
+
+`TaskUndoService.removeTask(task, remove)` runs the existing delete (`TaskService.remove`)
+for the task row (click or keyboard) and the context menu, records it, and returns
+false when the task must keep the plain path. Undo dispatches `restoreDeletedTask`
+from the payload `undoTaskDeleteMetaReducer` captured (read with
+`peekLastDeletePayload`, so the snackbar keeps working); redo deletes again through
+`TaskService.remove`, resolved lazily. The snackbar's Undo now checks that the task
+is still gone. The history ignores its own delete action (`_ownDeletes`) so that
+only other persistent actions clear it.
+
+Eligible (`task-delete-undo.ts`): a root task whose family (task and subtasks) has no
+section, issue or integration link, repeat configuration, reminder or time. A round
+trip probe shows everything else restores exactly, and shows two limits: a section
+membership is not returned, and a restore stores a stray `subTasks` array on the
+entities (the queue's payload strips it).
+
+Evidence: `undo-delete-roundtrip` (8 cases) compares state before delete and after
+restore for a plain task between others, Today, a later planner day, a tag, the
+backlog, subtasks, and a subtask, plus the section limit; `undo-delete-queue-sync`
+(14 cases) covers a concurrent newer and older title edit, completion, and a
+three-client control in both upload orders, with and without redo, and after a
+restart; 9 unit cases in `task-undo.service.spec.ts`, 2 for the snackbar guard;
+`undo-delete.spec.ts` (browser) deletes through the confirm dialog, then Ctrl+Z,
+Ctrl+Y, Ctrl+Z.
+
+Still the existing path: bulk delete, the planner, schedule and reminder dialog
+rows, subtask delete, and any task with a section, link, repeat, reminder or time.
+
 ## Validation completed
 
 - The previous combined Karma run passed 323 tests for the queue, supported

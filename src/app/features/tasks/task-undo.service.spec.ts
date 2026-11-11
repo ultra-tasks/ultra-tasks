@@ -6,7 +6,12 @@ import { ALL_ACTIONS } from '../../util/local-actions.token';
 import { bulkApplyOperations } from '../../op-log/apply/bulk-hydration.action';
 import { loadAllData } from '../../root-store/meta/load-all-data.action';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
-import { DEFAULT_TASK, Task } from './task.model';
+import { DEFAULT_TASK, Task, TaskWithSubTasks } from './task.model';
+import { TaskService } from './task.service';
+import { selectAllSections } from '../section/store/section.selectors';
+import { Section } from '../section/section.model';
+import { WorkContextType } from '../work-context/work-context.model';
+import { undoTaskDeleteMetaReducer } from '../../root-store/meta/undo-task-delete.meta-reducer';
 import { TaskUndoService } from './task-undo.service';
 import { selectTaskEntities } from './store/task.selectors';
 import { IssueProvider } from '../issue/issue.model';
@@ -21,6 +26,8 @@ describe('TaskUndoService', () => {
   let dispatch: jasmine.Spy;
   let issueProviders: ReturnType<typeof signal<IssueProvider[]>>;
   let todayStr: string;
+  let sections: ReturnType<typeof signal<Section[]>>;
+  let remove: jasmine.Spy;
 
   const task = (id: string, timeEstimate: number): Task => ({
     ...DEFAULT_TASK,
@@ -33,6 +40,7 @@ describe('TaskUndoService', () => {
     todayStr = '2026-11-10';
     tasks = signal({ a: task('a', 10), b: task('b', 20) });
     issueProviders = signal<IssueProvider[]>([]);
+    sections = signal<Section[]>([]);
     dispatch = jasmine.createSpy('dispatch').and.callFake((action: Action) => {
       if (action.type === TaskSharedActions.updateTask.type) {
         const update = action as ReturnType<typeof TaskSharedActions.updateTask>;
@@ -52,11 +60,41 @@ describe('TaskUndoService', () => {
           [plan.taskIds[0]]: { ...current[plan.taskIds[0]], dueDay: plan.today },
         }));
       }
+      if (action.type === TaskSharedActions.deleteTask.type) {
+        const deleted = action as ReturnType<typeof TaskSharedActions.deleteTask>;
+        // The real capture, as the store's meta-reducer chain runs it.
+        undoTaskDeleteMetaReducer((state) => state)(
+          {
+            tasks: { entities: tasks() },
+            projects: { entities: {} },
+            tag: { entities: {} },
+          } as never,
+          action,
+        );
+        tasks.update((current) => {
+          const next = { ...current };
+          [deleted.task.id, ...deleted.task.subTaskIds].forEach((id) => delete next[id]);
+          return next;
+        });
+      }
+      if (action.type === TaskSharedActions.restoreDeletedTask.type) {
+        const restore = action as ReturnType<typeof TaskSharedActions.restoreDeletedTask>;
+        tasks.update((current) => ({
+          ...current,
+          ...(restore.deletedTaskEntities as Record<string, Task>),
+        }));
+      }
       actions.next(action);
     });
+    remove = jasmine
+      .createSpy('remove')
+      .and.callFake((deleted: TaskWithSubTasks) =>
+        dispatch(TaskSharedActions.deleteTask({ task: deleted })),
+      );
     TestBed.configureTestingModule({
       providers: [
         TaskUndoService,
+        { provide: TaskService, useValue: { remove } },
         { provide: DateService, useValue: { todayStr: () => todayStr } },
         {
           provide: Store,
@@ -64,6 +102,7 @@ describe('TaskUndoService', () => {
             selectSignal: (selector: unknown) => {
               if (selector === selectTaskEntities) return tasks;
               if (selector === selectEnabledIssueProviders) return issueProviders;
+              if (selector === selectAllSections) return sections;
               throw new Error('Unexpected selector');
             },
             dispatch,
@@ -682,6 +721,153 @@ describe('TaskUndoService', () => {
 
       expect(service.undo()).toBeFalse();
       expect(service.canUndo()).toBeFalse();
+    });
+  });
+  describe('deleting one task', () => {
+    const withSubTasks = (id = 'a'): TaskWithSubTasks => ({
+      ...tasks()[id],
+      subTasks: tasks()[id].subTaskIds.map((subId) => tasks()[subId]),
+    });
+    const del = (id = 'a'): boolean => {
+      const target = withSubTasks(id);
+      return service.removeTask(target, () => remove(target));
+    };
+
+    it('deletes through the existing path, then restores and deletes again', () => {
+      expect(del()).toBeTrue();
+      expect(remove).toHaveBeenCalledTimes(1);
+      expect(tasks().a).toBeUndefined();
+      expect(service.undoField()).toBe('delete');
+
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a).toBeDefined();
+      const restore = dispatch.calls.mostRecent().args[0] as ReturnType<
+        typeof TaskSharedActions.restoreDeletedTask
+      >;
+      expect(restore.type).toBe(TaskSharedActions.restoreDeletedTask.type);
+      expect(restore.task.id).toBe('a');
+      expect('subTasks' in (restore.deletedTaskEntities['a'] as object)).toBeFalse();
+      expect(service.redoField()).toBe('delete');
+
+      expect(service.redo()).toBeTrue();
+      expect(tasks().a).toBeUndefined();
+      expect(remove).toHaveBeenCalledTimes(2);
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a).toBeDefined();
+    });
+
+    it('restores a task together with its subtasks', () => {
+      tasks.update((current) => ({
+        ...current,
+        a: { ...current.a, subTaskIds: ['s1', 's2'] },
+        s1: { ...task('s1', 1), parentId: 'a' },
+        s2: { ...task('s2', 2), parentId: 'a' },
+      }));
+
+      expect(del()).toBeTrue();
+      expect(Object.keys(tasks())).toEqual(['b']);
+      expect(service.undo()).toBeTrue();
+      expect(Object.keys(tasks()).sort()).toEqual(['a', 'b', 's1', 's2']);
+      expect(service.redo()).toBeTrue();
+      expect(Object.keys(tasks())).toEqual(['b']);
+    });
+
+    it('keeps its place among other edits', () => {
+      expect(service.updateEstimate('b', 20, 21)).toBeTrue();
+      expect(del()).toBeTrue();
+
+      expect(service.undo()).toBeTrue();
+      expect(tasks().a).toBeDefined();
+      expect(tasks().b.timeEstimate).toBe(21);
+      expect(service.undo()).toBeTrue();
+      expect(tasks().b.timeEstimate).toBe(20);
+      expect(service.redo()).toBeTrue();
+      expect(service.redo()).toBeTrue();
+      expect(tasks().a).toBeUndefined();
+    });
+
+    it('leaves a linked, repeating, reminded, timed, sectioned or child task to the existing path', () => {
+      tasks.update((current) => ({
+        ...current,
+        linked: { ...task('linked', 1), issueId: 'issue', issueType: 'GITHUB' },
+        repeating: { ...task('repeating', 1), repeatCfgId: 'repeat' },
+        reminded: { ...task('reminded', 1), remindAt: 1000 },
+        timed: { ...task('timed', 1), dueWithTime: 5000 },
+        sectioned: task('sectioned', 1),
+        child: { ...task('child', 1), parentId: 'a' },
+        parent: { ...task('parent', 1), subTaskIds: ['linkedChild'] },
+        linkedChild: { ...task('linkedChild', 1), parentId: 'parent', issueId: 'issue' },
+      }));
+      sections.set([
+        {
+          id: 's',
+          contextId: 'project',
+          contextType: WorkContextType.PROJECT,
+          title: 's',
+          taskIds: ['sectioned'],
+        },
+      ]);
+
+      for (const id of [
+        'linked',
+        'repeating',
+        'reminded',
+        'timed',
+        'sectioned',
+        'child',
+        'parent',
+      ]) {
+        expect(del(id)).withContext(id).toBeFalse();
+      }
+      expect(remove).not.toHaveBeenCalled();
+      expect(service.canUndo()).toBeFalse();
+    });
+
+    it('is cleared by another persistent change', () => {
+      expect(del()).toBeTrue();
+      expect(service.canUndo()).toBeTrue();
+
+      actions.next(
+        TaskSharedActions.updateTask({ task: { id: 'b', changes: { title: 'x' } } }),
+      );
+      expect(service.canUndo()).toBeFalse();
+    });
+
+    it('is cleared by a remote delete', () => {
+      expect(del()).toBeTrue();
+      const remoteDelete = TaskSharedActions.deleteTask({ task: withSubTasks('b') });
+      actions.next({
+        ...remoteDelete,
+        meta: { ...remoteDelete.meta, isRemote: true },
+      } as Action);
+
+      expect(service.canUndo()).toBeFalse();
+    });
+
+    it('refuses to undo when the task is already back, for example from the snackbar', () => {
+      expect(del()).toBeTrue();
+      tasks.update((current) => ({ ...current, a: task('a', 10) }));
+
+      expect(service.undo()).toBeFalse();
+      expect(service.canUndo()).toBeFalse();
+    });
+
+    it('refuses to redo when the task no longer qualifies', () => {
+      expect(del()).toBeTrue();
+      expect(service.undo()).toBeTrue();
+      tasks.update((current) => ({ ...current, a: { ...current.a, remindAt: 1000 } }));
+
+      expect(service.redo()).toBeFalse();
+      expect(remove).toHaveBeenCalledTimes(1);
+      expect(service.canRedo()).toBeFalse();
+    });
+
+    it('clears redo when another task is deleted after an undo', () => {
+      expect(del()).toBeTrue();
+      expect(service.undo()).toBeTrue();
+      expect(del('b')).toBeTrue();
+
+      expect(service.canRedo()).toBeFalse();
     });
   });
 });

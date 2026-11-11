@@ -52,6 +52,13 @@ export const getLastDeletePayload = (): RestoreDeletedTaskPayload | null => {
 };
 
 /**
+ * Reads the last captured delete payload without clearing it, so the undo
+ * snackbar can still use it. The caller must check the payload's task id.
+ */
+export const peekLastDeletePayload = (): RestoreDeletedTaskPayload | null =>
+  lastDeletePayload;
+
+/**
  * Meta-reducer that captures task state before deletion.
  * This runs before the main reducer, allowing us to capture project/tag context
  * that would be lost after the delete reducer runs.

@@ -663,7 +663,8 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
     if (!taskWithSubTasks) {
       return;
     }
-    this._taskService.remove(taskWithSubTasks);
+    const remove = (): void => this._taskService.remove(taskWithSubTasks);
+    if (!this._taskUndoService.removeTask(taskWithSubTasks, remove)) remove();
   }
 
   startTask(): void {

@@ -2974,6 +2974,8 @@
       "REDO_DONE": "Redo completion change",
       "UNDO_SCHEDULE": "Undo adding to Today",
       "REDO_SCHEDULE": "Redo adding to Today",
+      "UNDO_DELETE": "Undo deleting task",
+      "REDO_DELETE": "Redo deleting task",
       "FIXED_SHORTCUTS": "Navigation and selection",
       "FIXED_TASK_NAVIGATION": "Navigate focused tasks",
       "FIXED_TASK_EXPAND": "Collapse or expand a task",

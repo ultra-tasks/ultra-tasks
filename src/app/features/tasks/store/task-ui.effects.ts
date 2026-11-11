@@ -144,9 +144,15 @@ export class TaskUiEffects {
             actionStr: T.G.UNDO,
             actionFn: () => {
               const payload = getLastDeletePayload();
-              if (payload) {
-                this._store$.dispatch(TaskSharedActions.restoreDeletedTask(payload));
-              }
+              if (!payload) return;
+              // Undo in the task history may have restored it already.
+              this._store$
+                .pipe(select(selectTaskEntities), first())
+                .subscribe((entities) => {
+                  if (!entities[payload.task.id]) {
+                    this._store$.dispatch(TaskSharedActions.restoreDeletedTask(payload));
+                  }
+                });
             },
           });
         }),
