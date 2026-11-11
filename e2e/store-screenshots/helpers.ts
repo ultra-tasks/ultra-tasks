@@ -23,10 +23,11 @@ export const openNotesPanel = async (page: Page): Promise<void> => {
 
 /** Open the dedicated integration workspace. */
 export const openIssueProviderPanel = async (page: Page): Promise<void> => {
-  await page
-    .locator('magic-side-nav')
-    .getByRole('menuitem', { name: 'Integrations', exact: true })
-    .click();
+  // The sidebar row appears only once something is connected, and the
+  // screenshot profile has no connection yet: open the workspace by its route.
+  await page.evaluate(() => {
+    window.location.hash = '#/integrations';
+  });
   await page
     .locator('integrations-page')
     .getByRole('button', { name: 'Connect account', exact: true })

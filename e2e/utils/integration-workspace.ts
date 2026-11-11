@@ -1,11 +1,14 @@
 import { expect, Page } from '@playwright/test';
 
-/** Navigate without reloading, preserving sync-test barriers installed in the page. */
+/**
+ * Navigate without reloading, preserving sync-test barriers installed in the page.
+ * The sidebar row exists only once something is connected, so a fresh profile
+ * cannot use it; the workspace is opened by its route, which works either way.
+ */
 export const openIntegrations = async (page: Page): Promise<void> => {
-  await page
-    .locator('magic-side-nav')
-    .getByRole('menuitem', { name: 'Integrations', exact: true })
-    .click();
+  await page.evaluate(() => {
+    window.location.hash = '#/integrations';
+  });
   await expect(page.locator('integrations-page')).toBeVisible();
 };
 

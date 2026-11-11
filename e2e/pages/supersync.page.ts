@@ -1414,7 +1414,9 @@ export class SuperSyncPage extends BasePage {
    */
   /** Opens the sync settings dialog with the saved SuperSync config loaded. */
   async openSuperSyncSettings(): Promise<Locator> {
-    await this.clickSyncBtn({ button: 'right', noWaitAfter: true });
+    // The saved connection is usually disabled, and the header button is absent
+    // then, so open the dialog from the command bar.
+    await openSyncSetup(this.page);
     await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
     await this.selectSuperSyncProviderWithRetry();
     return this.page.locator('dialog-sync-cfg');
