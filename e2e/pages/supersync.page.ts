@@ -10,6 +10,7 @@ import { BasePage } from './base.page';
 import { normalizeDialogMessage, translationRegex } from '../utils/i18n-strings';
 import { confirmSyncConflictOverwriteIfShown } from '../utils/sync-helpers';
 import { cssSelectors } from '../constants/selectors';
+import { openSyncSetup } from '../utils/open-sync-setup';
 import {
   disconnectBeforeProviderSwitch,
   restoreSavedSuperSyncConnection,
@@ -427,10 +428,10 @@ export class SuperSyncPage extends BasePage {
       .waitForURL(/#\/(tag|project)\/.+\/tasks/, { timeout: 10000 })
       .catch(() => {});
 
-    // Open sync settings via right-click (context menu)
-    // This allows configuring sync even when already set up
-    // Use noWaitAfter to prevent blocking on Angular hash navigation
-    await this.clickSyncBtn({ button: 'right', noWaitAfter: true });
+    // Open sync settings from the command bar. The header button exists only
+    // once sync is set up, and this runs on a fresh profile as well as a
+    // configured one; the dialog is the same either way.
+    await openSyncSetup(this.page);
 
     // Wait for the provider select (indicates dialog is open)
     await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
@@ -445,7 +446,8 @@ export class SuperSyncPage extends BasePage {
       // The closing dialog can still look visible when the next right-click
       // occurs, causing the subsequent readiness check to match the old one.
       await expect(dialog).toBeHidden();
-      await this.clickSyncBtn({ button: 'right', noWaitAfter: true });
+      // The restored connection is disabled, so the header button is gone.
+      await openSyncSetup(this.page);
       await this.providerSelect.waitFor({ state: 'visible', timeout: 10000 });
     }
 

@@ -21,6 +21,7 @@ import { LayoutService } from '../layout/layout.service';
 import { TaskService } from '../../features/tasks/task.service';
 import { WorkContextService } from '../../features/work-context/work-context.service';
 import { SimpleCounterService } from '../../features/simple-counter/simple-counter.service';
+import { SyncProviderId } from '../../op-log/sync-providers/provider.const';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { SnackService } from '../../core/snack/snack.service';
 import { Router } from '@angular/router';
@@ -416,6 +417,7 @@ describe('MainHeaderComponent action placement', () => {
   let isShowNotes = signal(false);
   let syncWrapperState = {
     isEnabledAndReady: false,
+    syncCfg: { isEnabled: false, syncProvider: null as string | null },
     syncState: 'IN_SYNC',
     isSyncInProgress: false,
     hasNoPendingOps: true,
@@ -484,6 +486,7 @@ describe('MainHeaderComponent action placement', () => {
           useValue: {
             sync: jasmine.createSpy('sync'),
             isEnabledAndReady$: of(syncWrapperState.isEnabledAndReady),
+            syncCfg$: of(syncWrapperState.syncCfg),
             syncState$: of(syncWrapperState.syncState),
             isSyncInProgress$: of(syncWrapperState.isSyncInProgress),
             hasNoPendingOps$: of(syncWrapperState.hasNoPendingOps),
@@ -561,6 +564,7 @@ describe('MainHeaderComponent action placement', () => {
     isShowNotes = signal(false);
     syncWrapperState = {
       isEnabledAndReady: false,
+      syncCfg: { isEnabled: false, syncProvider: null },
       syncState: 'IN_SYNC',
       isSyncInProgress: false,
       hasNoPendingOps: true,
@@ -905,6 +909,7 @@ describe('MainHeaderComponent action placement', () => {
       syncWrapperState = {
         ...syncWrapperState,
         isEnabledAndReady: true,
+        syncCfg: { isEnabled: true, syncProvider: SyncProviderId.WebDAV },
         ...patch,
       };
     };
@@ -987,10 +992,68 @@ describe('MainHeaderComponent action placement', () => {
       expect(host.querySelector('button.sync-btn')).toBeTruthy();
     });
 
-    it('keeps the sync icon on a desktop before sync is set up', async () => {
+    it('hides the sync icon on a desktop until sync is set up', async () => {
+      const host = await mountAtWidth(1200);
+
+      expect(host.querySelector('button.sync-btn')).toBeFalsy();
+    });
+
+    // A token that needs re-authorising is "chosen but not ready": the icon is
+    // the way to fix it, so it must not depend on readiness.
+    const chosenButNotReady = (): void => {
+      syncWrapperState = {
+        ...syncWrapperState,
+        isEnabledAndReady: false,
+        syncCfg: { isEnabled: true, syncProvider: SyncProviderId.Dropbox },
+      };
+    };
+
+    it('keeps the sync icon on a desktop when a provider is chosen but not ready', async () => {
+      chosenButNotReady();
+
       const host = await mountAtWidth(1200);
 
       expect(host.querySelector('button.sync-btn')).toBeTruthy();
+    });
+
+    it('keeps the sync icon on a phone when a provider is chosen but not ready', async () => {
+      chosenButNotReady();
+      isXs = signal(true);
+
+      const host = await mountAtWidth(404);
+
+      expect(host.querySelector('button.sync-btn')).toBeTruthy();
+    });
+
+    it('hides the sync icon when sync is switched off, even if a provider is remembered', async () => {
+      syncWrapperState = {
+        ...syncWrapperState,
+        syncCfg: { isEnabled: false, syncProvider: SyncProviderId.WebDAV },
+      };
+
+      const host = await mountAtWidth(1200);
+
+      expect(host.querySelector('button.sync-btn')).toBeFalsy();
+    });
+
+    it('shows the sync icon on a desktop once sync is set up', async () => {
+      readySync();
+
+      const host = await mountAtWidth(1200);
+
+      expect(host.querySelector('button.sync-btn')).toBeTruthy();
+    });
+
+    it('hides the sync icon when the app feature is switched off, even with sync set up', async () => {
+      readySync();
+      appFeatures = signal({
+        ...DEFAULT_GLOBAL_CONFIG.appFeatures,
+        isSyncIconEnabled: false,
+      });
+
+      const host = await mountAtWidth(1200);
+
+      expect(host.querySelector('button.sync-btn')).toBeFalsy();
     });
 
     it('shows the plain sync ring while local changes wait for upload', () => {

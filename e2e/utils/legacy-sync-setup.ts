@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { openSyncSetup } from './open-sync-setup';
 
 /**
  * Restore a saved, disabled legacy connection through the existing persistent
@@ -105,6 +106,7 @@ export const disconnectBeforeProviderSwitch = async (
   await expect(enabled).not.toBeChecked();
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await page.locator('button.sync-btn').first().click({ button: 'right' });
+  // Sync is now off, so the header button is gone: reopen from the command bar.
+  await openSyncSetup(page);
   await expect(picker).toBeVisible();
 };

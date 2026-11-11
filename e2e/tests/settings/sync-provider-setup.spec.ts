@@ -1,11 +1,13 @@
 import { expect, test } from '../../fixtures/test.fixture';
+import { openSyncSetup } from '../../utils/open-sync-setup';
 
 test('new sync setup defaults to UltraTasks Account and offers personal-only alternatives', async ({
   page,
-  syncPage,
 }) => {
   await page.goto('/#/tag/TODAY/tasks');
-  await syncPage.clickSyncBtn();
+  // A fresh profile has no header sync button; setup opens from the command bar.
+  await expect(page.locator('button.sync-btn')).toHaveCount(0);
+  await openSyncSetup(page);
   const dialog = page.locator('dialog-sync-cfg');
   await expect(
     dialog.getByRole('button', { name: 'Continue with UltraTasks Account', exact: true }),
@@ -24,7 +26,7 @@ test('new sync setup defaults to UltraTasks Account and offers personal-only alt
   await expect(dialog.locator('.e2e-baseUrl input')).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await syncPage.clickSyncBtn();
+  await openSyncSetup(page);
   await expect(page.locator('dialog-sync-cfg').getByRole('combobox')).toContainText(
     'UltraTasks Account',
   );

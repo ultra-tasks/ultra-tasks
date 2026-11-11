@@ -13,6 +13,7 @@ export type SearchCommandId =
   | 'settings'
   | 'add-task'
   | 'focus'
+  | 'sync'
   | 'shortcuts';
 
 /** A destination opens a page; an action does something from where you are. */
@@ -120,6 +121,15 @@ export const buildSearchCommands = (features: SearchCommandFeatures): SearchComm
         } satisfies SearchCommand,
       ]
     : []),
+  {
+    // The header button only appears once sync is chosen, so this is the way in
+    // from anywhere; it opens the same dialog, for first set-up and for changes.
+    id: 'sync',
+    kind: 'action',
+    labelKey: T.PS.SYNC.SET_UP_SYNC,
+    icon: 'cloud_sync',
+    aliases: ['configure sync'],
+  },
   {
     id: 'shortcuts',
     kind: 'action',

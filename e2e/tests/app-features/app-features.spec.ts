@@ -35,10 +35,6 @@ test.describe('App Features', () => {
       label: 'Project notes',
       locator: (page: Page) => page.locator('.e2e-toggle-notes-btn'),
     },
-    {
-      label: 'Sync button',
-      locator: (page: Page) => page.locator('.sync-btn'),
-    },
   ].forEach((feature) => {
     test(`Element assigned with App feature ${feature.label} is only visible if feature is enabled`, async ({
       page,
@@ -81,6 +77,21 @@ test.describe('App Features', () => {
       await goToMainView(page);
       await expect(featureElement).toBeAttached();
     });
+  });
+
+  // Unlike the features above, the sync button also needs sync to be set up, so
+  // a fresh profile never shows it whatever its switch says. With sync set up the
+  // switch hides and restores it (header unit specs); this pins the fresh state.
+  test('the sync button stays out of the header until sync is set up', async ({
+    page,
+    settingsPage,
+  }) => {
+    await goToAppFeatures(settingsPage);
+    await expect(
+      page.getByRole('switch', { name: 'Sync button', exact: true }),
+    ).toBeChecked();
+    await goToMainView(page);
+    await expect(page.locator('.sync-btn')).not.toBeAttached();
   });
 
   test('the retired issues panel has no desktop or mobile toggle', async ({

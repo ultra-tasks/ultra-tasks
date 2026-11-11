@@ -105,9 +105,10 @@
           }
         </div>
 
-        <!-- On a phone the icon appears once sync is set up, so a sync error
-             stays visible; setting it up is under Account, a row at the end of Settings. -->
-        @if (isSyncIconEnabled() && (!isXs() || syncIsEnabledAndReady())) {
+        <!-- The icon appears once sync is chosen, on every screen size, so a sync
+             error stays visible and recoverable. Before that it is absent: setting
+             sync up lives in Settings (Sync), the search command bar and first run. -->
+        @if (isSyncIconEnabled() && hasSyncConfigured()) {
           <button
             class="sync-btn secondary-header-action"
             [class.is-error]="syncIsEnabledAndReady() && syncState() === 'ERROR'"

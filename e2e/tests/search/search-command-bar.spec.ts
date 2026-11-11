@@ -96,3 +96,22 @@ test.describe('Search as a command bar', () => {
     await expect(page).toHaveURL(/\/#\/planner/);
   });
 });
+
+test.describe('Set up sync from search', () => {
+  test('opens the sync dialog from a fresh profile, where the header has no sync button', async ({
+    page,
+    workViewPage,
+  }) => {
+    await workViewPage.waitForTaskList();
+    await expect(page.locator('button.sync-btn')).toHaveCount(0);
+
+    await openGlobalSearch(page);
+    await page.keyboard.type('sync');
+    await expect(page.locator('search-page .search-results.has-default')).toBeVisible();
+    await page.keyboard.press('Enter');
+
+    await expect(page.locator('dialog-sync-cfg')).toBeVisible();
+    // It opens over the page the user was on; Search does not navigate away.
+    await expect(page).toHaveURL(/#\/tag\/TODAY\/tasks/);
+  });
+});

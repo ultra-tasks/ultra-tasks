@@ -152,6 +152,7 @@ describe('SearchPageComponent commands (real template)', () => {
       'MH.SETTINGS',
       'GCF.KEYBOARD.ADD_NEW_TASK',
       'GCF.KEYBOARD.GO_TO_FOCUS_MODE',
+      'PS.SYNC.SET_UP_SYNC',
       'GCF.KEYBOARD.SHOW_HELP',
     ]);
     // The user's own shortcut is shown beside a command that has one.

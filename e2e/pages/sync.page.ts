@@ -9,6 +9,7 @@ import { BasePage } from './base.page';
 import { WEBDAV_SYNC_FORMAT } from '../utils/sync-helpers';
 import { cssSelectors } from '../constants/selectors';
 import { disconnectBeforeProviderSwitch } from '../utils/legacy-sync-setup';
+import { openSyncSetup } from '../utils/open-sync-setup';
 
 type SyncCycleIntent = 'any' | 'read' | 'write';
 
@@ -120,16 +121,27 @@ export class SyncPage extends BasePage {
         .waitForURL(/#\/(tag|project)\/.+\/tasks/, { timeout: 10000 })
         .catch(() => {});
 
-      // Ensure sync button is visible and clickable
-      await this.syncBtn.waitFor({ state: 'visible', timeout: 10000 });
-
-      // Click sync button to open settings dialog
-      // Use noWaitAfter to prevent blocking on Angular hash navigation
-      await this.syncBtn.click({
-        button: options.isReconfigure ? 'right' : 'left',
-        timeout: 5000,
-        noWaitAfter: true,
-      });
+      // First-time setup has no header button yet (it appears once a provider
+      // is chosen), so it opens the dialog from the command bar. Reconfiguring
+      // right-clicks the button, which exists by then. Both end at the same
+      // dialog. noWaitAfter keeps the click from blocking on hash navigation.
+      const openSetupDialog = async (force: boolean): Promise<void> => {
+        if (!options.isReconfigure) {
+          await openSyncSetup(this.page).catch(async () => {
+            await this.page.keyboard.press('Escape');
+            await openSyncSetup(this.page);
+          });
+          return;
+        }
+        await this.syncBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await this.syncBtn.click({
+          button: 'right',
+          timeout: 5000,
+          force,
+          noWaitAfter: true,
+        });
+      };
+      await openSetupDialog(false);
 
       // Wait for dialog to appear
       const dialog = this.page.locator('mat-dialog-container, .mat-mdc-dialog-container');
@@ -138,14 +150,10 @@ export class SyncPage extends BasePage {
         .then(() => true)
         .catch(() => false);
 
-      // If dialog didn't open, try clicking again
+      // If dialog didn't open, try again
       if (!dialogVisible) {
         await this.page.waitForTimeout(500);
-        await this.syncBtn.click({
-          button: options.isReconfigure ? 'right' : 'left',
-          force: true,
-          noWaitAfter: true,
-        });
+        await openSetupDialog(true);
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
       }
 

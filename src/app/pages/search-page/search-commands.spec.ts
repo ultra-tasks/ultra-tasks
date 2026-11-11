@@ -31,6 +31,7 @@ describe('search commands', () => {
         'settings',
         'add-task',
         'focus',
+        'sync',
         'shortcuts',
       ]);
     });
@@ -42,12 +43,18 @@ describe('search commands', () => {
         'integrations',
         'settings',
         'add-task',
+        'sync',
         'shortcuts',
       ]);
     });
 
     it('always lists Integrations, whose navigation row appears only once connected', () => {
       expect(ids(none)).toContain('integrations');
+    });
+
+    it('always lists Set up sync, the way in while the header button is hidden', () => {
+      expect(ids(none)).toContain('sync');
+      expect(ids(all)).toContain('sync');
     });
 
     it('gives each destination a route and no action one', () => {
@@ -96,6 +103,17 @@ describe('search commands', () => {
         (key) => labels.get(key) ?? 'zzz',
       ).map((c) => c.id);
       expect(result).toEqual(['today', 'settings', 'add-task']);
+    });
+
+    it('finds Set up sync by typing sync or configure, without matching Settings', () => {
+      const labels = new Map([['PS.SYNC.SET_UP_SYNC', 'Set up sync']]);
+      const labelled = (key: string): string => labels.get(key) ?? 'zzz';
+      expect(filterSearchCommands(commands, 'sync', labelled).map((c) => c.id)).toEqual([
+        'sync',
+      ]);
+      expect(filterSearchCommands(commands, 'config', labelled).map((c) => c.id)).toEqual(
+        ['sync'],
+      );
     });
 
     it('returns nothing when nothing matches', () => {

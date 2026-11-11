@@ -16,7 +16,7 @@ import { ProjectService } from '../../features/project/project.service';
 import { LayoutService } from '../layout/layout.service';
 import { TaskService } from '../../features/tasks/task.service';
 import { T } from '../../t.const';
-import { filter, map, switchMap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, switchMap } from 'rxjs/operators';
 import { of, Subscription } from 'rxjs';
 import { WorkContextService } from '../../features/work-context/work-context.service';
 import { SimpleCounterService } from '../../features/simple-counter/simple-counter.service';
@@ -35,6 +35,7 @@ import { LongPressDirective } from '../../ui/longpress/longpress.directive';
 import { isOnline$ } from '../../util/is-online';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import { SyncStatus } from '../../op-log/sync-exports';
+import { toSyncProviderId } from '../../op-log/sync-providers/provider.const';
 import { PluginHeaderBtnsComponent } from '../../plugins/ui/plugin-header-btns.component';
 import { PluginWorkContextHeaderBtnsComponent } from '../../plugins/ui/plugin-work-context-header-btns.component';
 import { PluginSidePanelBtnsComponent } from '../../plugins/ui/plugin-side-panel-btns.component';
@@ -168,6 +169,19 @@ export class MainHeaderComponent implements OnDestroy {
     return null;
   });
   syncIsEnabledAndReady = toSignal(this.syncWrapperService.isEnabledAndReady$);
+  /**
+   * Sync is switched on and a provider is chosen. Deliberately not "ready": a
+   * provider that needs re-authorisation or a re-picked file is not ready, but
+   * its icon is the recovery path and must stay. Mirrors the Settings sync
+   * summary, which treats "off" and "no provider" as the same empty state.
+   */
+  readonly hasSyncConfigured = toSignal(
+    this.syncWrapperService.syncCfg$.pipe(
+      map((cfg) => !!cfg?.isEnabled && toSyncProviderId(cfg.syncProvider) !== null),
+      distinctUntilChanged(),
+    ),
+    { initialValue: false },
+  );
   syncState = toSignal(this.syncWrapperService.syncState$);
   isSyncInProgress = toSignal(this.syncWrapperService.isSyncInProgress$);
   hasNoPendingOps = toSignal(this.syncWrapperService.hasNoPendingOps$, {

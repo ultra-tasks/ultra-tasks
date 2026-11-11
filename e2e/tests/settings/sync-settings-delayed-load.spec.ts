@@ -1,5 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { restoreSavedSuperSyncConnection } from '../../utils/legacy-sync-setup';
+import { openSyncSetup } from '../../utils/open-sync-setup';
 
 test('a delayed initial settings load cannot replace the chosen provider', async ({
   page,
@@ -21,7 +22,8 @@ test('a delayed initial settings load cannot replace the chosen provider', async
   );
 
   try {
-    await page.locator('button.sync-btn').first().click();
+    // The saved connection is disabled, so there is no header sync button.
+    await openSyncSetup(page);
     await overrideRequest;
     const dialog = page.locator('dialog-sync-cfg');
     const picker = dialog.locator('mat-select').first();
@@ -82,7 +84,7 @@ test('a delayed initial settings load cannot replace the chosen provider', async
     if (await skipEncryption.isVisible()) await skipEncryption.click();
     await expect(dialog).toBeHidden();
 
-    await page.locator('button.sync-btn').first().click({ button: 'right' });
+    await openSyncSetup(page);
     await expect(picker).toContainText('WebDAV');
     await expect(userName).toHaveValue('delayed-settings-draft');
   } finally {

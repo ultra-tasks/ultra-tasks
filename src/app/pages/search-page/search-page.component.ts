@@ -682,6 +682,13 @@ export class SearchPageComponent implements OnInit {
         case 'focus':
           if (this.appFeatures().isFocusModeEnabled) this._focusMode.openOverlay();
           break;
+        case 'sync':
+          void import('../../imex/sync/dialog-sync-cfg/dialog-sync-cfg.component').then(
+            ({ DialogSyncCfgComponent }) => {
+              this._matDialog.open(DialogSyncCfgComponent);
+            },
+          );
+          break;
         case 'shortcuts':
           void import('../../core-ui/shortcut/dialog-keyboard-shortcuts/dialog-keyboard-shortcuts.component').then(
             ({ DialogKeyboardShortcutsComponent }) => {

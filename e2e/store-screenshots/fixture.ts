@@ -546,9 +546,10 @@ export const test = base.extend<ScreenshotFixtures>({
     const viewport = testInfo.project.name as ViewportName;
     const showSyncReadyState = async (): Promise<void> => {
       await page.evaluate(async () => {
-        // Screenshots run without a sync provider. Show the in-sync icon
-        // instead of `sync_off`, as a configured install would. Fetched the
-        // same way the app loads its built-in SVG icons.
+        // Screenshots run without a sync provider, and the header shows no sync
+        // button then. If a build ever shows one, draw the in-sync icon rather
+        // than `sync_off`, as a configured install would. Fetched the same way
+        // the app loads its built-in SVG icons.
         const icon = document.querySelector('.sync-btn mat-icon');
         if (!icon) return;
         const res = await fetch('assets/icons/sync-done.svg');
