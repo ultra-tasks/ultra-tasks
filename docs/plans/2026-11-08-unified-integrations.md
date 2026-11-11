@@ -1,6 +1,6 @@
 # Unified integrations implementation plan
 
-**Status:** Product and engineering design, 2026-11-08. The initial implementation is on `feat/unified-integrations`; the original wireframes remain illustrative. See implementation status below.
+**Status:** Product and engineering design, 2026-11-08. The initial implementation is on `feat/unified-integrations`; the original wireframes remain illustrative. See implementation status below. Connection ownership (one owner device per connection) was decided on 2026-11-11; see [Connection ownership](#connection-ownership-one-owner-device).
 
 UltraTasks will give imported and synchronized work the same task experience: automatic source sections, source project and tag mappings, and individual or batch controls. Connections use a common setup flow, while a short capability explanation makes each platform's supported sync direction explicit.
 
@@ -163,6 +163,55 @@ Test one writer per connection across tabs/devices or prove idempotent writes pl
 Use optional persisted fields with runtime defaults. Test old backups, old clients, remote replay, and disconnects. A new optional field does not stop an old client from following legacy behavior. Import and stopped items must clear active legacy issue-link fields while keeping provenance elsewhere, so older clients cannot poll or push them as linked tasks. Disable existing legacy auto-import flags on connections managed by the new scoped discovery path, otherwise old clients can rediscover excluded identities. Compatible sync fields continue to use existing policy shapes.
 
 Mixed-version release tests must prove these claims for each connector, especially Plainspace and calendar automatic discovery. If a legacy path cannot be disabled safely, keep that connection on its existing behavior and explain the upgrade requirement before enabling the new modes. Do not rely on a schema bump or client-only hidden flag as a safety boundary. Existing rows are adopted as Synced with their current field policies; no migration silently enables write-back or turns polling links into snapshots.
+
+### Connection ownership: one owner device
+
+Maintainer decisions, 2026-11-11. This section settles the "one writer per
+connection across tabs/devices" requirement above. It replaces the earlier
+assumption that any device holding a credential polls and pushes.
+
+**Integrations are local to one device.** Each connection has exactly one
+**owner device**. Only the owner holds the connection's credentials. Only the owner
+contacts the provider: polling, discovery, refresh, write-back, remote creation,
+calendar writes and worklog prompts. Imported and synced tasks reach other devices
+as ordinary tasks through whichever personal sync the user has (UltraTasks account
+or a provider). When the owner is off, nothing new arrives from the provider and
+nothing is sent to it. This applies to every connection type, including read-only
+feeds, so the rule stays simple. It holds under both sync engines, because
+ownership is ordinary app state.
+
+| Concern                  | Rule                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where ownership lives    | The synced connection definition stores the owner's installation ID (the op-log client ID from `ClientIdService`) and a user-visible device label. Both are optional fields with runtime defaults; no device-name concept exists today.                                                                                                                                                                                 |
+| Credentials              | Stay on the owner device's local credential store only. They never enter synced state, task provenance, shared scopes, logs or URLs. Built-in providers currently keep tokens in the synced `issueProvider` slice (for example GitLab `token`, Jira `password`). Move them out.                                                                                                                                         |
+| Other devices            | Show "Connected on <device>" instead of a broken connection or a sign-in prompt, plus **Move to this device**. Their tasks stay fully usable.                                                                                                                                                                                                                                                                           |
+| Edits made elsewhere     | A change to a write-mapped field on a non-owner device is an ordinary local edit. The task shows **Waiting for <device>** until the owner sends it. This status is derived: the current value differs from the stored source baseline and this device is not the owner. No queue is persisted.                                                                                                                          |
+| How the owner sends them | During its poll, the owner compares current task state with the source baseline, pushes the differences, then updates the baseline in the same local transition as the accepted result. It never reacts to remote or replayed ops with an effect (contributor rule: replayed ops must not trigger effects).                                                                                                             |
+| Moving a connection      | The new device signs in to the provider, then sets itself as owner in one op. The old device does not need to be online. Before every provider call, including queued writes, a device checks it is still the owner, so a returning old owner stops and drops its in-flight work. If two devices claim at once, the field's normal conflict resolution picks one; the loser sees the winner on its next sync and stops. |
+| Lost or retired owner    | Move to this device from any other device. Nothing is lost locally; edits waiting for the old device are sent by the new owner, because the pending state is derived from the baseline.                                                                                                                                                                                                                                 |
+| Phone owners             | Accepted tradeoff: Android checks at most about every 15 minutes in the background (best effort), iOS only while the app is open.                                                                                                                                                                                                                                                                                       |
+| Shared projects (later)  | The member who linked a task is the only writer back to the provider, and that member's owner device does the work. Other members see provenance read-only. Constraints are in the [server coordination note](https://github.com/ultra-tasks/ultra-tasks-server/blob/claude/server-collaboration-plan-4cl6x6/docs/coordination/2026-11-10-integrations-oauth.md).                                                       |
+
+**Migration.** The maintainer confirmed on 2026-11-11 that there are no released
+clients to migrate. Credentials can therefore move out of synced state directly,
+without mixed-version compatibility handling. The persisted-model rules still apply
+to on-disk data: new fields are optional with runtime defaults, and
+`frozen-state.spec.ts` must pass.
+
+**Interaction with OAuth-first setup.** An optional, off-by-default "carry my
+sign-ins to my devices" (UltraTasks account only, end-to-end encrypted) would only
+let Move to this device skip signing in again. Carrying a credential never makes a
+second device a writer.
+
+**Acceptance.**
+
+- Real two-device E2E: owner polls and writes back.
+- A non-owner edit shows Waiting for <device> and is sent once by the owner.
+- Moving ownership while the old owner is offline, and the old owner returning
+  with a queued write.
+- A simultaneous claim.
+- No duplicate remote creates or worklogs.
+- Credentials absent from exported and synced data.
 
 ## Provider capability audit and quirks
 
