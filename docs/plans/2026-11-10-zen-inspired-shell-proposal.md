@@ -1,6 +1,6 @@
 # Zen-inspired shell: audit of the Codex work and a combined proposal
 
-**Status:** Proposal for triage, 2026-11-10. WP0–WP2 implemented 2026-11-11 (see [Implementation status](#implementation-status)); WP3–WP5 not started.
+**Status:** Proposal for triage, 2026-11-10. WP0–WP4 implemented 2026-11-11 and WP5 delivered as a paper prototype (see [Implementation status](#implementation-status)).
 **Reviewed:** commit `04fce5f` ("refine core productivity views") on `main`. The next commit, `8ac83b6` (task clipboard and undo), is outside this scope and was not audited.
 **Tracking:** requested repository review; no issue opened.
 
@@ -111,7 +111,7 @@ What is good, so it is not lost: tokens are used throughout and exist; only `en.
 
 ## Implementation status
 
-WP0–WP2 landed on 2026-11-11 after the maintainer settled the open questions. WP3 (Search as a command bar), WP4 and WP5 are not started.
+WP0–WP2 landed on 2026-11-11 after the maintainer settled the open questions; WP3 and WP4 followed the same day, and WP5 is a paper prototype.
 
 **Decisions taken**
 
@@ -127,3 +127,9 @@ WP0–WP2 landed on 2026-11-11 after the maintainer settled the open questions. 
 - **F7 used the styling guide's Material buttons** (`mat-flat-button`, `mat-button`, `mat-stroked-button`) rather than a new shared class, and removed the five `!important` rules.
 - **The Upcoming toggle sits beside the page title**, not in the right-hand action row, so it needs no new header plumbing.
 - **Deleted search results restore only through their Restore button.** Activating the row no longer restores (audit item 5); the page title of special sections is a plain heading (audit item 4).
+
+**WP3–WP5 (2026-11-11)**
+
+- **WP3, Search as a command bar.** Places and actions are one fixed, filterable list above the existing results, replacing the static suggestions; there is still one search. Enter in the field opens the first match. Integrations is always listed, since its navigation row appears only once connected. The optional peek landed as **Shift+Enter** (not Space, which already means "open" on a result button and types a space in the field): it selects the task so its details open in the side panel, and the page behind does not change.
+- **WP4, Calendar polish.** Today's header and column are tinted, work start and end are hairlines with a small label, and an empty week shows one muted line with a **Plan unscheduled tasks** action (hidden when Upcoming is off). It was implemented although Calendar is still off for new installs, at the maintainer's request.
+- **WP5, context identity.** Delivered as [a paper prototype and test plan](2026-11-11-context-identity-paper-prototype.md), by the maintainer's decision: four variants, the rules they must keep, and a decision rule. Folders are excluded because their tree is synced data and has no colour.

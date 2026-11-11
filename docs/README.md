@@ -49,6 +49,8 @@ must link to their replacement, and keep their original number.
 
 ## Active plans
 
+- [Context identity: paper prototype and test plan](plans/2026-11-11-context-identity-paper-prototype.md)
+  — four variants of project colour identity, rules, and a user-test plan; paper only until a test passes
 - [Zen-inspired shell: audit and combined proposal](plans/2026-11-10-zen-inspired-shell-proposal.md)
   — review of the Codex Upcoming, Calendar, empty-state, Focus and first-run work against
   Zen Browser prior art, with ordered fixes and declined ideas
