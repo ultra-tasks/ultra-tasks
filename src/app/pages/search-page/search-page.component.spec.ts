@@ -18,6 +18,7 @@ import { Tag } from '../../features/tag/tag.model';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslateModule } from '@ngx-translate/core';
 import { SearchItem } from './search-page.model';
+import { SearchCommand } from './search-commands';
 import { RecentlyDeletedService } from '../../features/tasks/recently-deleted/recently-deleted.service';
 import { RecentlyDeletedEntry } from '../../features/tasks/recently-deleted/recently-deleted.util';
 import { GlobalConfigService } from '../../features/config/global-config.service';
@@ -86,9 +87,13 @@ describe('SearchPageComponent', () => {
     projectFolderMapSignal = signal<Map<string, string>>(new Map());
     tagFolderMapSignal = signal<Map<string, string>>(new Map());
 
-    taskServiceSpy = jasmine.createSpyObj('TaskService', ['getArchivedTasks'], {
-      allTasks$,
-    });
+    taskServiceSpy = jasmine.createSpyObj(
+      'TaskService',
+      ['getArchivedTasks', 'setSelectedId'],
+      {
+        allTasks$,
+      },
+    );
     taskServiceSpy.getArchivedTasks.and.callFake(() => Promise.resolve(archivedTasks));
 
     navigateToTaskServiceSpy = jasmine.createSpyObj('NavigateToTaskService', [
@@ -96,8 +101,9 @@ describe('SearchPageComponent', () => {
     ]);
     navigateToTaskServiceSpy.navigate.and.returnValue(Promise.resolve());
 
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    routerSpy = jasmine.createSpyObj('Router', ['navigate', 'navigateByUrl']);
     routerSpy.navigate.and.returnValue(Promise.resolve(true));
+    routerSpy.navigateByUrl.and.returnValue(Promise.resolve(true));
 
     deletedEntries = [];
     recentlyDeletedSpy = jasmine.createSpyObj('RecentlyDeletedService', [
@@ -135,7 +141,11 @@ describe('SearchPageComponent', () => {
         {
           provide: GlobalConfigService,
           useValue: {
-            appFeatures: signal({ isFocusModeEnabled: true }),
+            appFeatures: signal({
+              isFocusModeEnabled: true,
+              isPlannerEnabled: true,
+              isSchedulerEnabled: false,
+            }),
             cfg: signal({ keyboard: {} }),
           },
         },
@@ -180,14 +190,58 @@ describe('SearchPageComponent', () => {
     tick(150);
   };
 
-  it('opens the existing task composer from a suggested action', () => {
-    component.runSuggestedAction('add');
+  const command = (id: string): SearchCommand => {
+    const found = component.commands().find((c) => c.id === id);
+    if (!found) throw new Error(`no command ${id}`);
+    return found;
+  };
+
+  it('opens the existing task composer from the Add task action', () => {
+    component.runCommand(command('add-task'));
     expect(layoutServiceSpy.showAddTaskBar).toHaveBeenCalled();
   });
 
-  it('opens Focus without starting a session from a suggested action', () => {
-    component.runSuggestedAction('focus');
+  it('opens Focus without starting a session from the focus action', () => {
+    component.runCommand(command('focus'));
     expect(TestBed.inject(FocusModeService).openOverlay).toHaveBeenCalled();
+  });
+
+  it('opens a destination through the router and closes the popup', () => {
+    const chosen = jasmine.createSpy('chosen');
+    component.itemChosen.subscribe(chosen);
+    component.runCommand(command('upcoming'));
+    expect(routerSpy.navigateByUrl).toHaveBeenCalledWith('/planner');
+    expect(chosen).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers only the places the user can reach', () => {
+    const ids = component.commands().map((c) => c.id);
+    expect(ids).toContain('upcoming');
+    expect(ids).toContain('focus');
+    expect(ids).not.toContain('calendar');
+  });
+
+  it('previews a task in the side panel without navigating', () => {
+    const chosen = jasmine.createSpy('chosen');
+    component.itemChosen.subscribe(chosen);
+    component.peekTask('t1');
+    expect(taskServiceSpy.setSelectedId).toHaveBeenCalledWith('t1');
+    expect(navigateToTaskServiceSpy.navigate).not.toHaveBeenCalled();
+    expect(routerSpy.navigate).not.toHaveBeenCalled();
+    expect(chosen).toHaveBeenCalledTimes(1);
+  });
+
+  it('can only preview live tasks', () => {
+    const item = (over: Partial<SearchItem>): SearchItem =>
+      ({ id: 'x', ...over }) as SearchItem;
+    expect(component.isPeekable(item({}))).toBe(true);
+    expect(component.isPeekable(item({ isProject: true }))).toBe(false);
+    expect(component.isPeekable(item({ isTag: true }))).toBe(false);
+    expect(component.isPeekable(item({ isNote: true }))).toBe(false);
+    expect(component.isPeekable(item({ isArchiveTask: true }))).toBe(false);
+    expect(component.isPeekable(item({ deletedEntry: {} as RecentlyDeletedEntry }))).toBe(
+      false,
+    );
   });
 
   // --- Behavioral tests ---

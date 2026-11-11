@@ -279,6 +279,20 @@
   font-weight: 600;
 }
 
+// Today: the header takes the tonal "selected" role and the column below it a
+// faint tint, so the day reads at a glance against the time grid.
+.day.is-today {
+  background: var(--palette-selected);
+  color: var(--palette-selected-ink);
+  border-start-start-radius: var(--r-md);
+  border-start-end-radius: var(--r-md);
+
+  .day-day {
+    color: inherit;
+    opacity: 0.8;
+  }
+}
+
 .day-day {
   color: var(--text-color-muted);
   font: var(--type-meta);
@@ -374,6 +388,10 @@
   grid-row: 1 / span var(--schedule-total-rows);
   grid-column: span 1;
 
+  &.is-today {
+    background: var(--state-hover);
+  }
+
   // Only show drag-over background when shift is pressed (planning for day)
   :host(.isShiftKeyPressed) &.drag-over {
     background: mat-css-vars.mat-css-color-primary($opacity: 0.05);
@@ -427,9 +445,11 @@
   pointer-events: none;
 }
 
+// The work period's edges are hairlines with a small muted label, not heavy
+// rules with bold chips: they frame the day without competing with its events.
 .work-end,
 .work-start {
-  border-top: 2px dashed var(--separator-color);
+  border-top: 1px dashed var(--separator-color);
   min-width: 100px;
   grid-column: 2 / -1;
   position: relative;
@@ -444,14 +464,14 @@
   // end line), where events rarely are, and above events (z-index 2) and the
   // now-line, so the first and last blocks of the day never cover it.
   > div {
-    left: 0;
-    font-weight: bold;
-    font-size: var(--font-size-xs);
+    inset-inline-end: 0;
+    color: var(--text-color-muted);
+    font: var(--type-meta);
     position: absolute;
     bottom: 100%;
     z-index: 3;
     line-height: 1;
-    padding: var(--s-quarter) var(--s);
+    padding: var(--s-quarter) var(--s-half);
     background: var(--bg);
   }
 

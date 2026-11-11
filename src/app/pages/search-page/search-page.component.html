@@ -34,19 +34,98 @@
     </mat-checkbox>
   </div>
 
-  <div class="search-results">
+  <div
+    class="search-results"
+    [class.has-default]="!!searchForm.value?.trim()"
+  >
+    @let commandGroups = commandGroups$ | async;
+    @let hasCommands =
+      !!commandGroups?.destinations?.length || !!commandGroups?.actions?.length;
+    <!-- Places and actions, filtered by what is typed (all of them while the field
+         is empty). Rows are buttons like the results: arrow keys and Tab reach
+         them, Enter runs one. -->
+    @if (commandGroups?.destinations?.length) {
+      <h3
+        class="search-group-title"
+        id="search-go-to"
+      >
+        {{ T.F.SEARCH_BAR.GO_TO | translate }}
+      </h3>
+      <ul
+        class="search-results-list"
+        aria-labelledby="search-go-to"
+      >
+        @for (command of commandGroups?.destinations; track command.id) {
+          <li class="search-result">
+            <button
+              #resultBtn
+              type="button"
+              class="search-result-main search-command"
+              (click)="runCommand(command)"
+            >
+              <mat-icon aria-hidden="true">{{ command.icon }}</mat-icon>
+              <span>{{ command.labelKey | translate }}</span>
+              @if (shortcutFor(command); as shortcut) {
+                <kbd>{{ shortcut }}</kbd>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    }
+    @if (commandGroups?.actions?.length) {
+      <h3
+        class="search-group-title"
+        id="search-actions"
+      >
+        {{ T.F.SEARCH_BAR.ACTIONS | translate }}
+      </h3>
+      <ul
+        class="search-results-list"
+        aria-labelledby="search-actions"
+      >
+        @for (command of commandGroups?.actions; track command.id) {
+          <li class="search-result">
+            <button
+              #resultBtn
+              type="button"
+              class="search-result-main search-command"
+              (click)="runCommand(command)"
+            >
+              <mat-icon aria-hidden="true">{{ command.icon }}</mat-icon>
+              <span>{{ command.labelKey | translate }}</span>
+              @if (shortcutFor(command); as shortcut) {
+                <kbd>{{ shortcut }}</kbd>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    }
     @let results = filteredResults$ | async;
     @if (results && results.length > 0) {
       <!-- A list of buttons: Tab or the arrow keys reach each result and Enter
            opens it. Restore and details are separate buttons beside it, as a
            button cannot contain another. -->
-      <ul class="search-results-list">
+      @if (hasCommands) {
+        <h3
+          class="search-group-title"
+          id="search-results"
+        >
+          {{ T.F.SEARCH_BAR.RESULTS | translate }}
+        </h3>
+      }
+      <ul
+        class="search-results-list"
+        [attr.aria-labelledby]="hasCommands ? 'search-results' : null"
+      >
         @for (item of results; track trackByFn($index, item)) {
           <li class="search-result">
             <button
               #resultBtn
               type="button"
               class="search-result-main"
+              [attr.data-peek-id]="isPeekable(item) ? item.id : null"
               (click)="navigateToItem(item)"
             >
               @if (item.parentId && item.parentTitle) {
@@ -130,51 +209,13 @@
           </li>
         }
       </ul>
-    } @else if (searchForm.value && searchForm.value.trim()) {
+      @if (hasPeekable(results)) {
+        <p class="search-hint">{{ T.F.SEARCH_BAR.PEEK_HINT | translate }}</p>
+      }
+    } @else if (searchForm.value && searchForm.value.trim() && !hasCommands) {
       <div class="empty-state">
         <mat-icon>search_off</mat-icon>
         <p>{{ T.F.SEARCH_BAR.NO_RESULTS | translate }}</p>
-      </div>
-    } @else {
-      <div class="suggested-actions">
-        <p class="suggested-heading">
-          {{ T.F.SEARCH_BAR.SUGGESTED_ACTIONS | translate }}
-        </p>
-        <button
-          #resultBtn
-          type="button"
-          (click)="runSuggestedAction('add')"
-        >
-          <mat-icon>add</mat-icon>
-          <span>{{ T.GCF.KEYBOARD.ADD_NEW_TASK | translate }}</span>
-          @if (keyboard()?.addNewTask; as shortcut) {
-            <kbd>{{ shortcut }}</kbd>
-          }
-        </button>
-        @if (appFeatures().isFocusModeEnabled) {
-          <button
-            #resultBtn
-            type="button"
-            (click)="runSuggestedAction('focus')"
-          >
-            <mat-icon>center_focus_strong</mat-icon>
-            <span>{{ T.GCF.KEYBOARD.GO_TO_FOCUS_MODE | translate }}</span>
-            @if (keyboard()?.goToFocusMode; as shortcut) {
-              <kbd>{{ shortcut }}</kbd>
-            }
-          </button>
-        }
-        <button
-          #resultBtn
-          type="button"
-          (click)="runSuggestedAction('shortcuts')"
-        >
-          <mat-icon>keyboard</mat-icon>
-          <span>{{ T.GCF.KEYBOARD.SHOW_HELP | translate }}</span>
-          @if (keyboard()?.showHelp; as shortcut) {
-            <kbd>{{ shortcut }}</kbd>
-          }
-        </button>
       </div>
     }
   </div>

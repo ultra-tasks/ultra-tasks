@@ -7,6 +7,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { GlobalTrackingIntervalService } from '../../../core/global-tracking-interval/global-tracking-interval.service';
 import { DateAdapter } from '@angular/material/core';
 import { signal, WritableSignal } from '@angular/core';
+import { Router } from '@angular/router';
+import { PlannerUnscheduledPanelService } from '../../planner/planner-unscheduled-panel/planner-unscheduled-panel.service';
 import { of } from 'rxjs';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import {
@@ -34,6 +36,7 @@ describe('ScheduleComponent', () => {
   let mockTaskService: jasmine.SpyObj<TaskService>;
   let mockLayoutService: jasmine.SpyObj<LayoutService>;
   let mockIsXs: WritableSignal<boolean>;
+  let mockAppFeatures: WritableSignal<{ isPlannerEnabled: boolean }>;
   let mockScheduleService: jasmine.SpyObj<ScheduleService>;
   let calendarColorByProviderId: WritableSignal<Map<string, string>>;
   let mockMatDialog: jasmine.SpyObj<MatDialog>;
@@ -50,6 +53,7 @@ describe('ScheduleComponent', () => {
     (mockTaskService as any).currentTaskId = signal(null);
 
     mockIsXs = signal(false);
+    mockAppFeatures = signal({ isPlannerEnabled: true });
     mockLayoutService = jasmine.createSpyObj('LayoutService', [], {
       selectedTimeView: signal('week'),
       isXs: mockIsXs,
@@ -124,6 +128,7 @@ describe('ScheduleComponent', () => {
       // runners (an en-GB runner would render "20 Jan", not "Jan 20").
       localization: mockLocalization,
       cfg: signal(undefined),
+      appFeatures: mockAppFeatures,
     });
 
     await TestBed.configureTestingModule({
@@ -158,6 +163,43 @@ describe('ScheduleComponent', () => {
   afterEach(() => {
     fixture.destroy();
     TestBed.inject(MockStore).resetSelectors();
+  });
+
+  describe('empty week', () => {
+    const empty = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector('.empty-week');
+
+    it('shows one line and one action when nothing is scheduled in the week', () => {
+      fixture.detectChanges();
+      expect(component.isEmptyWeek()).toBeTrue();
+      expect(empty()).not.toBeNull();
+      expect(empty()?.textContent).toContain('F.SCHEDULE.NOTHING_THIS_WEEK');
+      expect(empty()?.querySelectorAll('button').length).toBe(1);
+    });
+
+    it('is not an empty week in the day or month view', () => {
+      mockLayoutService.selectedTimeView.set('month');
+      fixture.detectChanges();
+      expect(component.isEmptyWeek()).toBeFalse();
+      expect(empty()).toBeNull();
+    });
+
+    it('offers no action when Upcoming is switched off', () => {
+      mockAppFeatures.set({ isPlannerEnabled: false });
+      fixture.detectChanges();
+      expect(empty()).not.toBeNull();
+      expect(empty()?.querySelectorAll('button').length).toBe(0);
+    });
+
+    it('opens Upcoming with the unscheduled panel from the action', () => {
+      const navigate = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+      const panel = TestBed.inject(PlannerUnscheduledPanelService);
+      panel.close();
+      component.planUnscheduled();
+      expect(panel.isOpen()).toBeTrue();
+      expect(navigate).toHaveBeenCalledWith('/planner');
+      panel.close();
+    });
   });
 
   describe('headerTitle computed', () => {

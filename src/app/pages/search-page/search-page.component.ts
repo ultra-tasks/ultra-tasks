@@ -28,6 +28,11 @@ import { TagService } from '../../features/tag/tag.service';
 import { Task } from '../../features/tasks/task.model';
 import { resolveDisplayTagIds } from '../../features/tasks/util/resolve-display-tag-ids.util';
 import { SearchItem } from './search-page.model';
+import {
+  buildSearchCommands,
+  filterSearchCommands,
+  SearchCommand,
+} from './search-commands';
 import { NavigateToTaskService } from '../../core-ui/navigate-to-task/navigate-to-task.service';
 import { AsyncPipe } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
@@ -96,6 +101,9 @@ export class SearchPageComponent implements OnInit {
   readonly itemChosen = output<void>();
   readonly appFeatures = this._globalConfig.appFeatures;
   readonly keyboard = computed(() => this._globalConfig.cfg()?.keyboard);
+  /** Places and actions Search offers next to tasks; only those the user can reach. */
+  readonly commands = computed(() => buildSearchCommands(this.appFeatures()));
+  private _commands$ = toObservable(this.commands);
 
   readonly inputEl = viewChild.required<ElementRef>('inputEl');
   readonly resultBtns = viewChildren<ElementRef<HTMLButtonElement>>('resultBtn');
@@ -104,6 +112,14 @@ export class SearchPageComponent implements OnInit {
   searchForm: UntypedFormControl = new UntypedFormControl('');
   includeCompletedForm: UntypedFormControl = new UntypedFormControl(false);
   filteredResults$: Observable<SearchItem[]> = new Observable();
+  /** The commands matching what is typed, grouped for display. */
+  commandGroups$: Observable<{
+    destinations: SearchCommand[];
+    actions: SearchCommand[];
+  }> = new Observable();
+  // The (trimmed) term the results on screen were computed for. They trail what is
+  // typed by the debounce, so Enter must not open a row that belongs to an older term.
+  private _resultsTerm = '';
 
   private _reloadDeleted$ = new BehaviorSubject<void>(undefined);
 
@@ -423,6 +439,13 @@ export class SearchPageComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // No debounce: the list is a handful of fixed entries, and it must be there
+    // the moment the popup opens.
+    this.commandGroups$ = combineLatest([
+      this.searchForm.valueChanges.pipe(startWith('')),
+      this._commands$,
+    ]).pipe(map(([term]) => this._groupedCommands(typeof term === 'string' ? term : '')));
+
     this.filteredResults$ = combineLatest([
       this._searchableItems$,
       this.searchForm.valueChanges.pipe(startWith('')),
@@ -430,9 +453,10 @@ export class SearchPageComponent implements OnInit {
     ]).pipe(
       debounceTime(150),
       filter(([, searchTerm]) => typeof searchTerm === 'string'),
-      map(([searchableItems, searchTerm, includeCompleted]) =>
-        this._filter(searchableItems, searchTerm, !!includeCompleted),
-      ),
+      map(([searchableItems, searchTerm, includeCompleted]) => {
+        this._resultsTerm = searchTerm.trim();
+        return this._filter(searchableItems, searchTerm, !!includeCompleted);
+      }),
     );
 
     // Focus the input after view init
@@ -522,10 +546,56 @@ export class SearchPageComponent implements OnInit {
 
   /** ArrowDown/ArrowUp move between the search field and the results. */
   onKeydown(ev: KeyboardEvent): void {
+    const searchInput = this.inputEl().nativeElement as HTMLElement;
+    if (ev.key === 'Enter' && !ev.isComposing) {
+      const target = ev.target as HTMLElement;
+      const isField = target === searchInput;
+      // From the field these act on the first match for what is typed *now*:
+      // a command is known at once, a task result only once the results have
+      // caught up with the text (else Enter would open a row of an older term).
+      const term = String(this.searchForm.value ?? '').trim();
+      const resultsAreCurrent = this._resultsTerm === term;
+      if (ev.shiftKey) {
+        // Shift+Enter previews the focused task (from the field: the first task
+        // match) instead of opening it. Space cannot be the key: on a result
+        // button it already means "open", and in the field it types a space.
+        const row = isField
+          ? term && resultsAreCurrent
+            ? this.resultBtns()
+                .map((btn) => btn.nativeElement)
+                .find((btn) => btn.hasAttribute('data-peek-id'))
+            : undefined
+          : target.closest<HTMLElement>('[data-peek-id]');
+        const taskId = row?.getAttribute('data-peek-id');
+        if (taskId) {
+          ev.preventDefault();
+          this.peekTask(taskId);
+        }
+        return;
+      }
+      if (isField) {
+        // Enter in the field opens the highlighted (first) match, like a command
+        // palette; with nothing typed there is nothing highlighted to open.
+        if (!term) {
+          return;
+        }
+        const command = this._firstCommand(term);
+        if (command) {
+          ev.preventDefault();
+          this.runCommand(command);
+          return;
+        }
+        const first = resultsAreCurrent ? this.resultBtns()[0]?.nativeElement : undefined;
+        if (first) {
+          ev.preventDefault();
+          first.click();
+        }
+        return;
+      }
+    }
     if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') {
       return;
     }
-    const searchInput = this.inputEl().nativeElement as HTMLElement;
     const targets = [searchInput, ...this.resultBtns().map((btn) => btn.nativeElement)];
     const index = targets.indexOf(ev.target as HTMLElement);
     if (index === -1 || targets.length < 2) {
@@ -543,23 +613,89 @@ export class SearchPageComponent implements OnInit {
     this.inputEl().nativeElement.focus();
   }
 
-  runSuggestedAction(action: 'add' | 'focus' | 'shortcuts'): void {
-    const run = (): void => {
-      if (action === 'add') {
-        this._layoutService.showAddTaskBar();
-      } else if (action === 'focus') {
-        if (this.appFeatures().isFocusModeEnabled) this._focusMode.openOverlay();
-      } else {
-        void import('../../core-ui/shortcut/dialog-keyboard-shortcuts/dialog-keyboard-shortcuts.component').then(
-          ({ DialogKeyboardShortcutsComponent }) => {
-            this._matDialog.open(DialogKeyboardShortcutsComponent, {
-              restoreFocus: true,
-            });
-          },
-        );
-      }
+  /** The commands matching a term, in display order: places first, then actions. */
+  private _groupedCommands(term: string): {
+    destinations: SearchCommand[];
+    actions: SearchCommand[];
+  } {
+    const matching = filterSearchCommands(this.commands(), term, (labelKey) =>
+      this._translateService.instant(labelKey),
+    );
+    return {
+      destinations: matching.filter((c) => c.kind === 'destination'),
+      actions: matching.filter((c) => c.kind === 'action'),
     };
+  }
 
+  /** The first command shown for a term: the one Enter opens. */
+  private _firstCommand(term: string): SearchCommand | undefined {
+    const { destinations, actions } = this._groupedCommands(term);
+    return destinations[0] ?? actions[0];
+  }
+
+  /** The user's shortcut for a command, when it has one. */
+  shortcutFor(command: SearchCommand): string | null {
+    return (command.shortcut && this.keyboard()?.[command.shortcut]) || null;
+  }
+
+  /** Only a live task can be previewed; projects, tags, notes, archived and deleted items cannot. */
+  isPeekable(item: SearchItem): boolean {
+    return (
+      !item.isProject &&
+      !item.isTag &&
+      !item.isNote &&
+      !item.isArchiveTask &&
+      !item.deletedEntry
+    );
+  }
+
+  hasPeekable(items: readonly SearchItem[] | null): boolean {
+    return !!items?.some((item) => this.isPeekable(item));
+  }
+
+  /**
+   * Opens a task's details in the side panel and leaves the page behind the
+   * popup where it is. Closing the panel (or Escape) is the way back.
+   */
+  peekTask(taskId: string): void {
+    this._taskService.setSelectedId(taskId);
+    this.itemChosen.emit();
+  }
+
+  /** Runs a command: a destination opens its page, an action does its thing. */
+  runCommand(command: SearchCommand): void {
+    if (command.kind === 'destination' && command.id !== 'settings') {
+      this.itemChosen.emit();
+      void this._router.navigateByUrl(command.route as string);
+      return;
+    }
+    // Actions, and Settings (a window of its own), run once the popup is gone,
+    // so they open over the page the user came from, not over Search.
+    this._afterPopupCloses(() => {
+      switch (command.id) {
+        case 'settings':
+          void this._router.navigateByUrl(command.route as string);
+          break;
+        case 'add-task':
+          this._layoutService.showAddTaskBar();
+          break;
+        case 'focus':
+          if (this.appFeatures().isFocusModeEnabled) this._focusMode.openOverlay();
+          break;
+        case 'shortcuts':
+          void import('../../core-ui/shortcut/dialog-keyboard-shortcuts/dialog-keyboard-shortcuts.component').then(
+            ({ DialogKeyboardShortcutsComponent }) => {
+              this._matDialog.open(DialogKeyboardShortcutsComponent, {
+                restoreFocus: true,
+              });
+            },
+          );
+          break;
+      }
+    });
+  }
+
+  private _afterPopupCloses(run: () => void): void {
     const dialog = this.isPopup() ? this._matDialog.getDialogById('search-popup') : null;
     if (dialog) {
       dialog.afterClosed().pipe(take(1)).subscribe(run);

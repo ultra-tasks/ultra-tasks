@@ -18,6 +18,10 @@ export class PlannerUnscheduledPanelService {
   readonly isOpen = signal(lsGetBoolean(LS.PLANNER_UNSCHEDULED_OPEN, false));
   readonly projectFilter = signal<string>(readFilter());
 
+  open(): void {
+    this._setOpen(true);
+  }
+
   toggle(): void {
     this._setOpen(!this.isOpen());
   }

@@ -9,6 +9,12 @@
   flex-direction: column;
 }
 
+// A week with nothing in it: one muted line and one action (the shared
+// .empty-state layout), on the toolbar's own start edge.
+.empty-week {
+  margin: var(--s2) var(--page-gutter);
+}
+
 // we need this to prevent problems with route ani and scroll behavior
 .scroll-wrapper {
   height: 100%;

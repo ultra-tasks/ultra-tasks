@@ -65,6 +65,29 @@ describe('ScheduleWeekComponent', () => {
     });
   });
 
+  it('marks only today, in the header and in the column, for the tint', () => {
+    fixture.componentRef.setInput('daysToShow', [
+      '2026-05-11',
+      '2026-05-12',
+      '2026-05-13',
+    ]);
+    fixture.componentRef.setInput('todayDateStr', '2026-05-12');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const headers = Array.from(el.querySelectorAll('.week-header-dates .day'));
+    expect(headers.map((h) => h.classList.contains('is-today'))).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    const todayCols = Array.from(el.querySelectorAll('.col.is-today'));
+    expect(todayCols.length).toBeGreaterThan(0);
+    expect(
+      todayCols.every((c) => c.getAttribute('data-day') === '2026-05-12'),
+    ).toBeTrue();
+  });
+
   it('halves weekly hour heights while preserving the day view density', () => {
     fixture.componentInstance.scheduleRowHeightPx.set(9);
     fixture.componentRef.setInput('daysToShow', ['2026-05-11', '2026-05-12']);

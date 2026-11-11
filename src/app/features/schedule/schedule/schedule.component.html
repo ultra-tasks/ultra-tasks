@@ -135,6 +135,22 @@
   </div>
 </div>
 
+@if (isEmptyWeek()) {
+  <div class="empty-state empty-week">
+    <p>{{ T.F.SCHEDULE.NOTHING_THIS_WEEK | translate }}</p>
+    @if (isPlannerEnabled()) {
+      <button
+        mat-button
+        type="button"
+        (click)="planUnscheduled()"
+      >
+        <mat-icon>checklist</mat-icon>
+        {{ T.F.SCHEDULE.PLAN_UNSCHEDULED | translate }}
+      </button>
+    }
+  </div>
+}
+
 <div
   #scrollWrapper
   class="scroll-wrapper"

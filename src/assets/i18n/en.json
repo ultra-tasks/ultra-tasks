@@ -1159,6 +1159,8 @@
       "NEXT_DAY": "Next Day",
       "NEXT_MONTH": "Next Month",
       "NEXT_WEEK": "Next Week",
+      "NOTHING_THIS_WEEK": "Nothing scheduled this week",
+      "PLAN_UNSCHEDULED": "Plan unscheduled tasks",
       "PREVIOUS_DAY": "Previous Day",
       "PREVIOUS_MONTH": "Previous Month",
       "PREVIOUS_WEEK": "Previous Week",
@@ -1178,12 +1180,15 @@
       "AUTOMATICALLY_PLACED": "Automatically placed"
     },
     "SEARCH_BAR": {
+      "ACTIONS": "Actions",
       "DELETED": "Deleted",
+      "GO_TO": "Go to",
       "INCLUDE_COMPLETED": "Include completed and archived tasks",
       "INFO": "Start typing to search for tasks, notes, projects or tags",
       "NO_RESULTS": "No tasks, notes, projects or tags found matching your search",
+      "PEEK_HINT": "Shift+Enter previews a task without leaving this page",
       "PLACEHOLDER": "Search for tasks, notes, projects or tags",
-      "SUGGESTED_ACTIONS": "Suggested actions",
+      "RESULTS": "Results",
       "UNAVAILABLE_CONTEXT": "Unavailable context"
     },
     "SIMPLE_COUNTER": {

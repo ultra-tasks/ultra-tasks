@@ -41,7 +41,9 @@ import { fastArrayCompare } from '../../../util/fast-array-compare';
 import { safeFormatDate } from '../../../util/safe-format-date';
 import { TaskService } from '../../tasks/task.service';
 import { LayoutService } from '../../../core-ui/layout/layout.service';
-import { MatIconButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
+import { Router } from '@angular/router';
+import { PlannerUnscheduledPanelService } from '../../planner/planner-unscheduled-panel/planner-unscheduled-panel.service';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { GlobalTrackingIntervalService } from '../../../core/global-tracking-interval/global-tracking-interval.service';
@@ -85,6 +87,7 @@ import {
     ScheduleMonthComponent,
     SwipePagerComponent,
     SwipePagerPageDirective,
+    MatButton,
     MatIconButton,
     MatIcon,
     MatTooltip,
@@ -120,6 +123,8 @@ export class ScheduleComponent {
   private _dateTimeFormatService = inject(DateTimeFormatService);
   private _dateService = inject(DateService);
   private _translate = inject(TranslateService);
+  private _router = inject(Router);
+  private _plannerPanel = inject(PlannerUnscheduledPanelService);
   private _hiddenCalendarProviders = inject(HiddenCalendarProvidersService);
   private _elRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private _pluginIssueProviderRegistry = inject(PluginIssueProviderRegistryService);
@@ -400,8 +405,19 @@ export class ScheduleComponent {
   });
 
   events = computed(() => this._eventsAndBeyondBudget().eventsFlat);
+  /** Nothing is scheduled in the week on screen: a line and one way forward replace a blank grid. */
+  isEmptyWeek = computed(() => this.isWeekView() && this.events().length === 0);
+  isPlannerEnabled = computed(
+    () => this._globalConfigService.appFeatures().isPlannerEnabled,
+  );
   beyondBudget = computed(() => this._eventsAndBeyondBudget().beyondBudgetDays);
   monthEvents = computed(() => this.events().concat(...this.beyondBudget()));
+
+  /** Opens Upcoming with the unscheduled-tasks panel, where tasks get their day. */
+  planUnscheduled(): void {
+    this._plannerPanel.open();
+    void this._router.navigateByUrl('/planner');
+  }
 
   nowRow = computed(() => {
     // Trigger re-computation every 2 minutes
