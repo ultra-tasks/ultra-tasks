@@ -1,6 +1,6 @@
 # Zen-inspired shell: audit of the Codex work and a combined proposal
 
-**Status:** Proposal for triage, 2026-11-10. This document changes no application code.
+**Status:** Proposal for triage, 2026-11-10. WP0–WP2 implemented 2026-11-11 (see [Implementation status](#implementation-status)); WP3–WP5 not started.
 **Reviewed:** commit `04fce5f` ("refine core productivity views") on `main`. The next commit, `8ac83b6` (task clipboard and undo), is outside this scope and was not audited.
 **Tracking:** requested repository review; no issue opened.
 
@@ -108,3 +108,22 @@ What is good, so it is not lost: tokens are used throughout and exist; only `en.
 1. **Integrations in the primary nav by default?** The [unified integrations plan](2026-11-08-unified-integrations.md) decided yes. A fresh install then shows four destinations, one of them for an opt-in feature; showing it once a connection exists would be calmer. Recommendation: disclose progressively, but this overturns a stated decision, so it is the maintainer's call.
 2. **Inbox-only triage or all unscheduled tasks?** Recommendation: Inbox only until a user reports needing more; Inbox is the triage queue.
 3. **Should first run offer a sync path?** UltraSync sign-ups are temporarily closed, but WebDAV and Dropbox sync are not. Recommendation: yes, folded into Restore.
+
+## Implementation status
+
+WP0–WP2 landed on 2026-11-11 after the maintainer settled the open questions. WP3 (Search as a command bar), WP4 and WP5 are not started.
+
+**Decisions taken**
+
+1. **Integrations stays in the primary navigation, but only once something is connected.** The footer Marketplace row moved into Settings: **Plugins & integrations** is a Settings row on every screen size (Account stays a phone-only Settings row). A fresh install keeps the `/integrations` route, the **Open Integrations** shortcut and the Marketplace window's "Go to integrations" button as ways in.
+2. **The Upcoming panel lists all unscheduled tasks, with a project filter**, not only the Inbox. It leaves out subtasks, done tasks, hidden integration tasks and each project's backlog, and caps the drawn rows at 100 (the filter narrows a longer list). Its open state and filter are device-local (`LS.PLANNER_UNSCHEDULED_*`), never synced.
+3. **First-run sync path (F2) is deferred** to a separate session, together with routing by a named target instead of tab index 5.
+
+**Deliberate deviations from the wireframes**
+
+- **Header "Set up sync" button (WP1) was not removed.** Several sync E2E helpers open setup by right-clicking it on a fresh profile, and sync entry points are being reworked in another session. Hiding it should land with that work.
+- **Search suggestions (F4) stay until WP3**, which replaces them. Search's hand-rolled row buttons are the one place the F7 cleanup was left for that reason.
+- **Phone: empty days stay separate rows but shrink** (one-line header over a slim dashed zone, no planned/available line) instead of merging into one "Wed – Fri" row. Merging would have broken `scrollToDay`, the visible-day observer and the infinite-scroll trigger, which all key off one element per day.
+- **F7 used the styling guide's Material buttons** (`mat-flat-button`, `mat-button`, `mat-stroked-button`) rather than a new shared class, and removed the five `!important` rules.
+- **The Upcoming toggle sits beside the page title**, not in the right-hand action row, so it needs no new header plumbing.
+- **Deleted search results restore only through their Restore button.** Activating the row no longer restores (audit item 5); the page title of special sections is a plain heading (audit item 4).
