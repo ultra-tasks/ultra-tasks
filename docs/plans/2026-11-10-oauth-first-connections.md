@@ -110,7 +110,7 @@ A device without its own sign-in (for example a phone when only the desktop is c
 
 ## Registrations the maintainer has to make
 
-Only the maintainer can do these; the code cannot ship them. Each is under the Ultra Tasks name, with redirects `http://127.0.0.1` (loopback, any port), `ultratasks://…` (desktop) and `app.ultratasks:/…` (mobile), plus `https://app.ultratasks.app/oauth/callback/<provider>` for web once that page exists. The web callback path must stay outside `/account`, with no secrets on the page, the code removed from the address bar first, and `Referrer-Policy: no-referrer`.
+Only the maintainer can do these; the code cannot ship them. Each is under the Ultra Tasks name, with redirects `http://127.0.0.1` (loopback, any port), `ultratasks://…` (desktop) and `app.ultratasks:/…` (mobile), plus `https://app.ultratasks.app/oauth/callback/<provider>` for web once that page exists. The web callback path must stay outside `/account` (path ownership: [hosted web app and account origin plan](2026-11-10-hosted-web-app-and-account-origin.md)), be an explicit file in the web bundle rather than a router route, with no secrets on the page, the code removed from the address bar first, and `Referrer-Policy: no-referrer`.
 
 1. Google Cloud project: desktop, Android (`app.ultratasks` + release SHA-1), iOS clients; brand verification for `calendar.events` (sensitive scope) and a privacy policy.
 2. Microsoft Entra app: extend the OneDrive registration with Azure DevOps delegated permission and mobile redirects.
