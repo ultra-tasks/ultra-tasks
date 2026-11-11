@@ -1503,6 +1503,67 @@ describe('DialogSyncCfgComponent', () => {
     });
   });
 
+  describe('Sign in with Nextcloud (Login Flow v2)', () => {
+    const RESULT = {
+      serverUrl: 'https://cloud.example.com',
+      loginName: 'jane@example.com',
+      appPassword: 'device-app-pw',
+      userId: 'janedoe',
+      davFilesUrl: 'https://cloud.example.com/remote.php/dav/files/janedoe/',
+    };
+
+    it('asks for the server address before opening anything', async () => {
+      await (component as any)._signInWithNextcloud('nextcloud', '  ');
+      expect(mockSnackService.open).toHaveBeenCalledWith(
+        jasmine.objectContaining({ msg: T.F.SYNC.FORM.NEXTCLOUD.S_SIGN_IN_NEED_SERVER }),
+      );
+      expect(mockCertTrustService.setPendingConfig).not.toHaveBeenCalled();
+    });
+
+    it('fills the Nextcloud fields with the device app password and user id', () => {
+      component.form = new FormGroup({
+        nextcloud: new FormGroup({
+          serverUrl: new FormControl('https://cloud.example.com/'),
+          userName: new FormControl(''),
+          loginName: new FormControl(''),
+          password: new FormControl(''),
+        }),
+      }) as any;
+
+      (component as any)._applyNextcloudSignIn('nextcloud', RESULT);
+
+      const v = (k: string): unknown => component.form.get(`nextcloud.${k}`)?.value;
+      expect(v('serverUrl')).toBe('https://cloud.example.com');
+      expect(v('loginName')).toBe('jane@example.com');
+      expect(v('userName')).toBe('janedoe');
+      expect(v('password')).toBe('device-app-pw');
+      expect(mockSnackService.open).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          type: 'SUCCESS',
+          msg: T.F.SYNC.FORM.NEXTCLOUD.S_SIGN_IN_SUCCESS,
+          translateParams: { loginName: 'jane@example.com' },
+        }),
+      );
+    });
+
+    it('fills the WebDAV files URL from the canonical user id and authenticates as the login', () => {
+      component.form = new FormGroup({
+        webDav: new FormGroup({
+          baseUrl: new FormControl('https://cloud.example.com'),
+          userName: new FormControl(''),
+          password: new FormControl(''),
+        }),
+      }) as any;
+
+      (component as any)._applyNextcloudSignIn('webDav', RESULT);
+
+      const v = (k: string): unknown => component.form.get(`webDav.${k}`)?.value;
+      expect(v('baseUrl')).toBe(RESULT.davFilesUrl);
+      expect(v('userName')).toBe('jane@example.com');
+      expect(v('password')).toBe('device-app-pw');
+    });
+  });
+
   describe('save() — already configured provider', () => {
     it('should close dialog when Dropbox is already configured (wasConfigured=false, isReady=true)', async () => {
       const alreadyConfigured = {

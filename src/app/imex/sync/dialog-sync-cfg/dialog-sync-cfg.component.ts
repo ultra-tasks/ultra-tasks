@@ -70,6 +70,10 @@ import {
 import { testWebdavConnection } from '../../../op-log/sync-providers/file-based/webdav/test-webdav-connection';
 import { CertTrustService } from '../../../features/issue/cert-trust.service';
 import { discoverNextcloudUserId } from '../../../op-log/sync-providers/file-based/webdav/discover-nextcloud-user-id';
+import {
+  signInWithNextcloud,
+  type NextcloudSignInResult,
+} from '../../../op-log/sync-providers/file-based/webdav/nextcloud-login-flow';
 import type { OneDrivePrivateCfg } from '../../../op-log/sync-providers/file-based/onedrive/onedrive.model';
 import type { LocalFileSyncPrivateCfg } from '@sp/sync-providers/local-file';
 import type { SuperSyncPrivateCfg } from '@sp/sync-providers/super-sync';
@@ -88,6 +92,17 @@ const PROVIDER_FORM_KEYS: Partial<Record<SyncProviderId, keyof SyncConfig>> = {
   [SyncProviderId.Nextcloud]: 'nextcloud',
   [SyncProviderId.LocalFile]: 'localFileSync',
   [SyncProviderId.OneDrive]: 'oneDrive',
+};
+
+const insertAfterKey = (
+  fields: FormlyFieldConfig[],
+  key: string,
+  extra: FormlyFieldConfig[],
+): FormlyFieldConfig[] => {
+  const i = fields.findIndex((f) => f.key === key);
+  return i < 0
+    ? [...extra, ...fields]
+    : [...fields.slice(0, i + 1), ...extra, ...fields.slice(i + 1)];
 };
 
 type SyncFormModel = SyncConfig & {
@@ -128,6 +143,7 @@ export class DialogSyncCfgComponent implements AfterViewInit {
 
   private _destroyRef = inject(DestroyRef);
   private _certTrustService = inject(CertTrustService);
+  private _nextcloudSignIn: AbortController | null = null;
 
   T = T;
   readonly native = inject(NativeSyncService);
@@ -258,14 +274,25 @@ export class DialogSyncCfgComponent implements AfterViewInit {
     if (item.key === 'webDav' && item.fieldGroup) {
       return {
         ...item,
-        fieldGroup: [...item.fieldGroup, this._webDavTestConnectionBtn()],
+        fieldGroup: [
+          ...insertAfterKey(
+            item.fieldGroup,
+            'baseUrl',
+            this._nextcloudSignInFields('webDav'),
+          ),
+          this._webDavTestConnectionBtn(),
+        ],
       };
     }
     if (item.key === 'nextcloud' && item.fieldGroup) {
       return {
         ...item,
         fieldGroup: [
-          ...item.fieldGroup,
+          ...insertAfterKey(
+            item.fieldGroup,
+            'serverUrl',
+            this._nextcloudSignInFields('nextcloud'),
+          ),
           this._nextcloudDetectUserIdBtn(),
           this._nextcloudTestConnectionBtn(),
         ],
@@ -355,6 +382,85 @@ export class DialogSyncCfgComponent implements AfterViewInit {
       text: T.F.SYNC.FORM.NEXTCLOUD.L_DETECT_USER_ID,
       className: 'mt3 block',
       onClick: (model) => this._detectNextcloudUserId(model as NextcloudPrivateCfg),
+    });
+  }
+
+  /**
+   * "Sign in with Nextcloud" (Login Flow v2) for the Nextcloud and WebDAV
+   * sections: the browser sign-in returns a per-device app password, so the
+   * manual app-password fields become the fallback rather than the first step.
+   */
+  private _nextcloudSignInFields(section: 'nextcloud' | 'webDav'): FormlyFieldConfig[] {
+    return [
+      {
+        type: 'tpl',
+        templateOptions: { tag: 'p', text: T.F.SYNC.FORM.NEXTCLOUD.SIGN_IN_INFO },
+      },
+      this._actionBtn({
+        text: T.F.SYNC.FORM.NEXTCLOUD.L_SIGN_IN,
+        className: 'mt2 mb3 block',
+        onClick: (model) =>
+          this._signInWithNextcloud(
+            section,
+            section === 'nextcloud'
+              ? (model as NextcloudPrivateCfg)?.serverUrl
+              : (model as WebdavPrivateCfg)?.baseUrl,
+          ),
+      }),
+    ];
+  }
+
+  private async _signInWithNextcloud(
+    section: 'nextcloud' | 'webDav',
+    serverUrl: string | undefined,
+  ): Promise<void> {
+    if (!serverUrl?.trim()) {
+      this._snackService.open({
+        type: 'ERROR',
+        msg: T.F.SYNC.FORM.NEXTCLOUD.S_SIGN_IN_NEED_SERVER,
+      });
+      return;
+    }
+    this._nextcloudSignIn?.abort();
+    const controller = new AbortController();
+    this._nextcloudSignIn = controller;
+    try {
+      await this._certTrustService.setPendingConfig(this, { baseUrl: serverUrl });
+      this._snackService.open({ msg: T.F.SYNC.FORM.NEXTCLOUD.S_SIGN_IN_WAITING });
+      const result = await signInWithNextcloud(serverUrl, { signal: controller.signal });
+      this._applyNextcloudSignIn(section, result);
+    } catch (e) {
+      if (controller.signal.aborted) return;
+      this._snackService.open({
+        type: 'ERROR',
+        msg: T.F.SYNC.FORM.NEXTCLOUD.S_SIGN_IN_FAIL,
+        translateParams: { error: e instanceof Error ? e.message : 'Unknown error' },
+      });
+    } finally {
+      if (this._nextcloudSignIn === controller) this._nextcloudSignIn = null;
+    }
+  }
+
+  /** Split from the network call so it is unit-testable without a live server. */
+  private _applyNextcloudSignIn(
+    section: 'nextcloud' | 'webDav',
+    result: NextcloudSignInResult,
+  ): void {
+    const set = (key: string, value: string): void =>
+      (this.form.get(`${section}.${key}`) as AbstractControl | null)?.setValue(value);
+    if (section === 'nextcloud') {
+      set('serverUrl', result.serverUrl);
+      set('loginName', result.loginName);
+      set('userName', result.userId ?? result.loginName);
+    } else {
+      set('baseUrl', result.davFilesUrl);
+      set('userName', result.loginName);
+    }
+    set('password', result.appPassword);
+    this._snackService.open({
+      type: 'SUCCESS',
+      msg: T.F.SYNC.FORM.NEXTCLOUD.S_SIGN_IN_SUCCESS,
+      translateParams: { loginName: result.loginName },
     });
   }
 
@@ -593,6 +699,8 @@ export class DialogSyncCfgComponent implements AfterViewInit {
     // here with the slot still set and discards it. Runs after a save too,
     // where it is a no-op.
     this._destroyRef.onDestroy(() => this._discardPendingLocalFileDir());
+    // Stop polling a Nextcloud sign-in the user walked away from.
+    this._destroyRef.onDestroy(() => this._nextcloudSignIn?.abort());
     // Hosts trusted for testing an unsaved config (#11097) end with the dialog.
     this._destroyRef.onDestroy(
       () => void this._certTrustService.setPendingConfig(this, null),
