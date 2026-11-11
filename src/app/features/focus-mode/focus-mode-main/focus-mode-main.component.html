@@ -254,23 +254,28 @@
       fmBottom
       class="bottom-controls"
     >
-      <!-- Back to Planning (cancels the session + closes the focus overlay) -->
-      <button
-        type="button"
-        class="focus-action exit-session-btn"
-        [matTooltip]="T.F.FOCUS_MODE.BACK_TO_PLANNING | translate"
-        [attr.aria-label]="T.F.FOCUS_MODE.BACK_TO_PLANNING | translate"
-        (click)="exitToPlanning()"
-      >
-        <mat-icon>arrow_back</mat-icon>
-        <span class="action-label">{{
-          T.F.FOCUS_MODE.BACK_TO_PLANNING | translate
-        }}</span>
-      </button>
+      <!-- Cancel session: ends it and closes the focus overlay. "Hide focus"
+           (top right) is the exit that keeps the session running. On phones it
+           lives, labelled, in the More menu so the row stays calm. -->
+      @if (!isXs()) {
+        <button
+          mat-button
+          type="button"
+          class="focus-action exit-session-btn"
+          [attr.aria-label]="T.F.FOCUS_MODE.CANCEL_SESSION | translate"
+          (click)="exitToPlanning()"
+        >
+          <mat-icon>arrow_back</mat-icon>
+          <span class="action-label">{{
+            T.F.FOCUS_MODE.CANCEL_SESSION | translate
+          }}</span>
+        </button>
+      }
 
       <!-- Pause / resume the session (the task-row time stack is read-only). -->
       @if (focusModeService.isSessionPaused()) {
         <button
+          mat-stroked-button
           type="button"
           class="focus-action pause-resume-btn"
           [matTooltip]="T.F.FOCUS_MODE.RESUME_SESSION | translate"
@@ -282,6 +287,7 @@
         </button>
       } @else {
         <button
+          mat-stroked-button
           type="button"
           class="focus-action pause-resume-btn"
           [matTooltip]="T.F.FOCUS_MODE.PAUSE_SESSION | translate"
@@ -295,6 +301,7 @@
 
       @if (isShowCompleteSessionButton()) {
         <button
+          mat-button
           type="button"
           class="focus-action complete-session-btn"
           [matTooltip]="T.F.FOCUS_MODE.END_SESSION | translate"
@@ -306,7 +313,7 @@
         </button>
       }
 
-      @if (isXs() && (isPomodoro() || displayed)) {
+      @if (isXs()) {
         <button
           mat-icon-button
           class="secondary-actions-menu-btn"
@@ -349,6 +356,7 @@
 
         @if (displayed) {
           <button
+            mat-button
             type="button"
             class="focus-action ico-btn show-additional-info-btn show-notes-btn"
             [matTooltip]="T.F.FOCUS_MODE.SHOW_HIDE_NOTES_AND_ATTACHMENTS | translate"
@@ -370,6 +378,15 @@
 
 <mat-menu #secondarySessionActions="matMenu">
   <ng-template matMenuContent>
+    <!-- Phones only (this menu has no other trigger): the labelled cancel action. -->
+    <button
+      mat-menu-item
+      class="exit-session-menu-item"
+      (click)="exitToPlanning()"
+    >
+      <mat-icon>arrow_back</mat-icon>
+      <span>{{ T.F.FOCUS_MODE.CANCEL_SESSION | translate }}</span>
+    </button>
     @if (isShowCompleteSessionButton() && isPomodoro()) {
       <button
         mat-menu-item

@@ -11,13 +11,14 @@
   @if (activePage()) {
     <main>
       <button
+        mat-button
         class="close-btn"
         type="button"
         (click)="closeOverlay()"
         [attr.aria-label]="T.F.FOCUS_MODE.HIDE_FOCUS | translate"
       >
-        <span>{{ T.F.FOCUS_MODE.HIDE_FOCUS | translate }}</span>
-        <mat-icon>close</mat-icon>
+        <span class="close-label">{{ T.F.FOCUS_MODE.HIDE_FOCUS | translate }}</span>
+        <mat-icon iconPositionEnd>close</mat-icon>
       </button>
 
       <!-- Mode selector is now integrated into focus-mode-main component -->

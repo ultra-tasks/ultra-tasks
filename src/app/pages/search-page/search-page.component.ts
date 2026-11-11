@@ -477,6 +477,9 @@ export class SearchPageComponent implements OnInit {
 
   navigateToItem(item: SearchItem): void {
     if (!item) return;
+    // A deleted task has nowhere to go to. Restoring is its own explicit button
+    // (restoreDeletedItem), never a side effect of activating the row.
+    if (item.deletedEntry) return;
     this.itemChosen.emit();
     if (item.isProject) {
       this._router.navigate([`/project/${item.id}/tasks`]);
@@ -484,10 +487,6 @@ export class SearchPageComponent implements OnInit {
     }
     if (item.isTag) {
       this._router.navigate([`/tag/${item.id}/tasks`]);
-      return;
-    }
-    if (item.deletedEntry) {
-      void this.restoreDeletedItem(item);
       return;
     }
     if (item.isNote) {

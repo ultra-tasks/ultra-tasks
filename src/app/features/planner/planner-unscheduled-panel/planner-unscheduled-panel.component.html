@@ -1,0 +1,104 @@
+<header>
+  <h2>
+    {{ T.F.PLANNER.UNSCHEDULED_TITLE | translate }}
+    <span class="count">{{ total() }}</span>
+  </h2>
+  <button
+    mat-icon-button
+    type="button"
+    class="close-btn"
+    [attr.aria-label]="T.G.CLOSE | translate"
+    (click)="panel.close()"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<button
+  mat-button
+  type="button"
+  class="filter-btn mat-button-compact"
+  [matMenuTriggerFor]="filterMenu"
+  [attr.aria-label]="T.F.PLANNER.UNSCHEDULED_FILTER_LABEL | translate"
+>
+  @if (activeFilter() === ALL) {
+    {{ T.F.PLANNER.UNSCHEDULED_FILTER_ALL | translate }}
+  } @else if (activeFilter() === inboxId) {
+    {{ T.G.INBOX_PROJECT_TITLE | translate }}
+  } @else {
+    {{ activeProjectTitle() }}
+  }
+  <mat-icon iconPositionEnd>expand_more</mat-icon>
+</button>
+<mat-menu #filterMenu="matMenu">
+  <button
+    mat-menu-item
+    type="button"
+    (click)="panel.setProjectFilter(ALL)"
+  >
+    <mat-icon>{{ activeFilter() === ALL ? 'check' : '' }}</mat-icon>
+    <span>{{ T.F.PLANNER.UNSCHEDULED_FILTER_ALL | translate }}</span>
+  </button>
+  @for (project of projects(); track project.id) {
+    <button
+      mat-menu-item
+      type="button"
+      (click)="panel.setProjectFilter(project.id)"
+    >
+      <mat-icon>{{ activeFilter() === project.id ? 'check' : '' }}</mat-icon>
+      <span>{{
+        project.id === inboxId ? (T.G.INBOX_PROJECT_TITLE | translate) : project.title
+      }}</span>
+    </button>
+  }
+</mat-menu>
+
+<div
+  class="rows"
+  cdkDropList
+  cdkDropListSortingDisabled
+  [cdkDropListData]="listId"
+  [cdkDropListEnterPredicate]="rejectIncoming"
+>
+  @for (task of rows(); track task.id) {
+    <div
+      class="row"
+      cdkDrag
+      [cdkDragData]="task"
+    >
+      <span class="title">{{ task.title }}</span>
+      <!-- The project, only for tasks outside the Inbox: the Inbox is the
+           default, and a label on every row would only crowd the titles. -->
+      @if (
+        activeFilter() === ALL &&
+          task.projectId !== inboxId &&
+          task.projectId &&
+          projectTitles().get(task.projectId);
+        as project
+      ) {
+        <span class="meta">{{ project }}</span>
+      }
+      @if (task.timeEstimate) {
+        <span class="meta">{{ task.timeEstimate | msToString }}</span>
+      }
+      <button
+        mat-icon-button
+        type="button"
+        class="schedule-btn"
+        [attr.aria-label]="T.F.TASK.CMP.SCHEDULE | translate"
+        (click)="openSchedule(task)"
+      >
+        <mat-icon>event</mat-icon>
+      </button>
+    </div>
+  } @empty {
+    <p class="empty-state">{{ T.F.PLANNER.NO_UNSCHEDULED | translate }}</p>
+  }
+</div>
+
+@if (hiddenCount() > 0) {
+  <p class="note">
+    {{ T.F.PLANNER.UNSCHEDULED_MORE | translate: { count: hiddenCount() } }}
+  </p>
+}
+<p class="note hint">{{ T.F.PLANNER.UNSCHEDULED_HINT | translate }}</p>

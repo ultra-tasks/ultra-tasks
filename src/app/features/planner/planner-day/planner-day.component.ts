@@ -82,6 +82,32 @@ export class PlannerDayComponent {
     return this.day?.dayDate;
   }
 
+  @HostBinding('class.is-today') get isTodayClass(): boolean {
+    return !!this.day?.isToday;
+  }
+
+  /** Nothing at all on this day: no tasks, repeats, events, scheduled items or deadlines. */
+  @HostBinding('class.is-empty') get isEmpty(): boolean {
+    const day = this.day;
+    return (
+      !!day &&
+      this.isListEmpty &&
+      !day.scheduledIItems?.length &&
+      !day.deadlineTasks?.length
+    );
+  }
+
+  /** The unscheduled list is empty: the dashed drop zone shows instead of rows. */
+  get isListEmpty(): boolean {
+    const day = this.day;
+    return (
+      !!day &&
+      !day.tasks?.length &&
+      !day.noStartTimeRepeatProjections?.length &&
+      !day.allDayEvents?.length
+    );
+  }
+
   @HostBinding('attr.data-planner-selection-scope')
   get selectionScopeAttr(): string | undefined {
     return this.day?.dayDate;

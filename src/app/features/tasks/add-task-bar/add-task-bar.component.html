@@ -6,14 +6,13 @@
   @if (!isSearchMode()) {
     @let destination = currentProject() || (defaultProject$ | async);
     @if (destination) {
-      <div
-        class="st-capture-context"
+      <!-- One destination control: the project chip in the action row. This
+           live region only announces a change of destination to assistive tech. -->
+      <span
+        class="st-capture-context cdk-visually-hidden"
         aria-live="polite"
+        >{{ T.F.ULTRA_TASKS.ADDING_TO | translate }} {{ destination.title }}</span
       >
-        <mat-icon aria-hidden="true">list_alt</mat-icon>
-        <span>{{ T.F.ULTRA_TASKS.ADDING_TO | translate }}</span>
-        <strong>{{ destination.title }}</strong>
-      </div>
     }
   }
   <div class="input-section">

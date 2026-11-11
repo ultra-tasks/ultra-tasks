@@ -112,20 +112,16 @@
               @expandFade
               class="add-more-or-finish"
             >
-              <div class="no-tasks-illu-wrapper">
-                <h2 class="no-tasks-label">
-                  @if (
-                    hasDoneTasks() || (workContextService.doneTodayArchived$ | async)
-                  ) {
-                    {{ T.WW.NO_PLANNED_TASK_ALL_DONE | translate }}
-                  } @else if (isProjectContext()) {
-                    <!-- "Planned" is day-planning wording; a project just has none. -->
-                    {{ T.WW.NO_TASKS_IN_PROJECT | translate }}
-                  } @else {
-                    {{ T.WW.NO_PLANNED_TASKS | translate }}
-                  }
-                </h2>
-              </div>
+              <p class="empty-state">
+                @if (hasDoneTasks() || (workContextService.doneTodayArchived$ | async)) {
+                  {{ T.WW.NO_PLANNED_TASK_ALL_DONE | translate }}
+                } @else if (isProjectContext()) {
+                  <!-- "Planned" is day-planning wording; a project just has none. -->
+                  {{ T.WW.NO_TASKS_IN_PROJECT | translate }}
+                } @else {
+                  {{ T.WW.NO_PLANNED_TASKS | translate }}
+                }
+              </p>
 
               <!-- Only where the list below has no inline "Add task" row, so the
                    empty state offers one way to add. -->

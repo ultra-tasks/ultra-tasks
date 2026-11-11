@@ -98,10 +98,14 @@ test.describe('App Features', () => {
       drawer.getByRole('menuitem', { name: /Issue Provider Panel/ }),
     ).not.toBeAttached();
     await expect(drawer.getByRole('menuitem', { name: /Project Notes/ })).toBeVisible();
-    await page
-      .locator('magic-side-nav')
-      .getByRole('menuitem', { name: 'Integrations', exact: true })
-      .click();
+    // Nothing is connected, so Integrations has no sidebar row yet; the
+    // workspace stays reachable by its route.
+    await expect(
+      page
+        .locator('magic-side-nav')
+        .getByRole('menuitem', { name: 'Integrations', exact: true }),
+    ).toHaveCount(0);
+    await page.goto('/#/integrations');
     await expect(page.locator('integrations-page')).toBeVisible();
     await goToAppFeatures(settingsPage);
     await expect(

@@ -250,15 +250,49 @@
   }
 }
 
-.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--planner-item-height);
-  padding-inline: var(--s);
-  color: var(--text-color-muted);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-snug);
+// An empty day: a dashed drop zone instead of a "No tasks" line, and the add
+// button only on hover or focus where a pointer can reveal it (it stays visible
+// on touch, and while its composer is open).
+.normal-tasks-items.is-empty {
+  min-height: var(--s9);
+  border: 1px dashed var(--divider-color);
+  border-radius: var(--r-md);
+
+  // While a task is dragged, every day that can take it is marked as a target.
+  &.cdk-drop-list-receiving {
+    border-color: var(--palette-accent-text);
+    background: var(--palette-selected);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :host(.is-empty) add-task-inline {
+    opacity: 0;
+    transition: opacity var(--transition-standard);
+  }
+
+  :host(.is-empty:hover) add-task-inline,
+  :host(.is-empty:focus-within) add-task-inline,
+  :host(.is-empty) add-task-inline:has(add-task-bar) {
+    opacity: 1;
+  }
+}
+
+// Phone: an empty day is a one-line header over a slim drop zone. The planned /
+// available line says nothing on a day with nothing planned.
+@include mq(xs, max) {
+  :host(.is-empty:not(.is-today)) {
+    margin-bottom: var(--s);
+
+    .day-counts,
+    .progress-container {
+      display: none;
+    }
+
+    .normal-tasks-items.is-empty {
+      min-height: var(--s5);
+    }
+  }
 }
 
 .all-day-event {

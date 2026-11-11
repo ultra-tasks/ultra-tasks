@@ -39,7 +39,12 @@ import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions'
 import { SimpleCounterService } from '../../simple-counter/simple-counter.service';
 import { SimpleCounter } from '../../simple-counter/simple-counter.model';
 import { ICAL_TYPE } from '../../issue/issue.const';
-import { MatFabButton, MatIconButton, MatMiniFabButton } from '@angular/material/button';
+import {
+  MatButton,
+  MatFabButton,
+  MatIconButton,
+  MatMiniFabButton,
+} from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIcon } from '@angular/material/icon';
@@ -102,6 +107,7 @@ import { LayoutService } from '../../../core-ui/layout/layout.service';
     FocusModeLayoutComponent,
     FocusClockFaceComponent,
     FocusModeTaskRowComponent,
+    MatButton,
     MatIconButton,
     MatTooltip,
     MatIcon,

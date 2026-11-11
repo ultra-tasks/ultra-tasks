@@ -434,7 +434,7 @@ describe('SearchPageComponent', () => {
       expect(latestResults[0].deletedEntry).toBeFalsy();
     }));
 
-    it('selecting one restores it and then navigates to it', fakeAsync(() => {
+    it('activating the row does not restore it; the Restore button does', fakeAsync(() => {
       const entry = deletedEntry({ id: 'gone', title: 'Lost Report' });
       deletedEntries = [entry];
       const calls: string[] = [];
@@ -448,6 +448,12 @@ describe('SearchPageComponent', () => {
       typeAndFlush('lost');
 
       component.navigateToItem(latestResults[0]);
+      tick();
+
+      expect(recentlyDeletedSpy.restore).not.toHaveBeenCalled();
+      expect(navigateToTaskServiceSpy.navigate).not.toHaveBeenCalled();
+
+      void component.restoreDeletedItem(latestResults[0]);
       tick();
 
       expect(recentlyDeletedSpy.restore).toHaveBeenCalledOnceWith(entry);

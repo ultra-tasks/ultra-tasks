@@ -57,6 +57,7 @@
 <div class="normal-tasks">
   <div
     class="normal-tasks-items"
+    [class.is-empty]="isListEmpty"
     cdkDropList
     [cdkDropListData]="day.dayDate"
     [cdkDropListAutoScrollStep]="8"
@@ -94,13 +95,10 @@
       ></planner-calendar-event>
     }
 
-    <!-- -->
-    @if (
-      day.tasks.length === 0 &&
-      day.noStartTimeRepeatProjections.length === 0 &&
-      day.allDayEvents.length === 0
-    ) {
-      <div class="empty">{{ T.F.PLANNER.NO_TASKS | translate }}</div>
+    <!-- An empty day is a dashed drop zone, not a repeated "No tasks" line.
+         Assistive tech still hears it. -->
+    @if (isListEmpty) {
+      <span class="cdk-visually-hidden">{{ T.F.PLANNER.NO_TASKS | translate }}</span>
     }
   </div>
 

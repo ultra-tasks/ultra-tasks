@@ -240,18 +240,6 @@ finish-day-btn,
   }
 }
 
-// Keep the empty message aligned with the task column and its add action.
-.no-tasks-illu-wrapper {
-  margin: var(--s4) 0 var(--s3);
-
-  .no-tasks-label {
-    font: var(--type-heading);
-    margin: 0;
-    text-align: start;
-    color: var(--text-color-muted);
-  }
-}
-
 // Unified collapsible section styles
 .collapsible-section {
   margin-top: var(--s2);

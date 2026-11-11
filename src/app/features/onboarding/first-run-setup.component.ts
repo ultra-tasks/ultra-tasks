@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { MatButton } from '@angular/material/button';
 import { MatDialogRef } from '@angular/material/dialog';
 import { TranslatePipe } from '@ngx-translate/core';
 import { GlobalThemeService } from '../../core/theme/global-theme.service';
@@ -11,7 +12,7 @@ export type FirstRunChoice = 'fresh' | 'restore' | 'import' | 'skip';
   templateUrl: './first-run-setup.component.html',
   styleUrl: './first-run-setup.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
+  imports: [MatButton, TranslatePipe],
 })
 export class FirstRunSetupComponent {
   readonly T = T;

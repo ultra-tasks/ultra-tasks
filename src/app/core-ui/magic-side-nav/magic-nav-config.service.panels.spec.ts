@@ -22,6 +22,7 @@ import { PluginService } from '../../plugins/plugin.service';
 import { MenuTreeService } from '../../features/menu-tree/menu-tree.service';
 import { SnackService } from '../../core/snack/snack.service';
 import { T } from '../../t.const';
+import { selectTotal as selectIssueProviderCount } from '../../features/issue/store/issue-provider.selectors';
 
 /**
  * Below 600px nothing renders the right-panel toggles in the header, so the
@@ -50,6 +51,7 @@ describe('MagicNavConfigService panel items', () => {
     over: Partial<AppFeaturesConfig>,
     sidePanelButtons: SidePanelBtn[] = [],
     contexts: { main: unknown; inbox: unknown } = { main: null, inbox: null },
+    issueProviderCount = 0,
   ): NavItem[] => {
     layout = {
       toggleNotes: jasmine.createSpy('toggleNotes'),
@@ -62,7 +64,15 @@ describe('MagicNavConfigService panel items', () => {
       providers: [
         MagicNavConfigService,
         { provide: LayoutService, useValue: layout },
-        { provide: Store, useValue: { select: () => of([]), dispatch } },
+        {
+          provide: Store,
+          useValue: {
+            // The nav only asks the store for lists, except the provider count.
+            select: (selector: unknown) =>
+              selector === selectIssueProviderCount ? of(issueProviderCount) : of([]),
+            dispatch,
+          },
+        },
         {
           provide: GlobalConfigService,
           useValue: {
@@ -135,7 +145,14 @@ describe('MagicNavConfigService panel items', () => {
   it('ignores the retired issue-panel flag', () => {
     const items = build({ ...ALL_OFF, isIssuesPanelEnabled: true });
     expect(panelItems(items)).toEqual([]);
-    expect(items.filter((item) => item.id === 'integrations').length).toBe(1);
+  });
+
+  it('shows Integrations only once an integration is connected', () => {
+    const none = build(ALL_OFF);
+    expect(none.filter((item) => item.id === 'integrations').length).toBe(0);
+
+    const connected = build(ALL_OFF, [], { main: null, inbox: null }, 2);
+    expect(connected.filter((item) => item.id === 'integrations').length).toBe(1);
   });
 
   it('lists every plugin side panel, toggling it and running its own handler', () => {
@@ -162,8 +179,9 @@ describe('MagicNavConfigService panel items', () => {
 
 /**
  * The phone drawer is Browse: what the bottom nav and Settings already reach is
- * left out of it. Today, Inbox and Upcoming are bottom-nav buttons; Plugins and
- * Account are Settings rows on a phone; Support us moves under Help.
+ * left out of it. Today, Inbox and Upcoming are bottom-nav buttons; Account is a
+ * Settings row on a phone; Plugins & integrations is a Settings row everywhere;
+ * Support us lives under Help on every screen size.
  */
 describe('MagicNavConfigService phone drawer placement', () => {
   let items: NavItem[];
@@ -235,9 +253,15 @@ describe('MagicNavConfigService phone drawer placement', () => {
     expect(find('planner')?.desktopOnly).toBe(true);
   });
 
-  it('leaves Plugins and Account to the Settings rows on a phone', () => {
-    expect(find('plugins')?.desktopOnly).toBe(true);
+  it('leaves Account to the Settings rows on a phone, and Plugins to Settings everywhere', () => {
     expect(find('account')?.desktopOnly).toBe(true);
+    // Plugins & integrations is reached from Settings on every screen size.
+    expect(find('plugins')).toBeUndefined();
+  });
+
+  it('shows Integrations only once something is connected', () => {
+    // This suite's store has no issue providers.
+    expect(find('integrations')).toBeUndefined();
   });
 
   it('keeps Settings and Help in the drawer', () => {
@@ -245,19 +269,18 @@ describe('MagicNavConfigService phone drawer placement', () => {
     expect(find('help')?.desktopOnly).toBeUndefined();
   });
 
-  it('moves Support us under Help on a phone', () => {
+  it('keeps Support us under Help on every screen size', () => {
     const help = find('help');
     const children = help?.type === 'menu' ? help.children : [];
-    const donate = find('donate');
 
-    // Donation links are off on iOS and macOS builds, where neither exists.
+    // No top-level row; donation links are off on iOS and macOS builds, where
+    // the Help entry does not exist either.
+    expect(find('donate')).toBeUndefined();
+    const donate = children.find((c) => c.id === 'help-donate');
     if (!donate) {
-      expect(children.find((c) => c.id === 'help-donate')).toBeUndefined();
       return;
     }
-    expect(donate.desktopOnly).toBe(true);
-    const phoneDonate = children.find((c) => c.id === 'help-donate');
-    expect(phoneDonate?.mobileOnly).toBe(true);
-    expect(phoneDonate?.type).toBe('action');
+    expect(donate.mobileOnly).toBeUndefined();
+    expect(donate.type).toBe('action');
   });
 });

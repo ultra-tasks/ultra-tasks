@@ -10,7 +10,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { selectPlannerDayMap } from './store/planner.selectors';
 import { signal } from '@angular/core';
 import { PlannerDay } from './planner.model';
-import { Task } from '../tasks/task.model';
+import { LS } from '../../core/persistence/storage-keys.const';
 
 describe('PlannerComponent', () => {
   let fixture: ComponentFixture<PlannerComponent>;
@@ -86,27 +86,19 @@ describe('PlannerComponent', () => {
 
   afterEach(() => {
     TestBed.inject(MockStore).resetSelectors();
+    localStorage.removeItem(LS.PLANNER_UNSCHEDULED_OPEN);
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('offers only unfinished, unscheduled top-level Inbox tasks in the panel', () => {
-    const tasks = [
-      { id: 'available', projectId: 'INBOX_PROJECT', isDone: false },
-      { id: 'planned', projectId: 'INBOX_PROJECT', dueDay: '2026-02-17' },
-      { id: 'timed', projectId: 'INBOX_PROJECT', dueWithTime: 1234 },
-      { id: 'done', projectId: 'INBOX_PROJECT', isDone: true },
-      { id: 'child', projectId: 'INBOX_PROJECT', parentId: 'available' },
-      { id: 'project', projectId: 'project-1' },
-    ] as Task[];
-    TestBed.inject(MockStore).overrideSelector(selectAllTasks, tasks);
-    TestBed.inject(MockStore).refreshState();
-    fixture.detectChanges();
-    expect(component.unscheduledInboxTasks().map((task) => task.id)).toEqual([
-      'available',
-    ]);
+  it('shows the unscheduled panel only once it is open', () => {
+    expect(component.unscheduledPanel.isOpen()).toBe(false);
+    component.unscheduledPanel.toggle();
+    expect(component.unscheduledPanel.isOpen()).toBe(true);
+    component.unscheduledPanel.close();
+    expect(component.unscheduledPanel.isOpen()).toBe(false);
   });
 
   describe('daysWithTasks', () => {

@@ -7,6 +7,10 @@ import { TranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import { LS } from '../../core/persistence/storage-keys.const';
 import { ExampleTasksService } from '../../core/example-tasks/example-tasks.service';
+import {
+  FirstRunGateService,
+  FirstRunOutcome,
+} from '../../core/example-tasks/first-run-gate.service';
 import { FirstRunChoice } from './first-run-setup.component';
 import { FirstRunSetupService } from './first-run-setup.service';
 import { OnboardingHintService, OnboardingStep } from './onboarding-hint.service';
@@ -109,6 +113,62 @@ describe('FirstRunSetupService', () => {
     closed.next('restore');
     expect(router.navigate).toHaveBeenCalledWith(['/config'], {
       queryParams: { tab: 5 },
+    });
+  });
+
+  describe('example-task gate', () => {
+    let gate: FirstRunGateService;
+    let released: FirstRunOutcome[];
+
+    beforeEach(() => {
+      gate = TestBed.inject(FirstRunGateService);
+      released = [];
+      spyOn(gate, 'release').and.callFake((outcome) => released.push(outcome));
+      spyOn(gate, 'hold').and.callThrough();
+    });
+
+    it('holds the gate while the welcome may open, and releases it with the choice', () => {
+      TestBed.inject(FirstRunSetupService);
+      expect(gate.hold).toHaveBeenCalledTimes(1);
+      step.set('create-task');
+      TestBed.tick();
+      expect(released).toEqual([]);
+      closed.next('fresh');
+      expect(released).toEqual(['fresh']);
+      expect(localStorage.getItem(LS.EXAMPLE_TASKS_CREATED)).toBeNull();
+    });
+
+    it('treats a dismissed dialog as Skip', () => {
+      TestBed.inject(FirstRunSetupService);
+      step.set('create-task');
+      TestBed.tick();
+      closed.next(undefined);
+      expect(released).toEqual(['skip']);
+    });
+
+    ['restore', 'import'].forEach((choice) => {
+      it(`marks examples as done when the user chooses ${choice}`, () => {
+        TestBed.inject(FirstRunSetupService);
+        step.set('create-task');
+        TestBed.tick();
+        closed.next(choice as FirstRunChoice);
+        expect(released).toEqual([choice as FirstRunOutcome]);
+        expect(localStorage.getItem(LS.EXAMPLE_TASKS_CREATED)).toBe('true');
+      });
+    });
+
+    it('releases as not-offered when the profile already has data', () => {
+      state.set({ task: { ids: ['existing-task'] } });
+      TestBed.inject(FirstRunSetupService);
+      step.set('create-task');
+      TestBed.tick();
+      expect(released).toEqual(['not-offered']);
+    });
+
+    it('never holds the gate for a previously used profile', () => {
+      localStorage.setItem(LS.EXAMPLE_TASKS_CREATED, 'true');
+      TestBed.inject(FirstRunSetupService);
+      expect(gate.hold).not.toHaveBeenCalled();
     });
   });
 });

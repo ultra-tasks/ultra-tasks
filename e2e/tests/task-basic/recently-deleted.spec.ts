@@ -84,7 +84,12 @@ test.describe('Recently deleted', () => {
     await expect(result).toHaveCount(1);
     await expect(result).toContainText('Deleted');
 
-    await result.click();
+    // Activating the row does nothing; Restore is its own explicit button.
+    await result.locator('.search-result-main').click();
+    await expect(page).toHaveURL(/\/#\/search/);
+    await expectRecentlyDeletedStoredCount(page, 1);
+
+    await result.locator('.restore-deleted-btn').click();
     await expect(page).toHaveURL(/\/#\/tag\/TODAY\/tasks/);
     await expect(taskPage.getTaskByText(title)).toBeVisible();
     await expectRecentlyDeletedStoredCount(page, 0);

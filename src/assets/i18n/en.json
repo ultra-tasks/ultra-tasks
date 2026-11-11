@@ -350,6 +350,7 @@
       "BREAK_TITLE": "Break",
       "BROWSER_TITLE_BREAK": "Break",
       "BROWSER_TITLE_PAUSED": "Paused",
+      "CANCEL_SESSION": "Cancel session",
       "CLICK_TO_EDIT_DURATION": "Click to edit duration",
       "COMPLETE_FOCUS_SESSION": "Complete focus session",
       "COUNTDOWN": "Countdown",
@@ -967,8 +968,7 @@
       "EDIT_REPEATED_TASK": "Edit recurring task \"{{taskName}}\"",
       "ITEMS_TOTAL": "Tasks and events: {{count}}",
       "NO_TASKS": "No tasks",
-      "NO_UNSCHEDULED_INBOX": "No unscheduled Inbox tasks",
-      "UNSCHEDULED_INBOX": "Unscheduled tasks",
+      "NO_UNSCHEDULED": "No unscheduled tasks",
       "PLANNED_LOAD": "Planned: {{planned}}",
       "PLAN_VIEW": {
         "NO_DEADLINES": "No deadlines",
@@ -980,7 +980,12 @@
         "TASK_ALREADY_PLANNED": "Task is already planned for {{date}}",
         "TASK_PLANNED_FOR": "Task planned for <strong>{{date}}</strong>{{extra}}"
       },
-      "TOTAL_TASKS": "Tasks"
+      "TOTAL_TASKS": "Tasks",
+      "UNSCHEDULED_FILTER_ALL": "All projects",
+      "UNSCHEDULED_FILTER_LABEL": "Show tasks from",
+      "UNSCHEDULED_HINT": "Drag onto a day, or use Schedule",
+      "UNSCHEDULED_MORE": "{{count}} more. Filter by project to narrow the list.",
+      "UNSCHEDULED_TITLE": "Unscheduled"
     },
     "POMODORO": {
       "BREAK_IS_DONE": "Break is over!"

@@ -131,26 +131,6 @@ body.ultra-tasks {
   task .time-wrapper {
     font-variant-numeric: tabular-nums;
   }
-  // "Adding to ..." line of the capture bar: meta type, no rule (the action
-  // row's own hairline separates the two).
-  .st-capture-context {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--s-half);
-    padding: var(--s) var(--s2) 0;
-    color: var(--text-color-less-intense);
-    font: var(--type-meta);
-  }
-  .st-capture-context strong {
-    color: var(--text-color);
-    font-weight: var(--font-weight-semibold);
-  }
-  .st-capture-context mat-icon {
-    font-size: var(--icon-sm);
-    width: var(--icon-sm);
-    height: var(--icon-sm);
-  }
   // Detail panel title: flat, a heading in the same 56px band as the page
   // header, one hairline under it (no box, no second rule).
   task-detail-panel .task-title-wrapper {

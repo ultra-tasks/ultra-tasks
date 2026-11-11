@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
+import { NgTemplateOutlet } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject, Subject, of } from 'rxjs';
 import { NavigationEnd, Router } from '@angular/router';
@@ -432,7 +433,7 @@ describe('PageTitleComponent', () => {
     })
       .overrideComponent(PageTitleComponent, {
         set: {
-          imports: [TranslatePipe, MatMenu, MatIconButton, MatIcon],
+          imports: [TranslatePipe, MatMenu, MatIconButton, MatIcon, NgTemplateOutlet],
           schemas: [NO_ERRORS_SCHEMA],
         },
       })
@@ -480,6 +481,31 @@ describe('PageTitleComponent', () => {
     it('renders no actions at the smallest breakpoint', async () => {
       isXxxs$.next({ matches: true });
       expect(buttons(await renderAt('/active/tasks')).length).toBe(0);
+    });
+  });
+
+  describe('the title element', () => {
+    const titleEl = async (url: string): Promise<HTMLElement> => {
+      await configureRender();
+      routerStub.url = url;
+      const fixture = TestBed.createComponent(TitleHostComponent);
+      fixture.detectChanges();
+      return (fixture.nativeElement as HTMLElement).querySelector(
+        '.page-title',
+      ) as HTMLElement;
+    };
+
+    it('is a link to the task list on a work context page', async () => {
+      const el = await titleEl('/active/tasks');
+      expect(el.tagName).toBe('A');
+    });
+
+    ['/planner', '/search', '/config'].forEach((url) => {
+      it(`is a plain heading on ${url}, a page of its own with no task list to go to`, async () => {
+        const el = await titleEl(url);
+        expect(el.tagName).toBe('H1');
+        expect(el.getAttribute('href')).toBeNull();
+      });
     });
   });
 

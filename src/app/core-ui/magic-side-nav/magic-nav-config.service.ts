@@ -1,6 +1,7 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { SearchDialogService } from '../../pages/search-page/search-dialog/search-dialog.service';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 import { Store } from '@ngrx/store';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -24,6 +25,7 @@ import {
   selectUnarchivedVisibleProjects,
 } from '../../features/project/store/project.selectors';
 import { toggleHideFromMenu } from '../../features/project/store/project.actions';
+import { selectTotal as selectIssueProviderCount } from '../../features/issue/store/issue-provider.selectors';
 import { NavConfig, NavItem } from './magic-side-nav.model';
 import { NAV_SECTION_ICON } from './nav-section-icons.const';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
@@ -101,6 +103,15 @@ export class MagicNavConfigService {
   );
   private readonly _tagNavTree = computed<MenuTreeViewNode[]>(() =>
     this._menuTreeService.buildTagViewTree(this._tags()),
+  );
+  /**
+   * Integrations is a primary destination only once something is connected. A
+   * fresh install has none, so its sidebar stays calm; connecting happens from
+   * Settings → Plugins & integrations (and the /integrations route still works).
+   */
+  private readonly _hasIntegrations = toSignal(
+    this._store.select(selectIssueProviderCount).pipe(map((count) => count > 0)),
+    { initialValue: false },
   );
   private readonly _pluginMenuEntries = this._pluginBridge.menuEntries;
   private readonly isSchedulerEnabled = computed(
@@ -258,22 +269,7 @@ export class MagicNavConfigService {
           ]
         : []),
 
-      // Help Menu (rendered as mat-menu)
-      // Donation links are disabled on native iOS and every macOS desktop build
-      // to keep App Store review behavior deterministic (Guideline 3.1.1).
-      ...(this.isDonatePageEnabled() && !IS_DONATION_UI_RESTRICTED
-        ? [
-            {
-              type: 'route',
-              id: 'donate',
-              label: T.MH.DONATE,
-              icon: NAV_SECTION_ICON.DONATE,
-              route: '/donate',
-              featureConfigKey: 'isDonatePageEnabled',
-              desktopOnly: true,
-            } as NavItem,
-          ]
-        : []),
+      // Help Menu (rendered as mat-menu). Support us lives inside it.
       {
         type: 'menu',
         id: 'help',
@@ -314,7 +310,9 @@ export class MagicNavConfigService {
                 },
               ]
             : []),
-          // The phone drawer has no top-level Support us row; it lives here.
+          // Support us has no sidebar row of its own on any screen size.
+          // Donation links are disabled on native iOS and every macOS desktop
+          // build to keep App Store review behavior deterministic (Guideline 3.1.1).
           ...(this.isDonatePageEnabled() && !IS_DONATION_UI_RESTRICTED
             ? [
                 {
@@ -323,7 +321,6 @@ export class MagicNavConfigService {
                   label: T.MH.DONATE,
                   // Not the donate icon: "Contribute" above already uses it.
                   icon: 'favorite',
-                  mobileOnly: true as const,
                   action: () => void this._router.navigateByUrl('/donate'),
                 },
               ]
@@ -352,15 +349,6 @@ export class MagicNavConfigService {
         ],
       },
 
-      {
-        type: 'route',
-        id: 'plugins',
-        label: T.PLUGINS.MARKETPLACE,
-        icon: 'storefront',
-        route: '/plugins',
-        // Settings lists Plugins as a category on a phone.
-        desktopOnly: true,
-      },
       {
         type: 'route',
         id: 'settings',
@@ -469,13 +457,15 @@ export class MagicNavConfigService {
       });
     }
 
-    items.push({
-      type: 'route',
-      id: 'integrations',
-      label: T.F.INTEGRATIONS.TITLE,
-      icon: 'hub',
-      route: '/integrations',
-    });
+    if (this._hasIntegrations()) {
+      items.push({
+        type: 'route',
+        id: 'integrations',
+        label: T.F.INTEGRATIONS.TITLE,
+        icon: 'hub',
+        route: '/integrations',
+      });
+    }
 
     if (this.isBoardsEnabled()) {
       items.push({

@@ -5,6 +5,7 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  computed,
   DestroyRef,
   effect,
   ElementRef,
@@ -214,11 +215,28 @@ export class ConfigPageComponent implements OnInit {
   readonly isAccount = this._dialogData?.['account'] === 'true';
   readonly isPhone = inject(LayoutService).isXs;
   private readonly _router = inject(Router);
-  /** Windows of their own that Settings points to on a phone (no drawer rows). */
+  /**
+   * Windows of their own that Settings points to. Plugins & integrations has no
+   * sidebar row on any screen size; Account has one on desktop, so it is a
+   * Settings row on a phone only.
+   */
   readonly windowLinks = [
-    { path: '/plugins', label: T.PS.REDESIGN.PLUGINS, icon: 'extension' },
-    { path: '/account', label: T.PS.REFINEMENT.ACCOUNT, icon: 'account_circle' },
+    {
+      path: '/plugins',
+      label: T.PS.REDESIGN.PLUGINS,
+      icon: 'extension',
+      isPhoneOnly: false,
+    },
+    {
+      path: '/account',
+      label: T.PS.REFINEMENT.ACCOUNT,
+      icon: 'account_circle',
+      isPhoneOnly: true,
+    },
   ];
+  readonly visibleWindowLinks = computed(() =>
+    this.windowLinks.filter((link) => !link.isPhoneOnly || this.isPhone()),
+  );
   private readonly _dateFormat = inject(DateTimeFormatService);
   get dateExamples(): { regional: string; task: string } {
     const sample = new Date(2026, 10, 18, 14, 30);

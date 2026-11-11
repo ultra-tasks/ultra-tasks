@@ -77,6 +77,10 @@ export enum LS {
   ONBOARDING_PRESET_DONE = 'SUP_ONBOARDING_PRESET_DONE',
   ONBOARDING_HINTS_DONE = 'SUP_ONBOARDING_HINTS_DONE',
   FIRST_RUN_SETUP_DONE = 'ULTRA_FIRST_RUN_SETUP_DONE',
+  // Upcoming's unscheduled-tasks panel (device-local presentation, never synced):
+  // whether it is open, and which project it is filtered to ('ALL' or a project id).
+  PLANNER_UNSCHEDULED_OPEN = 'ULTRA_PLANNER_UNSCHEDULED_OPEN',
+  PLANNER_UNSCHEDULED_FILTER = 'ULTRA_PLANNER_UNSCHEDULED_FILTER',
   // Quick tour (device-local, never synced): the running step and its task, so
   // a reload resumes it. Removed once the tour ends.
   QUICK_TOUR_STATE = 'SUP_QUICK_TOUR_STATE',

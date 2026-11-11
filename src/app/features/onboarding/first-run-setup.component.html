@@ -2,8 +2,8 @@
   <header>
     <strong>{{ T.ONBOARDING.SETUP.BRAND | translate }}</strong>
     <button
+      mat-button
       type="button"
-      class="skip"
       (click)="finish('skip')"
     >
       {{ T.ONBOARDING.SETUP.SKIP | translate }}
@@ -62,9 +62,12 @@
     </label>
     <footer>
       <span>{{ T.ONBOARDING.SETUP.LATER | translate }}</span>
+      <!-- Initial focus: Enter on opening continues, it never skips. -->
       <button
+        mat-flat-button
+        color="primary"
         type="button"
-        class="continue"
+        cdkFocusInitial
         (click)="finish(selected())"
       >
         {{ T.ONBOARDING.SETUP.CONTINUE | translate }}

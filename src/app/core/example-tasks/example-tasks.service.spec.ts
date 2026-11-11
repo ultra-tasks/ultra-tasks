@@ -3,6 +3,7 @@ import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { of, Subject } from 'rxjs';
 import { TranslateService } from '@ngx-translate/core';
 import { ExampleTasksService } from './example-tasks.service';
+import { FirstRunGateService, FirstRunOutcome } from './first-run-gate.service';
 import { TaskService } from '../../features/tasks/task.service';
 import { selectAllTasks } from '../../features/tasks/store/task.selectors';
 import { TaskSharedActions } from '../../root-store/meta/task-shared.actions';
@@ -144,5 +145,37 @@ describe('ExampleTasksService', () => {
     expect(taskService.createNewTaskWithDefaults).not.toHaveBeenCalled();
     expect(dispatchSpy).not.toHaveBeenCalled();
     expect(localStorage.getItem(LS.EXAMPLE_TASKS_CREATED)).toBeNull();
+  });
+
+  describe('first-run welcome gate', () => {
+    let gate: FirstRunGateService;
+
+    beforeEach(() => {
+      store.overrideSelector(selectAllTasks, [] as Task[]);
+      gate = TestBed.inject(FirstRunGateService);
+      gate.hold();
+      TestBed.inject(ExampleTasksService);
+      syncReady$.next(true);
+    });
+
+    it('creates nothing behind the welcome, then creates the example task for Start fresh', () => {
+      expect(taskService.createNewTaskWithDefaults).not.toHaveBeenCalled();
+      gate.release('fresh');
+      expect(taskService.createNewTaskWithDefaults).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem(LS.EXAMPLE_TASKS_CREATED)).toBe('true');
+    });
+
+    it('also creates it when the welcome was skipped or dismissed', () => {
+      gate.release('skip');
+      expect(taskService.createNewTaskWithDefaults).toHaveBeenCalledTimes(1);
+    });
+
+    (['restore', 'import'] as FirstRunOutcome[]).forEach((outcome) => {
+      it(`creates no example task when the user chose ${outcome}`, () => {
+        gate.release(outcome);
+        expect(taskService.createNewTaskWithDefaults).not.toHaveBeenCalled();
+        expect(dispatchSpy).not.toHaveBeenCalled();
+      });
+    });
   });
 });

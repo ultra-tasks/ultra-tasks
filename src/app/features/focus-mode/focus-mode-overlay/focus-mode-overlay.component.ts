@@ -9,6 +9,7 @@ import { fadeInAnimation } from '../../../ui/animations/fade.ani';
 import { warpAnimation, warpInAnimation } from '../../../ui/animations/warp.ani';
 import { T } from 'src/app/t.const';
 import { BannerComponent } from '../../../core/banner/banner/banner.component';
+import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
 import { FocusModeMainComponent } from '../focus-mode-main/focus-mode-main.component';
@@ -28,6 +29,7 @@ import { CdkTrapFocus } from '@angular/cdk/a11y';
   animations: [expandAnimation, fadeInAnimation, warpAnimation, warpInAnimation],
   imports: [
     BannerComponent,
+    MatButton,
     MatIcon,
     FocusModeMainComponent,
     FocusModeSessionDoneComponent,

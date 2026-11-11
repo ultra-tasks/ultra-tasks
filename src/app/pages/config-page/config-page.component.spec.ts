@@ -177,11 +177,16 @@ describe('ConfigPageComponent', () => {
     expect(mockSyncWrapperService.sync).toHaveBeenCalled();
   });
 
-  it('lists Plugins and Account as the windows Settings points to on a phone', () => {
+  it('lists Plugins & integrations and Account as the windows Settings points to', () => {
     expect(component.windowLinks.map((link) => link.path)).toEqual([
       '/plugins',
       '/account',
     ]);
+  });
+
+  it('shows Plugins & integrations on every screen size and Account on a phone only', () => {
+    // Desktop (the default in this suite): Account has its own sidebar row.
+    expect(component.visibleWindowLinks().map((link) => link.path)).toEqual(['/plugins']);
   });
 
   it('openWindow() closes Settings and opens the other window', () => {

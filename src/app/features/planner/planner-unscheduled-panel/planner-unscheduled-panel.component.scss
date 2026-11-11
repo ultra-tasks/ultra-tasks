@@ -1,0 +1,94 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  // A layout dimension: wide enough for a task title and its meta, narrow
+  // enough to leave Upcoming its day columns.
+  flex: 0 0 240px;
+  min-height: 0;
+  overflow: auto;
+  margin-inline-start: var(--page-gutter);
+  padding: var(--s);
+  border: 1px solid var(--palette-border);
+  border-radius: var(--r-md);
+  background: var(--card-bg);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline-start: var(--s);
+
+  h2 {
+    margin: 0;
+    font: var(--type-body-strong);
+  }
+
+  .count {
+    margin-inline-start: var(--s-half);
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+  }
+}
+
+.filter-btn {
+  align-self: flex-start;
+  margin-bottom: var(--s-half);
+}
+
+.rows {
+  flex: 1;
+  min-height: var(--s8);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s);
+  min-height: var(--ctl-md);
+  padding-inline: var(--s);
+  border-radius: var(--r-md);
+  font: var(--type-body);
+  cursor: grab;
+
+  &:hover,
+  &:focus-within {
+    background: var(--state-hover);
+  }
+
+  .title {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .meta {
+    flex-shrink: 0;
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+  }
+
+  // One scheduling affordance per row, revealed on hover or keyboard focus. It
+  // stays visible where there is no hover to reveal it.
+  .schedule-btn {
+    flex-shrink: 0;
+    margin-inline-end: calc(-1 * var(--s));
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .schedule-btn {
+      opacity: 0;
+    }
+
+    &:hover .schedule-btn,
+    &:focus-within .schedule-btn {
+      opacity: 1;
+    }
+  }
+}
+
+.note {
+  margin: var(--s) var(--s) 0;
+  color: var(--text-color-muted);
+  font: var(--type-meta);
+}

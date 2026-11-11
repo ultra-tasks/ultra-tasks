@@ -1,8 +1,9 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { MatRipple } from '@angular/material/core';
 import { MatTooltip } from '@angular/material/tooltip';
-import { MatIconButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatMenu, MatMenuContent, MatMenuTrigger } from '@angular/material/menu';
 import { WorkContextMenuComponent } from '../../work-context-menu/work-context-menu.component';
@@ -28,6 +29,7 @@ import { PlainspaceShareService } from '../../../features/issue/providers/plains
 import { TaskViewCustomizerService } from '../../../features/task-view-customizer/task-view-customizer.service';
 import { TaskViewCustomizerPanelComponent } from '../../../features/task-view-customizer/task-view-customizer-panel/task-view-customizer-panel.component';
 import { GlobalConfigService } from '../../../features/config/global-config.service';
+import { PlannerUnscheduledPanelService } from '../../../features/planner/planner-unscheduled-panel/planner-unscheduled-panel.service';
 import { KeyboardConfig } from '@sp/keyboard-config';
 import { PluginBridgeService } from '../../../plugins/plugin-bridge.service';
 import { PluginService } from '../../../plugins/plugin.service';
@@ -40,6 +42,7 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
     RouterLink,
     MatRipple,
     MatTooltip,
+    MatButton,
     MatIconButton,
     MatIcon,
     MatMenu,
@@ -49,36 +52,40 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
     TaskViewCustomizerPanelComponent,
     TranslatePipe,
     PluginIconComponent,
+    NgTemplateOutlet,
   ],
   template: `
     @if (activeWorkContextTypeAndId()) {
-      <a
-        [matTooltip]="T.MH.GO_TO_TASK_LIST | translate"
-        class="page-title"
-        mat-ripple
-        routerLink="/active/tasks"
-      >
-        @if (sectionIcon(); as icon) {
-          <!-- Same icon the side nav shows for this section; it inherits the
-               title color, as the nav's route icons inherit theirs. -->
-          <mat-icon class="page-title-icon">{{ icon }}</mat-icon>
-        } @else if (pluginId(); as id) {
-          <plugin-icon
-            class="page-title-icon"
-            [pluginId]="id"
-            [size]="20"
-            [fallbackIcon]="pluginFallbackIcon()"
-          ></plugin-icon>
-        } @else if (activeWorkContext()) {
-          <mat-icon
-            class="page-title-icon"
-            [class.page-title-icon--emoji]="isContextEmojiIcon()"
-            [style.color]="contextIconColor()"
-            >{{ contextIcon() }}</mat-icon
-          >
-        }
-        <span class="page-title-text">{{ displayTitle() }}</span>
-      </a>
+      @if (isSpecialSection()) {
+        <!-- A page of its own (Search, Upcoming, a plugin): the title names the
+             page. Linking it to the task list, which is somewhere else, is
+             misleading, so it is a plain heading. -->
+        <h1 class="page-title page-title--static">
+          <ng-container *ngTemplateOutlet="titleBody"></ng-container>
+        </h1>
+      } @else {
+        <a
+          [matTooltip]="T.MH.GO_TO_TASK_LIST | translate"
+          class="page-title"
+          mat-ripple
+          routerLink="/active/tasks"
+        >
+          <ng-container *ngTemplateOutlet="titleBody"></ng-container>
+        </a>
+      }
+      @if (isPlannerPage() && !isXs()) {
+        <!-- Upcoming only: opens the unscheduled-tasks panel beside the days. -->
+        <button
+          mat-button
+          type="button"
+          class="planner-unscheduled-toggle mat-button-compact"
+          [attr.aria-expanded]="plannerPanel.isOpen()"
+          (click)="plannerPanel.toggle()"
+        >
+          <mat-icon>checklist</mat-icon>
+          {{ T.F.PLANNER.UNSCHEDULED_TITLE | translate }}
+        </button>
+      }
       @if (!isXxxs() && !isSpecialSection()) {
         <div class="page-title-actions">
           @if (isSharedOnPlainspace()) {
@@ -140,12 +147,40 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
         </ng-template>
       </mat-menu>
     }
+
+    <ng-template #titleBody>
+      @if (sectionIcon(); as icon) {
+        <!-- Same icon the side nav shows for this section; it inherits the
+               title color, as the nav's route icons inherit theirs. -->
+        <mat-icon class="page-title-icon">{{ icon }}</mat-icon>
+      } @else if (pluginId(); as id) {
+        <plugin-icon
+          class="page-title-icon"
+          [pluginId]="id"
+          [size]="20"
+          [fallbackIcon]="pluginFallbackIcon()"
+        ></plugin-icon>
+      } @else if (activeWorkContext()) {
+        <mat-icon
+          class="page-title-icon"
+          [class.page-title-icon--emoji]="isContextEmojiIcon()"
+          [style.color]="contextIconColor()"
+          >{{ contextIcon() }}</mat-icon
+        >
+      }
+      <span class="page-title-text">{{ displayTitle() }}</span>
+    </ng-template>
   `,
   styles: [
     `
       :host {
         display: contents;
         --page-title-icon-size: 20px;
+      }
+
+      .page-title--static {
+        margin: 0;
+        cursor: default;
       }
 
       .page-title {
@@ -452,6 +487,14 @@ export class PageTitleComponent {
   });
 
   isSpecialSection = computed(() => !!this._routeSection() || !!this.pluginId());
+  readonly plannerPanel = inject(PlannerUnscheduledPanelService);
+  // The phone layout (below 600px, as the layout's `isXs`): no panel there.
+  readonly isXs = toSignal(
+    this._breakpointObserver.observe('(max-width: 599px)').pipe(map((r) => r.matches)),
+    { initialValue: false },
+  );
+  /** Upcoming (not a project's Upcoming layout, which has no unscheduled panel). */
+  readonly isPlannerPage = computed(() => this._routeSection()?.[1] === T.MH.PLANNER);
   isWorkViewPage = computed(() => /tasks$/.test(this._url()));
 
   displayTitle = computed(() => {

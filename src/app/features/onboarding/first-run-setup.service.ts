@@ -6,6 +6,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { take } from 'rxjs/operators';
 import { LS } from '../../core/persistence/storage-keys.const';
 import { ExampleTasksService } from '../../core/example-tasks/example-tasks.service';
+import { FirstRunGateService } from '../../core/example-tasks/first-run-gate.service';
 import { hasAnyUserData } from '../../op-log/validation/has-meaningful-state-data.util';
 import { RootState } from '../../root-store/root-state';
 import { T } from '../../t.const';
@@ -27,6 +28,7 @@ export class FirstRunSetupService {
   ].some((key) => localStorage.getItem(key) !== null);
   private readonly _hints = inject(OnboardingHintService);
   private readonly _examples = inject(ExampleTasksService);
+  private readonly _gate = inject(FirstRunGateService);
   private readonly _state = inject(Store).selectSignal((state: RootState) => state);
   private readonly _dialog = inject(MatDialog);
   private readonly _router = inject(Router);
@@ -36,6 +38,10 @@ export class FirstRunSetupService {
 
   constructor() {
     if (this._hadPriorUse) return;
+    // Example tasks wait for the welcome (see FirstRunGateService). If guidance
+    // ends without it opening (sync enabled, a returning profile), they come on
+    // the next start, when the flags above make this a used profile.
+    this._gate.hold();
     effect(() => {
       if (this._presented || this._hints.currentStep() !== 'create-task') return;
       // A profile can retain IndexedDB after its local flags are cleared. Do
@@ -45,6 +51,7 @@ export class FirstRunSetupService {
         hasAnyUserData(this._state(), new Set(this._examples.createdExampleTaskIds()))
       ) {
         this._presented = true;
+        untracked(() => this._gate.release('not-offered'));
         return;
       }
       this._presented = true;
@@ -67,7 +74,14 @@ export class FirstRunSetupService {
       .subscribe((choice) => {
         this.isOpen.set(false);
         localStorage.setItem(LS.FIRST_RUN_SETUP_DONE, 'true');
-        if (choice === 'restore' || choice === 'import') {
+        const isBringingData = choice === 'restore' || choice === 'import';
+        if (isBringingData) {
+          // They bring their own data: no example task now or on a later start.
+          localStorage.setItem(LS.EXAMPLE_TASKS_CREATED, 'true');
+        }
+        // Closing the dialog any other way (Escape, backdrop) counts as Skip.
+        this._gate.release(choice ?? 'skip');
+        if (isBringingData) {
           void this._router.navigate(['/config'], { queryParams: { tab: 5 } });
         }
       });

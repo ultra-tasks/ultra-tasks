@@ -955,7 +955,9 @@ describe('FocusModeMainComponent - notes panel (issue #5752)', () => {
       controls.querySelectorAll(':scope > button, :scope > a'),
     ) as HTMLElement[];
 
-    expect(buttons.length).toBe(4);
+    // Pause, End session and More. Cancel session lives, labelled, in More.
+    expect(buttons.length).toBe(3);
+    expect(controls.querySelector('.exit-session-btn')).toBeNull();
     expect(controls.querySelector('.secondary-actions-menu-btn')).not.toBeNull();
   });
 
@@ -971,6 +973,10 @@ describe('FocusModeMainComponent - notes panel (issue #5752)', () => {
     ) as HTMLElement[];
 
     expect(buttons.length).toBe(6);
+    // Cancel session is a labelled button of its own, never a bare arrow.
+    expect(
+      controls.querySelector('.exit-session-btn .action-label')?.textContent?.trim(),
+    ).toBe('F.FOCUS_MODE.CANCEL_SESSION');
     expect(controls.querySelector('.secondary-actions-menu-btn')).toBeNull();
     expect(controls.querySelector('.reset-cycles-btn')).not.toBeNull();
     expect(controls.querySelector('.open-issue-btn')).not.toBeNull();

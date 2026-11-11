@@ -41,7 +41,7 @@ test('Calendar and Upcoming remain usable at a narrow width', async ({ page }) =
 
   await page.goto('/#/planner');
   await expect(page.locator('planner-day').first()).toBeVisible();
-  await expect(page.locator('planner .inbox-toggle')).toHaveCount(0);
+  await expect(page.locator('page-title .planner-unscheduled-toggle')).toHaveCount(0);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);

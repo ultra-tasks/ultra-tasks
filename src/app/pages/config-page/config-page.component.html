@@ -85,10 +85,11 @@
               >{{ category.label | translate }}
             </button>
           }
-          <!-- Phones only: the drawer has no Plugins or Account row, so they
-               are reached from here. They open their own windows. -->
-          @if (isPhone() && !isAccount) {
-            @for (link of windowLinks; track link.path; let first = $first) {
+          <!-- Windows of their own, reached from here: Plugins & integrations
+               on every screen size, Account on a phone (the drawer has no
+               row for either). -->
+          @if (!isAccount) {
+            @for (link of visibleWindowLinks(); track link.path; let first = $first) {
               <button
                 type="button"
                 class="window-link"

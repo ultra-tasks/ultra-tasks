@@ -20,9 +20,14 @@ test('Ultra Tasks workspace stays readable across themes and narrow screens', as
     await workViewPage.addTask(name);
   }
   await openGlobalAddTaskBar(page);
-  await expect(page.locator('add-task-bar.global .st-capture-context')).toContainText(
-    'Inbox',
+  // One visible destination control (the project chip); the live region is
+  // only announced to assistive tech.
+  await expect(page.locator('add-task-bar.global .st-capture-context')).toHaveText(
+    /Adding to Inbox/,
   );
+  await expect(
+    page.locator('add-task-bar.global .action-bar .action-btn').first(),
+  ).toContainText('Inbox');
   await page.locator('add-task-bar.global .main-input').click();
   await page.screenshot({
     animations: 'disabled',

@@ -37,26 +37,9 @@ footer > span {
   margin: var(--s) 0 var(--s3);
 }
 
-button,
 select {
   font: inherit;
   color: inherit;
-}
-
-button {
-  cursor: pointer;
-  &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    outline-offset: var(--focus-ring-offset);
-  }
-}
-
-.skip {
-  min-height: var(--ctl-md);
-  border: 0;
-  background: transparent;
-  color: var(--palette-accent-text);
-  font: var(--type-label);
 }
 
 .choices {
@@ -73,6 +56,12 @@ button {
     color: var(--text-color);
     text-align: start;
     font: var(--type-body);
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: var(--focus-ring-offset);
+    }
 
     &[aria-pressed='true'] {
       border-color: var(--palette-accent-text);
@@ -125,14 +114,4 @@ footer {
   justify-content: space-between;
   gap: var(--s2);
   margin-top: var(--s3);
-}
-
-.continue {
-  min-height: var(--ctl-md);
-  padding: 0 var(--s2);
-  border: 0;
-  border-radius: var(--r-md);
-  background: var(--palette-accent);
-  color: var(--palette-accent-ink);
-  font: var(--type-label);
 }

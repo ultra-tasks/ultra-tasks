@@ -158,9 +158,12 @@
     var(--ani-enter-timing);
 }
 
+// Status line under the digits. Anchored to the digits themselves
+// (--clock-time-size, declared on focus-clock-face), so it follows the clock
+// face on every screen size instead of a fixed share of its height.
 .clock-status {
   position: absolute;
-  top: 61%;
+  top: calc(50% + var(--clock-time-size) * 0.62);
   left: 50%;
   transform: translateX(-50%);
   color: var(--text-color-muted);
@@ -192,7 +195,7 @@
 // One step less intense than the clock time so it reads as a subtitle.
 .cycle-counter {
   position: absolute;
-  top: 72%;
+  top: calc(50% + var(--clock-time-size) * 0.68);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -208,6 +211,11 @@
     width: var(--s3);
     height: var(--s3);
   }
+}
+
+// With the status line shown, the counter sits one line below it.
+.clock-status + .cycle-counter {
+  top: calc(50% + var(--clock-time-size) * 0.62 + var(--s3));
 }
 
 // ========== ROW 4 (Preparation): PLAY BUTTON + SETTINGS COG ==========
@@ -291,7 +299,7 @@
 }
 
 // ========== ROW 4 (In Progress): SESSION CONTROL ROW ==========
-// Back to Planning · Pause · Complete · More — one content-height bottom row.
+// Cancel session · Pause · Complete · More — one content-height bottom row.
 // Secondary actions use the More menu on mobile and stay direct on wider screens.
 // Keeps the hover/window-focus reveal (--revealed-opacity) so it stays
 // distraction-free, matching the rest of focus mode.
@@ -319,8 +327,10 @@
     color: inherit;
   }
 
+  // The round 56px icon buttons. `.focus-action` buttons are Material text
+  // buttons with a label and keep their own size.
   a,
-  button {
+  button:not(.focus-action) {
     width: 56px !important;
     height: 56px !important;
     position: relative;
@@ -347,42 +357,6 @@
       font-weight: bold;
       line-height: 1;
     }
-  }
-
-  .focus-action {
-    width: auto !important;
-    min-width: var(--ctl-lg);
-    height: var(--ctl-lg) !important;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--s-half);
-    padding: 0 var(--s);
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: inherit;
-    font: var(--type-label);
-    cursor: pointer;
-
-    &:hover {
-      background: var(--state-hover);
-    }
-
-    &:focus-visible {
-      outline: var(--focus-ring-width) solid var(--focus-ring-color);
-      outline-offset: var(--focus-ring-offset);
-    }
-
-    mat-icon {
-      width: var(--icon-md) !important;
-      height: var(--icon-md) !important;
-      font-size: var(--icon-md) !important;
-    }
-  }
-
-  .pause-resume-btn {
-    border-color: var(--divider-color);
   }
 
   @include mq(xs, max) {

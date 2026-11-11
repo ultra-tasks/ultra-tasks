@@ -55,18 +55,6 @@ main {
   position: absolute;
   top: var(--s);
   right: calc(var(--s) + var(--safe-area-right));
-  min-width: var(--ctl-lg);
-  min-height: var(--ctl-lg);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-half);
-  padding: 0 var(--s);
-  border: 0;
-  border-radius: var(--r-md);
-  background: transparent;
-  color: inherit;
-  font: var(--type-label);
-  cursor: pointer;
   z-index: var(--z-focus-mode-close-btn);
   @include mousePrimaryDevice {
     transition: opacity var(--transition-leave);
@@ -88,19 +76,8 @@ main {
     top: calc(var(--s) + 40px);
   }
 
-  mat-icon {
-    font-size: var(--icon-lg);
-    width: var(--icon-lg);
-    height: var(--icon-lg);
-  }
-
-  &:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    outline-offset: var(--focus-ring-offset);
-  }
-
   @include mq(xs, max) {
-    span {
+    .close-label {
       display: none;
     }
   }

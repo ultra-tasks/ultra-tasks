@@ -7,6 +7,7 @@ import { selectAllTasks } from '../../features/tasks/store/task.selectors';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- grandfathered layer-boundary debt
 import { TaskService } from '../../features/tasks/task.service';
 import { T } from '../../t.const';
+import { FirstRunGateService } from './first-run-gate.service';
 import { LS } from '../persistence/storage-keys.const';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- grandfathered layer-boundary debt
 import { WorkContextType } from '../../features/work-context/work-context.model';
@@ -43,6 +44,7 @@ export class ExampleTasksService {
   private _syncTriggerService = inject(SyncTriggerService);
   private _translateService = inject(TranslateService);
   private _taskService = inject(TaskService);
+  private _firstRunGate = inject(FirstRunGateService);
 
   constructor() {
     if (localStorage.getItem(LS.EXAMPLE_TASKS_CREATED)) {
@@ -61,6 +63,10 @@ export class ExampleTasksService {
     this._syncTriggerService.afterInitialSyncDoneStrict$
       .pipe(
         first(),
+        // The first-run welcome decides first: no example task appears behind
+        // it, and none for someone who restores a backup or imports tasks.
+        switchMap(() => this._firstRunGate.whenReleased$()),
+        filter((outcome) => outcome !== 'restore' && outcome !== 'import'),
         switchMap(() => this._store.select(selectAllTasks).pipe(first())),
         // Tasks already exist (e.g. synced from another device): mark onboarding done
         // so a future empty-task startup does not recreate example tasks. (#7976)
