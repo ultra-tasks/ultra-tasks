@@ -86,7 +86,7 @@ describe('generic project moves and undo across two clients', () => {
     }, 60_000);
   }
 
-  it('exposes the existing project-order gap when another task is concurrently added', async () => {
+  it('keeps the known order-only divergence when another task is concurrently added', async () => {
     harness.tick();
     await harness.as(a, async () => {
       await update({ projectId: TARGET });
@@ -98,8 +98,12 @@ describe('generic project moves and undo across two clients', () => {
       expect(await harness.sync(a)).toBeTrue();
       expect(await harness.sync(b)).toBeTrue();
     }
-    // Project membership is maintained by task reducers, while conflicts are
-    // tracked per task. Independent appends can replay in opposite orders.
+    // Same members, opposite order, and it persists through further syncs and a
+    // restart. project.taskIds is a stored order list that task reducers append
+    // to, so two independent appends replay in opposite orders. Order-only
+    // differences do not qualify for a sync fix (contributor-sync-model.md, Fix
+    // intake); the options are in order-and-membership-options.md. Keep this
+    // reproduction so a deterministic order is noticed if it ever lands.
     expect((await stateOf(a)).targetIds).toEqual([TASK_ID, OTHER_ID]);
     expect((await stateOf(b)).targetIds).toEqual([OTHER_ID, TASK_ID]);
   }, 60_000);

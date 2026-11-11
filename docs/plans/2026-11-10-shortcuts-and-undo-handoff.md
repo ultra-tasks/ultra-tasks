@@ -129,7 +129,22 @@ three-client case) now asserts that the edit survives; 5 of them fail without
 the change. Not covered: project-list order after a restore (the specs compare
 the title only).
 
-Still open in stage 1: project-list order after a concurrent move and add.
+Project-list order (investigated, deliberately not fixed): moving a task into a
+project while another device concurrently appends to that project leaves the
+same members in opposite order (A: moved, other / B: other, moved). It persists
+through four sync rounds and a restart, and it needs a single move, not undo.
+Concurrent adds to the source project, and a move beside a title edit,
+converge. `project.taskIds` is a stored order list that task reducers append
+to, so the two appends replay in opposite orders. Fix intake excludes
+order-only differences, and `order-and-membership-options.md` records
+"do nothing" as a valid outcome for exactly this class; the only structural
+option there is a derived membership with a deterministic read-side order, a
+separate design decision with a visible effect on every list. The negative
+control in `undo-project-move-sync` stays as the reproduction. Moves remain a
+history barrier, so the current undo queue is unaffected; the question returns
+if undo of a move is added.
+
+Stage 1 is otherwise done.
 
 ## Validation completed
 
