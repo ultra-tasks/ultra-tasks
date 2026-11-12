@@ -123,7 +123,7 @@ test.describe.serial('Plugin Loading', () => {
 
     // Navigate back to work view to see plugin menu
     await page
-      .getByRole('dialog', { name: 'Plugins & integrations' })
+      .getByRole('dialog', { name: 'Marketplace' })
       .getByRole('button', { name: 'Close', exact: true })
       .click();
     await page.click('text=Today');
@@ -227,7 +227,7 @@ test.describe.serial('Plugin Loading', () => {
 
     // Navigate back to main view
     await page
-      .getByRole('dialog', { name: 'Plugins & integrations' })
+      .getByRole('dialog', { name: 'Marketplace' })
       .getByRole('button', { name: 'Close', exact: true })
       .click();
     await page.click('text=Today'); // Click on Today navigation
