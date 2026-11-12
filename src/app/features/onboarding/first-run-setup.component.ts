@@ -4,6 +4,7 @@ import { MatDialogRef } from '@angular/material/dialog';
 import { TranslatePipe } from '@ngx-translate/core';
 import { GlobalThemeService } from '../../core/theme/global-theme.service';
 import { T } from '../../t.const';
+import { IS_SYNC_AVAILABLE } from '../../app.constants';
 
 export type FirstRunChoice = 'fresh' | 'sync' | 'restore' | 'import' | 'skip';
 
@@ -16,6 +17,7 @@ export type FirstRunChoice = 'fresh' | 'sync' | 'restore' | 'import' | 'skip';
 })
 export class FirstRunSetupComponent {
   readonly T = T;
+  readonly isSyncAvailable = IS_SYNC_AVAILABLE;
   readonly theme = inject(GlobalThemeService);
   readonly selected = signal<Exclude<FirstRunChoice, 'skip'>>('fresh');
   private readonly _dialogRef = inject(MatDialogRef<FirstRunSetupComponent>);
