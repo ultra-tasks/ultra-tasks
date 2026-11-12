@@ -4,7 +4,7 @@ This document tracks significant architectural decisions and patterns in the Sup
 
 It is also the **index** of accepted decisions: a decision recorded somewhere else — because it is long enough to stand alone, or because it is enforced as a contributor rule — must still be listed under [Decisions Recorded Elsewhere](#decisions-recorded-elsewhere).
 
-**Decisions:** [1. dueDay/dueWithTime Mutual Exclusivity Pattern](#1-duedayduewithtime-mutual-exclusivity-pattern) · [2. TODAY_TAG Virtual Tag Pattern](#2-today_tag-virtual-tag-pattern) · [3. Sync Package Boundary Direction](#3-sync-package-boundary-direction) · [4. Upload Conflict Safety via the lastSeq Row Lock Under RepeatableRead](#4-upload-conflict-safety-via-the-lastseq-row-lock-under-repeatableread) · [5. Project Completion: Decoupled Resolution over Atomic Multi-Entity Op](#5-project-completion-decoupled-resolution-over-atomic-multi-entity-op) · [6. Passkeys Stay Pending Until Email Verification](#6-passkeys-stay-pending-until-email-verification) · [7. Versioned Delete-Wins Semantics for Project Deletion](#7-versioned-delete-wins-semantics-for-project-deletion) · [8. Additive Data-Model Evolution over Schema Bumps](#8-additive-data-model-evolution-over-schema-bumps) · [9. Calendar Writes Live in Plugins, Behind Per-Provider Opt-In](#9-calendar-writes-live-in-plugins-behind-per-provider-opt-in) · [10. Vector Clocks over Server-Side Entity Versioning](#10-vector-clocks-over-server-side-entity-versioning)
+**Decisions:** [1. dueDay/dueWithTime Mutual Exclusivity Pattern](#1-duedayduewithtime-mutual-exclusivity-pattern) · [2. TODAY_TAG Virtual Tag Pattern](#2-today_tag-virtual-tag-pattern) · [3. Sync Package Boundary Direction](#3-sync-package-boundary-direction) · [4. Upload Conflict Safety via the lastSeq Row Lock Under RepeatableRead](#4-upload-conflict-safety-via-the-lastseq-row-lock-under-repeatableread) · [5. Project Completion: Decoupled Resolution over Atomic Multi-Entity Op](#5-project-completion-decoupled-resolution-over-atomic-multi-entity-op) · [6. Passkeys Stay Pending Until Email Verification](#6-passkeys-stay-pending-until-email-verification) · [7. Versioned Delete-Wins Semantics for Project Deletion](#7-versioned-delete-wins-semantics-for-project-deletion) · [8. Additive Data-Model Evolution over Schema Bumps](#8-additive-data-model-evolution-over-schema-bumps) · [9. Calendar Writes Live in Plugins, Behind Per-Provider Opt-In](#9-calendar-writes-live-in-plugins-behind-per-provider-opt-in) · [10. Vector Clocks over Server-Side Entity Versioning](#10-vector-clocks-over-server-side-entity-versioning) · [11. Two Remote Sync Engines; Provider Sync Receives Fixes Only](#11-two-remote-sync-engines-provider-sync-receives-fixes-only)
 
 ## Active Patterns & Decisions
 
@@ -598,6 +598,71 @@ The server prunes after conflict detection, before storage.
   problem)
 - SuperSync becomes the only supported backend, removing the "file providers need
   the clock path regardless" constraint
+
+### 11. Two Remote Sync Engines; Provider Sync Receives Fixes Only
+
+**Status**: ✅ Active (maintainer decision, 2026-11-11)
+
+**Decision**: Ultra Tasks keeps two remote sync engines behind one local
+operation log:
+
+1. The **UltraTasks account** engine (formerly the working name UltraSync): the
+   native encrypted scope protocol. It uses per-record revisions, atomic
+   transactions, a three-way record merge with private conflict drafts, and
+   WebSocket change signals. All new sync capability goes here, including
+   collaboration, faster catch-up and change signals.
+2. The **provider** engine: op-log transports with vector clocks, used by OneDrive,
+   WebDAV and the remaining legacy targets (Dropbox, Nextcloud, local file, legacy
+   SuperSync). It receives **only security fixes, bug fixes and data-safety
+   fixes**. It gets no new features, sharing, change signals, or new merge
+   behavior.
+
+The local operation log is not frozen. It stays the durable intent source for
+both engines, and the account engine's personal bridge depends on it.
+
+**Rationale**:
+
+- Users without an account still get personal sync through storage they already
+  own. Removing that conflicts with the offline- and privacy-first principles.
+- The two engines resolve conflicts differently (vector clocks with field-level
+  last-write-wins, versus record revisions with three-way merge and drafts).
+  Developing both would double the work on merge rules, edge cases and tests.
+  Freezing one keeps the second engine's cost bounded.
+- Only the account engine can support collaboration, membership, key rotation and
+  near-real-time delivery. A shared cloud folder is not presented as collaboration.
+- The engines never run together on one dataset. A device uses one personal sync
+  mode at a time, and linking the account refuses while provider sync is enabled
+  (`NATIVE_SYNC.ERROR_LEGACY`). The remaining risk is an old device still writing to
+  a previous provider, which neither side can detect. Switching modes therefore
+  stays an explicit disconnect, recovery-point and data-choice workflow.
+
+**What counts as a fix**: anything that closes a security issue, prevents data
+loss, a sync stop or permanent divergence, corrects behavior that breaks for users,
+or keeps a provider working when its API, authentication or platform changes.
+Sync rule 15 (evidence of harm) still applies.
+
+**Implementation**:
+
+- Account engine: [`src/app/features/native-sync/`](src/app/features/native-sync/)
+  and `@sp/sync-providers/ultra-tasks` (the released SDK from
+  [ultra-tasks-server](https://github.com/ultra-tasks/ultra-tasks-server)); contract
+  in its [native sync doc](https://github.com/ultra-tasks/ultra-tasks-server/blob/main/apps/server/docs/native-sync.md).
+- Provider engine: [`packages/sync-providers/src/`](packages/sync-providers/src/)
+  and [`src/app/op-log/sync/`](src/app/op-log/sync/); see
+  [`docs/sync-and-op-log/README.md`](docs/sync-and-op-log/README.md).
+- Setup labels OneDrive and WebDAV "Personal sync only — no team collaboration"
+  ([0.3.0 plan](docs/plans/2026-11-07-ultrasync-0.3.0-release.md)).
+
+**No new providers**: the **Google Drive** provider that the 0.3.0 plan scheduled
+after 0.3.0 is dropped for now (maintainer, 2026-11-11). A new provider adapter is
+new provider-engine work under this decision.
+
+**When to Update This Pattern**:
+
+- The maintainer retires provider sync entirely (Decision 10's "SuperSync becomes
+  the only supported backend" condition then also applies to the account engine)
+- A provider-engine change is proposed that is not a security, bug or data-safety
+  fix
 
 ---
 
