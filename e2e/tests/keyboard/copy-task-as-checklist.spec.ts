@@ -20,13 +20,14 @@ test.describe('Copy task as markdown checklist', () => {
     await workViewPage.addSubTask(parent, 'Sub one');
     await workViewPage.addSubTask(parent, 'Sub two');
 
-    // clipboard-read cannot be granted in this browser context, so record what
-    // the app hands to the real clipboard API instead of reading it back.
+    // Ctrl+C is a native copy event: the app puts the checklist on the event's
+    // clipboardData and the browser hands that to the OS clipboard. clipboard-read
+    // cannot be granted in this browser context, so read back what the app set on
+    // the event. This listener is added after the app's own, so it runs after it.
     await page.evaluate(() => {
-      navigator.clipboard.writeText = (text: string): Promise<void> => {
-        window.__copiedText = text;
-        return Promise.resolve();
-      };
+      document.addEventListener('copy', (event) => {
+        window.__copiedText = event.clipboardData?.getData('text/plain');
+      });
     });
 
     await parent.focus();

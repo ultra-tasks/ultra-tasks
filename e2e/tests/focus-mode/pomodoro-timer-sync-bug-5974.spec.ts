@@ -73,6 +73,13 @@ const startFocusSession = async (page: Page): Promise<void> => {
 
 // Helper to complete current session
 const completeSession = async (page: Page): Promise<void> => {
+  // The session controls are hidden, and ignore the pointer, until the mouse is
+  // over the focus view or keyboard focus is inside it (touch always shows them).
+  // A user moves the mouse there before clicking; Playwright checks the click
+  // target before it moves, so after the overlay was reopened from the header
+  // button the pointer would still rest outside and the layout row would
+  // intercept the click.
+  await page.locator('focus-mode-main').hover();
   const completeSessionBtn = page.locator('focus-mode-main .complete-session-btn');
   await expect(completeSessionBtn).toBeVisible({ timeout: 5000 });
   await completeSessionBtn.click();
