@@ -26,6 +26,8 @@ export class InlineInputComponent implements AfterViewInit {
   @Input() type: 'text' | 'duration' | 'time' = 'text';
   readonly value = input<string | number>();
   readonly displayValue = input<string>();
+  /** The accessible name of the field, which has no visible label of its own. */
+  readonly ariaLabel = input<string>();
   // TODO: Skipped for migration because:
   //  Your application code writes to the input. This prevents migration.
   @Input() newValue?: string | number;

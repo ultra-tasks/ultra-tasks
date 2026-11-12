@@ -12,6 +12,7 @@
       (keypress)="keypressHandler($event)"
       (ngModelChange)="onChange($event)"
       [ngModel]="value()"
+      [attr.aria-label]="ariaLabel() || null"
       class="duration-input"
       inputDuration
     />
@@ -23,6 +24,7 @@
       (keypress)="keypressHandler($event)"
       (ngModelChange)="onChange($event)"
       [ngModel]="value()"
+      [attr.aria-label]="ariaLabel() || null"
       [type]="type"
     />
   }

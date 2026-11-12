@@ -65,6 +65,12 @@
     &.has-default > ul:first-of-type > li:first-child .search-result-main {
       background: var(--palette-selected);
       color: var(--palette-selected-ink);
+
+      // The muted chip colour is too faint on the tonal row (3.9:1); the row's
+      // own ink is the one pair that is chosen to read on it.
+      kbd {
+        color: inherit;
+      }
     }
 
     .search-command {

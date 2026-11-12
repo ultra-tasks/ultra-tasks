@@ -51,6 +51,7 @@
         data-test="add-task-bar-clear-due-btn"
         (click)="clearDateWithSyntax(); $event.stopPropagation()"
         [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_DATE | translate"
+        [attr.aria-label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_DATE | translate"
         matTooltipPosition="above"
       >
         <mat-icon>close</mat-icon>
@@ -76,6 +77,7 @@
       data-test="add-task-bar-clear-deadline-btn"
       (click)="clearDeadlineWithSyntax(); $event.stopPropagation()"
       [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_DEADLINE | translate"
+      [attr.aria-label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_DEADLINE | translate"
       matTooltipPosition="above"
     >
       <mat-icon>close</mat-icon>
@@ -129,6 +131,7 @@
         class="clear-btn"
         (click)="clearTagsWithSyntax(); $event.stopPropagation()"
         [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_TAGS | translate"
+        [attr.aria-label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_TAGS | translate"
         matTooltipPosition="above"
       >
         <mat-icon>close</mat-icon>
@@ -157,6 +160,7 @@
       class="clear-btn"
       (click)="clearEstimateWithSyntax(); $event.stopPropagation()"
       [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_ESTIMATE | translate"
+      [attr.aria-label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_ESTIMATE | translate"
       matTooltipPosition="above"
     >
       <mat-icon>close</mat-icon>
@@ -186,6 +190,7 @@
       data-test="add-task-bar-clear-repeat-btn"
       (click)="clearRepeatSetting(); $event.stopPropagation()"
       [matTooltip]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_REPEAT | translate"
+      [attr.aria-label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_CLEAR_REPEAT | translate"
       matTooltipPosition="above"
     >
       <mat-icon>close</mat-icon>

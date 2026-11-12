@@ -42,10 +42,14 @@ header {
 }
 
 .row {
-  display: flex;
+  // The title takes the whole first column; the project and estimate sit on a
+  // line of their own under it, and the schedule button spans both lines.
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--s);
   align-items: center;
-  gap: var(--s);
   min-height: var(--ctl-md);
+  padding-block: var(--s-half);
   padding-inline: var(--s);
   border-radius: var(--r-md);
   font: var(--type-body);
@@ -57,9 +61,16 @@ header {
   }
 
   .title {
-    flex: 1;
+    grid-column: 1;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .meta-line {
+    grid-column: 1;
+    display: flex;
+    gap: var(--s);
+    min-width: 0;
   }
 
   .meta {
@@ -68,10 +79,20 @@ header {
     font: var(--type-meta);
   }
 
+  // A long project name is cut short rather than taking the line from the rest.
+  .meta.project {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   // One scheduling affordance per row, revealed on hover or keyboard focus. It
   // stays visible where there is no hover to reveal it.
   .schedule-btn {
-    flex-shrink: 0;
+    grid-column: 2;
+    grid-row: 1 / span 2;
     margin-inline-end: calc(-1 * var(--s));
   }
 

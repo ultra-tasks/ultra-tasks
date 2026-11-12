@@ -68,18 +68,21 @@
     >
       <span class="title">{{ task.title }}</span>
       <!-- The project, only for tasks outside the Inbox: the Inbox is the
-           default, and a label on every row would only crowd the titles. -->
-      @if (
-        activeFilter() === ALL &&
-          task.projectId !== inboxId &&
-          task.projectId &&
-          projectTitles().get(task.projectId);
-        as project
-      ) {
-        <span class="meta">{{ project }}</span>
-      }
-      @if (task.timeEstimate) {
-        <span class="meta">{{ task.timeEstimate | msToString }}</span>
+           default, and a label on every row would only crowd the titles. It sits
+           under the title so a long name can never squeeze the title narrow. -->
+      @let project =
+        activeFilter() === ALL && task.projectId && task.projectId !== inboxId
+          ? projectTitles().get(task.projectId)
+          : undefined;
+      @if (project || task.timeEstimate) {
+        <span class="meta-line">
+          @if (project) {
+            <span class="meta project">{{ project }}</span>
+          }
+          @if (task.timeEstimate) {
+            <span class="meta">{{ task.timeEstimate | msToString }}</span>
+          }
+        </span>
       }
       <button
         mat-icon-button

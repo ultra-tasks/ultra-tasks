@@ -65,6 +65,7 @@
         <inline-input
           (changed)="updateTimeEstimate($event)"
           [displayValue]="timeEstimate() | msToString"
+          [ariaLabel]="T.F.TASK.CMP.ESTIMATE | translate"
           [type]="'duration'"
           [value]="timeEstimate()"
         >
