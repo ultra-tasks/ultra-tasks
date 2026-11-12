@@ -3,6 +3,7 @@ import { AppFeaturesConfig } from '../../features/config/global-config.model';
 import { INBOX_PROJECT } from '../../features/project/project.const';
 import { NAV_SECTION_ICON } from '../../core-ui/magic-side-nav/nav-section-icons.const';
 import { T } from '../../t.const';
+import { IS_SYNC_AVAILABLE } from '../../app.constants';
 
 export type SearchCommandId =
   | 'today'
@@ -121,15 +122,20 @@ export const buildSearchCommands = (features: SearchCommandFeatures): SearchComm
         } satisfies SearchCommand,
       ]
     : []),
-  {
-    // The header button only appears once sync is chosen, so this is the way in
-    // from anywhere; it opens the same dialog, for first set-up and for changes.
-    id: 'sync',
-    kind: 'action',
-    labelKey: T.PS.SYNC.SET_UP_SYNC,
-    icon: 'cloud_sync',
-    aliases: ['configure sync'],
-  },
+  ...(IS_SYNC_AVAILABLE
+    ? [
+        {
+          // The header button only appears once sync is chosen, so this is the way
+          // in from anywhere; it opens the same dialog, for first set-up and for
+          // changes. The standalone web build has no sync at all.
+          id: 'sync',
+          kind: 'action',
+          labelKey: T.PS.SYNC.SET_UP_SYNC,
+          icon: 'cloud_sync',
+          aliases: ['configure sync'],
+        } satisfies SearchCommand,
+      ]
+    : []),
   {
     id: 'shortcuts',
     kind: 'action',

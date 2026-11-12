@@ -143,6 +143,43 @@
               "extractLicenses": true,
               "serviceWorker": "ngsw-config.json"
             },
+            "productionWebStandalone": {
+              "outputPath": {
+                "base": "dist",
+                "browser": "browser"
+              },
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "5.5mb",
+                  "maximumError": "6.25mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "20kb"
+                }
+              ],
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.web-standalone.ts"
+                }
+              ],
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": true
+                },
+                "fonts": true
+              },
+              "outputHashing": "all",
+              "sourceMap": true,
+              "namedChunks": false,
+              "aot": true,
+              "extractLicenses": true,
+              "serviceWorker": "ngsw-config.json"
+            },
             "stage": {
               "baseHref": "",
               "budgets": [

@@ -38,8 +38,18 @@ jobs:
       - name: Generate environment file
         run: npm run env
 
-      - name: Build Frontend for Web
-        run: npm run buildFrontend:prodWeb
+      - name: Build standalone (no-sync) web app
+        run: npm run buildFrontend:prodWebStandalone
+
+      - name: Keep the preview out of search indexes
+        # Browser data is stored per origin, so the preview must not become a
+        # place people keep real tasks. The production app lives at the root of
+        # the account origin.
+        run: |
+          {
+            echo '/*'
+            echo '  X-Robots-Tag: noindex, nofollow'
+          } > dist/browser/_headers
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3

@@ -8,7 +8,7 @@ Completion condition: The server builds and releases from its own repository, a 
 
 The [app 0.3.0 release plan](2026-11-07-ultrasync-0.3.0-release.md) now defines the confirmed UltraSync name/default, official/custom sign-in, MFA/storage parity, and provider deprecation direction. App 0.3.0 remains private-sync first; Google Drive and collaboration follow later. Server 1.0.0 and SDK versions remain separate release targets.
 
-Ultra Tasks will have a separately maintained server repository and Docker image. Users create an account with an email and password, sign in on their devices, and sync encrypted data automatically. A small account dashboard provides security, device management, and sync information; the full browser task application follows on the same hosting foundation.
+Ultra Tasks will have a separately maintained server repository and Docker image. Users create an account with an email and password, sign in on their devices, and sync encrypted data automatically. A small account dashboard provides security, device management, and sync information; the full browser task application follows at the root of the same origin (see the [hosted web app and account origin plan](2026-11-10-hosted-web-app-and-account-origin.md)).
 
 This plan replaces the repository ownership, hosted onboarding, and personal sync scheduling proposals in the [native collaboration plan](2026-11-05-native-encrypted-collaboration.md). It reuses the implemented native account and encrypted record protocol. Repository extraction must preserve existing cryptographic formats, database identities, retry semantics, and supported data.
 
@@ -121,9 +121,9 @@ Show the browser's local sync state only when that browser is a connected client
 
 The flow is Create account -> save recovery key -> verify email -> sign in -> connect a client. Login supports password managers and optional second factors. The dashboard does not pretend to be the full task application. Add an Open Ultra Tasks web entry only when that client is available.
 
-For the later web client, reserve an application route such as `/app/`, reuse the existing Angular application and account SDK, and keep service-worker scope and SPA fallback away from `/api/` and account recovery routes. Route reservation alone adds no placeholder UI. Integrating its browser profile/session handling must preserve the existing account-bound cache and single refresh owner; do not send tokens or vault keys through URLs, broad cookies, or local-storage handoffs. Browser login does not silently sign in an installed app.
+The later web client is served at the **root** of the account origin (`https://app.ultratasks.app/`), with `/account` remaining the dashboard and `/api/` the API; there is no `/app/` prefix. It reuses the existing Angular application and account SDK. The application uses hash routing, so it needs no SPA fallback; keep the service worker's navigation fallback away from `/account`, `/api/`, `/live`, and `/health`, and give any path-based page (the OAuth callback) an explicit file. Path ownership, hosting, headers, and rollout are in the [hosted web app and account origin plan](2026-11-10-hosted-web-app-and-account-origin.md). Route reservation alone adds no placeholder UI. Integrating its browser profile/session handling must preserve the existing account-bound cache and single refresh owner; do not send tokens or vault keys through URLs, broad cookies, or local-storage handoffs. Browser login does not silently sign in an installed app.
 
-The account origin serves no analytics or third-party scripts. Keep CSP, no-store policies, referrer protection, and a distinct offline/locked state. Browser-delivered code can access unlocked keys, so release integrity and XSS review are part of the E2EE security review.
+The account origin serves no analytics or third-party scripts. Keep CSP, no-store policies, referrer protection, and a distinct offline/locked state. The task application at `/` needs a broader CSP than the dashboard, so headers are set per path, never origin-wide. Browser-delivered code can access unlocked keys, so release integrity and XSS review are part of the E2EE security review.
 
 ## Updated sync scheme
 
@@ -284,7 +284,7 @@ Use Cloudflare for the public static website, DNS, and optional encrypted backup
 
 ## Work after the first server release
 
-1. Serve a versioned browser task application from the stable account origin, reusing the main app and E2EE SDK rather than rebuilding task views in the dashboard.
+1. Serve a versioned browser task application at the root of the stable account origin (hosting, path ownership, and rollout: [hosted web app and account origin plan](2026-11-10-hosted-web-app-and-account-origin.md)), reusing the main app and E2EE SDK rather than rebuilding task views in the dashboard.
 2. Release shared projects only after independent-password owner/editor/viewer scenarios, invitation isolation, member removal and rekey, ownership transfer, shared restore, deletion, lost-response retries after permission changes, and private-overlay preservation pass. Shared data must not leak through legacy task/plugin APIs. Integrate sharing into all relevant task views only after scope-aware references and private-field boundaries are implemented and tested.
 3. Introduce authenticated incremental catch-up and measured storage improvements where full-head downloads or whole-account local state rewrites become limiting.
 4. Complete legacy route/provider retirement after the migration window, retaining supported import/export readers and the ability to recover old data.

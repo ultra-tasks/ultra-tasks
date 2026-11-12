@@ -46,7 +46,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ProjectCfgFormKey } from '../../features/project/project.model';
 import { T } from '../../t.const';
 import { versions } from '../../../environments/versions';
-import { IS_ELECTRON } from '../../app.constants';
+import { IS_ELECTRON, IS_SYNC_AVAILABLE } from '../../app.constants';
 import { IS_ANDROID_WEB_VIEW_TOKEN } from '../../util/is-android-web-view';
 import { getAutomaticBackUpFormCfg } from '../../features/config/form-cfgs/automatic-backups-form.const';
 import { getAppVersionStr } from '../../util/get-app-version-str';
@@ -235,7 +235,11 @@ export class ConfigPageComponent implements OnInit {
     },
   ];
   readonly visibleWindowLinks = computed(() =>
-    this.windowLinks.filter((link) => !link.isPhoneOnly || this.isPhone()),
+    this.windowLinks.filter(
+      (link) =>
+        (!link.isPhoneOnly || this.isPhone()) &&
+        (IS_SYNC_AVAILABLE || link.path !== '/account'),
+    ),
   );
   private readonly _dateFormat = inject(DateTimeFormatService);
   get dateExamples(): { regional: string; task: string } {

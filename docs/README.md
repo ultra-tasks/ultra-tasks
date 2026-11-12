@@ -58,6 +58,7 @@ must link to their replacement, and keep their original number.
   — official/custom account setup, browser-to-app sign-in, MFA/storage parity,
   private-sync delivery, and personal-only provider migration; Google Drive follows later
 - [Server extraction and version one launch](plans/2026-11-07-server-extraction-and-v1-launch.md)
+- [Hosted web app and account origin](plans/2026-11-10-hosted-web-app-and-account-origin.md)
   — separate server and Docker repository, native account sync, account dashboard,
   Oracle deployment, and production release gates
 - [Native encrypted collaboration](plans/2026-11-05-native-encrypted-collaboration.md)

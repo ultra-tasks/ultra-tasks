@@ -112,7 +112,7 @@ For **production-docker**:
 
 For **production-web**:
 
-- Secrets: `WEB_SERVER_SSH_KEY`, `WEB_REMOTE_HOST`, `WEB_REMOTE_USER`, `WEB_REMOTE_TARGET`
+- Secrets: none. The release workflow now attaches the web bundle to the GitHub release instead of deploying over SSH, so `WEB_SERVER_SSH_KEY`, `WEB_REMOTE_HOST`, `WEB_REMOTE_USER` and `WEB_REMOTE_TARGET` are no longer used.
 
 #### C. Update Workflow Files (AUTOMATED - Skip this if already done)
 

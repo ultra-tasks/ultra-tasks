@@ -40,7 +40,7 @@ import {
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { AppFeaturesConfig } from '../../features/config/global-config.model';
 import { SnackService } from '../../core/snack/snack.service';
-import { IS_DONATION_UI_RESTRICTED } from '../../app.constants';
+import { IS_DONATION_UI_RESTRICTED, IS_SYNC_AVAILABLE } from '../../app.constants';
 import { resolveTagIcon } from '../../features/tag/resolve-tag-icon.util';
 import { LayoutService } from '../layout/layout.service';
 import { togglePluginPanel } from '../layout/store/layout.actions';
@@ -357,15 +357,19 @@ export class MagicNavConfigService {
         route: '/config',
         tourClass: 'tour-settingsMenuBtn',
       },
-      {
-        type: 'route',
-        id: 'account',
-        label: T.PS.REFINEMENT.ACCOUNT,
-        icon: 'account_circle',
-        route: '/account',
-        // Settings lists Account as a category on a phone.
-        desktopOnly: true,
-      },
+      ...(IS_SYNC_AVAILABLE
+        ? [
+            {
+              type: 'route' as const,
+              id: 'account',
+              label: T.PS.REFINEMENT.ACCOUNT,
+              icon: 'account_circle',
+              route: '/account',
+              // Settings lists Account as a category on a phone.
+              desktopOnly: true as const,
+            },
+          ]
+        : []),
     ],
     fullModeByDefault: true,
     showLabels: true,

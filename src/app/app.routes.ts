@@ -13,16 +13,21 @@ import {
 
 import { TagTaskPageComponent } from './pages/tag-task-page/tag-task-page.component';
 import { environment } from '../environments/environment';
+import { IS_SYNC_AVAILABLE } from './app.constants';
 
 export const APP_ROUTES: Routes = [
-  {
-    path: 'native-sync',
-    loadComponent: () =>
-      import('./features/native-sync/native-sync.component').then(
-        (m) => m.NativeSyncComponent,
-      ),
-    canActivate: [FocusOverlayOpenGuard],
-  },
+  ...(IS_SYNC_AVAILABLE
+    ? [
+        {
+          path: 'native-sync',
+          loadComponent: () =>
+            import('./features/native-sync/native-sync.component').then(
+              (m) => m.NativeSyncComponent,
+            ),
+          canActivate: [FocusOverlayOpenGuard],
+        },
+      ]
+    : []),
   // Eagerly loaded — this is the main view
   {
     path: 'tag/:id/tasks',
@@ -55,13 +60,17 @@ export const APP_ROUTES: Routes = [
     data: { page: 'config' },
     canActivate: [FocusOverlayOpenGuard, settingsDialogGuard],
   },
-  {
-    path: 'account',
-    loadComponent: () =>
-      import('./routes/pages.routes').then((m) => m.ConfigPageComponent),
-    data: { account: true },
-    canActivate: [FocusOverlayOpenGuard, settingsDialogGuard],
-  },
+  ...(IS_SYNC_AVAILABLE
+    ? [
+        {
+          path: 'account',
+          loadComponent: () =>
+            import('./routes/pages.routes').then((m) => m.ConfigPageComponent),
+          data: { account: true },
+          canActivate: [FocusOverlayOpenGuard, settingsDialogGuard],
+        },
+      ]
+    : []),
   {
     path: 'integrations',
     loadComponent: () =>

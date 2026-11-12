@@ -28,14 +28,16 @@
         <strong>{{ T.ONBOARDING.SETUP.START_FRESH | translate }}</strong>
         <span>{{ T.ONBOARDING.SETUP.START_FRESH_HINT | translate }}</span>
       </button>
-      <button
-        type="button"
-        [attr.aria-pressed]="selected() === 'sync'"
-        (click)="selected.set('sync')"
-      >
-        <strong>{{ T.ONBOARDING.SETUP.SYNC | translate }}</strong>
-        <span>{{ T.ONBOARDING.SETUP.SYNC_HINT | translate }}</span>
-      </button>
+      @if (isSyncAvailable) {
+        <button
+          type="button"
+          [attr.aria-pressed]="selected() === 'sync'"
+          (click)="selected.set('sync')"
+        >
+          <strong>{{ T.ONBOARDING.SETUP.SYNC | translate }}</strong>
+          <span>{{ T.ONBOARDING.SETUP.SYNC_HINT | translate }}</span>
+        </button>
+      }
       <button
         type="button"
         [attr.aria-pressed]="selected() === 'restore'"
