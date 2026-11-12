@@ -43,6 +43,62 @@ describe('completed task project ordering', () => {
     expect(hasManualDoneTaskOrder({ ...moved, projectId: 'other' })).toBeFalse();
   });
 
+  it('keeps an order across the few milliseconds between the live and replayed completion time', () => {
+    // The reducer and op-log capture each stamp doneOn, so a reload that replays
+    // the log sees a slightly later value than the one the order was saved with.
+    const moved = {
+      ...task('one', 2000),
+      doneOrder: { projectId: 'p', doneOn: 2000, key: 'zV' },
+    };
+    expect(hasManualDoneTaskOrder({ ...moved, doneOn: 2002 })).toBeTrue();
+    expect(hasManualDoneTaskOrder({ ...moved, doneOn: 2010 })).toBeTrue();
+    expect(hasManualDoneTaskOrder({ ...moved, doneOn: 1990 })).toBeTrue();
+    expect(hasManualDoneTaskOrder({ ...moved, doneOn: 2999 })).toBeTrue();
+  });
+
+  it('still drops an order once the task was completed a second or more later', () => {
+    const moved = {
+      ...task('one', 2000),
+      doneOrder: { projectId: 'p', doneOn: 2000, key: 'zV' },
+    };
+    expect(hasManualDoneTaskOrder({ ...moved, doneOn: 3000 })).toBeFalse();
+    expect(hasManualDoneTaskOrder({ ...moved, doneOn: 1000 })).toBeFalse();
+    expect(hasManualDoneTaskOrder({ ...moved, doneOn: 60_000 })).toBeFalse();
+  });
+
+  it('does not treat a missing completion time as the saved one', () => {
+    const saved = { projectId: 'p', doneOn: 2000, key: 'zV' };
+    expect(
+      hasManualDoneTaskOrder({
+        projectId: 'p',
+        doneOn: undefined,
+        doneOrder: saved,
+      }),
+    ).toBeFalse();
+    expect(
+      hasManualDoneTaskOrder({
+        projectId: 'p',
+        doneOn: undefined,
+        doneOrder: { ...saved, doneOn: null },
+      }),
+    ).toBeTrue();
+  });
+
+  it('keeps the manual position when the replayed completion time differs slightly', () => {
+    const older = task('older', 1000);
+    const newer = task('newer', 2000);
+    const moved = {
+      ...newer,
+      doneOn: 2007,
+      doneOrder: {
+        projectId: 'p',
+        doneOn: 2000,
+        key: doneTaskOrderBetween(doneTaskOrderKey(older), null, 'newer'),
+      },
+    };
+    expect(sortDoneTasksByProjectOrder([older, moved])).toEqual([older, moved]);
+  });
+
   it('can repeatedly insert before, after, and between keys', () => {
     const keys: string[] = [];
     let random = 9341;

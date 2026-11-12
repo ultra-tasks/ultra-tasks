@@ -9,12 +9,27 @@ const idSuffix = (id: string): string =>
   Array.from(id, (char) => char.codePointAt(0)!.toString(16).padStart(6, '0')).join('') +
   'V';
 
+// One completion gets two `doneOn` stamps: from the reducer when the task is
+// completed, and from op-log capture for the persisted operation, a few
+// milliseconds later. A reload that replays the log, or another device, sees the
+// second one, so a saved order has to survive that gap or it is lost on reload
+// and never matches across devices. A genuine second completion (reopen, then
+// complete again) is told apart by being further apart than this; one that is
+// closer keeps its manual place, which is harmless.
+const COMPLETION_TIME_TOLERANCE_MS = 1000;
+
+const isSameCompletion = (saved: number | null, current: number | null): boolean =>
+  saved === current ||
+  (saved !== null &&
+    current !== null &&
+    Math.abs(saved - current) < COMPLETION_TIME_TOLERANCE_MS);
+
 export const hasManualDoneTaskOrder = (
   task: Pick<Task, 'projectId' | 'doneOn' | 'doneOrder'>,
 ): boolean =>
   !!task.doneOrder &&
   task.doneOrder.projectId === task.projectId &&
-  task.doneOrder.doneOn === (task.doneOn ?? null) &&
+  isSameCompletion(task.doneOrder.doneOn, task.doneOn ?? null) &&
   /^[0-9A-Za-z]+V$/.test(task.doneOrder.key);
 
 export const doneTaskOrderKey = (
