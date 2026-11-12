@@ -13,6 +13,12 @@ const saveAttachment = async (
   const dialog = page.locator('dialog-edit-task-attachment');
   const pathInput = dialog.locator('input[name="path"]');
   const save = dialog.getByRole('button', { name: 'Save', exact: true });
+  // Visible is not ready: a path typed before the dialog has written its initial
+  // value can show in the field yet be dropped from the form model, so the save
+  // keeps the old path and the display check below cannot see it. Wait out the
+  // open animation first.
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.mdc-dialog--opening')).toHaveCount(0);
   // A fill that lands while the dialog is still opening can be cleared again,
   // so fill until the value sticks and the form accepts it.
   await expect(async () => {

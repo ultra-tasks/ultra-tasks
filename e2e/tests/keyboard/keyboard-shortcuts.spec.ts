@@ -368,7 +368,12 @@ test.describe('Keyboard Shortcuts', () => {
     await task.focus();
     await page.keyboard.press('t');
     const dialog = page.locator('dialog-time-estimate');
+    // Visible is not ready: a value typed before the dialog has written its
+    // initial value shows in the field but is dropped from the form model, so the
+    // save keeps the old estimate. Wait out the open animation first.
+    const dialogOpening = page.locator('.mdc-dialog--opening');
     await expect(dialog).toBeVisible();
+    await expect(dialogOpening).toHaveCount(0);
     await dialog.locator('input').nth(1).fill('30m');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden();
@@ -384,6 +389,7 @@ test.describe('Keyboard Shortcuts', () => {
     await task.focus();
     await page.keyboard.press('t');
     await expect(dialog).toBeVisible();
+    await expect(dialogOpening).toHaveCount(0);
     const estimateInput = dialog.locator('input').nth(1);
     await estimateInput.fill('45m');
     await estimateInput.press('Enter');
