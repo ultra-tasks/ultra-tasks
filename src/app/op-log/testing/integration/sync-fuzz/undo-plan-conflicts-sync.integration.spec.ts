@@ -7,7 +7,7 @@ const TASK_ID = 'undo-plan-conflict-task';
 const PROJECT_ID = 'INBOX_PROJECT';
 const ORDER = { projectId: PROJECT_ID, doneOn: 3000, key: 'aV' };
 
-describe('field undo against concurrent Add to Today', () => {
+describe('field edits and undo against concurrent Add to Today', () => {
   let harness: SyncFuzzHarness;
   let a: FuzzDevice;
   let b: FuzzDevice;
@@ -49,7 +49,7 @@ describe('field undo against concurrent Add to Today', () => {
     for (const uploadFirst of ['A', 'B'] as const) {
       for (const planNewer of [false, true]) {
         for (const withUndo of [false, true]) {
-          it(`records the ${field} ${withUndo ? 'redo' : 'single edit'} conflict when ${uploadFirst} uploads first and planning is ${planNewer ? 'newer' : 'older'}`, async () => {
+          it(`keeps the ${field} ${withUndo ? 'redo' : 'single edit'} and the plan when ${uploadFirst} uploads first and planning is ${planNewer ? 'newer' : 'older'}`, async () => {
             harness = await SyncFuzzHarness.create();
             a = await harness.addDevice('A');
             b = await harness.addDevice('B');
@@ -84,16 +84,19 @@ describe('field undo against concurrent Add to Today', () => {
                   await update(after);
                 }
               });
-            const plan = (): Promise<void> =>
-              harness.as(b, () =>
+            const plan = async (): Promise<void> => {
+              const planned = await taskOn(b);
+              await harness.as(b, () =>
                 harness.dispatch(
                   TaskSharedActions.planTasksForToday({
                     taskIds: [TASK_ID],
                     today,
                     startOfNextDayDiffMs: 0,
+                    plannedTask: planned,
                   }),
                 ),
               );
+            };
             harness.tick();
             if (planNewer) {
               await editAndUndo();
@@ -109,16 +112,13 @@ describe('field undo against concurrent Add to Today', () => {
               for (const device of devices) expect(await harness.sync(device)).toBeTrue();
             }
             const tasks = [await taskOn(a), await taskOn(b)];
-            if (planNewer) {
-              // Existing whole-task LWW can discard the unrelated field edit.
-              expect(
-                tasks.some(
-                  (task) => JSON.stringify(task[field]) !== JSON.stringify(after[field]),
-                ),
-              ).toBeTrue();
-            } else {
-              // A newer field update can instead discard the plan.
-              expect(tasks.some((task) => task.dueDay !== today)).toBeTrue();
+            // The plan declares the fields it writes, so field-level resolution
+            // keeps the unrelated edit and the plan in both timestamp orders.
+            for (const task of tasks) {
+              expect(task.dueDay).withContext('plan').toBe(today);
+              expect(JSON.stringify(task[field]))
+                .withContext(field)
+                .toBe(JSON.stringify(after[field]));
             }
             const beforeRestart = await taskOn(a);
             await harness.restart(a);

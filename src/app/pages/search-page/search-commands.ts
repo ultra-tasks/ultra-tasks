@@ -15,6 +15,8 @@ export type SearchCommandId =
   | 'add-task'
   | 'focus'
   | 'sync'
+  | 'undo'
+  | 'redo'
   | 'shortcuts';
 
 /** A destination opens a page; an action does something from where you are. */
@@ -39,13 +41,22 @@ export type SearchCommandFeatures = Pick<
   'isPlannerEnabled' | 'isSchedulerEnabled' | 'isFocusModeEnabled'
 >;
 
+/** Translation keys for Undo and Redo; a command is listed only when its key is set. */
+export interface SearchCommandHistory {
+  undoLabelKey?: string;
+  redoLabelKey?: string;
+}
+
 /**
  * The places and actions Search offers next to tasks. Only what the user can
  * reach is listed: Upcoming, Calendar and Focus follow their feature switches.
  * Integrations is always listed, because its navigation row appears only once
  * something is connected.
  */
-export const buildSearchCommands = (features: SearchCommandFeatures): SearchCommand[] => [
+export const buildSearchCommands = (
+  features: SearchCommandFeatures,
+  history: SearchCommandHistory = {},
+): SearchCommand[] => [
   {
     id: 'today',
     kind: 'destination',
@@ -133,6 +144,30 @@ export const buildSearchCommands = (features: SearchCommandFeatures): SearchComm
           labelKey: T.PS.SYNC.SET_UP_SYNC,
           icon: 'cloud_sync',
           aliases: ['configure sync'],
+        } satisfies SearchCommand,
+      ]
+    : []),
+  // Undo and Redo are offered only while there is something to undo or redo, and
+  // are named after what they would change.
+  ...(history.undoLabelKey
+    ? [
+        {
+          id: 'undo',
+          kind: 'action',
+          labelKey: history.undoLabelKey,
+          icon: 'undo',
+          shortcut: 'undo',
+        } satisfies SearchCommand,
+      ]
+    : []),
+  ...(history.redoLabelKey
+    ? [
+        {
+          id: 'redo',
+          kind: 'action',
+          labelKey: history.redoLabelKey,
+          icon: 'redo',
+          shortcut: 'redo',
         } satisfies SearchCommand,
       ]
     : []),

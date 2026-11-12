@@ -23,6 +23,8 @@ import { RecentlyDeletedService } from '../../features/tasks/recently-deleted/re
 import { RecentlyDeletedEntry } from '../../features/tasks/recently-deleted/recently-deleted.util';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
+import { TaskUndoService } from '../../features/tasks/task-undo.service';
+import { T } from '../../t.const';
 
 // Minimal stub task matching the Task interface shape
 const createTask = (overrides: Partial<Task> = {}): Task =>
@@ -154,6 +156,17 @@ describe('SearchPageComponent', () => {
           useValue: { openOverlay: jasmine.createSpy('openOverlay') },
         },
         {
+          provide: TaskUndoService,
+          useValue: {
+            canUndo: signal(true),
+            canRedo: signal(false),
+            undoField: signal<string | null>('title'),
+            redoField: signal<string | null>(null),
+            undo: jasmine.createSpy('undo'),
+            redo: jasmine.createSpy('redo'),
+          },
+        },
+        {
           provide: MenuTreeService,
           useValue: {
             projectFolderMap: projectFolderMapSignal,
@@ -204,6 +217,16 @@ describe('SearchPageComponent', () => {
   it('opens Focus without starting a session from the focus action', () => {
     component.runCommand(command('focus'));
     expect(TestBed.inject(FocusModeService).openOverlay).toHaveBeenCalled();
+  });
+
+  it('offers Undo while available, named after the change, and runs it', () => {
+    const history = TestBed.inject(TaskUndoService);
+    expect(command('undo').labelKey).toBe(T.GCF.KEYBOARD.UNDO_TITLE);
+    expect(component.commands().some((c) => c.id === 'redo')).toBeFalse();
+
+    component.runCommand(command('undo'));
+
+    expect(history.undo).toHaveBeenCalledTimes(1);
   });
 
   it('opens a destination through the router and closes the popup', () => {

@@ -1,7 +1,8 @@
 # Task undo and redo: design for implementation
 
 Status: a limited session queue is implemented for eligible single-task estimates,
-priority, notes, ordinary title edits, and a single completed-task reorder. The
+priority, notes, ordinary title edits, completing or reopening one ordinary task, and
+a single completed-task reorder. The
 app does not have general task undo. Expand coverage only after each action is
 safe end-to-end.
 
@@ -82,12 +83,22 @@ confirms no derived changes; syntax that changes tags, scheduling,
 projects, attachments or another field is a barrier. History is temporarily
 unavailable while parsing is pending and is cleared if parsing does not finish.
 
-Completion and reopening are history barriers. A two-device replay control
-showed that completing an initially unscheduled task can race with another
-device adding it to Today: a newer completion can lose the plan, and a newer
-plan can lose the redone completion. Some upload orders leave the devices with
-different results. Ordinary completion keeps its existing behavior; adding it
-to this queue requires a compatible fix for the underlying conflict path.
+Completing and reopening one ordinary task enters the queue (2026-11-11). A
+two-device control had shown that completing an initially unscheduled task could
+race with another device adding it to Today, because the plan was an opaque
+operation that fell back to whole-task LWW. A single-task Add to Today now
+declares the fields it writes, so the plan and the completion (or its undo and
+redo) both survive in either upload order and either timestamp order. The
+eligible set is deliberately narrow: a local, non-repeating task without a
+reminder, won't-do mark or integration link, and not a timed task while an
+enabled integration can write calendar blocks. Completion effects that write more
+state (a reminder dismissal, a parent that completes with its last subtask)
+dispatch their own persistent action, which clears the history instead of being
+recorded. The gesture sites record the change (`TaskService.toggleDoneWithAnimation`
+callers and the context menu); programmatic callers, bulk completion and drag into
+Done stay barriers. Redo stamps a new completion time. An Add to Today that does
+not declare its fields (a subtask, a bulk plan, an older client) still falls
+back to whole-task LWW against a concurrent completion.
 
 The same existing whole-task conflict also affects title, notes, priority and
 completed-task ordering when Add to Today races on another device. Matched
@@ -103,14 +114,20 @@ Each supported command checks the fields and parent identity it reverses;
 unknown changes are barriers. A command stores no unrelated task snapshot and
 never records automatic or provider-originated updates.
 
-Add to Today remains a barrier. Even for a previously unscheduled task, a
-date-field update as an inverse can leave stale Today ordering when replayed on
-a later logical day. The existing unschedule action removes that ordering, but
-also triggers calendar-block deletion. More fundamentally, plan and unschedule
-actions are opaque to the field-level conflict path and fall back to whole-task
-last-write-wins: an offline concurrent edit can lose unrelated task content.
-A safe expansion needs a generic conflict-resolution path and two-client tests
-in both directions, as well as reminder, ordering and provider coverage.
+Adding one task to Today enters the queue only for a task with no schedule at
+all (2026-11-11). Undo takes it off Today with `updateTask { dueDay: null }`,
+which the existing reducer reconciles with the Today list and `planner.days`
+(and an LWW patch does the same, `syncPlannerDays`); redo dispatches the original
+plan again, only on the same logical day, so it never schedules a day the user did
+not choose. The earlier objections no longer hold for this case: the plan now
+declares the fields it writes, so it resolves per field against a concurrent edit
+or completion in either upload order, and an unscheduled root task has no reminder,
+time or earlier planner day that the plan would have cleared and the inverse could
+not restore. A task that already has a day, a reminder or a time, a subtask, a
+repeating or finished task, and a linked task keep the existing path. Every other
+scheduling action (a date or time from the dialog, Tomorrow and later, unscheduling,
+deadlines) stays a barrier. The older prototype below that used field patches for
+planning is superseded for this case.
 
 A narrower prototype used only `updateTask` field patches for planning,
 undo and redo. Eight two-device tests ran through the real operation capture,
@@ -122,18 +139,37 @@ do not maintain planner ordering. Updating only the new client's reducer would
 leave older clients inconsistent; any fix must also preserve released-client
 replay and concurrent ordering before this prototype can be enabled.
 
-Deleting and restoring a task is also unsafe to add to the queue as-is. Real
-two-device replay tests cover both the trash restore and the snackbar restore,
-both upload orders, and both timestamp winners. If the concurrent title edit
-predates the restore, each restore's whole-task snapshot currently wins over
-that unseen edit; the task reappears with the old title on both devices and
-after restart. A three-client control also loses both concurrent edits when
-their timestamps precede the restore. Simply copying a title into a new
-snapshot at the restore's timestamp would incorrectly outrank a third device's
-intervening edit. A safe
-fix needs a structural restoration that retains the original field-write
-timestamps, preserves archive and ordering effects, and remains compatible with
-released clients before queue deletion is enabled.
+Deleting one task is in the queue for a narrow case (2026-11-11). The earlier
+objection was that a restore's whole-task snapshot outranked a concurrent edit it
+had never seen. The sync layer now treats an adjacent delete and restore of the
+same snapshot from one client as inert (`demoteNetNoopRestorePlans`), so the round
+trip writes no field. Real two-device tests (`undo-delete-queue-sync`, 14 cases)
+run the exact actions the queue dispatches (the delete, `restoreDeletedTask` from
+the payload the delete captured, and a second delete for redo) against a newer and
+an older concurrent title edit in both upload orders, a concurrent completion, and
+a three-client control, and check the task, the project list and the Today list on
+both devices and after a restart. A delete older than a concurrent edit loses to
+the edit, whether it is typed directly or is the redo.
+
+A round-trip probe (`undo-delete-roundtrip`) compares the whole state before a
+delete and after the restore. The restore returns the task, its subtasks and its
+position in the project list, the backlog, tags, Today and the planner exactly.
+It does not return a section membership, and a restore does not recalculate a
+parent's times after a subtask delete, so those stay out. Eligible: an unfinished
+or finished root task, with or without subtasks, that has no section, no link to an
+integration or issue, no repeat configuration, no reminder and no time. Everything
+else (and bulk delete, reminders dialog, planner and schedule rows) keeps the
+existing snackbar path, because a delete also sends or cancels things a restore
+cannot return: a linked remote item is deleted after a short grace period, a
+calendar block, a native reminder, a repeating task's bookkeeping.
+
+The queue records its own delete (the existing delete path runs unchanged, so the
+snackbar and the trash still work) and reads the payload the delete captured
+without consuming it. The snackbar's Undo now does nothing when the task is
+already back, so Ctrl+Z followed by the snackbar cannot restore it twice.
+Restoring from the captured payload also stored a derived `subTasks` array on the
+task entities; the queue's payload leaves it out, and the older snackbar path still
+stores it (harmless, noted for a later cleanup).
 
 Project moves have a separate order problem. A prototype using single-task
 field updates preserved an unrelated concurrent title in both upload orders,
@@ -149,16 +185,17 @@ be partially replayed. The existing multi-task update is not generally safe to
 merge with concurrent task updates, so an atomic, compatible bulk representation
 is needed before adding grouped history.
 
-| Action                                                               | Queue status                                  | Requirement before adding more coverage                                                                                  |
-| -------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Estimate, priority, notes, ordinary title                            | Supported for eligible single-task edits      | Support other inputs only after accounting for short syntax, recurrence, parent recalculation and provider side effects. |
-| Completion or reopen                                                 | Barrier                                       | Preserve concurrent scheduling and model reminders, tracking, recurrence, parent/child effects and ordering.             |
-| Completed-task reorder                                               | Supported for a single root task in a project | Multi-task moves and other list ordering need an atomic inverse.                                                         |
-| Scheduling, tags, project moves, tracking                            | Barrier                                       | Model the full intent, related entities and side effects; prove a safe inverse.                                          |
-| Single delete and restore                                            | Existing time-limited snackbar only           | Coordinate one-shot capture, trash, provider deletion grace, and queue ownership.                                        |
-| Bulk actions, including delete                                       | Barrier initially                             | Atomic inverse for all affected entities and ordering; bulk delete currently has no undo.                                |
-| Linked-task priority and fields on read-only or stopped integrations | Supported as local field edits                | Provider push ignores priority, and read-only/stopped tasks do not make provider requests.                               |
-| Other linked or externally controlled changes                        | Barrier                                       | Explicit provider semantics; never promise to reverse a remote external side effect.                                     |
+| Action                                                               | Queue status                                                        | Requirement before adding more coverage                                                                                  |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Estimate, priority, notes, ordinary title                            | Supported for eligible single-task edits                            | Support other inputs only after accounting for short syntax, recurrence, parent recalculation and provider side effects. |
+| Completion or reopen                                                 | Supported for one ordinary local task                               | Reminders, recurrence, integrations, bulk completion and drag into Done stay barriers until each effect has an inverse.  |
+| Completed-task reorder                                               | Supported for a single root task in a project                       | Multi-task moves and other list ordering need an atomic inverse.                                                         |
+| Add to Today of an unscheduled task                                  | Supported for one ordinary local root task                          | A task with a day, reminder or time keeps the existing path until its earlier state has a faithful inverse.              |
+| Other scheduling, tags, project moves, tracking                      | Barrier                                                             | Model the full intent, related entities and side effects; prove a safe inverse.                                          |
+| Single delete and restore                                            | Supported for one ordinary root task; the snackbar and trash remain | A section, link, repeat, reminder or time keeps the existing path; bulk delete stays a barrier.                          |
+| Bulk actions, including delete                                       | Barrier initially                                                   | Atomic inverse for all affected entities and ordering; bulk delete currently has no undo.                                |
+| Linked-task priority and fields on read-only or stopped integrations | Supported as local field edits                                      | Provider push ignores priority, and read-only/stopped tasks do not make provider requests.                               |
+| Other linked or externally controlled changes                        | Barrier                                                             | Explicit provider semantics; never promise to reverse a remote external side effect.                                     |
 
 The candidate must be visible and useful enough to justify release. If the
 history would routinely be cleared during ordinary workflows, continue building

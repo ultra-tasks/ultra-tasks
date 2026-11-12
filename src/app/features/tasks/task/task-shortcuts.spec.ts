@@ -134,6 +134,8 @@ describe('TaskComponent shortcut handling', () => {
           useValue: {
             updateNotes: () => false,
             updateTitle: () => false,
+            updateDone: () => false,
+            addToToday: () => false,
           },
         },
         {
@@ -874,6 +876,7 @@ describe('TaskComponent shortcut handling', () => {
           startOfNextDayDiffMs: 0,
           // computed key: a quoted 'top-1' trips the naming-convention rule
           parentTaskMap: { ['top-1']: undefined },
+          plannedTask: component.task(),
         }),
       );
 

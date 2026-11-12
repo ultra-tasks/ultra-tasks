@@ -382,6 +382,34 @@ residual with the same end date, the enforced version floor (#10397). A
 `'replace'` here instead would lose tracked time (#10393 open question 6,
 decided 2026-10-06).
 
+**Decision 6, single-task Add to Today (2026-11-10, fork).** A single-root-task
+`planTasksForToday` states the fields it writes as a readable `{ id, changes }`
+beside its ids (`declarePlanForToday`), so it is no longer an opaque op in
+conflicts. The reducer ignores the declaration and conflict resolution reads it
+like an `updateTask`; released clients ignore the extra keys. Without it a plan
+and an unrelated field edit resolved by whole-task LWW: one side's change was
+lost and, in two of four orders, the devices diverged for good. The declaration
+is derived from the task as it was when the user acted and lists only what the
+plan changes. Subtasks, bulk plans and no-op plans stay opaque. LWW patches
+now also reconcile `planner.days` when `dueDay` changes
+(`syncPlannerDays` in `lww-update.meta-reducer.ts`), mirroring `updateTask`.
+Proof: `undo-plan-conflicts-sync.integration.spec.ts` (32 cases, both upload
+orders and timestamp winners, with and without undo/redo, restart) and
+`undo-scheduling-sync.integration.spec.ts`.
+
+**Decision 6, delete→restore round trips (2026-11-10, fork).** A client's
+`deleteTask` directly followed by `restoreTask`/`restoreDeletedTask` carrying
+the same task snapshot wrote no field. `demoteNetNoopRestorePlans` marks such
+pairs inert (per client, ignoring `subTasks` and `modified`) and, for
+timestamp-decided TASK plans, lets a side holding any non-inert op beat a side
+made only of them, so an unrelated concurrent edit is no longer lost to the
+restore's newer snapshot. Detection emits one conflict per remote op, so pairs
+are found across all of an entity's conflicts and each plan's sides are judged
+on their own ops. Archive and delete-wins plans, cascade (multi-entity)
+deletes, restores that change a field and two inert sides keep whole-entity
+LWW. Proof: `undo-delete-sync.integration.spec.ts` and
+`conflict-net-noop-restore.util.spec.ts`.
+
 **Decision 5a (2026-10-01, #10421).** Asked whether rule 1 below stays within
 decision 5, @johannesjo answered: "Ponder in sub agent and act according to
 recommendation". As recommended:

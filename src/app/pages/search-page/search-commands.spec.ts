@@ -2,6 +2,7 @@ import {
   buildSearchCommands,
   filterSearchCommands,
   SearchCommandFeatures,
+  SearchCommandHistory,
 } from './search-commands';
 
 describe('search commands', () => {
@@ -55,6 +56,21 @@ describe('search commands', () => {
     it('always lists Set up sync, the way in while the header button is hidden', () => {
       expect(ids(none)).toContain('sync');
       expect(ids(all)).toContain('sync');
+    });
+
+    it('lists Undo and Redo only while there is something to undo or redo', () => {
+      const idsWith = (history: SearchCommandHistory): string[] =>
+        buildSearchCommands(none, history).map((c) => c.id);
+      expect(idsWith({})).not.toContain('undo');
+      expect(idsWith({})).not.toContain('redo');
+      expect(idsWith({ undoLabelKey: 'U' })).toContain('undo');
+      expect(idsWith({ undoLabelKey: 'U' })).not.toContain('redo');
+      const both = buildSearchCommands(none, { undoLabelKey: 'U', redoLabelKey: 'R' });
+      expect(both.map((c) => c.id)).toEqual(
+        jasmine.arrayContaining(['undo', 'redo', 'shortcuts']),
+      );
+      expect(both.find((c) => c.id === 'undo')?.labelKey).toBe('U');
+      expect(both.find((c) => c.id === 'redo')?.shortcut).toBe('redo');
     });
 
     it('gives each destination a route and no action one', () => {

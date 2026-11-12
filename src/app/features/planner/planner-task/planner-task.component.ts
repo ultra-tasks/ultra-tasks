@@ -17,6 +17,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TaskCopy } from '../../tasks/task.model';
 import { TaskService } from '../../tasks/task.service';
+import { TaskUndoService } from '../../tasks/task-undo.service';
 import { isTouchActive } from '../../../util/input-intent';
 import { IS_HYBRID_DEVICE } from '../../../util/is-mouse-primary';
 import { DRAG_DELAY_FOR_TOUCH } from '../../../app.constants';
@@ -103,6 +104,7 @@ import { IssueSyncStateService } from '../../issue/two-way-sync/issue-sync-state
 })
 export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
   private _taskService = inject(TaskService);
+  private _taskUndo = inject(TaskUndoService);
   private _cd = inject(ChangeDetectorRef);
   private _destroyRef = inject(DestroyRef);
   private _elementRef = inject(ElementRef);
@@ -827,6 +829,7 @@ export class PlannerTaskComponent implements OnInit, OnDestroy, AfterViewInit {
       t.id,
       t.isDone,
       (v) => this.showDoneAnimation.set(v),
+      (expected, value) => this._taskUndo.updateDone(t.id, expected, value),
     );
   }
 

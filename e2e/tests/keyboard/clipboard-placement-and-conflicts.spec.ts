@@ -21,7 +21,7 @@ const readCompletionTime = (page: Page, id: string): Promise<number | undefined>
     return value;
   }, id);
 
-test('uses the current placement rules for copy and cut', async ({
+test('places copies and cut tasks after the focused task', async ({
   page,
   workViewPage,
   projectPage,
@@ -54,8 +54,8 @@ test('uses the current placement rules for copy and cut', async ({
   await page.keyboard.press('Control+C');
   await first.focus();
   await page.keyboard.press('Control+V');
-  await expect(rows.first()).toContainText(`${secondName} (copy)`);
-  await expect(rows.nth(1)).toHaveAttribute('data-task-id', firstId!);
+  await expect(rows.first()).toHaveAttribute('data-task-id', firstId!);
+  await expect(rows.nth(1)).toContainText(`${secondName} (copy)`);
 
   await projectPage.createProject('Clipboard placement destination');
   await projectPage.navigateToProjectByName('Clipboard placement destination');
@@ -71,8 +71,8 @@ test('uses the current placement rules for copy and cut', async ({
   await taskPage.getTaskByText(destinationFirst).focus();
   await page.keyboard.press('Control+V');
   await expect(rows.nth(0)).toContainText(destinationFirst);
-  await expect(rows.nth(1)).toContainText(destinationLast);
-  await expect(rows.nth(2)).toHaveAttribute('data-task-id', secondId!);
+  await expect(rows.nth(1)).toHaveAttribute('data-task-id', secondId!);
+  await expect(rows.nth(2)).toContainText(destinationLast);
 });
 
 test('reorders completed project tasks without changing completion time', async ({
@@ -323,9 +323,13 @@ test('pastes several copied tasks in the order they were copied', async ({
   await page.keyboard.press('Control+C');
   await page.keyboard.press('Control+V');
 
-  // The copies come in as they were in the list, not back to front.
+  // Where the copies land is the placement rule's business (after the focused
+  // task). Whatever the place, they must keep the order they had in the list,
+  // not come in back to front.
   await expect(rows).toHaveCount(6);
+  const copies = rows.filter({ hasText: '(copy)' });
+  await expect(copies).toHaveCount(3);
   for (let i = 0; i < 3; i++) {
-    await expect(rows.nth(i)).toContainText(`${listOrder[i]} (copy)`);
+    await expect(copies.nth(i)).toContainText(`${listOrder[i]} (copy)`);
   }
 });

@@ -18,3 +18,14 @@ export {
   type DiscoverNextcloudUserIdDeps,
   type DiscoverNextcloudUserIdResult,
 } from './file-based/webdav/discover-nextcloud-user-id';
+export {
+  startNextcloudLoginFlow,
+  pollNextcloudLoginFlow,
+  normalizeNextcloudServerUrl,
+  buildNextcloudDavFilesUrl,
+  NextcloudLoginFlowError,
+  type NextcloudLoginFlowDeps,
+  type NextcloudLoginFlowSession,
+  type NextcloudLoginFlowCredentials,
+  type PollNextcloudLoginFlowOptions,
+} from './file-based/webdav/nextcloud-login-flow';

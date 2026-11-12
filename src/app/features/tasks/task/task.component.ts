@@ -842,7 +842,9 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
     }
 
     this._isTaskDeleteTriggered = true;
-    this._taskService.remove(this.task());
+    const task = this.task();
+    const remove = (): void => this._taskService.remove(task);
+    if (!this._taskUndoService.removeTask(task, remove)) remove();
   }
 
   startTask(): void {
@@ -1197,6 +1199,7 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
       task.id,
       task.isDone,
       (v) => this.showDoneAnimation.set(v),
+      (expected, value) => this._taskUndoService.updateDone(task.id, expected, value),
     );
   }
 
@@ -1296,12 +1299,16 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
 
   addToMyDay(): void {
     const task = this.task();
+    const today = this._dateService.todayStr();
+    const startOfNextDayDiffMs = this._dateService.getStartOfNextDayDiffMs();
+    if (this._taskUndoService.addToToday(task, today, startOfNextDayDiffMs)) return;
     this._store.dispatch(
       TaskSharedActions.planTasksForToday({
         taskIds: [task.id],
-        today: this._dateService.todayStr(),
-        startOfNextDayDiffMs: this._dateService.getStartOfNextDayDiffMs(),
+        today,
+        startOfNextDayDiffMs,
         parentTaskMap: { [task.id]: task.parentId },
+        plannedTask: task,
       }),
     );
   }

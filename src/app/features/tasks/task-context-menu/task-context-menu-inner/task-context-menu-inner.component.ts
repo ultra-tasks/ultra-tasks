@@ -663,7 +663,8 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
     if (!taskWithSubTasks) {
       return;
     }
-    this._taskService.remove(taskWithSubTasks);
+    const remove = (): void => this._taskService.remove(taskWithSubTasks);
+    if (!this._taskUndoService.removeTask(taskWithSubTasks, remove)) remove();
   }
 
   startTask(): void {
@@ -731,10 +732,12 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleTaskDone(): void {
-    if (this.task.isDone) {
-      this._taskService.setUnDone(this.task.id);
+    const { id, isDone } = this.task;
+    if (this._taskUndoService.updateDone(id, !!isDone, !isDone)) return;
+    if (isDone) {
+      this._taskService.setUnDone(id);
     } else {
-      this._taskService.setDone(this.task.id);
+      this._taskService.setDone(id);
     }
   }
 
@@ -744,13 +747,19 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
   }
 
   addToMyDay(): void {
+    const today = this._dateService.todayStr();
+    const startOfNextDayDiffMs = this._dateService.getStartOfNextDayDiffMs();
+    if (this._taskUndoService.addToToday(this.task, today, startOfNextDayDiffMs, true)) {
+      return;
+    }
     this._store.dispatch(
       TaskSharedActions.planTasksForToday({
         taskIds: [this.task.id],
-        today: this._dateService.todayStr(),
-        startOfNextDayDiffMs: this._dateService.getStartOfNextDayDiffMs(),
+        today,
+        startOfNextDayDiffMs,
         parentTaskMap: { [this.task.id]: this.task.parentId },
         isShowSnack: true,
+        plannedTask: this.task,
       }),
     );
   }

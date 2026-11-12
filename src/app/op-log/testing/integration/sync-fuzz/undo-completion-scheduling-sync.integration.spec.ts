@@ -6,7 +6,7 @@ import { FuzzDevice, SyncFuzzHarness } from './sync-fuzz-harness';
 const TASK_ID = 'undo-completion-scheduling-task';
 const PROJECT_ID = 'INBOX_PROJECT';
 
-describe('completion undo against concurrent Add to Today', () => {
+describe('completion, undo and redo against concurrent Add to Today', () => {
   let harness: SyncFuzzHarness;
   let a: FuzzDevice;
   let b: FuzzDevice;
@@ -49,7 +49,7 @@ describe('completion undo against concurrent Add to Today', () => {
   for (const uploadFirst of ['A', 'B'] as const) {
     for (const planNewer of [false, true]) {
       for (const redo of [false, true]) {
-        it(`records the current conflict outcome after undo${redo ? '/redo' : ''} when ${uploadFirst} uploads first and planning is ${planNewer ? 'newer' : 'older'}`, async () => {
+        it(`keeps the plan and the ${redo ? 'redone completion' : 'reopened task'} when ${uploadFirst} uploads first and planning is ${planNewer ? 'newer' : 'older'}`, async () => {
           const completeAndUndo = (): Promise<void> =>
             harness.as(a, async () => {
               await harness.dispatch(
@@ -73,16 +73,19 @@ describe('completion undo against concurrent Add to Today', () => {
                 );
               }
             });
-          const plan = (): Promise<void> =>
-            harness.as(b, () =>
+          const plan = async (): Promise<void> => {
+            const planned = await taskOn(b);
+            await harness.as(b, () =>
               harness.dispatch(
                 TaskSharedActions.planTasksForToday({
                   taskIds: [TASK_ID],
                   today,
                   startOfNextDayDiffMs: 0,
+                  plannedTask: planned,
                 }),
               ),
             );
+          };
           harness.tick();
           if (planNewer) {
             await completeAndUndo();
@@ -97,17 +100,15 @@ describe('completion undo against concurrent Add to Today', () => {
           for (let round = 0; round < 2; round++) {
             for (const device of order) expect(await harness.sync(device)).toBeTrue();
           }
+          // The plan declares the fields it writes, so it no longer conflicts
+          // with the completion in either timestamp order.
           const tasks = [await taskOn(a), await taskOn(b)];
-          if (!planNewer) {
-            // The newer completion snapshot can discard the unrelated plan.
-            expect(tasks.some((task) => task.dueDay !== today)).toBeTrue();
-          } else if (redo) {
-            // A newer plan can instead discard the redone completion.
-            expect(tasks.some((task) => !task.isDone)).toBeTrue();
-          } else {
-            expect(
-              tasks.every((task) => task.dueDay === today && !task.isDone),
-            ).toBeTrue();
+          for (const task of tasks) {
+            expect(task.dueDay).withContext('plan').toBe(today);
+            expect(task.isDone).withContext('completion').toBe(redo);
+            expect(task.doneOn ?? null)
+              .withContext('doneOn')
+              .toBe(redo ? 3000 : null);
           }
           const beforeRestart = await taskOn(a);
           await harness.restart(a);

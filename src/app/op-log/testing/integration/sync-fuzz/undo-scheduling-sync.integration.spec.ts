@@ -91,7 +91,7 @@ describe('generic scheduling updates and undo across two clients', () => {
     }, 60_000);
   }
 
-  it('exposes the existing planner-order gap after redo and a concurrent title edit', async () => {
+  it('keeps planner.days in step after redo and a concurrent title edit', async () => {
     harness.tick();
     await harness.as(a, async () => {
       await update({ dueDay: FIRST_DAY });
@@ -104,15 +104,16 @@ describe('generic scheduling updates and undo across two clients', () => {
       expect(await harness.sync(b)).toBeTrue();
       expect(await harness.sync(a)).toBeTrue();
     }
-    const onA = await stateOf(a);
-    const onB = await stateOf(b);
-    expect(onA.dueDay).toBe(FIRST_DAY);
-    expect(onB.dueDay).toBe(FIRST_DAY);
-    expect(onA.title).toBe('Edited on B');
-    expect(onB.title).toBe('Edited on B');
-    // Current LWW field patches do not rebuild planner.days. Keep this
-    // reproduction until a released-client-compatible solution converges it.
-    expect(onA.first).toEqual([TASK_ID]);
-    expect(onB.first).toEqual([]);
+    const expected = {
+      dueDay: FIRST_DAY,
+      title: 'Edited on B',
+      first: [TASK_ID],
+      second: [],
+    };
+    expect(await stateOf(a)).toEqual(expected);
+    // The LWW patch that carries the redone day also lists the task under it.
+    expect(await stateOf(b)).toEqual(expected);
+    await harness.restart(b);
+    expect(await stateOf(b)).toEqual(expected);
   }, 60_000);
 });

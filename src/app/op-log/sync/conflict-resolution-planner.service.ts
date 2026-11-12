@@ -27,6 +27,7 @@ import type { Task } from '../../features/tasks/task.model';
 import { hasOpaqueChanges, mergeChangedFields } from './conflict-disjoint-merge.util';
 import { preserveTaskSnapshotTimes } from './time-preserving-task-snapshot.util';
 import { ConflictLocalWinOpsService } from './conflict-local-win-ops.service';
+import { demoteNetNoopRestorePlans } from './conflict-net-noop-restore.util';
 import { ConflictEntityStateService } from './conflict-entity-state.service';
 import { createLWWUpdateOp, mergeAndIncrementClocks } from './lww-update-op.util';
 import {
@@ -65,7 +66,11 @@ export class ConflictResolutionPlannerService {
     const resolutions: LWWResolution[] = [];
     const mergedResolutions: MergedResolution[] = [];
 
-    const plans = planLwwConflictResolutions(conflicts, LWW_PLANNING_OPTIONS);
+    // A delete→restore round trip wrote no field, so it must not beat a side
+    // that did just because its restore snapshot is newer.
+    const plans = demoteNetNoopRestorePlans(
+      planLwwConflictResolutions(conflicts, LWW_PLANNING_OPTIONS),
+    );
     this._assertMultiEntityPlansAreSafe(plans);
     await this._forceLocalWinForUnwritableRoundTimeTargets(plans);
 

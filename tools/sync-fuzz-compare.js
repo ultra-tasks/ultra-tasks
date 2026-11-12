@@ -153,12 +153,25 @@ const runReport = (cwd, label) => {
   execFileSync('node', ['tools/load-env.js', '--ensure'], { cwd, stdio: 'ignore' });
   const result = spawnSync(
     'npx',
-    ['ng', 'test', '--watch=false', '--include', REPORT_SPEC],
+    [
+      'ng',
+      'test',
+      '--watch=false',
+      // The sweep is silent for long stretches; a slow machine can point this
+      // at a Karma config with a longer `browserNoActivityTimeout`.
+      ...(process.env.SYNC_FUZZ_KARMA_CONFIG
+        ? [`--karma-config=${process.env.SYNC_FUZZ_KARMA_CONFIG}`]
+        : []),
+      '--include',
+      REPORT_SPEC,
+    ],
     {
       cwd,
       env: { ...process.env, TZ: 'Europe/Berlin' },
       encoding: 'utf8',
       maxBuffer: 256 * 1024 * 1024,
+      // `npx` is a .cmd shim on Windows, which cannot be spawned without a shell.
+      shell: process.platform === 'win32',
     },
   );
   // spawnSync blocks the event loop, so the SIGINT handler has not run yet;
@@ -168,7 +181,10 @@ const runReport = (cwd, label) => {
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   const report = parseReport(output);
   if (!report) {
-    throw new Error(`No signature report from ${cwd}:\n${output.slice(-4000)}`);
+    const spawnError = result.error ? `${result.error}\n` : '';
+    throw new Error(
+      `No signature report from ${cwd}:\n${spawnError}${output.slice(-4000)}`,
+    );
   }
   return report;
 };
@@ -209,11 +225,15 @@ const main = () => {
       execFileSync('npm', ['ci', '--no-audit', '--no-fund'], {
         cwd: worktree,
         stdio: 'inherit',
+        shell: process.platform === 'win32',
       });
     } else {
+      // A junction needs no elevated rights on Windows; elsewhere the type is
+      // ignored and this is the plain symlink.
       fs.symlinkSync(
         path.join(root, 'node_modules'),
         path.join(worktree, 'node_modules'),
+        'junction',
       );
     }
     for (const file of SHARED_FILES) {
@@ -230,6 +250,14 @@ const main = () => {
     }
     throw error;
   } finally {
+    // Drop the shared link first, so removing the worktree can never follow it
+    // into the real node_modules.
+    try {
+      const link = path.join(worktree, 'node_modules');
+      if (fs.lstatSync(link).isSymbolicLink()) fs.unlinkSync(link);
+    } catch {
+      // No link was made (own install, or the worktree was never created).
+    }
     git(root, ['worktree', 'remove', '--force', worktree]);
   }
   console.log(formatComparison(comparison, `working tree vs ${baseLabel}`, runs));

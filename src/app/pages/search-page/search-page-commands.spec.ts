@@ -8,6 +8,7 @@ import { LayoutService } from '../../core-ui/layout/layout.service';
 import { NavigateToTaskService } from '../../core-ui/navigate-to-task/navigate-to-task.service';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
+import { TaskUndoService } from '../../features/tasks/task-undo.service';
 import { MenuTreeService } from '../../features/menu-tree/menu-tree.service';
 import { Note } from '../../features/note/note.model';
 import { NoteService } from '../../features/note/note.service';
@@ -99,6 +100,17 @@ describe('SearchPageComponent commands (real template)', () => {
         },
         { provide: FocusModeService, useValue: { openOverlay: () => undefined } },
         {
+          provide: TaskUndoService,
+          useValue: {
+            canUndo: signal(true),
+            canRedo: signal(false),
+            undoField: signal<string | null>('title'),
+            redoField: signal<string | null>(null),
+            undo: () => true,
+            redo: () => true,
+          },
+        },
+        {
           provide: MenuTreeService,
           useValue: {
             projectFolderMap: signal(new Map()),
@@ -153,6 +165,7 @@ describe('SearchPageComponent commands (real template)', () => {
       'GCF.KEYBOARD.ADD_NEW_TASK',
       'GCF.KEYBOARD.GO_TO_FOCUS_MODE',
       'PS.SYNC.SET_UP_SYNC',
+      'GCF.KEYBOARD.UNDO_TITLE',
       'GCF.KEYBOARD.SHOW_HELP',
     ]);
     // The user's own shortcut is shown beside a command that has one.
