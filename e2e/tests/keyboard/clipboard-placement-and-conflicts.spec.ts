@@ -124,11 +124,17 @@ test('reorders completed project tasks without changing completion time', async 
   const reloadedDone = page.locator(
     '.task-list-inner[data-id="DONE"] > task.isDone:not(.ng-animating)',
   );
+  // After a keyboard move the list re-renders and focus returns to the moved task
+  // a moment later. The next shortcut acts on the focused task, so wait for that,
+  // as someone watching the focus ring does, rather than firing it into the gap.
+  const movedRow = page.locator(`task[data-task-id="${movingId}"]`);
   await reloadedDone.last().focus();
   await page.keyboard.press('Control+Shift+ArrowUp');
   await expect(reloadedDone.nth(1)).toHaveAttribute('data-task-id', movingId!);
+  await expect(movedRow).toBeFocused();
   await page.keyboard.press('Control+Alt+ArrowUp');
   await expect(reloadedDone.first()).toHaveAttribute('data-task-id', movingId!);
+  await expect(movedRow).toBeFocused();
   await page.keyboard.press('Control+Z');
   await expect(reloadedDone.nth(1)).toHaveAttribute('data-task-id', movingId!);
   await page.keyboard.press('Control+Y');
@@ -279,4 +285,47 @@ test('offers an explicit safe replacement for a saved shortcut conflict', async 
   await settingsPage.openSettingsSection('keyboard');
   await expect(calendar).toHaveValue('Shift+C');
   await expect(deadline).toHaveValue('Shift+S');
+});
+
+test('pastes several copied tasks in the order they were copied', async ({
+  page,
+  workViewPage,
+  projectPage,
+  taskPage,
+  testPrefix,
+}) => {
+  await workViewPage.waitForTaskList();
+  await projectPage.createProject('Clipboard copy order');
+  await projectPage.navigateToProjectByName('Clipboard copy order');
+  await workViewPage.waitForTaskList();
+  const titles = ['Alpha', 'Bravo', 'Charlie'].map((name) => `${testPrefix}-${name}`);
+  for (const title of titles) await workViewPage.addTask(title);
+  const rows = page.locator('.task-list-inner[data-id="UNDONE"] > task');
+  await expect(rows).toHaveCount(3);
+
+  const titleById = new Map<string, string>();
+  for (const title of titles) {
+    const id = await taskPage.getTaskByText(title).getAttribute('data-task-id');
+    titleById.set(id!, title);
+  }
+  const listOrder = (
+    await rows.evaluateAll((els) => els.map((el) => el.getAttribute('data-task-id')))
+  ).map((id) => titleById.get(id!)!);
+
+  for (const title of titles) {
+    await taskPage
+      .getTaskByText(title)
+      .locator('done-toggle')
+      .click({
+        modifiers: ['Control'],
+      });
+  }
+  await page.keyboard.press('Control+C');
+  await page.keyboard.press('Control+V');
+
+  // The copies come in as they were in the list, not back to front.
+  await expect(rows).toHaveCount(6);
+  for (let i = 0; i < 3; i++) {
+    await expect(rows.nth(i)).toContainText(`${listOrder[i]} (copy)`);
+  }
 });

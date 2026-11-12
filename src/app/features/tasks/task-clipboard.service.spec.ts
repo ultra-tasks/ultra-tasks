@@ -528,4 +528,71 @@ describe('TaskClipboardService', () => {
     service.copy(copy, false);
     expect(copy.defaultPrevented).toBeFalse();
   });
+
+  it('pastes several copied tasks back to front, so each copy lands in its original order', fakeAsync(() => {
+    // Every copy is added at the top, so the last one added ends up first.
+    const second = { ...task, id: 'two', title: 'Two' };
+    const selection = TestBed.inject(TaskMultiSelectService);
+    spyOn(selection, 'isActive').and.returnValue(true);
+    spyOn(selection, 'has').and.returnValue(true);
+    spyOn(selection, 'selectedIdsInDomOrder').and.returnValue(['one', 'two']);
+    spyOn(TestBed.inject(TaskService), 'getByIdWithSubTaskData$').and.callFake((id) =>
+      of(id === 'one' ? task : second),
+    );
+    const data = new DataTransfer();
+    service.copy(clipboardEvent('copy', host, data), false);
+    expect(service.paste(clipboardEvent('paste', document.body, data))).toBeTrue();
+    tick();
+    expect(duplicate.calls.allArgs().map(([copied]) => copied.id)).toEqual([
+      'two',
+      'one',
+    ]);
+  }));
+
+  describe('clipboard HTML marker scan', () => {
+    const token = '12345678-1234-1234-1234-123456789abc';
+    const marker = (html: string): string | null =>
+      (
+        service as unknown as { _markerFromHtml(value: string): string | null }
+      )._markerFromHtml(html);
+
+    it('finds the marker behind the short wrapper a browser adds', () => {
+      expect(
+        marker(
+          `<meta charset='utf-8'><html><body><!--StartFragment--><div data-ultratasks-task-clipboard="${token}"><pre>x</pre></div>`,
+        ),
+      ).toBe(token);
+    });
+
+    it('answers at once for pathological HTML instead of backtracking', () => {
+      // An unbounded attribute run took half a second for 80 KB of this.
+      const html = '<div '.repeat(40000) + 'data-ultratasks-task-clipboard';
+      const start = performance.now();
+      expect(marker(html)).toBeNull();
+      expect(performance.now() - start).toBeLessThan(100);
+    });
+
+    it('ignores a marker far from the start, where this app never puts it', () => {
+      expect(
+        marker(`${'x'.repeat(5000)}<div data-ultratasks-task-clipboard="${token}">`),
+      ).toBeNull();
+    });
+  });
+
+  it('reads the page selection only for a key that is a task clipboard shortcut', () => {
+    const getSelection = spyOn(window, 'getSelection').and.callThrough();
+    const plain = new KeyboardEvent('keydown', { key: 'a' });
+    Object.defineProperty(plain, 'target', { value: host });
+    expect(service.handleKeyDown(plain, {} as never)).toBeFalse();
+    expect(getSelection).not.toHaveBeenCalled();
+
+    const copy = new KeyboardEvent('keydown', {
+      key: 'c',
+      code: 'KeyC',
+      ctrlKey: true,
+    });
+    Object.defineProperty(copy, 'target', { value: host });
+    service.handleKeyDown(copy, {} as never);
+    expect(getSelection).toHaveBeenCalled();
+  });
 });
