@@ -52,3 +52,45 @@ test('restore opens the existing import settings without replacing data', async 
   await expect(page.locator('work-view')).toBeAttached();
   await expect(page.locator('task')).toHaveCount(0);
 });
+
+test('syncing from another device opens the Account page and seeds no example task', async ({
+  isolatedContext,
+}) => {
+  const page = await isolatedContext.newPage();
+  await page.goto('/');
+  const setup = page.locator('first-run-setup');
+  await expect(setup).toBeVisible();
+  await setup.getByRole('button', { name: 'Sync from another device' }).click();
+  await setup.getByRole('button', { name: 'Continue' }).click();
+  await expect(setup).toHaveCount(0);
+  // The page that sets sync up, not a sync dialog opened for them.
+  await expect(
+    page.getByRole('button', { name: 'Set up sync', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('dialog-sync-cfg')).toHaveCount(0);
+
+  // Their tasks come from elsewhere: no example task, now or later.
+  await page.goto('/#/project/INBOX_PROJECT/tasks');
+  await expect(page.locator('work-view')).toBeAttached();
+  await expect(page.locator('task')).toHaveCount(0);
+});
+
+test('offers the four ways to begin, and the new one is reachable by keyboard', async ({
+  isolatedContext,
+}) => {
+  const page = await isolatedContext.newPage();
+  await page.goto('/');
+  const setup = page.locator('first-run-setup');
+  await expect(setup).toBeVisible();
+  const choices = setup.getByRole('group', { name: 'Choose how to begin' });
+  await expect(choices.getByRole('button')).toHaveText([
+    /Start fresh/,
+    /Sync from another device/,
+    /Restore backup/,
+    /Import tasks/,
+  ]);
+  const sync = choices.getByRole('button', { name: /Sync from another device/ });
+  await sync.focus();
+  await page.keyboard.press('Enter');
+  await expect(sync).toHaveAttribute('aria-pressed', 'true');
+});

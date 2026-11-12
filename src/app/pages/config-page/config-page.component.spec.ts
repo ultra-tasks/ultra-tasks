@@ -39,6 +39,7 @@ describe('ConfigPageComponent', () => {
     isAndroidWebView: boolean = false,
     lastBackupTime: number | null = null,
     isRenderSections: boolean = false,
+    queryParams: Record<string, string> = {},
   ): Promise<void> => {
     const mockSyncConfigService = jasmine.createSpyObj(
       'SyncConfigService',
@@ -103,7 +104,7 @@ describe('ConfigPageComponent', () => {
             appFeatures: signal(NEW_INSTALL_APP_FEATURES),
           }),
         },
-        { provide: ActivatedRoute, useValue: { queryParams: of({}) } },
+        { provide: ActivatedRoute, useValue: { queryParams: of(queryParams) } },
         { provide: PluginBridgeService, useValue: { shortcuts: signal([]) } },
         { provide: SyncWrapperService, useValue: mockSyncWrapperService },
         { provide: ShareService, useValue: {} },
@@ -201,6 +202,28 @@ describe('ConfigPageComponent', () => {
     expect(mockMatDialog.getDialogById).toHaveBeenCalledWith('settings-window');
     expect(close).toHaveBeenCalledTimes(1);
     expect(navigateByUrl).toHaveBeenCalledWith('/account');
+  });
+
+  describe('named section targets', () => {
+    // The first-run Restore and Import open Settings by name, never by tab index.
+    it('opens the Data tab for section=data', async () => {
+      TestBed.resetTestingModule();
+      await setup(false, null, false, { section: 'data' });
+      component.ngOnInit();
+      expect(component.selectedTabIndex).toBe(5);
+    });
+
+    it('opens Appearance for section=appearance, as before', async () => {
+      TestBed.resetTestingModule();
+      await setup(false, null, false, { section: 'appearance' });
+      component.ngOnInit();
+      expect(component.selectedTabIndex).toBe(6);
+    });
+
+    it('stays on the first tab without a target', () => {
+      component.ngOnInit();
+      expect(component.selectedTabIndex).toBe(0);
+    });
   });
 
   it('openSyncCfgDialog() should open DialogSyncCfgComponent', async () => {

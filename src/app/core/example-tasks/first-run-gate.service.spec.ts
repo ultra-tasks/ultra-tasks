@@ -30,4 +30,11 @@ describe('FirstRunGateService', () => {
     gate.whenReleased$().subscribe((outcome) => seen.push(outcome));
     expect(seen).toEqual(['restore']);
   });
+
+  it('carries the sync outcome like any other', () => {
+    gate.hold();
+    gate.whenReleased$().subscribe((outcome) => seen.push(outcome));
+    gate.release('sync');
+    expect(seen).toEqual(['sync']);
+  });
 });

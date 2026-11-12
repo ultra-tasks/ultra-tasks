@@ -106,14 +106,32 @@ describe('FirstRunSetupService', () => {
     expect(dialog.open).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the existing import settings rather than importing data itself', () => {
+  (['restore', 'import'] as FirstRunChoice[]).forEach((choice) => {
+    it(`opens the data settings by name, not by tab index, for ${choice}`, () => {
+      TestBed.inject(FirstRunSetupService);
+      step.set('create-task');
+      TestBed.tick();
+      closed.next(choice);
+      expect(router.navigate).toHaveBeenCalledOnceWith(['/config'], {
+        queryParams: { section: 'data' },
+      });
+    });
+  });
+
+  it('opens the Account page, where sync is set up, rather than setting sync up itself', () => {
     TestBed.inject(FirstRunSetupService);
     step.set('create-task');
     TestBed.tick();
-    closed.next('restore');
-    expect(router.navigate).toHaveBeenCalledWith(['/config'], {
-      queryParams: { tab: 5 },
-    });
+    closed.next('sync');
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/account']);
+  });
+
+  it('goes nowhere for Start fresh', () => {
+    TestBed.inject(FirstRunSetupService);
+    step.set('create-task');
+    TestBed.tick();
+    closed.next('fresh');
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   describe('example-task gate', () => {
@@ -146,7 +164,7 @@ describe('FirstRunSetupService', () => {
       expect(released).toEqual(['skip']);
     });
 
-    ['restore', 'import'].forEach((choice) => {
+    ['sync', 'restore', 'import'].forEach((choice) => {
       it(`marks examples as done when the user chooses ${choice}`, () => {
         TestBed.inject(FirstRunSetupService);
         step.set('create-task');

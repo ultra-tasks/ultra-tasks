@@ -44,7 +44,7 @@ select {
 
 .choices {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--s);
 
   button {
@@ -77,6 +77,10 @@ select {
   span {
     margin-top: var(--s-half);
     font: var(--type-meta);
+  }
+
+  @include mq(sm, max) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   @include mq(xs, max) {

@@ -170,7 +170,7 @@ describe('ExampleTasksService', () => {
       expect(taskService.createNewTaskWithDefaults).toHaveBeenCalledTimes(1);
     });
 
-    (['restore', 'import'] as FirstRunOutcome[]).forEach((outcome) => {
+    (['sync', 'restore', 'import'] as FirstRunOutcome[]).forEach((outcome) => {
       it(`creates no example task when the user chose ${outcome}`, () => {
         gate.release(outcome);
         expect(taskService.createNewTaskWithDefaults).not.toHaveBeenCalled();

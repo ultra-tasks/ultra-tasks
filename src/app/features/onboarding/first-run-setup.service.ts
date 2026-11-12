@@ -74,15 +74,20 @@ export class FirstRunSetupService {
       .subscribe((choice) => {
         this.isOpen.set(false);
         localStorage.setItem(LS.FIRST_RUN_SETUP_DONE, 'true');
-        const isBringingData = choice === 'restore' || choice === 'import';
+        const isBringingData =
+          choice === 'sync' || choice === 'restore' || choice === 'import';
         if (isBringingData) {
           // They bring their own data: no example task now or on a later start.
           localStorage.setItem(LS.EXAMPLE_TASKS_CREATED, 'true');
         }
         // Closing the dialog any other way (Escape, backdrop) counts as Skip.
         this._gate.release(choice ?? 'skip');
-        if (isBringingData) {
-          void this._router.navigate(['/config'], { queryParams: { tab: 5 } });
+        // Each path opens the page that does the work, by a named target (never
+        // a tab index, which would silently point elsewhere if the tabs moved).
+        if (choice === 'sync') {
+          void this._router.navigate(['/account']);
+        } else if (choice === 'restore' || choice === 'import') {
+          void this._router.navigate(['/config'], { queryParams: { section: 'data' } });
         }
       });
   }

@@ -5,7 +5,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { GlobalThemeService } from '../../core/theme/global-theme.service';
 import { T } from '../../t.const';
 
-export type FirstRunChoice = 'fresh' | 'restore' | 'import' | 'skip';
+export type FirstRunChoice = 'fresh' | 'sync' | 'restore' | 'import' | 'skip';
 
 @Component({
   selector: 'first-run-setup',

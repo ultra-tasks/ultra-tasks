@@ -374,6 +374,8 @@ export class ConfigPageComponent implements OnInit {
           if (this.expandedSection === 'keyboard') this.selectedTabIndex = 7;
           if (this.expandedSection === 'sound') this.selectedTabIndex = 8;
           if (this.expandedSection === 'appearance') this.selectedTabIndex = 6;
+          // Backups, import and export: the first-run Restore and Import land here.
+          if (this.expandedSection === 'data') this.selectedTabIndex = 5;
           if (
             this.globalTasksFormCfg.some(
               (section) => section.key === this.expandedSection,

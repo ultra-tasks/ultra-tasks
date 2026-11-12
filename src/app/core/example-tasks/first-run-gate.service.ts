@@ -3,7 +3,13 @@ import { defer, Observable, of, Subject } from 'rxjs';
 import { take } from 'rxjs/operators';
 
 /** How the first-run welcome ended, or `not-offered` when it never opens. */
-export type FirstRunOutcome = 'not-offered' | 'fresh' | 'restore' | 'import' | 'skip';
+export type FirstRunOutcome =
+  | 'not-offered'
+  | 'fresh'
+  | 'sync'
+  | 'restore'
+  | 'import'
+  | 'skip';
 
 /**
  * Lets the first-run welcome decide before example tasks are seeded.
@@ -11,7 +17,7 @@ export type FirstRunOutcome = 'not-offered' | 'fresh' | 'restore' | 'import' | '
  * The welcome holds the gate when it may open, and releases it with the user's
  * choice. `ExampleTasksService` waits on {@link whenReleased$}, so nothing is
  * created behind a dialog that offers "Start fresh", and nothing is created for
- * someone who restores a backup or imports tasks. When nobody holds the gate
+ * someone who syncs from another device, restores a backup or imports tasks. When nobody holds the gate
  * (returning profile, tests) the wait resolves at once as `not-offered`.
  *
  * Device-local and in memory only: no persisted state, no sync surface.

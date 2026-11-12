@@ -3479,6 +3479,8 @@
       "SKIP": "Skip setup",
       "START_FRESH": "Start fresh",
       "START_FRESH_HINT": "Open your workspace",
+      "SYNC": "Sync from another device",
+      "SYNC_HINT": "Bring your tasks here",
       "TITLE": "A little room to focus."
     },
     "HINTS": {

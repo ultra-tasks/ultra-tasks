@@ -64,9 +64,13 @@ export class ExampleTasksService {
       .pipe(
         first(),
         // The first-run welcome decides first: no example task appears behind
-        // it, and none for someone who restores a backup or imports tasks.
+        // it, and none for someone who syncs from another device, restores a
+        // backup or imports tasks: their data comes from elsewhere.
         switchMap(() => this._firstRunGate.whenReleased$()),
-        filter((outcome) => outcome !== 'restore' && outcome !== 'import'),
+        filter(
+          (outcome) =>
+            outcome !== 'sync' && outcome !== 'restore' && outcome !== 'import',
+        ),
         switchMap(() => this._store.select(selectAllTasks).pipe(first())),
         // Tasks already exist (e.g. synced from another device): mark onboarding done
         // so a future empty-task startup does not recreate example tasks. (#7976)
