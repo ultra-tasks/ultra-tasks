@@ -58,9 +58,14 @@ must link to their replacement, and keep their original number.
   — official/custom account setup, browser-to-app sign-in, MFA/storage parity,
   private-sync delivery, and personal-only provider migration; Google Drive follows later
 - [Server extraction and version one launch](plans/2026-11-07-server-extraction-and-v1-launch.md)
-- [Hosted web app and account origin](plans/2026-11-10-hosted-web-app-and-account-origin.md)
   — separate server and Docker repository, native account sync, account dashboard,
   Oracle deployment, and production release gates
+- [Hosted web app and account origin](plans/2026-11-10-hosted-web-app-and-account-origin.md)
+  — one origin for the web application, account dashboard and API, the Caddy and
+  service-worker path rules, and the rollout from the Pages preview to production
+- [Ultra Tasks 0.4.0 and server beta 3](plans/2026-11-12-ultratasks-0.4.0-release.md)
+  — public calendar feed, two-way sync, Linear/Trello/GitLab/GitHub write-back,
+  Play and F-Droid, signed Mac build, and the server release that carries them
 - [Native encrypted collaboration](plans/2026-11-05-native-encrypted-collaboration.md)
   — proposed Ultra Tasks fork direction: password accounts and 2FA, encrypted
   project sharing, periodic personal sync, near real-time shared sync, and one

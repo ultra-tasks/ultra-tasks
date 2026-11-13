@@ -228,7 +228,7 @@ Consistent already and unchanged: the collaboration plan's statement that a self
 ## Decisions on the open questions
 
 1. **Same origin for the dashboard and the web application, with per-path headers.** Revisit only if the independent XSS and key-handling review finds the shared origin unacceptable, and then before enrolment opens: the WebAuthn RP ID is fixed once passkeys exist.
-2. **Hosted web ships as Phase 1 on its own schedule, after the Caddy split is accepted on the VM**, and independently of 0.3.0 and of browser sync. The website's "coming soon" copy changes when it ships. Nothing is announced from the `pages.dev` preview.
+2. **Hosted web ships as Phase 1 on its own schedule, after the Caddy split is accepted on the VM**, and independently of 0.3.0 and of browser sync. The [0.4.0 release plan](2026-11-12-ultratasks-0.4.0-release.md) schedules Phase 1 with app 0.4.0. The website's "coming soon" copy changes when it ships. Nothing is announced from the `pages.dev` preview.
 3. **Bundle delivery is a release-attached tarball installed by the operator** with `scripts/install-web.sh`. Automating the VM side is a later improvement.
 4. **The Pages preview stays** as `ultra-tasks-preview.pages.dev` for checking builds, marked `noindex`, and is not linked from anywhere.
 
