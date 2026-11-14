@@ -5,6 +5,8 @@
       <div
         class="day"
         [class.is-today]="day === todayDateStr()"
+        [class.drag-over]="dragOverTrayDay() === day"
+        [attr.data-tray-day]="trays() ? day : null"
       >
         @if (day === todayDateStr()) {
           <mat-icon>today</mat-icon>
@@ -59,7 +61,10 @@
     }
   </div>
   @if (hasFloatingEvents()) {
-    <div class="floating-events">
+    <div
+      class="floating-events"
+      [attr.weekHeaderBelow]="trays() ? '' : null"
+    >
       <div class="floating-events-label">{{ T.F.SCHEDULE.ANY_TIME | translate }}</div>
       @for (day of daysToShow(); track day) {
         <div
@@ -83,6 +88,17 @@
       }
     </div>
   }
+  <ng-content select="[weekHeaderEnd]"></ng-content>
+  @if (trays(); as trays) {
+    <schedule-tray
+      [days]="daysToShow()"
+      [trays]="trays"
+      [isHorizontalScroll]="isHorizontalScrollMode()"
+      (openDay)="openDay.emit($event)"
+    ></schedule-tray>
+  }
+  <!-- Below the date row, sticky with it. -->
+  <ng-content select="[weekHeaderBelow]"></ng-content>
 </header>
 
 <div

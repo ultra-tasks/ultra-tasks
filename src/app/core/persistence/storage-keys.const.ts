@@ -51,6 +51,8 @@ export enum LS {
   // don't all hit SuperSync at the same second. Device-local on purpose: the
   // point is that it differs between devices.
   DUE_DATE_NOTIFICATION_OFFSET_MS = 'SUP_DUE_DATE_NOTIFICATION_OFFSET_MS',
+  // Epoch ms the iOS reminder-limit notice was last shown (device-local).
+  IOS_REMINDER_LIMIT_NOTICE_AT = 'SUP_IOS_REMINDER_LIMIT_NOTICE_AT',
 
   // Epoch ms until which the "encrypt your SuperSync account" migration banner
   // stays hidden. Set when the user picks "Later" (or opens the flow), so — unlike

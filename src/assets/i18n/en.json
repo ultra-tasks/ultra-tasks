@@ -1132,6 +1132,7 @@
       "EXACT_ALARM_HINT": "Reminders may be delayed because \"Alarms & reminders\" is turned off for this app in Android settings.",
       "EXACT_ALARM_OPEN_SETTINGS": "Open settings",
       "S_ACTIVE_TASK_DUE": "The task you are currently working on is now due!<br/> ({{title}})",
+      "S_IOS_LIMIT": "iOS limits how many reminders an app can set. Yours are set for the next {{days}} days. Later ones follow as you keep using the app.",
       "S_REMINDER_ERR": "Error for reminder interface"
     },
     "SCHEDULE": {
@@ -1177,7 +1178,13 @@
       "START": "Work Start",
       "TOGGLE_DAY_PLANNING_HINT": "Ctrl+1 to toggle day planning",
       "TOGGLE_TIME_SCHEDULING_HINT": "Ctrl+1 to toggle time scheduling",
-      "AUTOMATICALLY_PLACED": "Automatically placed"
+      "AUTOMATICALLY_PLACED": "Automatically placed",
+      "TRAY_FREE": "{{time}} free",
+      "TRAY_MORE": "+{{count}} more",
+      "TRAY_OVER": "{{time}} over",
+      "TRAY_PLANNED": "{{time}} planned",
+      "TRAY_SET_TIME": "Set a time",
+      "TRAY_SHOW_LESS": "Show less"
     },
     "SEARCH_BAR": {
       "ACTIONS": "Actions",
@@ -1684,6 +1691,7 @@
         "ERROR_REMOTE_FILE_LOCKED": "Remote sync file is locked by the server. This may resolve on the next sync attempt.",
         "ERROR_REMOTE_RESPONSE_NOT_SYNC_DATA": "The sync server answered with a web page instead of your sync data (e.g. a login, proxy or error page). Your remote data is probably intact — check your server URL, credentials and network, then try again. If the problem persists, you can overwrite the remote via Sync Settings → Force Overwrite.",
         "ERROR_SYNC_VERSION_MISMATCH": "Remote sync data uses an incompatible format version. Ensure all devices run the same version of Ultra Tasks.",
+        "ERROR_UNTRUSTED_CERTIFICATE_ANDROID": "Sync failed: the server's certificate is not trusted on this device, has expired, or does not match the server address.\n\nFor a self-signed certificate or private CA, search Android Settings for \"CA certificate\" and install it there (not as a \"VPN & app user certificate\"). The certificate must list the server's address as a Subject Alternative Name.",
         "WARN_CLIENT_ID_REGENERATED": "Sync device ID was invalid and has been regenerated. A sync conflict may occur on next sync.",
         "ERROR_UNABLE_TO_READ_REMOTE_DATA": "Error while syncing. Unable to read remote data. Maybe you enabled encryption and your local password does not match the one used to encrypt the remote data?",
         "FINISH_DAY_SYNC_ERROR": "Sync error while finishing day. Please try again.",
@@ -3244,6 +3252,10 @@
       "L_IS_WORK_START_END_ENABLED": "Limit unscheduled task flow to specific work times",
       "L_LUNCH_BREAK_END": "Lunch break end",
       "L_LUNCH_BREAK_START": "Lunch break start",
+      "L_UNTIMED_TASK_PLACEMENT": "Tasks without a time",
+      "UNTIMED_TASK_PLACEMENT_AUTO": "Placed automatically",
+      "UNTIMED_TASK_PLACEMENT_TRAY": "Kept in a tray",
+      "UNTIMED_TASK_PLACEMENT_HELP": "Keep the existing budget-based placement, or keep untimed tasks on their planned day in a workload tray. Day and week views only.",
       "L_WORK_END": "Work day end",
       "L_WORK_START": "Work day start",
       "LUNCH_BREAK_START_END_DESCRIPTION": "Regular tasks are not placed in your lunch break in the Calendar.",

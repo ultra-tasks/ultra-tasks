@@ -17,6 +17,8 @@ export interface ScheduleEvent {
   data?: SVE['data'];
   overlap?: { count: number; offset: number };
   isBeyondBudget?: boolean;
+  // dragged from the tray, where the task has no slot in the grid yet
+  isInTray?: boolean;
 }
 
 export interface ScheduleDay {
@@ -24,6 +26,19 @@ export interface ScheduleDay {
   entries: SVE[];
   beyondBudgetTasks: TaskCopy[];
   isToday: boolean;
+  // only set in tray mode (ScheduleConfig.untimedTaskPlacement === 'tray')
+  tray?: ScheduleDayTray;
+}
+
+/** What a day holds without a time while untimed tasks are kept out of the grid. */
+export interface ScheduleDayTray {
+  tasks: TaskCopy[];
+  // untimed repeating tasks due that day whose instance does not exist yet
+  repeatCfgs: TaskRepeatCfg[];
+  plannedMs: number;
+  // Work time left that day minus plannedMs (negative = over). Undefined while
+  // work hours are off: there is no capacity to compare against.
+  freeMs?: number;
 }
 
 interface SVEBase {

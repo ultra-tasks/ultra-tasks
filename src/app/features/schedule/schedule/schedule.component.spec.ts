@@ -184,6 +184,22 @@ describe('ScheduleComponent', () => {
       expect(empty()).toBeNull();
     });
 
+    it('does not show an empty-week message when only the tray has tasks', () => {
+      spyOn(component, 'trays').and.returnValue({
+        ['2026-01-20']: {
+          tasks: [{ ...DEFAULT_TASK, id: 'tray-task', projectId: 'INBOX' }],
+          repeatCfgs: [],
+          plannedMs: 0,
+        },
+      });
+      mockLayoutService.selectedTimeView.set('month');
+      fixture.detectChanges();
+      mockLayoutService.selectedTimeView.set('week');
+      fixture.detectChanges();
+      expect(component.isEmptyWeek()).toBeFalse();
+      expect(empty()).toBeNull();
+    });
+
     it('offers no action when Upcoming is switched off', () => {
       mockAppFeatures.set({ isPlannerEnabled: false });
       fixture.detectChanges();
@@ -444,6 +460,28 @@ describe('ScheduleComponent', () => {
         expect(newDate?.getMonth()).toBe(0); // January
         expect(component.isViewingToday()).toBe(true);
       });
+    });
+  });
+
+  describe('openDayView', () => {
+    // it saves the view like selectTimeView; later specs must not inherit it
+    afterEach(() => localStorage.removeItem('SELECTED_TIME_VIEW'));
+
+    it('opens the day view on a later day', () => {
+      component.openDayView('2026-01-22');
+
+      const d = component['_selectedDate']();
+      expect(mockLayoutService.selectedTimeView()).toBe('day');
+      expect([d?.getFullYear(), d?.getMonth(), d?.getDate()]).toEqual([2026, 0, 22]);
+    });
+
+    it('opens (logical) today in the "today" mode', () => {
+      component['_selectedDate'].set(new Date(2026, 0, 22));
+
+      component.openDayView('2026-01-20');
+
+      expect(mockLayoutService.selectedTimeView()).toBe('day');
+      expect(component['_selectedDate']()).toBeNull();
     });
   });
 

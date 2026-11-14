@@ -118,6 +118,7 @@ export class ScheduleService {
       plannerDayMap,
       timelineCfg,
       currentTaskId = null,
+      isAutoPlacementOnly = false,
     } = params;
 
     if (!timelineTasks || !taskRepeatCfgs || !plannerDayMap) {
@@ -138,6 +139,10 @@ export class ScheduleService {
       timelineCfg?.isLunchBreakEnabled ? createLunchBreakCfg(timelineCfg) : undefined,
       realNow,
       this._startOfNextDayDiffMs() ?? 0,
+      // the one place the setting is read: missing or unknown = auto-placement
+      timelineCfg?.untimedTaskPlacement === 'tray' && !isAutoPlacementOnly
+        ? { isCapacityLimited: !!timelineCfg.isWorkStartEndEnabled }
+        : undefined,
     );
   }
 
@@ -160,6 +165,7 @@ export class ScheduleService {
     currentTaskId: string | null;
     /** Narrows the data to one project. Calendar-provider events are then left out unless `isIncludeCalendarEvents`. */
     scope?: ProjectScope | null;
+    isAutoPlacementOnly?: boolean;
   }): ScheduleDay[] {
     this.scheduleRefreshTick();
     const projectId = params.scope?.projectId;
@@ -215,6 +221,7 @@ export class ScheduleService {
       plannerDayMap,
       timelineCfg,
       currentTaskId: params.currentTaskId,
+      isAutoPlacementOnly: params.isAutoPlacementOnly,
     });
   }
 
@@ -489,4 +496,6 @@ export interface BuildScheduleDaysParams {
   plannerDayMap: PlannerDayMap | undefined | null;
   timelineCfg?: ScheduleConfig | null;
   currentTaskId?: string | null;
+  // month view has no tray: it keeps auto-placement whatever the setting says
+  isAutoPlacementOnly?: boolean;
 }

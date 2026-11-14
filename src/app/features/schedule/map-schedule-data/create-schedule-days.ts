@@ -408,7 +408,7 @@ const uniqueTasksById = <T extends ScheduleFlowTask>(tasks: T[]): T[] => {
   });
 };
 
-const getBudgetLeftForDay = (
+export const getBudgetLeftForDay = (
   blockerBlocksForDay: BlockedBlock[],
   nowIfToday?: number,
 ): number => {

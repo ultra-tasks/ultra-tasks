@@ -10,7 +10,8 @@ import { ScheduleEventComponent } from '../schedule-event/schedule-event.compone
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
 import { GlobalConfigService } from '../../config/global-config.service';
 import { DEFAULT_GLOBAL_CONFIG } from '../../config/default-global-config.const';
-import { ScheduleEvent } from '../schedule.model';
+import { ScheduleDayTray, ScheduleEvent } from '../schedule.model';
+import { ScheduleTrayComponent } from '../schedule-tray/schedule-tray.component';
 import { SVEType } from '../schedule.const';
 import { CalendarEventActionsService } from '../../calendar-integration/calendar-event-actions.service';
 
@@ -48,8 +49,8 @@ describe('ScheduleWeekComponent', () => {
       ],
     })
       .overrideComponent(ScheduleWeekComponent, {
-        remove: { imports: [ScheduleEventComponent] },
-        add: { imports: [ScheduleEventStubComponent] },
+        remove: { imports: [ScheduleEventComponent, ScheduleTrayComponent] },
+        add: { imports: [ScheduleEventStubComponent, ScheduleTrayStubComponent] },
       })
       .compileComponents();
 
@@ -108,6 +109,11 @@ describe('ScheduleWeekComponent', () => {
     expect(
       fixture.nativeElement.querySelectorAll('.grid-container schedule-event').length,
     ).toBe(0);
+    const row = fixture.nativeElement.querySelector('.floating-events');
+    expect(row.hasAttribute('weekHeaderBelow')).toBeFalse();
+    fixture.componentRef.setInput('trays', {});
+    fixture.detectChanges();
+    expect(row.hasAttribute('weekHeaderBelow')).toBeTrue();
   });
 
   it('should dedupe visible and hidden beyond-budget tasks in the day badge', () => {
@@ -219,3 +225,11 @@ const createTaskEvent = (
   plannedForDay,
   isBeyondBudget,
 });
+
+@Component({ selector: 'schedule-tray', template: '' })
+class ScheduleTrayStubComponent {
+  @Input() days: string[] = [];
+  @Input() trays: Record<string, ScheduleDayTray> = {};
+  @Input() isHorizontalScroll = false;
+  @Output() openDay = new EventEmitter<string>();
+}
