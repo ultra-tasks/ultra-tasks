@@ -61,7 +61,11 @@ test.describe('Schedule tray mode', () => {
     await page.getByRole('button', { name: 'View Week' }).click();
 
     const week = page.locator('schedule schedule-week');
-    const event = week.locator('schedule-event').filter({ hasText: TITLE });
+    // The custom drag preview is also a schedule-event with this task's title.
+    // Only measure/drag the persisted event after the preview is removed.
+    const event = week
+      .locator('.grid-container > schedule-event:not(.custom-drag-preview)')
+      .filter({ hasText: TITLE });
     const cells = week.locator('schedule-tray .tray-cell');
     const chip = cells.first().locator('.chip').filter({ hasText: TITLE });
 
@@ -78,7 +82,9 @@ test.describe('Schedule tray mode', () => {
     await expect(week.locator('.custom-drag-preview')).toBeVisible();
     await page.mouse.up();
 
+    await expect(week.locator('.custom-drag-preview')).toHaveCount(0);
     await expect(event).toHaveCount(1);
+    await expect(event).toBeVisible();
     const columnBox = (await column.boundingBox())!;
     const eventCenter = await centerOf(event);
     expect(eventCenter.x).toBeGreaterThan(columnBox.x);
