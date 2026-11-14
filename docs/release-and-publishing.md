@@ -128,8 +128,14 @@ existing Super Productivity data is imported explicitly from a backup.
 
 For signed Android downloads without a Play Console submission, manually dispatch
 `build-android.yml` on the same reviewed commit. Manual runs use the package's
-release version/code and skip Play distribution, including when dispatched on a
-release tag. Automatic main pushes retain their development codes; automatic
+release version/code and skip Play distribution by default, including when
+dispatched on a release tag. To exercise the upload key and service account
+without a final tag, set the `play_track` input (`internal`, or the id of a
+closed-test track such as `alpha`). The workflow then uploads the built AAB to
+that track with the `play_status` you choose (`draft` by default, which needs a
+manual rollout in Play Console). `production` is refused, and a version code Play
+has already seen is rejected, so use a new `version_code` or a new version.
+Automatic main pushes retain their development codes; automatic
 stable-tag runs retain the inherited Play submission path. The workflow verifies
 each APK's signature, `app.ultratasks` identity and package version before saving
 the `sup-android-release` artifact. Attach the signed APKs to the matching GitHub
@@ -276,7 +282,7 @@ For a non-prerelease release, publishing the draft starts:
 
 | Channel     | Workflow                                                    | Result                                                          |
 | ----------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
-| Google Play | `.github/workflows/auto-publish-google-play-on-release.yml` | Promote `internal` to `production`                              |
+| Google Play | `.github/workflows/auto-publish-google-play-on-release.yml` | Promote `internal` to `production` at a 10% staged rollout      |
 | Snap Store  | `.github/workflows/build-publish-to-snap-on-release.yml`    | Publish the release Snap to `edge` and `stable`                 |
 | Web app     | `.github/workflows/build-update-web-app-on-release.yml`     | Build the standalone web bundle and attach it to the release    |
 | Docker Hub  | `.github/workflows/publish-to-hub-docker.yml`               | Build and publish the application image                         |
@@ -405,7 +411,9 @@ for development-only labels, secrets, and personal data before upload.
   completion in App Store Connect. Follow
   [Apple release automation](apple-release-automation.md#caveats).
 - The Play promotion workflow can be manually dispatched for an Android-only
-  release after the intended build is already on `internal`.
+  release after the intended build is already on `internal`. It promotes at a 10%
+  rollout (`user-fraction: 0.1`); widen it in Play Console, or raise the value in
+  the workflow, once the first hours look healthy.
 - Snap publishing can be manually dispatched with an existing release tag.
 - Publishing a GitHub release fans out quickly. If only one channel should move,
   use that channel's supported manual workflow instead of publishing a broad

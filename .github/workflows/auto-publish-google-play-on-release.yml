@@ -42,3 +42,8 @@ jobs:
           from-track: internal
           to-track: production
           inapp-update-priority: 3
+          # Staged rollout: the promoted release reaches 10% of users. Widen it
+          # in Play Console (Production, Releases, Update rollout) once the
+          # first hours look healthy. The action's default is 1.0, which is
+          # every user at once.
+          user-fraction: 0.1

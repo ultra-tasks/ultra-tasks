@@ -14,6 +14,15 @@ on:
         description: 'Optional Android version code for a replacement build'
         type: string
         required: false
+      play_track:
+        description: 'Optional: also upload the built AAB to this Play track (internal, or a closed-test track id such as alpha). Empty skips Play. production is refused.'
+        type: string
+        required: false
+      play_status:
+        description: 'Release status for the play_track upload. draft needs a manual rollout in Play Console.'
+        type: choice
+        options: [draft, completed]
+        default: draft
 
 permissions:
   contents: write
@@ -35,6 +44,22 @@ jobs:
       UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
       UNSPLASH_CLIENT_ID: ${{ secrets.UNSPLASH_CLIENT_ID }}
     steps:
+      # Fail before the long build, not after it.
+      - name: Validate play_track
+        if: github.event_name == 'workflow_dispatch' && inputs.play_track != ''
+        env:
+          PLAY_TRACK: ${{ inputs.play_track }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$PLAY_TRACK" =~ ^[a-z0-9][a-z0-9_-]{0,63}$ ]]; then
+            echo "::error::play_track must be lowercase letters, digits, - or _"
+            exit 1
+          fi
+          if [ "$PLAY_TRACK" = "production" ]; then
+            echo "::error::play_track=production is refused. Promote through the release workflow."
+            exit 1
+          fi
+
       - name: Checkout sources
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -251,6 +276,23 @@ jobs:
           shopt -s nullglob
           bundles=(android/app/build/outputs/bundle/playRelease/*.aab)
           test ${#bundles[@]} -eq 1 || { echo '::error::Expected exactly one Play release AAB'; exit 1; }
+
+      # On-demand Play upload for manual runs. Pre-release tags and manual runs
+      # never reach Play otherwise, so the service account and upload key would
+      # first be exercised by a final tag (which also starts a production
+      # promotion). Set `play_track` to try them on `internal` or a closed-test
+      # track first. Production is refused here: only the release workflow
+      # promotes to it.
+      - name: Upload to Play (manual run, chosen track)
+        if: github.event_name == 'workflow_dispatch' && inputs.play_track != ''
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.ultratasks
+          releaseFiles: android/app/build/outputs/bundle/playRelease/*.aab
+          releaseName: 'manual ${{ github.run_id }}'
+          tracks: ${{ inputs.play_track }}
+          status: ${{ inputs.play_status }}
 
       # Ship the dev-versioned AAB to the Play `internal` track (non-tag main
       # pushes only, and only when the versionCode was actually applied). This is
