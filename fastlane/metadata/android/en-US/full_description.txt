@@ -1,17 +1,21 @@
-Organize your daily tasks at one place while making time tracking a lot less annoying. Ultra Tasks is a ToDo List / Time Tracker / Personal Jira Task Manager for multiple platforms.
+Ultra Tasks is a calm, free and open-source to-do list, planner and time tracker. It works offline, needs no account, and has no ads or tracking in the app.
 
-<h3>Features</h3>
+<b>Capture and plan</b>
+• Add tasks in a few keystrokes with projects, tags, estimates and scheduling shorthand
+• Break bigger tasks into subtasks; keep quick thoughts in the Inbox
+• See the week ahead in Upcoming and give work a time slot in the calendar
+• Reminders, a home screen widget and a focus mode
 
-<b>Plan, track & summarize</b>. Create time sheets and work summaries in a breeze to easily export them to your companies time tracking system.
+<b>Track your time</b>
+• Start and stop a timer on any task, with estimates and a daily summary
+• Pomodoro-style focus sessions
 
-Integrate with <b>Jira</b>, <b>Github</b> and <b>Gitlab</b>. Auto import tasks assigned to you, plan the details locally, automatically create worklogs and get notified right away, when somfething changes.
+<b>Your data stays yours</b>
+• Tasks, notes and settings are stored on your device
+• Optional sync (WebDAV, OneDrive, self-hosted UltraSync) and optional integrations such as calendars and issue trackers; they only contact the services you configure
+• Import from Super Productivity, Todoist and TickTick
+• Open source under AGPL-3.0; the F-Droid build contains no Google Play services
 
-Organize your project's data. Create <b>notes</b>, attach <b>files</b> or create <b>bookmarks</b> for links, files and even commands and have it all out of the way, once you're ready for the weekend.
+Ultra Tasks is a fork of Super Productivity with its own app ID (app.ultratasks), so it installs alongside the original.
 
-Helps you to <b>establish healthy habits</b>. A break timer reminds to you, when it's time to step away. You also can collect personal metrics for yourself to see, which of your work routines need adjustments.
-
-Stuck and procrastinating? No problem! Ultra Tasks's <b>anti procrastination</b> feature helps you to reconsider your options and a <b>pomodoro timer</b> is also always at hand.
-
-Ultra Tasks <b>does NOT actively collect any data</b> and there are no user accounts or registration. It's <b>free</b> and <b>open-source</b> and always will be. <b>NOTE:</b> There will however be data loaded from ultratasks.app on app start and if you use one of the third party providers, you will have to comply with their private policy.
-
-<a href="https://github.com/ac9492/ultra-tasks/blob/main/docs/privacy.md">Private Policy</a>
+<a href="https://github.com/ultra-tasks/ultra-tasks/blob/main/docs/privacy.md">Privacy policy</a>

@@ -343,14 +343,23 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          apks=(android/app/build/outputs/apk/play/release/*.apk)
+          play_apks=(android/app/build/outputs/apk/play/release/*.apk)
+          fdroid_apks=(android/app/build/outputs/apk/fdroid/release/*.apk)
           # An unmatched glob left the old `for`/`[ -f ]` body unrun and the step
           # green, so a tagged release could ship with no Android APK attached.
-          if [ ${#apks[@]} -eq 0 ]; then
-            echo "::error::no play release APK found to attach to ${TAG}"
+          # Exactly one of each flavor: the play APK carries Google Play
+          # Services and must never be mistaken for the F-Droid one, and
+          # IzzyOnDroid / F-Droid pick the `-FDroid` asset by name.
+          if [ ${#play_apks[@]} -ne 1 ] || [ ${#fdroid_apks[@]} -ne 1 ]; then
+            echo "::error::expected exactly one play and one fdroid release APK to attach to ${TAG}"
             exit 1
           fi
-          for apk in "${apks[@]}"; do
+          version=$(node -p "require('./package.json').version")
+          mkdir -p release-assets
+          # Asset names match the 0.3.0 release and the website download page.
+          cp "${play_apks[0]}" "release-assets/Ultra-Tasks-${version}-Android.apk"
+          cp "${fdroid_apks[0]}" "release-assets/Ultra-Tasks-${version}-Android-FDroid.apk"
+          for apk in release-assets/*.apk; do
             echo "Uploading ${apk} to release ${TAG}"
             # --clobber so re-running a tag build replaces the asset instead of
             # failing on "already exists" — that failure also skipped the Play
