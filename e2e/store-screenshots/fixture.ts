@@ -494,6 +494,19 @@ export const test = base.extend<ScreenshotFixtures>({
       (window as unknown as { __spCurrentLocale?: string }).__spCurrentLocale =
         initialLocale;
     }, locale);
+    // Headless Chromium refuses persistent storage, which makes the app show the
+    // "Data will not be persisted permanently" snackbar over every capture. Real
+    // browsers and the native apps grant it, so report it as granted here.
+    await page.addInitScript(() => {
+      try {
+        if (navigator.storage) {
+          navigator.storage.persisted = async () => true;
+          navigator.storage.persist = async () => true;
+        }
+      } catch {
+        /* noop */
+      }
+    });
     // Suppress Material tooltips and CDK overlay tooltips for the duration of
     // capture. Cursor lingering at the last click position would otherwise pop
     // a tooltip into the screenshot. Setting visibility:hidden (not display)

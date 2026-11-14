@@ -208,7 +208,7 @@ Before pushing anything:
    confirm the base in the `npm version` output is the version users last
    received.
 3. For a final release, confirm the generated Android changelog exists under
-   `android/fastlane/metadata/android/en-US/changelogs/`.
+   `fastlane/metadata/android/en-US/changelogs/` (the repo root, where F-Droid and IzzyOnDroid read it).
 4. Run the relevant release-note tests:
 
    ```bash

@@ -48,9 +48,12 @@ export class ImportPage extends BasePage {
       .getByRole('button', { name: 'Import & export', exact: true });
     await syncBackupCategory.waitFor({ state: 'visible', timeout: 10000 });
     await syncBackupCategory.click();
-    await expect(syncBackupCategory).toHaveAttribute('aria-current', 'page');
-
     await this.importFromFileBtn.waitFor({ state: 'visible', timeout: 10000 });
+    // On narrow (mobile) viewports the category list collapses into a drill-down and
+    // is gone once the page opens, so only assert the selected state where it stays.
+    if (await syncBackupCategory.isVisible()) {
+      await expect(syncBackupCategory).toHaveAttribute('aria-current', 'page');
+    }
   }
 
   /**

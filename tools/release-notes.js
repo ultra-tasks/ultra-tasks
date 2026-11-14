@@ -601,7 +601,9 @@ const getAiReleaseNotes = ({
   }
 };
 
-const getAndroidFastlaneChangelogFile = (versionCode) =>
+// Older location, read-only fallback. F-Droid and IzzyOnDroid do not look here
+// (the F-Droid build subdir is android/app), so new changelogs are not written to it.
+const getAndroidSubdirFastlaneChangelogFile = (versionCode) =>
   path.join(
     ROOT_DIR,
     'android',
@@ -613,7 +615,9 @@ const getAndroidFastlaneChangelogFile = (versionCode) =>
     `${versionCode}.txt`,
   );
 
-const getLegacyFastlaneChangelogFile = (versionCode) =>
+// Canonical location: next to the store listing text and images, where F-Droid and
+// IzzyOnDroid read fastlane metadata from.
+const getFastlaneChangelogFile = (versionCode) =>
   path.join(
     ROOT_DIR,
     'fastlane',
@@ -666,18 +670,16 @@ ${aiReleaseNotes?.githubMarkdown || deterministicGithubMarkdown}
   }
 
   const playStoreChangelog = aiReleaseNotes?.playStore || deterministicPlayStoreText;
-  const androidFastlaneChangelogFile = getAndroidFastlaneChangelogFile(versionCode);
-  writeFileEnsuringDir(androidFastlaneChangelogFile, playStoreChangelog);
+  const fastlaneChangelogFile = getFastlaneChangelogFile(versionCode);
+  writeFileEnsuringDir(fastlaneChangelogFile, playStoreChangelog);
 
-  console.log(
-    `Wrote Android changelog for ${version} to ${androidFastlaneChangelogFile}`,
-  );
+  console.log(`Wrote Android changelog for ${version} to ${fastlaneChangelogFile}`);
 };
 
 const preparePlayStoreReleaseNotes = ({ versionCode }) => {
   const candidates = [
-    getAndroidFastlaneChangelogFile(versionCode),
-    getLegacyFastlaneChangelogFile(versionCode),
+    getFastlaneChangelogFile(versionCode),
+    getAndroidSubdirFastlaneChangelogFile(versionCode),
   ];
   const source = candidates.find((candidate) => fs.existsSync(candidate));
   if (!source) {
