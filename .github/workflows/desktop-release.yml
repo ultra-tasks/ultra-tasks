@@ -31,14 +31,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            platform: win
-          - os: macos-15
-            platform: mac
-          - os: ubuntu-latest
-            platform: linux
-    if: ${{ !inputs.dry_run || matrix.platform == 'mac' }}
+        # A dry run builds only the macOS packages.
+        include: ${{ fromJSON(inputs.dry_run && '[{"os":"macos-15","platform":"mac"}]' || '[{"os":"windows-latest","platform":"win"},{"os":"macos-15","platform":"mac"},{"os":"ubuntu-latest","platform":"linux"}]') }}
     runs-on: ${{ matrix.os }}
     # Three notarizations plus the DMG submissions can take a long time.
     timeout-minutes: ${{ matrix.platform == 'mac' && 90 || 40 }}
