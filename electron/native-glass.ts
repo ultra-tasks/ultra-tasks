@@ -9,7 +9,6 @@ import {
 
 // Windows 11 22H2: the first build whose DWM system backdrop Electron uses.
 const MIN_WINDOWS_BUILD_FOR_MATERIAL = 22621;
-const TRANSPARENT = '#00000000';
 
 /** What main keeps between launches (SimpleStoreKey.NATIVE_GLASS). */
 export interface PersistedNativeGlass {
@@ -62,7 +61,20 @@ export const parsePersistedNativeGlass = (raw: unknown): PersistedNativeGlass | 
     : null;
 };
 
-/** Constructor options for a window that starts with the material on. */
+/**
+ * Constructor options for the window's OS material. Setting either option makes
+ * Electron create the web contents transparent.
+ *
+ * macOS always gets vibrancy, whatever was saved: the view lives as long as the
+ * window and the renderer decides whether it shows (transparent canvas) or is
+ * covered (opaque surfaces). Nothing switches vibrancy on once the window
+ * exists, which is unreliable on recent macOS: a fresh install (nothing saved
+ * yet, Glass defaults to on) would open opaque and stay that way, and so would
+ * turning Glass back on in Settings after it started off.
+ *
+ * Windows starts with acrylic only when it was on last time; the DWM backdrop
+ * can be switched on afterwards.
+ */
 export const getNativeGlassWindowOptions = (
   material: NativeGlassMaterial | null,
   persisted: PersistedNativeGlass | null,
@@ -70,18 +82,17 @@ export const getNativeGlassWindowOptions = (
   BrowserWindowConstructorOptions,
   'vibrancy' | 'visualEffectState' | 'backgroundMaterial'
 > => {
-  if (!material || !persisted?.isEnabled) {
-    return {};
+  if (material === 'vibrancy') {
+    return { vibrancy: 'under-window', visualEffectState: 'followWindow' };
   }
-  // Setting either one makes Electron create the web contents transparent.
-  return material === 'vibrancy'
-    ? { vibrancy: 'under-window', visualEffectState: 'followWindow' }
-    : { backgroundMaterial: 'acrylic' };
+  if (material === 'acrylic' && persisted?.isEnabled) {
+    return { backgroundMaterial: 'acrylic' };
+  }
+  return {};
 };
 
 export interface NativeGlassWindow {
   isDestroyed(): boolean;
-  setVibrancy(type: 'under-window' | null): void;
   setBackgroundMaterial(material: 'acrylic' | 'none'): void;
   setBackgroundColor(color: string): void;
 }
@@ -95,6 +106,10 @@ export interface NativeGlassThemeHost {
  * material's light/dark variant follows `nativeTheme.themeSource`, so it
  * mirrors the app's mode while the material is on and goes back to the
  * system's otherwise (the behaviour without glass).
+ *
+ * On macOS that is all there is to do: the vibrancy view stays attached (see
+ * `getNativeGlassWindowOptions`) and the renderer's surfaces cover it when Glass
+ * is off. Windows swaps the DWM backdrop.
  */
 export const applyNativeGlass = (
   win: NativeGlassWindow,
@@ -104,8 +119,6 @@ export const applyNativeGlass = (
 ): void => {
   theme.themeSource = state.isEnabled ? state.themeSource : 'system';
   if (material === 'vibrancy') {
-    win.setVibrancy(state.isEnabled ? 'under-window' : null);
-    win.setBackgroundColor(state.isEnabled ? TRANSPARENT : state.solidColor);
     return;
   }
   win.setBackgroundMaterial(state.isEnabled ? 'acrylic' : 'none');
@@ -141,7 +154,11 @@ export const initNativeGlassIpc = ({
       last?.isEnabled === payload.isEnabled && last.themeSource === payload.themeSource;
     if (!isSameMode) {
       applyNativeGlass(win, material, payload, theme);
-    } else if (!payload.isEnabled && last?.solidColor !== payload.solidColor) {
+    } else if (
+      material === 'acrylic' &&
+      !payload.isEnabled &&
+      last?.solidColor !== payload.solidColor
+    ) {
       // Palette edits while glass is off only repaint the opaque window.
       win.setBackgroundColor(payload.solidColor);
     }

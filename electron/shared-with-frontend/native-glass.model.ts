@@ -6,7 +6,9 @@
  * renderer as a startup argument, so the renderer knows synchronously whether
  * the window can be translucent. The renderer reports the user's effective
  * Glass choice back over IPC; main mirrors it in its own settings file so the
- * next window starts with the right material. Device-local, never synced.
+ * next window starts with the right material (macOS always starts with
+ * vibrancy, and the renderer's opaque surfaces cover it while Glass is off).
+ * Device-local, never synced.
  */
 export type NativeGlassMaterial = 'vibrancy' | 'acrylic';
 
@@ -18,7 +20,7 @@ export interface NativeGlassState {
   /** Glass on and no reduced-transparency or forced-colors preference. */
   isEnabled: boolean;
   themeSource: NativeGlassThemeSource;
-  /** Opaque window color (`#rrggbb`) to paint while the material is off. */
+  /** Opaque window color (`#rrggbb`) to paint while the material is off (Windows). */
   solidColor: string;
 }
 
