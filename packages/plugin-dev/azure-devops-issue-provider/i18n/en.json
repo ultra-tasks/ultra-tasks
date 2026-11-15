@@ -4,6 +4,7 @@
     "HOST_DESC": "Use the full Azure DevOps URL, for example https://dev.azure.com/your-org or https://server:8080/tfs/DefaultCollection.",
     "PROJECT": "Project",
     "TOKEN": "Personal Access Token",
+    "HOW_TO_GET_TOKEN": "How to create a token (needs Work Items: Read & write)",
     "SCOPE": "Scope (Auto Import only)",
     "SCOPE_ALL": "All",
     "SCOPE_CREATED": "Created by me",

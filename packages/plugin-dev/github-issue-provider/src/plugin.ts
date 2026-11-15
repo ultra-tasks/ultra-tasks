@@ -131,7 +131,7 @@ registerIssueProvider({
       key: 'tokenHelp',
       type: 'link',
       label: t('CFG.HOW_TO_GET_TOKEN'),
-      url: 'https://github.com/super-productivity/super-productivity/blob/master/docs/github-access-token-instructions.md',
+      url: 'https://github.com/ultra-tasks/ultra-tasks/blob/main/docs/github-access-token-instructions.md',
     },
     {
       key: 'apiBaseUrl',

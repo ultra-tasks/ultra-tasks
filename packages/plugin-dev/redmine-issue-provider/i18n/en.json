@@ -2,6 +2,7 @@
   "CFG": {
     "HOST": "Host (e.g. https://redmine.org)",
     "API_KEY": "API access key",
+    "HOW_TO_GET_TOKEN": "How to find your API key (My account → API access key)",
     "PROJECT_ID": "Project Identifier (optional)",
     "PROJECT_ID_DESC": "Can be found as part of the URL when viewing the project in a web browser. Leave empty to search across the whole Redmine instance.",
     "SCOPE": "Scope",

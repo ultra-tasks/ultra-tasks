@@ -139,6 +139,12 @@ registerIssueProvider({
     },
     { key: 'api_key', type: 'password', label: t('CFG.API_KEY'), required: true },
     {
+      key: 'apiKeyHelp',
+      type: 'link',
+      label: t('CFG.HOW_TO_GET_TOKEN'),
+      url: 'https://www.redmine.org/projects/redmine/wiki/RedmineAccounts',
+    },
+    {
       key: 'projectId',
       type: 'input',
       label: t('CFG.PROJECT_ID'),

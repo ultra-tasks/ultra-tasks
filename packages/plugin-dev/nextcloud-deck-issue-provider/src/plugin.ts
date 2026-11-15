@@ -210,6 +210,12 @@ registerIssueProvider({
     { key: 'username', type: 'input', label: t('CFG.USERNAME'), required: true },
     { key: 'password', type: 'password', label: t('CFG.PASSWORD'), required: true },
     {
+      key: 'passwordHelp',
+      type: 'link',
+      label: t('CFG.HOW_TO_GET_TOKEN'),
+      url: 'https://docs.nextcloud.com/server/latest/user_manual/en/session_management.html',
+    },
+    {
       key: 'selectedBoardId',
       type: 'select',
       label: t('CFG.BOARD'),

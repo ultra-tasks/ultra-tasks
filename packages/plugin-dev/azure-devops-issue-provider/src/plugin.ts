@@ -209,6 +209,12 @@ registerIssueProvider({
       required: true,
     },
     {
+      key: 'tokenHelp',
+      type: 'link',
+      label: t('CFG.HOW_TO_GET_TOKEN'),
+      url: 'https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate',
+    },
+    {
       key: 'scope',
       type: 'select',
       label: t('CFG.SCOPE'),

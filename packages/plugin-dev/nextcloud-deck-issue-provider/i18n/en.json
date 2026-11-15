@@ -3,6 +3,7 @@
     "BASE_URL": "Nextcloud Base URL",
     "USERNAME": "Your Nextcloud username",
     "PASSWORD": "Your Nextcloud app password",
+    "HOW_TO_GET_TOKEN": "How to create an app password (Settings → Security)",
     "BOARD": "Board",
     "IMPORT_STACKS": "Import from stacks (leave empty for all)",
     "DONE_STACK": "Done stack (cards are moved here on completion)",
