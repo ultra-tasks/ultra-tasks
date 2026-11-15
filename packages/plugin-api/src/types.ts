@@ -477,6 +477,17 @@ export interface OAuthFlowConfig {
    * field is ignored (stripped) on those platforms and the platform default is used.
    */
   redirectUri?: string;
+  /**
+   * Redirect URI for the Android and iOS apps, for providers that refuse the app's
+   * custom scheme and only accept `https` redirect addresses (Trello OAuth 2.0).
+   * It must be one of the hand-off pages the host allows (currently
+   * `https://ultratasks.app/oauth-callback/`); any other value is rejected on native.
+   * That page forwards the provider's `code` and `state` to the app, so the redirect
+   * address registered with the provider and the one sent here must be identical.
+   *
+   * Native-only: ignored (stripped) on desktop and web.
+   */
+  nativeRedirectUri?: string;
 }
 
 export interface OAuthTokenResult {

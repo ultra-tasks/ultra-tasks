@@ -109,6 +109,53 @@ describe('resolveEffectiveOAuthConfig', () => {
     expect(result.clientId).toBe('desktop-client-id');
   });
 
+  describe('nativeRedirectUri (https hand-off for providers that refuse custom schemes)', () => {
+    const handoff = 'https://ultratasks.app/oauth-callback/';
+    const withHandoff: OAuthFlowConfig = { ...baseConfig, nativeRedirectUri: handoff };
+
+    it('on Android uses it instead of the desktop loopback redirectUri', () => {
+      const result = resolveEffectiveOAuthConfig(
+        withHandoff,
+        platform({ isNative: true, isAndroid: true }),
+      );
+      expect(result.clientId).toBe('android-client-id');
+      expect(result.clientSecret).toBeUndefined();
+      expect(result.redirectUri).toBe(handoff);
+    });
+
+    it('on iOS uses it instead of the desktop loopback redirectUri', () => {
+      const result = resolveEffectiveOAuthConfig(
+        withHandoff,
+        platform({ isNative: true, isIos: true }),
+      );
+      expect(result.clientId).toBe('ios-client-id');
+      expect(result.redirectUri).toBe(handoff);
+    });
+
+    it('on a native platform with no matching client id still uses it (and never the loopback)', () => {
+      const result = resolveEffectiveOAuthConfig(
+        { ...withHandoff, mobileClientId: undefined },
+        platform({ isNative: true, isAndroid: true }),
+      );
+      expect(result.redirectUri).toBe(handoff);
+      expect(result.clientSecret).toBeUndefined();
+      expect(result.clientId).toBe('desktop-client-id');
+    });
+
+    it('is ignored on desktop, which keeps its own loopback redirectUri', () => {
+      const result = resolveEffectiveOAuthConfig(
+        withHandoff,
+        platform({ isElectron: true }),
+      );
+      expect(result.redirectUri).toBe('http://127.0.0.1:8976/callback');
+    });
+
+    it('is ignored on web, which gets the platform default', () => {
+      const result = resolveEffectiveOAuthConfig(withHandoff, platform());
+      expect(result.redirectUri).toBeUndefined();
+    });
+  });
+
   it('does not mutate the input config', () => {
     const snapshot = JSON.parse(JSON.stringify(baseConfig));
     resolveEffectiveOAuthConfig(baseConfig, platform());

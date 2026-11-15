@@ -5,6 +5,17 @@ import {
 
 export const WEB_OAUTH_CALLBACK_PATH = '/assets/oauth-callback.html';
 
+/**
+ * https hand-off pages a native build may send as the redirect address, for providers
+ * that refuse the app's custom scheme (Trello OAuth 2.0). The page, served by the
+ * website, passes `code` and `state` on to `app.ultratasks:/plugin-oauth-callback`. An
+ * allowlist of exact values: a plugin must never be able to send the authorization code
+ * to a page it controls.
+ */
+export const NATIVE_OAUTH_HANDOFF_URIS: readonly string[] = [
+  'https://ultratasks.app/oauth-callback/',
+];
+
 export interface RedirectUriPlatform {
   isElectron: boolean;
   isNative: boolean;
@@ -48,10 +59,14 @@ export const validateOAuthRedirectUri = (
   }
 
   if (platform.isNative) {
-    // A native OAuth callback must use the app's fixed custom scheme, so a plugin-supplied
-    // redirectUri override is meaningless here. Reject outright — an allowlist of one value
-    // that the user can't usefully set — which also closes the incomplete-scheme-check (no
-    // scheme can slip through a denylist).
+    // A native OAuth callback uses the app's fixed custom scheme, so a plugin-supplied
+    // redirectUri override is meaningless here, with one exception: the exact https
+    // hand-off pages in NATIVE_OAUTH_HANDOFF_URIS. Everything else is rejected — an
+    // allowlist, which also closes the incomplete-scheme-check (no scheme can slip
+    // through a denylist).
+    if (NATIVE_OAUTH_HANDOFF_URIS.includes(redirectUri)) {
+      return;
+    }
     throw new Error(
       `OAuth redirectUri override is not supported on native; the app's fixed callback scheme is used. Got ${redirectUri}`,
     );

@@ -19,6 +19,9 @@ export interface OAuthPlatform {
  *   produces the platform default (web callback page / native app scheme). Otherwise a
  *   web/native-capable plugin that also sets a desktop redirectUri would throw at
  *   connect time when that loopback URI fails web/native validation.
+ *   On native, `nativeRedirectUri` (an allowlisted https hand-off page, see
+ *   validate-redirect-uri.util.ts) replaces it for providers that refuse custom schemes;
+ *   without it the native app scheme default applies. Desktop and web ignore it.
  *
  * Throws if the web build has no webClientId (the plugin isn't web-capable).
  *
@@ -36,7 +39,7 @@ export const resolveEffectiveOAuthConfig = (
       ...config,
       clientId: config.mobileClientId,
       clientSecret: undefined,
-      redirectUri: undefined,
+      redirectUri: config.nativeRedirectUri,
     };
   }
   if (platform.isIos && config.iosClientId) {
@@ -44,7 +47,7 @@ export const resolveEffectiveOAuthConfig = (
       ...config,
       clientId: config.iosClientId,
       clientSecret: undefined,
-      redirectUri: undefined,
+      redirectUri: config.nativeRedirectUri,
     };
   }
   if (!platform.isElectron && !platform.isNative) {
@@ -67,7 +70,7 @@ export const resolveEffectiveOAuthConfig = (
   // strip both: the secret must not be sent, and the desktop loopback redirectUri would
   // be rejected by native/web validation. Keeps clientSecret + redirectUri desktop-only.
   if (!platform.isElectron) {
-    return { ...config, clientSecret: undefined, redirectUri: undefined };
+    return { ...config, clientSecret: undefined, redirectUri: config.nativeRedirectUri };
   }
   return config;
 };

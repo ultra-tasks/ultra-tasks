@@ -1,4 +1,5 @@
 import {
+  NATIVE_OAUTH_HANDOFF_URIS,
   validateOAuthRedirectUri,
   RedirectUriPlatform,
   WEB_OAUTH_CALLBACK_PATH,
@@ -126,6 +127,32 @@ describe('validateOAuthRedirectUri', () => {
       expect(() => validateOAuthRedirectUri('not-a-url', nativePlatform)).toThrowError(
         /Invalid OAuth redirectUri/,
       );
+    });
+
+    it('should accept the allowlisted https hand-off page', () => {
+      for (const uri of NATIVE_OAUTH_HANDOFF_URIS) {
+        expect(() => validateOAuthRedirectUri(uri, nativePlatform)).not.toThrow();
+      }
+      expect(NATIVE_OAUTH_HANDOFF_URIS).toContain(
+        'https://ultratasks.app/oauth-callback/',
+      );
+    });
+
+    it('should reject look-alikes of the hand-off page', () => {
+      for (const uri of [
+        'https://ultratasks.app/oauth-callback',
+        'https://ultratasks.app/oauth-callback/?x=1',
+        'https://ultratasks.app/oauth-callback/../evil',
+        'https://ultratasks.app/other/',
+        'http://ultratasks.app/oauth-callback/',
+        'https://app.ultratasks.app/oauth-callback/',
+        'https://ultratasks.app.evil.example/oauth-callback/',
+        'https://evil.example/oauth-callback/',
+      ]) {
+        expect(() => validateOAuthRedirectUri(uri, nativePlatform))
+          .withContext(uri)
+          .toThrowError(/override is not supported on native/);
+      }
     });
   });
 
