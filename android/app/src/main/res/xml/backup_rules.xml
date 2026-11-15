@@ -31,4 +31,14 @@
   <exclude
     domain="sharedpref"
     path="SuperProductivityTracking.xml" />
+  <!--
+    Decrypted reminder, widget and shared/captured content (including titles of
+    E2EE project tasks) lives in these files in plaintext. Keep it out of cloud
+    backup, adb backup and device transfer; it is rebuilt from sync on next run.
+  -->
+  <exclude domain="sharedpref" path="SuperProductivityAlarms.xml" />
+  <exclude domain="sharedpref" path="SuperProductivityWidget.xml" />
+  <exclude domain="sharedpref" path="SuperProductivityWidgetDone.xml" />
+  <exclude domain="sharedpref" path="SuperProductivityShare.xml" />
+  <exclude domain="sharedpref" path="SuperProductivityCapture.xml" />
 </full-backup-content>

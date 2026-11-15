@@ -76,9 +76,12 @@ object BackgroundSyncCredentialStore {
             try {
                 createEncryptedPrefs(context)
             } catch (e2: Exception) {
-                // Fallback to standard SharedPreferences if KeyStore is broken
-                Log.w(TAG, "EncryptedSharedPreferences unavailable, falling back to standard", e2)
-                context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                // The Keystore is unusable. Never write the access token or the
+                // E2EE password to a plaintext file: keep them in memory for this
+                // process only. The WebView re-supplies them on the next sync.
+                Log.w(TAG, "EncryptedSharedPreferences unavailable, keeping credentials in memory only", e2)
+                context.applicationContext.deleteSharedPreferences(PREFS_NAME)
+                InMemorySharedPreferences()
             }
         }
     }

@@ -38,13 +38,25 @@ object NativeAccountRuntime {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
     }
+    /** True only when the Keystore key is permanently gone, so the stored ciphertext can never be read again. */
+    private fun isPermanentKeyLoss(error: Throwable): Boolean = generateSequence(error) { it.cause }.take(8).any {
+        it is javax.crypto.AEADBadTagException || it is javax.crypto.BadPaddingException ||
+            it is java.security.InvalidKeyException || it is java.security.UnrecoverableKeyException
+    }
     private fun prefs(context: Context): SharedPreferences = preferences ?: try {
         createPreferences(context).also { preferences = it }
-    } catch (_: Exception) {
-        // Unreadable device-bound ciphertext after OS migration contains no
-        // recoverable session. Recreate encrypted storage; never fall back.
-        context.applicationContext.deleteSharedPreferences("UltraNativeAccountV2")
-        createPreferences(context).also { preferences = it }
+    } catch (first: Exception) {
+        // A transient Keystore error must not sign the user out, so retry once and
+        // only discard the store when the key is permanently lost (device-bound
+        // ciphertext after an OS migration holds no recoverable session). Never
+        // fall back to plaintext.
+        val retried = runCatching { createPreferences(context) }
+        retried.getOrNull()?.also { preferences = it } ?: run {
+            val second = retried.exceptionOrNull()!!
+            if (!isPermanentKeyLoss(second) && !isPermanentKeyLoss(first)) throw IllegalStateException("Secure storage unavailable", second)
+            context.applicationContext.deleteSharedPreferences("UltraNativeAccountV2")
+            createPreferences(context).also { preferences = it }
+        }
     }
     private fun read(context: Context): JSONObject = JSONObject(prefs(context).getString(PROFILE, null) ?: throw SessionRevoked())
     private fun save(context: Context, profile: JSONObject) { check(prefs(context).edit().putString(PROFILE, profile.toString()).commit()) }
@@ -168,7 +180,15 @@ object NativeAccountRuntime {
                 val buffer = ByteArray(8192)
                 while (true) { val count = stream.read(buffer); if (count == -1) break; require(bytes.size() + count <= 32 * 1024 * 1024) { "Background snapshot too large" }; bytes.write(buffer, 0, count) }
             }
-            Pair(response.code, JSONObject(bytes.toString("UTF-8")))
+            // Check the status before trusting the body: a proxy 502 page or an empty
+            // 401 is not JSON, and must not be mistaken for a corrupt snapshot (which
+            // would cancel reminders). A malformed 2xx body is retryable too.
+            val text = bytes.toString("UTF-8")
+            val body = try { JSONObject(text) } catch (error: org.json.JSONException) {
+                if (response.code in 200..299) throw IllegalStateException("Malformed server response", error)
+                JSONObject()
+            }
+            Pair(response.code, body)
         }
     }
     private fun credentials(context: Context, profile: JSONObject, force: Boolean = false): JSONObject {
