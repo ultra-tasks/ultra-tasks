@@ -10,6 +10,9 @@ linux:
   maintainer: Adrian Chase <8574757+ac9492@users.noreply.github.com>
 mac:
   appId: app.ultratasks
+  # Ad-hoc signing for local builds only. Releases use electron-builder.desktop-signed.yaml;
+  # the suffix keeps these files from being mistaken for the notarized downloads.
+  artifactName: Ultra-Tasks-${version}-mac-${arch}-adhoc.${ext}
   identity: '-'
   provisioningProfile: null
   notarize: false

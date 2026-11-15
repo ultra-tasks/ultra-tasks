@@ -1,6 +1,11 @@
 name: Desktop GitHub Release
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build, sign, notarize and verify only the macOS packages. No validation, tag or release.
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -8,6 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   validate:
+    if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -32,20 +38,105 @@ jobs:
             platform: mac
           - os: ubuntu-latest
             platform: linux
+    if: ${{ !inputs.dry_run || matrix.platform == 'mac' }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    # Three notarizations plus the DMG submissions can take a long time.
+    timeout-minutes: ${{ matrix.platform == 'mac' && 90 || 40 }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-electron-build
+      - name: Check Apple signing credentials
+        # Fail in seconds, not after a 30 minute build, and never fall back to an
+        # ad-hoc or un-notarized package when a secret is missing or wrong.
+        if: matrix.platform == 'mac'
+        shell: bash
+        env:
+          MAC_CERTS: ${{ secrets.MAC_CERTS }}
+          MAC_CERTS_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in MAC_CERTS MAC_CERTS_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository secret $name"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+          p12="$RUNNER_TEMP/check-signing.p12"
+          printf '%s' "$MAC_CERTS" | base64 --decode > "$p12"
+          certs=$(openssl pkcs12 -in "$p12" -nokeys -passin env:MAC_CERTS_PASSWORD) || {
+            rm -f "$p12"
+            echo "::error::MAC_CERTS is not a readable .p12, or MAC_CERTS_PASSWORD is wrong"
+            exit 1
+          }
+          rm -f "$p12"
+          grep -q 'Developer ID Application' <<<"$certs" || {
+            echo "::error::MAC_CERTS does not contain a Developer ID Application certificate"
+            exit 1
+          }
+          grep -q "($APPLE_TEAM_ID)" <<<"$certs" || {
+            echo "::error::The certificate does not belong to the team in APPLE_TEAM_ID"
+            exit 1
+          }
+          xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" > /dev/null || {
+            echo "::error::notarytool rejected APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD or APPLE_TEAM_ID"
+            exit 1
+          }
+          echo "Apple signing and notarization credentials accepted"
       - name: Install Linux packaging and display dependencies
         if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y rpm xvfb
       - run: npm ci
       - run: npm run buildFrontend:prod:es6
       - run: npm run electron:build
+      - name: Package signed and notarized macOS downloads
+        if: matrix.platform == 'mac'
+        shell: bash
+        env:
+          # The job-level default disables identity discovery; re-enable it so the
+          # imported Developer ID certificate is used instead of skipping signing.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+          CSC_LINK: ${{ secrets.MAC_CERTS }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # electron-builder notarizes and staples each .app; the DMGs are done below.
+          npx electron-builder --config electron-builder.desktop-signed.yaml --mac --publish never
+      - name: Notarize and staple the macOS disk images
+        if: matrix.platform == 'mac'
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dmgs=(.tmp/app-builds/*.dmg)
+          test "${#dmgs[@]}" -eq 3
+          for dmg in "${dmgs[@]}"; do
+            echo "Notarizing $dmg"
+            result=$(xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 45m --output-format json)
+            status=$(jq -r .status <<<"$result")
+            id=$(jq -r .id <<<"$result")
+            echo "Submission $id: $status"
+            if [ "$status" != "Accepted" ]; then
+              xcrun notarytool log "$id" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" || true
+              echo "::error::Apple did not accept $dmg ($status)"
+              exit 1
+            fi
+            xcrun stapler staple "$dmg"
+          done
       - name: Package desktop downloads
+        if: matrix.platform != 'mac'
         shell: bash
         run: |
           if [ '${{ matrix.platform }}' = 'linux' ]; then
@@ -57,6 +148,45 @@ jobs:
         shell: bash
         run: |
           find .tmp/app-builds -name app.asar -print -exec node tools/verify-electron-requires.js '{}' \;
+      - name: Verify macOS signature, notarization and stapling
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          fail() { echo "::error::$1"; exit 1; }
+          check_app() {
+            local app="$1" info out
+            codesign --verify --deep --strict --verbose=2 "$app"
+            info=$(codesign -dv --verbose=4 "$app" 2>&1)
+            grep -q 'Authority=Developer ID Application' <<<"$info" || fail "$app is not signed with a Developer ID Application identity"
+            grep -q 'Signature=adhoc' <<<"$info" && fail "$app is ad-hoc signed"
+            grep -Eq 'flags=.*runtime' <<<"$info" || fail "$app has no hardened runtime"
+            out=$(spctl --assess --verbose=4 --type exec "$app" 2>&1) || { echo "$out"; fail "Gatekeeper rejected $app"; }
+            echo "$out"
+            grep -q 'source=Notarized Developer ID' <<<"$out" || fail "$app is not notarized"
+            xcrun stapler validate "$app"
+          }
+          apps=(.tmp/app-builds/mac*/"Ultra Tasks.app")
+          test "${#apps[@]}" -ge 3
+          for app in "${apps[@]}"; do
+            echo "== $app"
+            check_app "$app"
+          done
+          for dmg in .tmp/app-builds/*.dmg; do
+            echo "== $dmg"
+            out=$(spctl --assess --verbose=4 --type open --context context:primary-signature "$dmg" 2>&1) || { echo "$out"; fail "Gatekeeper rejected $dmg"; }
+            echo "$out"
+            xcrun stapler validate "$dmg"
+            mountpoint="$(mktemp -d)"
+            hdiutil attach "$dmg" -readonly -nobrowse -mountpoint "$mountpoint"
+            if ! check_app "$mountpoint/Ultra Tasks.app"; then
+              hdiutil detach "$mountpoint" || true
+              exit 1
+            fi
+            hdiutil detach "$mountpoint"
+            rmdir "$mountpoint"
+          done
       - name: Smoke test packaged app
         shell: bash
         run: |
@@ -93,6 +223,7 @@ jobs:
             .tmp/app-builds/*.rpm
           if-no-files-found: error
   publish:
+    if: ${{ !inputs.dry_run }}
     needs: [validate, package]
     runs-on: ubuntu-latest
     permissions:
