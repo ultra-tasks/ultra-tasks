@@ -166,6 +166,8 @@ Mixed-version release tests must prove these claims for each connector, especial
 
 ### Connection ownership: one owner device
 
+**Relationship to the OAuth plan (reconciled 2026-11-13, maintainer).** This section describes the default: one device is signed in, and it is the owner. The [OAuth-first plan](2026-11-10-oauth-first-connections.md) describes the optional extension: the user may also sign in on further devices, each with its own local credential, under that plan's conflict rules. The two are layers, not rivals. Where this section says "only the owner holds credentials", read it as the single-device case. Once several devices are signed in, "Waiting for <device>" shows only on devices that are not signed in, and the OAuth plan's conflict rules govern the signed-in ones. Signing in on another device never re-elects the owner or moves the first device's credentials. 0.4.0 ships the single-device path only.
+
 Maintainer decisions, 2026-11-11. This section settles the "one writer per
 connection across tabs/devices" requirement above. It replaces the earlier
 assumption that any device holding a credential polls and pushes.

@@ -70,6 +70,8 @@ Setup offers the first method that works for the provider, the platform and this
 
 The server session first proposed one owner device per connection. **The maintainer chose every-device sign-in instead (2026-11-10):** each device may sign in to a connection and sync it, and a device that does not sign in still receives the tasks through app sync. The rules below keep several writers from conflicting.
 
+**Reconciled with the unified integrations plan (2026-11-13, maintainer).** The one-owner-device design in [Unified integrations](2026-11-08-unified-integrations.md#connection-ownership-one-owner-device) is the default for a connection signed in on one device. Signing in on further devices is optional and is what this plan adds on top. It is an extension of that default, not a replacement: the first device keeps its credentials and owner role. The multi-writer pieces here (deterministic import IDs, write receipts, conflict labels) are only needed once a second device signs in, so they are a follow-up after 0.4.0.
+
 **Connections (personal)**
 
 - **A connection definition syncs, but its credentials do not.** Provider, scope, mode, field policy and mappings sync. Tokens, app passwords and OAuth grants stay in per-device stores (`sup-plugin-oauth`, `sup-sync`, `setSecret`). Each device signs in itself, with its own grant, revocable on its own at the provider. With OAuth that is one consent screen, since the definition is already there.
@@ -149,7 +151,7 @@ Tested with unit tests against scripted HTTP responses, not against a live Nextc
 
 ## Decisions for the maintainer
 
-1. **Decided 2026-11-10: every device may sign in and sync**, with the conflict rules and the "Updates from your other devices" label above, instead of one owner device.
+1. **Decided 2026-11-10: every device may sign in and sync**, with the conflict rules and the "Updates from your other devices" label above, instead of one owner device. **Reconciled 2026-11-13:** this is an optional extension of the one-owner-device default, not a replacement; see the note under "The shared model".
 2. **Register Ultra Tasks' own OAuth apps**, starting with Google (the current Android client cannot match this app) and the providers in step 4.
 3. **The broker** as a post-1.0.0 server module, or never: never would mean token-only for Jira Cloud and ClickUp.
 

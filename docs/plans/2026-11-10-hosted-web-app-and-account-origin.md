@@ -54,14 +54,16 @@ Separate the dashboard onto its own subdomain only if the shared-origin trust co
 
 One origin means a routing table. Everything not listed is the web application.
 
-| Path                           | Owner      | Notes                                                                                                    |
-| ------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------- |
-| `/account`, `/account/*`       | Server     | Dashboard. Its assets load from `/api/v2/accounts/*`. Verification and reset links stay here.            |
-| `/api/*`                       | Server     | REST and the `/api/v2/accounts/sync/events` WebSocket. Never cached, never served by the service worker. |
-| `/live`, `/health`             | Server     | Probes.                                                                                                  |
-| `/privacy.html`, `/terms.html` | Server     | Legal pages or a redirect to the published policy.                                                       |
-| `/oauth/callback/<provider>`   | Web bundle | An explicit file (not a router route) that strips the code from the URL first. See OAuth plan.           |
-| `/` and every static asset     | Web bundle | Hash routing (`#/…`); no SPA fallback is needed or wanted.                                               |
+| Path                                                                                                                                         | Owner      | Notes                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/account`, `/account/*`                                                                                                                     | Server     | Dashboard page. Verification and reset links stay here.                                                                                                                                                                    |
+| `/ultra-account.css`, `/account-theme.css`, `/account-assets/*`, `/simplewebauthn-browser.min.js`, `/ultra-account/*`, `/ultra-account.html` | Server     | The dashboard's own files, served from the origin root by the server's static handler (`@fastify/static` on `account-public/`). The dashboard page requests them at these paths, so the web bundle must never answer them. |
+| `/cal/*`                                                                                                                                     | Server     | Public calendar feed (`/cal/<token>.ics`). See the 0.4.0 release plan, Workstream B.                                                                                                                                       |
+| `/api/*`                                                                                                                                     | Server     | REST and the `/api/v2/accounts/sync/events` WebSocket. Never cached, never served by the service worker.                                                                                                                   |
+| `/live`, `/health`                                                                                                                           | Server     | Probes.                                                                                                                                                                                                                    |
+| `/privacy.html`, `/terms.html`                                                                                                               | Server     | Legal pages or a redirect to the published policy.                                                                                                                                                                         |
+| `/oauth/callback/<provider>`                                                                                                                 | Web bundle | An explicit file (not a router route) that strips the code from the URL first. See OAuth plan.                                                                                                                             |
+| `/` and every static asset                                                                                                                   | Web bundle | Hash routing (`#/…`); no SPA fallback is needed or wanted.                                                                                                                                                                 |
 
 Today the server answers `GET /` with a redirect to `/account` (`private-server.ts`). Caddy must send `/` to the bundle before the server sees it. A server image run without the bundle keeps the redirect, which is correct for installs that have no web client.
 
@@ -77,7 +79,7 @@ Sketch (for the server repository; not applied):
 
 ```caddyfile
 {$DOMAIN} {
-    @server path /account /account/* /api/* /live /health /privacy.html /terms.html
+    @server path /account /account/* /api/* /live /health /privacy.html /terms.html /cal/* /ultra-account.html /ultra-account.css /account-theme.css /account-assets/* /simplewebauthn-browser.min.js /ultra-account/*
     handle @server {
         reverse_proxy server:1900
     }
@@ -235,6 +237,7 @@ Consistent already and unchanged: the collaboration plan's statement that a self
 ## Still unverified
 
 - The `deploy/Caddyfile` passes `caddy validate` (Caddy 2.11) and was run in Docker against a stand-in server and a fake bundle. Verified: `/` and static files come from the bundle; `/account`, `/api/*`, `/live`, `/health`, `/privacy.html` and `/terms.html` reach the server and carry no web-app CSP; `/oauth/callback/*` returns the callback page; `/`, `sw.js` and `ngsw.json` are `no-cache`; hashed files are `immutable`; with no bundle installed, `/` reaches the server. Not verified: TLS, WebSocket upgrades through Caddy, real server responses, and behaviour behind Cloudflare.
+- **Correction (2026-11-15):** the stand-in server in that test did not serve the dashboard's own root files (`/ultra-account.css`, `/account-theme.css`, `/account-assets/*`, `/simplewebauthn-browser.min.js`, `/ultra-account/*`), which the real server serves from the origin root and the dashboard page requests at those paths. The matcher above now lists them. Re-run the Caddy test with a stand-in that serves those paths, and check that `/account` renders styled against the real server before go-live.
 - The report-only CSP for the web bundle has not been checked against real usage.
 - The nginx fragment in the server README for the external-proxy mode is illustrative.
 - Whether the production VM uses the bundled Caddy or an existing host proxy (`ULTRA_EXTERNAL_PROXY`) is not recorded in either repository.
