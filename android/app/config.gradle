@@ -26,7 +26,7 @@ ext.getBuildConfigFields = { appConfig, isDebugBuild ->
     def serviceIsLocal = appConfig.getProperty("ONLINE_SERVICE_IS_LOCAL", "true")
 
     // Set the service host based on the build type and whether it's running locally
-    def serviceHost = (serviceIsLocal == "true" && isDebugBuild) ? "10.0.2.2:4200" : appConfig.getProperty("ONLINE_SERVICE_HOST", "app.super-productivity.com")
+    def serviceHost = (serviceIsLocal == "true" && isDebugBuild) ? "10.0.2.2:4200" : appConfig.getProperty("ONLINE_SERVICE_HOST", "app.ultratasks.app")
 
     // Set the protocol based on the build type and whether it's running locally
     def serviceProtocol = (serviceIsLocal == "true" && isDebugBuild) ? "http" : appConfig.getProperty("ONLINE_SERVICE_PROTOCOL", "https")

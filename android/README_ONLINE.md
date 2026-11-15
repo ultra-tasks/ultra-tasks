@@ -31,7 +31,7 @@ To enable Online-Only Mode, set the `LAUNCH_MODE` to `1` or `0` in `android/app/
 
 2. **Use Production URL**
    - **Condition**: Applicable when `LAUNCH_MODE` is set to `1`, or set to `0` and the user has upgraded from a previous version.
-   - **Default**: `https://app.super-productivity.com` (the upstream Super Productivity web app; Ultra Tasks does not host a web app)
+   - **Default**: `https://app.ultratasks.app` (the Ultra Tasks web app)
    - **Configuration**: Ensure `ONLINE_SERVICE_IS_LOCAL` is set to `false`.
 
    ```properties
