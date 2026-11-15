@@ -121,8 +121,28 @@ passes does it create `ultra-tasks-v<package version>` and publish the GitHub
 release with SHA-256 checksums and `build/desktop-release-notes.md`.
 
 This workflow uses `electron-builder.desktop.yaml` for the independent Ultra
-Tasks desktop identity. The initial packages are unsigned on Windows and ad-hoc
-signed, without notarization, on macOS. Signing status must appear in the notes.
+Tasks desktop identity on Windows and Linux, and
+`electron-builder.desktop-signed.yaml` on macOS. Windows packages are unsigned.
+macOS packages are signed with a Developer ID Application certificate,
+notarized and stapled (each `.app` by electron-builder, each DMG by a workflow
+step), and the job verifies `codesign`, Gatekeeper (`spctl`) and `stapler` on
+every app and DMG before anything is published. Signing status must appear in
+the notes.
+
+The macOS job needs five repository secrets: `MAC_CERTS` (base64 of the
+Developer ID Application `.p12`, private key included), `MAC_CERTS_PASSWORD`,
+`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`. A preflight step
+checks them first and fails the run if one is missing or wrong, so a release can
+never fall back to an ad-hoc or un-notarized package. Create the certificate and
+secrets as described in [certificate renewal](update-mac-certificates.md); a
+Developer ID build needs no provisioning profile.
+
+To test signing without releasing, dispatch the workflow with **dry_run**
+checked. It builds, notarizes and verifies only the macOS packages and
+uploads them as the `desktop-mac` artifact; it creates no tag or release.
+`electron-builder.desktop.yaml` keeps ad-hoc macOS signing for local builds, and
+its output carries an `-adhoc` suffix.
+
 The package name (`ultra-tasks`) supplies the independent default data directory;
 existing Super Productivity data is imported explicitly from a backup.
 

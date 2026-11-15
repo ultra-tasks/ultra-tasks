@@ -1,0 +1,27 @@
+# Developer ID signed and notarized macOS downloads. Used by desktop-release.yml.
+# Extends the base file rather than electron-builder.desktop.yaml: that file pins
+# `identity: '-'` (ad-hoc), and an extending config cannot remove a key.
+# CI supplies CSC_LINK, CSC_KEY_PASSWORD and the APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD /
+# APPLE_TEAM_ID variables; see docs/release-and-publishing.md.
+extends: ./electron-builder.yaml
+appId: app.ultratasks
+productName: Ultra Tasks
+artifactName: Ultra-Tasks-${version}-${arch}.${ext}
+mac:
+  appId: app.ultratasks
+  # Developer ID needs no provisioning profile: the entitlements are only
+  # hardened-runtime exceptions (see build/entitlements.mac.plist).
+  provisioningProfile: null
+  hardenedRuntime: true
+  notarize: true
+  # The base file lists the arm64, x64 and universal DMGs; arrays are
+  # concatenated, so this adds the two architecture-specific ZIPs.
+  target:
+    - target: zip
+      arch: [arm64, x64]
+dmg:
+  sign: true
+publish:
+  provider: github
+  owner: ac9492
+  repo: ultra-tasks
