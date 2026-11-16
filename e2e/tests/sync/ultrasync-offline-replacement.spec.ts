@@ -84,8 +84,12 @@ test.describe('@webdav UltraSync replacement while another device is offline', (
       await sourceSync.syncBtn.click({ button: 'right' });
       const dialog = source.page.locator('dialog-sync-cfg');
       await dialog.getByRole('combobox').click();
-      await source.page.getByRole('option', { name: 'UltraSync', exact: true }).click();
-      await dialog.getByRole('button', { name: 'Continue with UltraSync' }).click();
+      await source.page
+        .getByRole('option', { name: 'UltraTasks Account', exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: 'Continue with UltraTasks Account' })
+        .click();
       await signIn(source.page);
       await source.page
         .getByRole('button', { name: 'Import this device’s data' })

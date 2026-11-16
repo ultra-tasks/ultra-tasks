@@ -174,6 +174,12 @@ test.describe('@supersync Fresh-client example tasks vs incoming import (#7976)'
         isNewInstallAppFeatures: true,
       });
       const hint = freshClient.page.locator('onboarding-hint');
+      // A genuinely new install first chooses its starting path. Hints start
+      // only after the welcome closes; skipping still keeps the task guidance.
+      await freshClient.page
+        .locator('first-run-setup')
+        .getByRole('button', { name: 'Skip', exact: true })
+        .click();
       // Proves guidance actually started, so its absence below is not vacuous.
       await expect(hint).toContainText('add your first task');
 

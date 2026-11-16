@@ -30,9 +30,9 @@ const openUltraFromProvider = async (page: Page): Promise<void> => {
   await page.locator('button.sync-btn').first().click({ button: 'right' });
   const dialog = page.locator('dialog-sync-cfg');
   await dialog.getByRole('combobox').click();
-  await page.getByRole('option', { name: 'UltraSync', exact: true }).click();
+  await page.getByRole('option', { name: 'UltraTasks Account', exact: true }).click();
   await expect(dialog).toContainText('Switch your other devices');
-  await dialog.getByRole('button', { name: 'Continue with UltraSync' }).click();
+  await dialog.getByRole('button', { name: 'Continue with UltraTasks Account' }).click();
 };
 
 const expectConnected = async (page: Page): Promise<void> => {
@@ -77,9 +77,9 @@ test.describe('@webdav UltraSync provider migration', () => {
       await expect(dialog).toBeVisible();
       await dialog.getByRole('combobox').click();
       await expect(
-        page.getByRole('option', { name: 'UltraSync', exact: true }),
+        page.getByRole('option', { name: 'UltraTasks Account', exact: true }),
       ).toBeEnabled();
-      await page.getByRole('option', { name: 'UltraSync', exact: true }).click();
+      await page.getByRole('option', { name: 'UltraTasks Account', exact: true }).click();
       await expect(dialog).toContainText('UltraSync');
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
       await expect(page.locator('task').filter({ hasText: title })).toBeVisible();

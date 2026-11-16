@@ -17,6 +17,13 @@ export const openSyncSetup = async (page: Page): Promise<void> => {
   const search = page.getByRole('dialog', { name: 'Search', exact: true });
   // A previous attempt can leave the popup open; do not toggle it shut.
   if (!(await search.isVisible())) {
+    // Global shortcuts deliberately ignore editable controls. A setup caller
+    // may have just edited a task, whose editor retains focus after saving.
+    await page.locator(':focus').evaluateAll((elements) => {
+      for (const element of elements) {
+        if (element instanceof HTMLElement) element.blur();
+      }
+    });
     await page.keyboard.press('Control+F');
     await expect(search).toBeVisible();
   }

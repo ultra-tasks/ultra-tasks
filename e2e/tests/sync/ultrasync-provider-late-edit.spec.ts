@@ -68,8 +68,12 @@ for (const phase of ['preflight', 'download', 'foreign'] as const) {
       await sync.syncBtn.click({ button: 'right' });
       const dialog = source.page.locator('dialog-sync-cfg');
       await dialog.getByRole('combobox').click();
-      await source.page.getByRole('option', { name: 'UltraSync', exact: true }).click();
-      await dialog.getByRole('button', { name: 'Continue with UltraSync' }).click();
+      await source.page
+        .getByRole('option', { name: 'UltraTasks Account', exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: 'Continue with UltraTasks Account' })
+        .click();
       await signIn(source.page, username);
       const useAccount = source.page.getByRole('button', {
         name: 'Use the account’s existing data',
@@ -171,8 +175,12 @@ for (const writer of ['local', 'foreign'] as const) {
       await sync.syncBtn.click({ button: 'right' });
       const dialog = source.page.locator('dialog-sync-cfg');
       await dialog.getByRole('combobox').click();
-      await source.page.getByRole('option', { name: 'UltraSync', exact: true }).click();
-      await dialog.getByRole('button', { name: 'Continue with UltraSync' }).click();
+      await source.page
+        .getByRole('option', { name: 'UltraTasks Account', exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: 'Continue with UltraTasks Account' })
+        .click();
       await signIn(source.page, username);
       const useLocal = source.page.getByRole('button', {
         name: 'Import this device’s data',
@@ -272,8 +280,12 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
     await sync.syncBtn.click({ button: 'right' });
     const dialog = source.page.locator('dialog-sync-cfg');
     await dialog.getByRole('combobox').click();
-    await source.page.getByRole('option', { name: 'UltraSync', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Continue with UltraSync' }).click();
+    await source.page
+      .getByRole('option', { name: 'UltraTasks Account', exact: true })
+      .click();
+    await dialog
+      .getByRole('button', { name: 'Continue with UltraTasks Account' })
+      .click();
     await signIn(source.page, 'latefailure');
     const stage = /\/sync\/scopes\/[^/]+\/replacement\/stage$/;
     await source.page.route(stage, (route) => route.abort());

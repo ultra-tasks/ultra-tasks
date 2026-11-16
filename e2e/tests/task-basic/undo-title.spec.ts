@@ -9,6 +9,8 @@ const editTitle = async (page: Page, task: Locator, value: string): Promise<void
   await expect(editor).toBeVisible();
   await editor.fill(value);
   await editor.press('Tab');
+  // A new edit must not reuse the textarea whose blur is still being saved.
+  await expect(editor).toBeHidden();
 };
 
 test('undoes and redoes a plain saved title', async ({
