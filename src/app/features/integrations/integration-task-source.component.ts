@@ -104,6 +104,7 @@ export class IntegrationTaskSourceComponent {
     this.data.providers().find((p) => p.id === this.link()?.providerId),
   );
   readonly waitingFor = computed(() => {
+    this.capabilities.version();
     const provider = this.provider();
     const task = this.task();
     if (

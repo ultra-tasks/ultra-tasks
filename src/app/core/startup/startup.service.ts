@@ -6,6 +6,7 @@ import { LocalBackupService } from '../../imex/local-backup/local-backup.service
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { SnackService } from '../snack/snack.service';
 import { PluginService } from '../../plugins/plugin.service';
+import { PluginConnectionRuntimeService } from '../../plugins/issue-provider/plugin-connection-runtime.service';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { BannerService } from '../banner/banner.service';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- grandfathered layer-boundary debt
@@ -509,6 +510,7 @@ export class StartupService {
           .toPromise(),
       ]);
       await this._pluginService.initializePlugins();
+      this._injector.get(PluginConnectionRuntimeService).start();
       Log.log('Plugin system initialized after sync completed');
     } catch (error) {
       Log.err('Failed to initialize plugin system:', error);

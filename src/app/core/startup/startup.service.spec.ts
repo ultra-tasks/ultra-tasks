@@ -6,6 +6,7 @@ import { LocalBackupService } from '../../imex/local-backup/local-backup.service
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { SnackService } from '../snack/snack.service';
 import { PluginService } from '../../plugins/plugin.service';
+import { PluginConnectionRuntimeService } from '../../plugins/issue-provider/plugin-connection-runtime.service';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { BannerService } from '../banner/banner.service';
 import { UiHelperService } from '../../features/ui-helper/ui-helper.service';
@@ -142,6 +143,10 @@ describe('StartupService', () => {
         { provide: SnackService, useValue: snackServiceSpy },
         { provide: RatePromptService, useValue: ratePromptServiceSpy },
         { provide: PluginService, useValue: pluginServiceSpy },
+        {
+          provide: PluginConnectionRuntimeService,
+          useValue: { start: jasmine.createSpy('start') },
+        },
         { provide: JiraElectronBridgeService, useValue: jiraElectronBridgeSpy },
         { provide: SyncWrapperService, useValue: syncWrapperServiceSpy },
         { provide: BannerService, useValue: bannerServiceSpy },
