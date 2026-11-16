@@ -1,6 +1,6 @@
 # Opt-in calendar publications
 
-Implementation in progress for 0.4.0. The existing account page owns publication controls; this keeps authentication and revocation together without adding a new settings category. The hosted local-only app has no publication controls.
+Implemented for 0.4.0; live subscription acceptance and production rollout remain pending. The existing account page owns publication controls; this keeps authentication and revocation together without adding a new settings category. The hosted local-only app has no publication controls.
 
 ## Prior art
 
