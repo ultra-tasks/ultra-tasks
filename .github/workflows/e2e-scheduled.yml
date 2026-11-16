@@ -6,6 +6,11 @@ on:
 
   workflow_dispatch:
     inputs:
+      regular_grep:
+        description: 'Playwright --grep filter for regular tests (empty runs the full suite)'
+        required: false
+        type: string
+        default: ''
       grep:
         description: 'Playwright --grep filter for the SuperSync job (default: @supersync)'
         required: false
@@ -138,7 +143,9 @@ jobs:
           path: .tmp/angular-dist
 
       - name: Run Regular E2E Tests
-        run: npm run e2e:ci
+        env:
+          REGULAR_GREP: ${{ inputs.regular_grep || '' }}
+        run: npm run quiet -- e2e:ci --grep "$REGULAR_GREP"
 
       - name: Upload E2E Results on Failure
         if: ${{ failure() }}

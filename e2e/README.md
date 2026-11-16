@@ -693,3 +693,7 @@ When writing a new test:
 - [ ] Ensure test is isolated (no shared state)
 - [ ] Run test locally before committing
 - [ ] Test passes consistently (run 3+ times)
+
+## Focused scheduled runs
+
+The scheduled workflow accepts a regular_grep filter for regular browser tests, alongside grep for SuperSync and webdav_grep for WebDAV. Leave regular_grep empty for the full regular suite. Focused runs confirm selected regressions; run the full suites before tagging a release.
