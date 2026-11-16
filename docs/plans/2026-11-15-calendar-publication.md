@@ -31,4 +31,4 @@ Real PostgreSQL-compatible route tests cover create/fetch/update/rotate/revoke, 
 
 Before enabling the server feature: apply the migration, set `ULTRA_CALENDAR_FEEDS_ENABLED=true`, update the operator privacy notice, and exclude `/cal/*` from proxy access logs and caches. Verify TLS and service-worker routing through the deployed proxy. Test subscriptions and polling in Google Calendar, Apple Calendar, Outlook and Thunderbird; these manual checks are not replaced by automated tests.
 
-The clean production web bundle measures approximately 6.2515 MB with these additions. Production desktop/web initial-bundle limits increase from 6.25 to 6.26 MB (10 KB) for the calendar controls and translated privacy text; the warning limit stays unchanged. Calendar publishing resumes lazily for existing account profiles.
+The clean production web bundle measures approximately 6.2515 MB with these additions. Production desktop/web, standalone web and staging initial-bundle limits increase from 6.25 to 6.26 MB (10 KB) for the calendar controls and translated privacy text; the warning limit stays unchanged. Calendar publishing resumes lazily for existing account profiles.
