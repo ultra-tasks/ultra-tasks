@@ -987,7 +987,7 @@ test.describe('@supersync released provider reorder compatibility', () => {
             ).__SP_E2E_BLOCK_AUTO_SYNC = true;
           });
           await client.page.reload();
-          await waitForAppReady(client.page);
+          await waitForAppReady(client.page, { ensureRoute: false });
           if (client === current) expect(await snapshot(client.page)).toEqual(final);
           else {
             await expect.poll(() => releasedSnapshot(client.page)).toEqual(final);
