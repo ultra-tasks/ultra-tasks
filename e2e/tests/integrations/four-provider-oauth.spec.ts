@@ -6,6 +6,9 @@ import {
   refreshProviderItem,
 } from '../../utils/four-provider-fixtures';
 
+// Keep authorization and source requests inside this test's mock routes.
+test.use({ serviceWorkers: 'block' });
+
 for (const key of ['GITLAB', 'LINEAR', 'TRELLO'] as const) {
   test(`${key} public-client sign-in completes PKCE and imports without a pasted token`, async ({
     page,

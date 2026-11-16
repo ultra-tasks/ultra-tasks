@@ -16,6 +16,7 @@ import { integrationForTask, IntegrationMode } from './integration.model';
 import { ProjectService } from '../project/project.service';
 import { TagService } from '../tag/tag.service';
 import { createIntegrationCalendar } from './integration-calendar';
+import { download } from '../../util/download';
 
 @Injectable({ providedIn: 'root' })
 export class IntegrationService {
@@ -203,12 +204,6 @@ export class IntegrationService {
   }
   async exportCalendar(ids: string[]): Promise<void> {
     const tasks = ids.map((id) => this.entities()[id]).filter((t): t is Task => !!t);
-    const { saveAs } = await import('file-saver');
-    saveAs(
-      new Blob([createIntegrationCalendar(tasks)], {
-        type: 'text/calendar;charset=utf-8',
-      }),
-      'ultratasks.ics',
-    );
+    await download('ultratasks.ics', createIntegrationCalendar(tasks));
   }
 }

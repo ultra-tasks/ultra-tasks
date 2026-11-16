@@ -6,6 +6,8 @@ import { expect, Page } from '@playwright/test';
  * cannot use it; the workspace is opened by its route, which works either way.
  */
 export const openIntegrations = async (page: Page): Promise<void> => {
+  // A sync-button tooltip can otherwise cover the next page's Connect button.
+  await page.mouse.move(0, 0);
   await page.evaluate(() => {
     window.location.hash = '#/integrations';
   });

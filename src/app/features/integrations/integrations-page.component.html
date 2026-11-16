@@ -95,7 +95,7 @@
         <strong>{{ selected().size }} {{ I.SELECTED | translate }}</strong
         ><button
           mat-button
-          [disabled]="busy()"
+          [disabled]="busy() || !selectedSourcesReady()"
           (click)="refresh()"
         >
           {{ I.REFRESH | translate }}</button

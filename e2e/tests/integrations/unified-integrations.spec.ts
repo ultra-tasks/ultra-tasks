@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '../../fixtures/test.fixture';
 
+test.use({ serviceWorkers: 'block' });
+
 const githubIssue = (number: number, title: string): Record<string, unknown> => ({
   id: number + 1000,
   number,

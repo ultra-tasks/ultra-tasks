@@ -9,6 +9,9 @@ import {
 } from '../../utils/four-provider-fixtures';
 import { openIntegrations } from '../../utils/integration-workspace';
 
+// Source HTTP is mocked; service workers would bypass Playwright's routes.
+test.use({ serviceWorkers: 'block' });
+
 for (const key of FOUR_PROVIDERS) {
   test(`${key} connection retains a rejected edit and retries after permission is restored`, async ({
     page,
