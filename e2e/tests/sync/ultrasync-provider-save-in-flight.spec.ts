@@ -1,5 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { waitForStatePersistence } from '../../utils/waits';
+import { openSyncSetup } from '../../utils/open-sync-setup';
 
 const ultraUrl = process.env.E2E_ULTRA_URL;
 if (!ultraUrl && process.env.E2E_REQUIRE_ULTRA === 'true') {
@@ -43,7 +44,7 @@ test('keeps the provider choice and dialog fixed while a switch is saving', asyn
   await expect(syncNow).toBeEnabled({ timeout: 60000 });
   await page.goto('/#/tag/TODAY/tasks');
 
-  await page.locator('button.sync-btn').first().click({ button: 'right' });
+  await openSyncSetup(page);
   const dialog = page.locator('dialog-sync-cfg');
   const picker = dialog.getByRole('combobox');
   await picker.click();
