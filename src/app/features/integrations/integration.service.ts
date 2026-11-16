@@ -15,7 +15,6 @@ import { FieldSyncConfig } from '../issue/two-way-sync/issue-sync.model';
 import { integrationForTask, IntegrationMode } from './integration.model';
 import { ProjectService } from '../project/project.service';
 import { TagService } from '../tag/tag.service';
-import { saveAs } from 'file-saver';
 import { createIntegrationCalendar } from './integration-calendar';
 
 @Injectable({ providedIn: 'root' })
@@ -192,8 +191,9 @@ export class IntegrationService {
   openTask(task: Task): void {
     this._tasks.setSelectedId(task.id);
   }
-  exportCalendar(ids: string[]): void {
+  async exportCalendar(ids: string[]): Promise<void> {
     const tasks = ids.map((id) => this.entities()[id]).filter((t): t is Task => !!t);
+    const { saveAs } = await import('file-saver');
     saveAs(
       new Blob([createIntegrationCalendar(tasks)], {
         type: 'text/calendar;charset=utf-8',

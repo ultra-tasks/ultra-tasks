@@ -11,7 +11,8 @@
     "!/api/**",
     "!/live",
     "!/health",
-    "!/oauth/**"
+    "!/oauth/**",
+    "!/cal/**"
   ],
   "assetGroups": [
     {

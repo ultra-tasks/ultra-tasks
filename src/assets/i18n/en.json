@@ -1,4 +1,24 @@
 {
+  "CALENDAR_PUBLICATION": {
+    "TITLE": "Publish a calendar",
+    "DISCLOSURE": "Publishing sends a readable copy of selected tasks to your server. The server operator and anyone with the subscription URL can read it. Notes are never included. This copy is outside end-to-end encryption.",
+    "REFRESH_HELP": "This device updates the feed while signed in and online. It includes scheduled, unfinished tasks from the last 30 days through the next 180 days, including recurring instances already created in the app. Calendar apps refresh on their own schedule, sometimes hours later. Changes in the calendar do not change your tasks.",
+    "LABEL": "Calendar label",
+    "SELECTION": "Tasks to publish",
+    "ALL": "All scheduled tasks",
+    "PRIVACY": "What to show",
+    "BUSY": "Busy only",
+    "TITLES": "Task titles and times",
+    "CONSENT": "I understand that these published items will be readable by the server operator and anyone with the URL.",
+    "PUBLISH": "Publish calendar",
+    "URL": "Subscription URL",
+    "URL_HELP": "Copy this URL into your calendar app’s subscription settings. It is shown only now. Rotating a URL or stopping publication blocks future fetches; calendars may retain copies they already downloaded.",
+    "OWNER": "Updated by this device.",
+    "OTHER_DEVICE": "Updated by another device. You can rotate its URL or stop publication here.",
+    "ROTATE": "Rotate URL",
+    "STOP": "Stop publishing",
+    "ERROR": "Could not update the calendar publication. Check your connection and sign-in. If another device changed the publication, reopen this page before trying again."
+  },
   "APP": {
     "B_INSTALL": {
       "IGNORE": "Ignore",

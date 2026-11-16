@@ -46,5 +46,7 @@ test.describe('Production PWA server-owned paths', () => {
       (await fetch('/api/v2/accounts/ping')).json(),
     );
     expect(api).toEqual({ owner: 'server' });
+    await page.goto('/cal/test-token', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('body')).toContainText('PWA_E2E_CALENDAR_FEED');
   });
 });

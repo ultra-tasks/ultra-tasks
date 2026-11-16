@@ -2,7 +2,7 @@ import type { Task } from '../tasks/task.model';
 const escapeIcs = (value: string): string =>
   value
     .replace(/\\/g, '\\\\')
-    .replace(/\r?\n/g, '\\n')
+    .replace(/\r\n|\r|\n/g, '\\n')
     .replace(/,/g, '\\,')
     .replace(/;/g, '\\;');
 const utc = (time: number): string =>
@@ -28,20 +28,38 @@ const fold = (line: string): string => {
   parts.push(current);
   return parts.join('\r\n');
 };
-export const createIntegrationCalendar = (tasks: Task[]): string => {
+export interface CalendarPublicationOptions {
+  privacy: 'busy' | 'titles';
+  revision: number;
+  updatedAt: number;
+  windowStart: number;
+  windowEnd: number;
+}
+
+export const createIntegrationCalendar = (
+  tasks: Task[],
+  publication?: CalendarPublicationOptions,
+): string => {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//UltraTasks//Task Export//EN',
     'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
   ];
   for (const task of tasks) {
     if (!task.dueWithTime && !task.dueDay) continue;
+    if (publication) {
+      const date = task.dueWithTime ?? Date.parse(`${task.dueDay}T12:00:00Z`);
+      if (date < publication.windowStart || date > publication.windowEnd || task.isDone)
+        continue;
+    }
     lines.push(
       'BEGIN:VEVENT',
       `UID:${escapeIcs(task.id)}@ultratasks`,
-      'DTSTAMP:19700101T000000Z',
-      `SUMMARY:${escapeIcs(task.title)}`,
+      `DTSTAMP:${publication ? utc(publication.updatedAt) : '19700101T000000Z'}`,
+      `SUMMARY:${publication?.privacy === 'busy' ? 'Busy' : escapeIcs(task.title)}`,
+      ...(publication ? [`SEQUENCE:${publication.revision}`, 'CLASS:PUBLIC'] : []),
     );
     if (task.dueWithTime)
       lines.push(

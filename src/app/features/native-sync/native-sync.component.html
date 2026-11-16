@@ -626,5 +626,8 @@
         }
       }
     }
+    @if (native.unlocked() && native.linked()) {
+      <calendar-publications />
+    }
   </main>
 </div>

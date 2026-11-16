@@ -1,6 +1,7 @@
 import { MAT_SLIDE_TOGGLE_DEFAULT_OPTIONS } from '@angular/material/slide-toggle';
 import {
   APP_INITIALIZER,
+  inject,
   provideAppInitializer,
   enableProdMode,
   EnvironmentInjector,
@@ -14,7 +15,7 @@ import {
 import { registerLocaleData } from '@angular/common';
 
 import { environment } from './environments/environment';
-import { IS_ELECTRON } from './app/app.constants';
+import { IS_SYNC_AVAILABLE, IS_ELECTRON } from './app/app.constants';
 import { DEFAULT_LANGUAGE, LocaleImportFns } from './app/core/locale.constants';
 import {
   registerDefaultLocale,
@@ -152,6 +153,19 @@ bootstrapApplication(AppComponent, {
     // timeout, so a failed or stalled chunk load degrades to the default locale
     // instead of failing bootstrap or holding up first render indefinitely.
     provideAppInitializer(() => registerNavigatorLocale()),
+    provideAppInitializer(() => {
+      // Existing publishers resume on startup. Fresh/local-only profiles load
+      // the account feature only when they open it.
+      if (IS_SYNC_AVAILABLE && localStorage.getItem('ultra-native-server')) {
+        const injector = inject(Injector);
+        return import('./app/features/integrations/calendar-publication.service').then(
+          ({ CalendarPublicationService }) => {
+            injector.get(CalendarPublicationService);
+          },
+        );
+      }
+      return;
+    }),
     // Feature-owned formly types, registered here rather than in ui/'s
     // FormlyConfigModule so ui/ does not import from features/.
     provideFormlyConfig(PRIORITY_ICON_PRESET_SELECT_FORMLY_CONFIG),

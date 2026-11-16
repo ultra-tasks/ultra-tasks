@@ -7,6 +7,7 @@ import {
   OnInit,
   DestroyRef,
 } from '@angular/core';
+import { CalendarPublicationsComponent } from '../integrations/calendar-publications.component';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -41,6 +42,7 @@ import { selectAllProjects } from '../project/store/project.selectors';
 @Component({
   selector: 'native-sync',
   imports: [
+    CalendarPublicationsComponent,
     FormsModule,
     TranslatePipe,
     MatButtonModule,

@@ -1,12 +1,20 @@
 # Ultra Tasks 0.4.0 and server beta 3 release plan
 
-Status: Proposed. Decisions 1 (single device by default, extra devices later), 2 (calendar feed opt-in, busy only), 3 (Developer ID only), 4 (pre-releases, beta.1 first) and 6 (hosted web is Phase 1 only) are made; decision 5 (F-Droid route) is open, see [decisions needed first](#decisions-needed-first).
+Status: In progress. Decisions 1 (single device by default, extra devices later), 2 (calendar feed opt-in, busy only), 3 (Developer ID only), 4 (pre-releases, beta.1 first) and 6 (hosted web is Phase 1 only) are made; decision 5 (F-Droid route) is open, see [decisions needed first](#decisions-needed-first).
 Owner: Ultra Tasks maintainer.
 Tracking: Maintainer request in this chat, 2026-11-12.
 Last verified against the code: 2026-11-12, client `main` at `e8df032522`, server `origin/main` at `877a4d6` and release `server-v0.1.0-beta.2`.
 Completion condition: App 0.4.0 and a matching server release are published with the six capabilities below accepted, or this plan is cut down by an explicit maintainer decision and the removed items are recorded elsewhere.
 
 No document defined 0.4.0 before this one. The scope below is the maintainer's list from the request plus what is already on `main` since `ultra-tasks-v0.3.0` (63 commits). Choosing the number does not waive the gates in the [server launch plan](2026-11-07-server-extraction-and-v1-launch.md). Server and SDK versions stay independent of the app version.
+
+## Implementation update — 2026-11-15
+
+Workstreams A and B are being implemented. Calendar publication now has opt-in app controls, busy-only default, account-scoped device-local publishing ownership, automatic updates, stable task UIDs, revision checks, URL rotation/revocation, server/dashboard controls, a database migration and privacy disclosures. It stays off on servers unless `ULTRA_CALENDAR_FEEDS_ENABLED=true`; nothing has been enabled on the production VM. See [implementation and acceptance notes](2026-11-15-calendar-publication.md).
+
+Validated locally: calendar API/schema/security tests (59), account/sync regressions (77), real Angular/server calendar and private-sync browser checks (2), Windows warm/cold browser-return checks (2), calendar generator/publisher unit tests (6), and undo browser checks (2). Additional working-tree validation failures in notes-panel state, scrolling tests and required test inputs were corrected. Full scheduled WebDAV/SuperSync/released-client CI must still pass on the committed release candidate; unavailable Docker on this Windows host means those suites are not claimed as locally verified.
+
+Still required for B acceptance: subscriptions in Google Calendar, Apple Calendar, Outlook and Thunderbird; production proxy/service-worker verification and operator privacy review. Maintainer decision, 2026-11-15: 0.4.0 publishes already-created scheduled instances within 30 days past and 180 days ahead. Future recurrence projections are deferred to a follow-up. The release checklist remains open until these gates pass or scope is explicitly revised.
 
 ## Sections
 
@@ -83,7 +91,7 @@ From commits since the 0.3.0 tag, branches, session titles and the plan document
 **Design for option A.**
 
 - Client: Settings, Calendar, **Publish a calendar**. Choose which tasks (for example Today, a project, or a tag), what is shown (**Busy only** by default, or title and time, never notes), and a label. Show the exact URL once created, with a rotate and a stop-publishing action. Explain in the dialog that published items are readable by the server operator and anyone with the URL.
-- Generator: extend the ICS code in `integration-calendar.ts`. It must produce stable `UID`s, `DTSTAMP`, `SEQUENCE`, proper `VTIMEZONE` or UTC, date-only all-day values (no invented midnight), and recurrence as expanded instances for a bounded window rather than `RRULE`, until recurrence identity is proven.
+- Generator: extend the ICS code in `integration-calendar.ts`. It must produce stable `UID`s, `DTSTAMP`, `SEQUENCE`, proper `VTIMEZONE` or UTC, date-only all-day values (no invented midnight), and recurrence as expanded instances for a bounded window rather than `RRULE`. Maintainer decision, 2026-11-15: 0.4.0 includes existing task instances only; projected future occurrences are deferred.
 - Publishing: debounced upload after relevant local changes while signed in and online. Include a monotonic revision so two devices cannot overwrite a newer upload with an older one. Which device publishes follows the owner-device decision.
 - Server (`ultra-tasks-server`): a `CalendarFeed` record per account (hashed token, label, privacy level, ICS body, revision, ETag, timestamps), authenticated create, update, rotate and delete routes under `/api/v2/accounts/`, and an unauthenticated `GET /cal/<token>.ics` with `ETag`, `Last-Modified`, `Cache-Control`, `X-Robots-Tag: noindex`, rate limit and size cap. Token is 256 bits, stored hashed, compared in constant time. Deleted with the account and included in backups. Dashboard lists feeds with rotate and revoke.
 - Hosting: `/cal/*` is server-owned. Add it to the path table in the [hosted web app plan](2026-11-10-hosted-web-app-and-account-origin.md), the Caddy server matcher, and the service worker `navigationUrls` exclusions (`!/cal/**`). A returning visitor with an active worker must still reach the server.

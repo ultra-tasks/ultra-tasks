@@ -165,6 +165,10 @@ const interceptVersionedRequests = (request, response) => {
     );
     return;
   }
+  if (request.method === 'GET' && pathname.startsWith('/cal/')) {
+    sendBuffer(request, response, 'text/plain; charset=utf-8', Buffer.from('PWA_E2E_CALENDAR_FEED'));
+    return;
+  }
   if (request.method === 'GET' && pathname === '/api/v2/accounts/ping') {
     sendBuffer(
       request,
