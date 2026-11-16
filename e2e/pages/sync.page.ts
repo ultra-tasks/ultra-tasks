@@ -121,12 +121,11 @@ export class SyncPage extends BasePage {
         .waitForURL(/#\/(tag|project)\/.+\/tasks/, { timeout: 10000 })
         .catch(() => {});
 
-      // First-time setup has no header button yet (it appears once a provider
-      // is chosen), so it opens the dialog from the command bar. Reconfiguring
-      // right-clicks the button, which exists by then. Both end at the same
-      // dialog. noWaitAfter keeps the click from blocking on hash navigation.
+      // Native account sync also has no legacy header button. Use the command
+      // bar for that provider switch as well as first-time setup; reconfigure
+      // a visible legacy button directly. Both open the same dialog.
       const openSetupDialog = async (force: boolean): Promise<void> => {
-        if (!options.isReconfigure) {
+        if (!options.isReconfigure || !(await this.syncBtn.isVisible())) {
           await openSyncSetup(this.page).catch(async () => {
             await this.page.keyboard.press('Escape');
             await openSyncSetup(this.page);
