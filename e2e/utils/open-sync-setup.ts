@@ -14,9 +14,19 @@ import { expect, type Page } from '@playwright/test';
  * reconfigure still works on a configured profile.
  */
 export const openSyncSetup = async (page: Page): Promise<void> => {
-  const search = page.getByRole('dialog', { name: 'Search', exact: true });
+  // Published v18/v19 clients predate the command bar. Their always-visible
+  // sync button opens the same setup form, even on an unconfigured profile.
+  const syncButton = page.locator('button.sync-btn');
+  if (await syncButton.isVisible()) {
+    await syncButton.click({ button: 'right' });
+    await expect(page.locator('dialog-sync-cfg')).toBeAttached();
+    return;
+  }
+  // The input is shared by the popup and page layouts. Wait for the content
+  // rather than assuming a particular dialog wrapper or accessible name.
+  const field = page.locator('search-page .search-field input');
   // A previous attempt can leave the popup open; do not toggle it shut.
-  if (!(await search.isVisible())) {
+  if (!(await field.isVisible())) {
     // Global shortcuts deliberately ignore editable controls. A setup caller
     // may have just edited a task, whose editor retains focus after saving.
     await page.locator(':focus').evaluateAll((elements) => {
@@ -25,9 +35,8 @@ export const openSyncSetup = async (page: Page): Promise<void> => {
       }
     });
     await page.keyboard.press('Control+F');
-    await expect(search).toBeVisible();
+    await expect(field).toBeVisible();
   }
-  const field = page.locator('search-page .search-field input');
   await expect(field).toBeFocused();
   await field.fill('set up sync');
   // The command is the typed match, so Enter runs it (see the command bar spec).
