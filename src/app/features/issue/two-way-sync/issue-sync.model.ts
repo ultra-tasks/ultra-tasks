@@ -8,6 +8,8 @@ export type FieldSyncConfig = Partial<Record<keyof Task, SyncDirection>>;
 export interface FieldMappingContext {
   issueId: string;
   issueNumber?: number;
+  /** Local source-managed tag names; never sent to a provider. */
+  managedTagPrefix?: string;
 }
 
 /**

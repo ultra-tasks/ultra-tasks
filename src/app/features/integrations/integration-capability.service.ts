@@ -20,6 +20,14 @@ export class IntegrationCapabilityService {
   private readonly _adapters = inject(IssueSyncAdapterResolverService);
   readonly version = this._registry.registrationVersion;
 
+  isReady(key: IssueProviderKey): boolean {
+    this.version();
+    return (
+      ['JIRA', 'GITLAB', 'CALDAV', 'ICAL', 'OPEN_PROJECT', 'PLAINSPACE'].includes(key) ||
+      this._registry.hasProvider(key)
+    );
+  }
+
   name(key: IssueProviderKey): string {
     this.version();
     return (
@@ -40,7 +48,7 @@ export class IntegrationCapabilityService {
     const adapter = this._adapters.getAdapter(provider.issueProviderKey);
     const writable =
       !!definition?.updateIssue ||
-      ['CALDAV', 'PLAINSPACE'].includes(provider.issueProviderKey);
+      ['CALDAV', 'PLAINSPACE', 'GITLAB'].includes(provider.issueProviderKey);
     const configured = {
       ...adapter?.getSyncConfig(provider),
       ...provider.integrationFieldPolicy,
@@ -89,6 +97,7 @@ export const integrationQuirk = (key: IssueProviderKey, isCalendar = false): str
     ICAL: T.F.INTEGRATIONS.Q_ICAL,
     GITHUB: T.F.INTEGRATIONS.Q_GITHUB,
     GITLAB: T.F.INTEGRATIONS.Q_GITLAB,
+    LINEAR: T.F.INTEGRATIONS.Q_LINEAR,
     NEXTCLOUD_DECK: T.F.INTEGRATIONS.Q_DECK,
   };
   if (isCalendar) return quirks[key] ?? T.F.INTEGRATIONS.Q_CALENDAR;

@@ -1,4 +1,8 @@
-import { integrationQuirk } from '../../integrations/integration-capability.service';
+import {
+  IntegrationCapabilityService,
+  integrationQuirk,
+} from '../../integrations/integration-capability.service';
+import { IssueProviderOwnershipService } from '../issue-provider-ownership.service';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -6,6 +10,7 @@ import {
   DestroyRef,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -54,7 +59,12 @@ import { JiraCfg } from '../providers/jira/jira.model';
 import { HelpSectionComponent } from '../../../ui/help-section/help-section.component';
 import { TranslatePipe } from '@ngx-translate/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
-import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
+import {
+  FormlyFieldConfig,
+  FormlyForm,
+  FormlyFormOptions,
+  FormlyModule,
+} from '@ngx-formly/core';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -83,6 +93,16 @@ import {
   shouldScopePluginOAuth,
 } from '../../../plugins/oauth/plugin-oauth-token-key.util';
 import { useDialogSize } from '../../../ui/dialog-size.util';
+import {
+  OFFICIAL_OAUTH_CLIENTS,
+  OfficialOAuthProvider,
+} from '../../../plugins/oauth/official-oauth-clients';
+import {
+  IssueProviderCredentialsService,
+  providerCredential,
+} from '../issue-provider-credentials.service';
+import { PluginOAuthBridgeService } from '../../../plugins/oauth/plugin-oauth-bridge.service';
+import { GitHubDeviceAuthorization } from '../../../plugins/oauth/github-device-flow.service';
 
 type OptionsLoadState = 'idle' | 'loading' | 'loaded' | 'empty' | 'failed';
 
@@ -113,6 +133,7 @@ type OptionsLoadState = 'idle' | 'loading' | 'loaded' | 'empty' | 'failed';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DialogEditIssueProviderComponent {
+  readonly ownership = inject(IssueProviderOwnershipService);
   private readonly _dialogSize = useDialogSize('m');
   readonly T: typeof T = T;
   readonly integrationQuirk = integrationQuirk;
@@ -128,11 +149,21 @@ export class DialogEditIssueProviderComponent {
   isConnectionWorks = signal(false);
   isOAuthConnected = signal(false);
   isOAuthConnecting = signal(false);
+  hasLocalCredential = signal(false);
+  isSavingCredential = signal(false);
+  deviceAuthorization = signal<GitHubDeviceAuthorization | null>(null);
+  formlyOptions: FormlyFormOptions = {
+    formState: {
+      hasLocalCredentials: () => this.isOAuthConnected() || this.hasLocalCredential(),
+    },
+  };
+  private readonly _providerForm = viewChild<FormlyForm>('providerForm');
   optionsLoadState = signal<OptionsLoadState>('idle');
   form = new FormGroup({});
   showLoadOptionsButton = false;
 
   private _pluginRegistry = inject(PluginIssueProviderRegistryService);
+  private readonly _capabilities = inject(IntegrationCapabilityService);
   private _pluginBridge = inject(PluginBridgeService);
   private _pluginHttp = inject(PluginHttpService);
   private _cdr = inject(ChangeDetectorRef);
@@ -148,6 +179,8 @@ export class DialogEditIssueProviderComponent {
       ? this._migratePluginConfigForEdit({
           ...this.issueProvider,
           id: nanoid(),
+          integrationOwnerId: undefined,
+          integrationOwnerLabel: undefined,
           migratedFromProjectId: undefined,
         })
       : ({
@@ -179,7 +212,7 @@ export class DialogEditIssueProviderComponent {
   configFormSection: ConfigFormSection<IssueIntegrationCfg> | undefined =
     this._pluginRegistry.hasProvider(this.issueProviderKey)
       ? this._getPluginFormSection()
-      : ISSUE_PROVIDER_FORM_CFGS_MAP[this.issueProviderKey as BuiltInIssueProviderKey];
+      : this._getBuiltinFormSection();
 
   fields = this.configFormSection?.items ?? [];
 
@@ -196,6 +229,9 @@ export class DialogEditIssueProviderComponent {
   private _taskService = inject(TaskService);
   private _tagService = inject(TagService);
   private _certTrustService = inject(CertTrustService);
+  private _credentials = inject(IssueProviderCredentialsService);
+  private _oauthBridge = inject(PluginOAuthBridgeService);
+  private _oauthAbort: AbortController | null = null;
 
   private _isSubmitSuccessful = false;
   private _isClosedOrDestroyed = false;
@@ -232,6 +268,7 @@ export class DialogEditIssueProviderComponent {
     });
     const onClose = (): void => {
       this._isClosedOrDestroyed = true;
+      this._oauthAbort?.abort();
       void this._certTrustService.setPendingConfig(this, null);
       this._cleanupUnsavedOAuthToken().catch((err) => {
         IssueLog.err(
@@ -247,8 +284,31 @@ export class DialogEditIssueProviderComponent {
     this._destroyRef.onDestroy(onClose);
   }
 
-  submit(isSkipClose = false): void {
+  async submit(isSkipClose = false): Promise<void> {
     if (this.form.valid) {
+      if (this.isSavingCredential()) return;
+      if (providerCredential(this.issueProviderKey)) {
+        this.isSavingCredential.set(true);
+        try {
+          this.model = await this._credentials.save(
+            this.model,
+            this.isEdit ? this.issueProvider : undefined,
+          );
+          this.hasLocalCredential.set(
+            await this._credentials.hasLocalCredential(this.model),
+          );
+        } catch (error) {
+          this._snackService.open({
+            type: 'ERROR',
+            msg: T.F.ISSUE.S.CONNECTION_FAILED_WITH_ERROR,
+            translateParams: { errorMsg: getErrorTxt(error) },
+          });
+          return;
+        } finally {
+          this.isSavingCredential.set(false);
+        }
+        if (this._isClosedOrDestroyed) return;
+      }
       if (this.d.deferSave) {
         this._isSubmitSuccessful = true;
         this._matDialogRef.close(this.model);
@@ -304,6 +364,7 @@ export class DialogEditIssueProviderComponent {
     // multiSelect field (e.g. "Calendars to display") holds an array value (#8777).
     // Partial updates from custom cfg components still go through updateModel().
     this.model = model;
+    this.oauthButtons = this._getOAuthButtons();
     this.isConnectionWorks.set(false);
   }
 
@@ -425,7 +486,7 @@ export class DialogEditIssueProviderComponent {
     if (this.isOAuthUnavailableInWeb(oauthConfig)) {
       return;
     }
-    const pluginId = this._pluginRegistry.getProvider(this.issueProviderKey)?.pluginId;
+    const pluginId = this._oauthPluginId();
     if (!pluginId) {
       return;
     }
@@ -435,8 +496,27 @@ export class DialogEditIssueProviderComponent {
       : undefined;
     this.isOAuthConnecting.set(true);
     try {
-      await this._pluginBridge.startOAuthFlow(pluginId, effectiveOAuthConfig, tokenKey);
+      if (
+        OFFICIAL_OAUTH_CLIENTS[this.issueProviderKey as OfficialOAuthProvider]?.flow ===
+        'device'
+      ) {
+        this._oauthAbort?.abort();
+        this._oauthAbort = new AbortController();
+        await this._oauthBridge.startGithubDeviceFlow(
+          effectiveOAuthConfig.clientId,
+          tokenKey!,
+          (authorization) => this.deviceAuthorization.set(authorization),
+          this._oauthAbort.signal,
+        );
+      } else {
+        await this._pluginBridge.startOAuthFlow(pluginId, effectiveOAuthConfig, tokenKey);
+      }
     } catch (e) {
+      if (
+        this._isClosedOrDestroyed ||
+        (e instanceof DOMException && e.name === 'AbortError')
+      )
+        return;
       const detail = (e instanceof Error ? e.message : String(e))
         .replace(/\s+/g, ' ')
         .slice(0, 200);
@@ -450,6 +530,7 @@ export class DialogEditIssueProviderComponent {
     } finally {
       if (!this._isClosedOrDestroyed) {
         this.isOAuthConnecting.set(false);
+        this.deviceAuthorization.set(null);
       }
     }
     if (this._isClosedOrDestroyed) {
@@ -457,6 +538,7 @@ export class DialogEditIssueProviderComponent {
       return;
     }
     this.isOAuthConnected.set(true);
+    this._refreshCredentialValidation();
     this._snackService.open({
       type: 'SUCCESS',
       msg: T.F.ISSUE.S.OAUTH_CONNECTED,
@@ -464,10 +546,11 @@ export class DialogEditIssueProviderComponent {
     // _loadDynamicOptions surfaces its own per-field error snacks; failures
     // here must not be reported as OAuth failures (the connection succeeded).
     await this._loadAndSetDynamicOptionsState();
+    this._refreshCredentialValidation();
   }
 
   async disconnectOAuth(): Promise<void> {
-    const pluginId = this._pluginRegistry.getProvider(this.issueProviderKey)?.pluginId;
+    const pluginId = this._oauthPluginId();
     if (!pluginId) {
       return;
     }
@@ -476,6 +559,30 @@ export class DialogEditIssueProviderComponent {
       : undefined;
     await this._pluginBridge.clearOAuthToken(pluginId, tokenKey);
     this.isOAuthConnected.set(false);
+    this._refreshCredentialValidation();
+  }
+
+  cancelDeviceSignIn(): void {
+    this._oauthAbort?.abort();
+  }
+
+  async moveConnectionHere(): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this._matDialog
+        .open(DialogConfirmComponent, {
+          data: {
+            message: T.F.ISSUE.DIALOG.MOVE_DEVICE_CONFIRM,
+            okTxt: T.F.ISSUE.DIALOG.MOVE_DEVICE,
+            cancelTxt: T.G.CANCEL,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) return;
+    this.model = { ...this.model, ...(await this.ownership.claim()) };
+    this.isOAuthConnected.set(false);
+    this.hasLocalCredential.set(await this._credentials.hasLocalCredential(this.model));
+    this._cdr.markForCheck();
   }
 
   protected readonly ICAL_TYPE = ICAL_TYPE;
@@ -626,9 +733,17 @@ export class DialogEditIssueProviderComponent {
   ): Partial<IssueProvider> {
     const pluginConfig = (model as { pluginConfig?: Record<string, unknown> })
       .pluginConfig;
-    if (!pluginConfig) return model;
+    if (!pluginConfig)
+      return this.d.isDuplicate && this.issueProviderKey === 'GITLAB'
+        ? ({ ...model, token: null, isAutoCreateIssues: false } as Partial<IssueProvider>)
+        : model;
     // Shallow-clone pluginConfig to avoid mutating store state
     const migrated = { ...pluginConfig };
+    if (this.d.isDuplicate) {
+      const credential = providerCredential(this.issueProviderKey);
+      if (credential) migrated[credential.field] = null;
+      migrated['isAutoCreateIssues'] = false;
+    }
     // Migrate old single-calendar calendarId to multi-calendar config shape
     if (
       migrated['calendarId'] &&
@@ -777,6 +892,11 @@ export class DialogEditIssueProviderComponent {
         : {}),
       templateOptions: {
         label: f.label,
+        ...(this.isEdit &&
+        this.issueProviderKey === 'GITHUB' &&
+        ['repo', 'apiBaseUrl'].includes(f.key)
+          ? { readonly: true }
+          : {}),
         required: f.required ?? false,
         ...(f.description ? { description: f.description } : {}),
         ...(f.type === 'password' ? { type: 'password' } : {}),
@@ -794,6 +914,57 @@ export class DialogEditIssueProviderComponent {
         ...(f.type === 'multiSelect' ? { multiple: true } : {}),
         ...(f.pattern ? { pattern: f.pattern } : {}),
       },
+      expressionProperties: {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        'props.required': () =>
+          !!f.required &&
+          !(this.isOAuthConnected() && ['token', 'apiKey'].includes(f.key)) &&
+          !(
+            providerCredential(this.issueProviderKey)?.field === f.key &&
+            this.hasLocalCredential()
+          ),
+      },
+    };
+  }
+
+  private _getBuiltinFormSection(): ConfigFormSection<IssueIntegrationCfg> | undefined {
+    const section =
+      ISSUE_PROVIDER_FORM_CFGS_MAP[this.issueProviderKey as BuiltInIssueProviderKey];
+    if (this.issueProviderKey !== 'GITLAB' || !section) return section;
+    const mappings = this._capabilities
+      .fields(this.model as IssueProvider)
+      .map((field) => ({
+        taskField: field.key,
+        issueField: field.remoteField,
+        defaultDirection: field.defaultDirection,
+      }));
+    return {
+      ...section,
+      items: [
+        ...(section.items ?? []).map((item) => ({
+          ...item,
+          ...(item.fieldGroup
+            ? {
+                fieldGroup: item.fieldGroup.map((field) =>
+                  field.key === 'gitlabBaseUrl'
+                    ? {
+                        ...field,
+                        props: {
+                          ...field.templateOptions,
+                          ...field.props,
+                          readonly: this.isEdit,
+                        },
+                      }
+                    : field,
+                ),
+              }
+            : {}),
+        })),
+        this._buildTwoWaySyncSection(
+          this.issueProviderKey,
+          mappings,
+        ) as LimitedFormlyFieldConfig<IssueIntegrationCfg>,
+      ],
     };
   }
 
@@ -802,7 +973,7 @@ export class DialogEditIssueProviderComponent {
     fieldMappings: { taskField: string; issueField: string; defaultDirection: string }[],
   ): unknown {
     const provider = this._pluginRegistry.getProvider(pluginKey);
-    const isPushSupported = !!provider?.definition.updateIssue;
+    const isPushSupported = !!provider?.definition.updateIssue || pluginKey === 'GITLAB';
     const syncDirectionOptions = [
       { value: 'off', label: T.F.ISSUE.TWO_WAY_SYNC.OFF },
       { value: 'pullOnly', label: T.F.ISSUE.TWO_WAY_SYNC.PULL_ONLY },
@@ -823,16 +994,21 @@ export class DialogEditIssueProviderComponent {
       tagIds: T.F.ISSUE.TWO_WAY_SYNC.TAGS,
     };
     const syncFields: any[] = fieldMappings.map((m) => ({
-      key: ('pluginConfig.twoWaySync.' + m.taskField) as keyof IssueIntegrationCfg,
+      key: ((pluginKey === 'GITLAB'
+        ? 'integrationFieldPolicy.'
+        : 'pluginConfig.twoWaySync.') + m.taskField) as keyof IssueIntegrationCfg,
       type: 'select' as const,
       props: {
         label: TASK_FIELD_LABELS[m.taskField] ?? m.taskField,
         options: syncDirectionOptions,
       },
     }));
-    if (provider?.definition.createIssue) {
+    if (provider?.definition.createIssue || pluginKey === 'GITLAB') {
       syncFields.push({
-        key: 'pluginConfig.isAutoCreateIssues',
+        key:
+          pluginKey === 'GITLAB'
+            ? 'isAutoCreateIssues'
+            : 'pluginConfig.isAutoCreateIssues',
         type: 'checkbox',
         expressions: {
           // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -875,7 +1051,9 @@ export class DialogEditIssueProviderComponent {
   }
 
   private _getOAuthTokenKey(): string | undefined {
-    return this.oauthButtons.length ? this.model.id : undefined;
+    return this.oauthButtons.length || providerCredential(this.issueProviderKey)
+      ? this.model.id
+      : undefined;
   }
 
   private _withPluginOAuthOverrides(oauthConfig: OAuthFlowConfig): OAuthFlowConfig {
@@ -893,42 +1071,61 @@ export class DialogEditIssueProviderComponent {
     label: string;
     oauthConfig: OAuthFlowConfig;
   }[] {
-    if (!this._pluginRegistry.hasProvider(this.issueProviderKey)) {
-      return [];
-    }
+    const official =
+      OFFICIAL_OAUTH_CLIENTS[this.issueProviderKey as OfficialOAuthProvider];
+    const config = 'pluginConfig' in this.model ? this.model.pluginConfig : this.model;
+    const customBase =
+      this.issueProviderKey === 'GITLAB'
+        ? (this.model as Record<string, unknown>)['gitlabBaseUrl']
+        : config?.['apiBaseUrl'];
+    const isOfficialOrigin =
+      !customBase ||
+      String(customBase).replace(/\/+$/, '') ===
+        (this.issueProviderKey === 'GITLAB'
+          ? 'https://gitlab.com'
+          : 'https://api.github.com');
+    if (official && isOfficialOrigin)
+      return [{ label: official.label, oauthConfig: official.config }];
+    if (!this._pluginRegistry.hasProvider(this.issueProviderKey)) return [];
     const configFields = this._pluginRegistry.getConfigFields(this.issueProviderKey);
     return configFields
-      .filter((f) => f.type === 'oauthButton' && f.oauthConfig)
+      .filter(
+        (f) => f.type === 'oauthButton' && f.oauthConfig && f.key !== 'officialOAuth',
+      )
       .map((f) => ({ label: f.label, oauthConfig: f.oauthConfig! }));
   }
 
   private async _initOAuthAndOptions(): Promise<void> {
+    this.hasLocalCredential.set(await this._credentials.hasLocalCredential(this.model));
+    this._refreshCredentialValidation();
+    if (!this.ownership.isOwner(this.model)) return;
     const provider = this._pluginRegistry.getProvider(this.issueProviderKey);
-    if (!provider) {
+    const pluginId = this._oauthPluginId();
+    if (!pluginId) {
       return;
     }
-    const tokenKey = shouldScopePluginOAuth(provider.pluginId)
+    const tokenKey = shouldScopePluginOAuth(pluginId)
       ? this._getOAuthTokenKey()
       : undefined;
     const hasTokens = await this._pluginBridge.restoreAndCheckOAuthTokens(
-      provider.pluginId,
+      pluginId,
       tokenKey,
     );
     if (this._isClosedOrDestroyed) {
       return;
     }
     this.isOAuthConnected.set(hasTokens);
-    if (hasTokens) {
+    this._refreshCredentialValidation();
+    if (hasTokens && provider) {
       await this._loadAndSetDynamicOptionsState();
-    } else {
+    } else if (provider) {
       // For non-OAuth plugins (e.g. CalDAV with Basic Auth), show a "Load Calendars"
       // button and attempt to load dynamic options if credentials are already saved.
       const configFields = this._pluginRegistry.getConfigFields(this.issueProviderKey);
       const hasLoadOptions = configFields.some(
         (f) => typeof f.loadOptions === 'function',
       );
-      const hasNoOAuth = !configFields.some((f) => f.type === 'oauthButton');
-      if (hasLoadOptions && hasNoOAuth) {
+      if (hasLoadOptions) {
         this.showLoadOptionsButton = true;
         if (this.isEdit) {
           await this.loadDynamicOptions();
@@ -937,13 +1134,47 @@ export class DialogEditIssueProviderComponent {
     }
   }
 
+  private _refreshCredentialValidation(): void {
+    const credential = providerCredential(this.issueProviderKey);
+    let changed = false;
+    for (const config of this._pluginRegistry.getConfigFields(this.issueProviderKey)) {
+      if (!config.required || !['token', 'apiKey'].includes(config.key)) continue;
+      const field = this._findFormlyField(
+        this.fields as FormlyFieldConfig[],
+        `pluginConfig.${config.key}`,
+      );
+      if (!field) continue;
+      const required =
+        !this.isOAuthConnected() &&
+        !(this.hasLocalCredential() && credential?.field === config.key);
+      if ((field.props ?? field.templateOptions)?.required === required) continue;
+      const props = { ...field.templateOptions, ...field.props, required };
+      field.props = props;
+      field.templateOptions = props;
+      changed = true;
+    }
+    if (changed) {
+      // Seed the cloned fields with the current requirement, so rebuilding
+      // dynamic selectors cannot restore a password validator after sign-in.
+      this.fields = [...this.fields];
+      this._cdr.detectChanges();
+    }
+    // Formly's immutable mode keeps the live fields/options in the child form.
+    const providerForm = this._providerForm();
+    if (!providerForm) return;
+    providerForm.options.checkExpressions?.(providerForm.field);
+    providerForm.options.detectChanges?.(providerForm.field);
+    this.form.updateValueAndValidity({ emitEvent: false });
+    this._cdr.markForCheck();
+  }
+
   private async _cleanupUnsavedOAuthToken(): Promise<void> {
-    const provider = this._pluginRegistry.getProvider(this.issueProviderKey);
+    const pluginId = this._oauthPluginId();
     if (
       this.isEdit ||
       this._isSubmitSuccessful ||
-      !provider ||
-      !shouldScopePluginOAuth(provider.pluginId)
+      !pluginId ||
+      !shouldScopePluginOAuth(pluginId)
     ) {
       return;
     }
@@ -951,8 +1182,15 @@ export class DialogEditIssueProviderComponent {
     if (!tokenKey) {
       return;
     }
-    await this._pluginBridge.clearOAuthToken(provider.pluginId, tokenKey);
+    await this._pluginBridge.clearOAuthToken(pluginId, tokenKey);
     this.isOAuthConnected.set(false);
+  }
+
+  private _oauthPluginId(): string | undefined {
+    return (
+      this._pluginRegistry.getProvider(this.issueProviderKey)?.pluginId ??
+      providerCredential(this.issueProviderKey)?.pluginId
+    );
   }
 
   async loadDynamicOptions(): Promise<void> {

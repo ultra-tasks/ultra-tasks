@@ -4,7 +4,7 @@ import {
 } from '../integrations/integration.model';
 import { selectEntities as selectIntegrationProviders } from './store/issue-provider.selectors';
 import { selectTaskEntities } from '../tasks/store/task.selectors';
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, Injector } from '@angular/core';
 import { unique } from '../../util/unique';
 import { generateCalendarTaskId } from '../calendar-integration/generate-calendar-task-id';
 import { generatePlainspaceTaskId } from './providers/plainspace/generate-plainspace-task-id';
@@ -77,6 +77,7 @@ import { NavigateToTaskService } from '../../core-ui/navigate-to-task/navigate-t
 import { PluginIssueProviderAdapterService } from '../../plugins/issue-provider/plugin-issue-provider-adapter.service';
 import { PluginIssueProviderRegistryService } from '../../plugins/issue-provider/plugin-issue-provider-registry.service';
 import { PlainspaceIssue } from './providers/plainspace/plainspace-issue.model';
+import { IssueOwnerPendingWritesService } from './two-way-sync/issue-owner-pending-writes.service';
 
 /**
  * Plainspace reuses one issue id per series (#10074). Completion advances the
@@ -97,6 +98,7 @@ const isIssueAwaitingNextOccurrence = (
   providedIn: 'root',
 })
 export class IssueService {
+  private readonly _injector = inject(Injector);
   private _taskService = inject(TaskService);
   private _pendingRemoteIssueDelete = inject(PendingRemoteIssueDeleteService);
   private _jiraCommonInterfacesService = inject(JiraCommonInterfacesService);
@@ -426,6 +428,8 @@ export class IssueService {
         },
       });
     }
+    if (this._integrationProviders()[issueProviderId]?.integrationOwnerId)
+      await this._injector.get(IssueOwnerPendingWritesService).flush([task]);
   }
 
   // TODO given we have issueProvider available, we could also just pass that
@@ -516,6 +520,10 @@ export class IssueService {
           });
         }
       }
+      if (issueProvider.integrationOwnerId)
+        await this._injector
+          .get(IssueOwnerPendingWritesService)
+          .flush(tasksIssueIdsByIssueProviderKey[providerKey]);
     }
 
     for (const taskWithoutIssueId of tasksWithoutIssueId) {
@@ -531,6 +539,7 @@ export class IssueService {
     isAddToBacklog = false,
     isForceDefaultProject = false,
     isAutoImport = false,
+    isSourceDetail = false,
   }: {
     issueDataReduced: IssueDataReduced;
     issueProviderId: string;
@@ -542,6 +551,8 @@ export class IssueService {
     // calendar auto-import. Such imports fire regardless of what the user is
     // viewing, so they must not inherit the active context's tag (#8673).
     isAutoImport?: boolean;
+    /** The caller already fetched the full source item (e.g. to copy its labels). */
+    isSourceDetail?: boolean;
   }): Promise<string | undefined> {
     if (!issueDataReduced || !issueDataReduced.id || !issueProviderId) {
       throw new Error('No issueData');
@@ -561,6 +572,21 @@ export class IssueService {
       )
     ) {
       return undefined;
+    }
+
+    // Search/backlog rows can contain decorated titles and omit writable fields.
+    // Every import entry point needs the same full baseline as later write-back.
+    if (
+      !isSourceDetail &&
+      ['GITHUB', 'GITLAB', 'LINEAR', 'TRELLO'].includes(issueProviderKey)
+    ) {
+      const detail = await this.getById(
+        issueProviderKey,
+        String(issueDataReduced.id),
+        issueProviderId,
+      );
+      if (!detail) throw new Error('Source item is unavailable.');
+      issueDataReduced = detail;
     }
 
     // For calendar events, use deterministic ID to prevent duplicates across devices

@@ -8,6 +8,7 @@ import {
   asConfig,
   canConnect,
   COMMENTS_CONFIG,
+  connectionCredential,
   isDoneMapping,
   pickSyncValues,
   registerIssueProvider,
@@ -162,9 +163,18 @@ registerIssueProvider({
     },
   ],
 
-  getHeaders: (config) => ({
+  getHeaders: async (config) => ({
     Accept: 'application/vnd.github.v3+json',
-    ...tokenAuth(asConfig<GithubConfig>(config).token),
+    ...tokenAuth(
+      (
+        await connectionCredential(
+          config,
+          'token',
+          getApiBaseUrl(asConfig<GithubConfig>(config)) === DEFAULT_API_BASE,
+          getApiBaseUrl(asConfig<GithubConfig>(config)),
+        )
+      ).value,
+    ),
   }),
 
   async searchIssues(
@@ -279,7 +289,16 @@ registerIssueProvider({
     // public-repo auto-import works without credentials.
     const query =
       cfg.backlogQuery ||
-      (cfg.token ? 'sort:updated state:open assignee:@me' : 'sort:updated state:open');
+      ((
+        await connectionCredential(
+          config,
+          'token',
+          getApiBaseUrl(cfg) === DEFAULT_API_BASE,
+          getApiBaseUrl(cfg),
+        )
+      ).value
+        ? 'sort:updated state:open assignee:@me'
+        : 'sort:updated state:open');
     const typeFilter = cfg.includePullRequests ? '' : ' is:issue';
     const q = encodeGithubQuery(`repo:${owner}/${repo}${typeFilter} ${query}`);
     const url = `${getApiBaseUrl(cfg)}/search/issues?q=${q}&per_page=50&advanced_search=true`;
@@ -325,6 +344,13 @@ registerIssueProvider({
       },
     },
     textMapping('notes', 'body', 'off'),
+    {
+      taskField: 'tagIds',
+      issueField: 'labels',
+      defaultDirection: 'off',
+      toIssueValue: (value: unknown) => (Array.isArray(value) ? value : []),
+      toTaskValue: (value: unknown) => (Array.isArray(value) ? value : []),
+    },
   ] satisfies PluginFieldMapping[],
 
   async updateIssue(
@@ -334,11 +360,24 @@ registerIssueProvider({
     http: PluginHttp,
   ): Promise<void> {
     const cfg = asConfig<GithubConfig>(config);
-    if (!cfg.token) {
-      throw new Error(t('ERRORS.TOKEN_REQUIRED'));
-    }
     const { owner, repo } = parseRepo(cfg);
     try {
+      if (Array.isArray(changes.labels)) {
+        const existing = new Set<string>();
+        let page = 1;
+        let labels: Array<{ name: string }>;
+        do {
+          labels = await http.get<Array<{ name: string }>>(
+            `${getApiBaseUrl(cfg)}/repos/${owner}/${repo}/labels`,
+            {
+              params: { per_page: '100', page: String(page++) },
+            },
+          );
+          labels.forEach((label) => existing.add(label.name));
+        } while (labels.length === 100);
+        if (changes.labels.some((label) => !existing.has(String(label))))
+          throw new Error(t('ERRORS.LABEL_MUST_EXIST'));
+      }
       await http.patch(
         `${getApiBaseUrl(cfg)}/repos/${owner}/${repo}/issues/${id}`,
         changes,
@@ -356,9 +395,6 @@ registerIssueProvider({
     http: PluginHttp,
   ): Promise<{ issueId: string; issueNumber: number; issueData: PluginIssue }> {
     const cfg = asConfig<GithubConfig>(config);
-    if (!cfg.token) {
-      throw new Error(t('ERRORS.TOKEN_REQUIRED'));
-    }
     const { owner, repo } = parseRepo(cfg);
     let response: GithubIssueResponse;
     try {
@@ -385,5 +421,5 @@ registerIssueProvider({
     };
   },
 
-  extractSyncValues: pickSyncValues('state', 'title', 'body'),
+  extractSyncValues: pickSyncValues('state', 'title', 'body', 'labels'),
 });

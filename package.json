@@ -157,6 +157,8 @@
     "stats": "ng build --configuration production --source-map --stats-json && npx esbuild-visualizer --metadata .tmp/angular-dist/stats.json && xdg-open stats.html",
     "test": "npm run test:berlin && npm run test:tz:la:subset",
     "test:ci": "npm run test:berlin && npm run test:tz:ci",
+    "test:integration-providers": "npm --prefix packages/plugin-dev run test:integrations",
+    "check:integration-providers": "npm --prefix packages/plugin-dev/github-issue-provider run typecheck && npm --prefix packages/plugin-dev/linear-issue-provider run typecheck && npm --prefix packages/plugin-dev/trello-issue-provider run typecheck",
     "test:berlin": "npm run packages:test && npm run release-notes:test && cross-env TZ='Europe/Berlin' ng test --watch=false",
     "test:once": "cross-env TZ='Europe/Berlin' ng test --watch=false",
     "test:watch": "cross-env TZ='Europe/Berlin' ng test --browsers ChromeHeadless",

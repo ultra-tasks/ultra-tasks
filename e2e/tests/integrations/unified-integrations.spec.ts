@@ -53,7 +53,7 @@ test('integration setup imports snapshots and keeps stopped source identities ex
   await expect(setup).toContainText('Map projects and tags');
   await setup.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(setup).toContainText('Completion write-back closes or reopens the issue');
-  await expect(setup.locator('integration-fields select')).toHaveCount(3);
+  await expect(setup.locator('integration-fields select')).toHaveCount(4);
   await setup.getByRole('button', { name: 'Save connection', exact: true }).click();
   const source = page.locator('.source-browser');
   await source.locator('input').first().fill('is:open');
@@ -146,9 +146,7 @@ test('Trello setup explains that completion archives cards and offers a local-on
   const dialog = page.locator('mat-dialog-container');
   // Credentials are never submitted: explain connector behavior before authorization.
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText(
-    'Trello completion currently means archiving a card',
-  );
+  await expect(dialog).toContainText('Completion archives a Trello card by default');
   await dialog.getByText('Two-Way Sync (experimental)', { exact: true }).click();
   await dialog
     .getByRole('combobox', { name: 'Status sync direction', exact: true })

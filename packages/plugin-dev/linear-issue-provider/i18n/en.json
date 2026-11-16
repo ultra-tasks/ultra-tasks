@@ -1,8 +1,8 @@
 {
   "CFG": {
     "API_KEY": "API Key",
-    "TEAM_ID": "Team ID (optional, filter to a specific team)",
-    "PROJECT_ID": "Project ID (optional, filter to a specific project)",
+    "TEAM_ID": "Team (required to create issues)",
+    "PROJECT_ID": "Project (optional)",
     "HOW_TO_GET_TOKEN": "Get your API key"
   },
   "DISPLAY": {

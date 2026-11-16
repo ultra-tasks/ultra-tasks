@@ -8,6 +8,13 @@ import type { IssueSyncAdapter } from '../issue/two-way-sync/issue-sync-adapter.
 
 export type IntegrationMode = 'import' | 'sync';
 
+export const managedSourceTagPrefix = (
+  provider: Partial<IssueProvider>,
+): string | undefined =>
+  provider.issueProviderKey === 'GITHUB' && provider.id
+    ? `${provider.id.slice(0, 6)} / `
+    : undefined;
+
 /** Provenance survives detaching the active issue link. Optional on old tasks. */
 export interface TaskIntegration {
   providerId: string;

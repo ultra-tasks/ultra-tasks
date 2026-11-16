@@ -7,9 +7,11 @@ import {
   asConfig,
   canConnect,
   COMMENTS_CONFIG,
+  connectionCredential,
   isDoneMapping,
   pickSyncValues,
   registerIssueProvider,
+  textMapping,
   t,
 } from '../../issue-provider-kit';
 
@@ -58,6 +60,33 @@ interface LinearRawIssue extends LinearRawIssueReduced {
     }>;
   };
 }
+
+const mapIssue = (issue: LinearRawIssue): PluginIssue => ({
+  id: issue.id,
+  title: issue.title,
+  body: issue.description || '',
+  url: issue.url,
+  state: issue.state?.name,
+  lastUpdated: new Date(issue.updatedAt).getTime(),
+  assignee: issue.assignee?.name,
+  labels: (issue.labels?.nodes || []).map((label) => label.name),
+  comments: (issue.comments?.nodes || [])
+    .filter((comment) => !!comment.user)
+    .map((comment) => ({
+      author: comment.user!.name,
+      body: comment.body || '',
+      created: new Date(comment.createdAt).getTime(),
+      avatarUrl: comment.user!.avatarUrl,
+    })),
+  identifier: issue.identifier,
+  number: issue.number,
+  summary: `${issue.identifier} ${issue.title}`,
+  stateType: issue.state?.type,
+  priority: issue.priority,
+  creator: issue.creator?.name,
+  createdAt: new Date(issue.createdAt).getTime(),
+  completedAt: issue.completedAt ? new Date(issue.completedAt).getTime() : undefined,
+});
 
 const SEARCH_ISSUES_QUERY = `
   query SearchIssues($first: Int!, $team: TeamFilter, $project: NullableProjectFilter) {
@@ -176,23 +205,39 @@ registerIssueProvider({
     },
     {
       key: 'teamId',
-      type: 'input',
+      type: 'select',
       label: t('CFG.TEAM_ID'),
-      advanced: true,
+      async loadOptions(_config, http) {
+        const data = await graphql<{
+          teams: { nodes: Array<{ id: string; name: string }> };
+        }>(http, 'query ConnectionTeams { teams { nodes { id name } } }', {});
+        return data.teams.nodes.map((team) => ({ label: team.name, value: team.id }));
+      },
     },
     {
       key: 'projectId',
-      type: 'input',
+      type: 'select',
       label: t('CFG.PROJECT_ID'),
       advanced: true,
+      async loadOptions(_config, http) {
+        const data = await graphql<{
+          projects: { nodes: Array<{ id: string; name: string }> };
+        }>(http, 'query ConnectionProjects { projects { nodes { id name } } }', {});
+        return data.projects.nodes.map((project) => ({
+          label: project.name,
+          value: project.id,
+        }));
+      },
     },
   ],
 
-  getHeaders: (config) => ({
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'Content-Type': 'application/json',
-    Authorization: asConfig<LinearConfig>(config).apiKey || '',
-  }),
+  getHeaders: async (config) => {
+    const credential = await connectionCredential(config, 'apiKey');
+    return {
+      'Content-Type': 'application/json',
+      Authorization: credential.isOAuth ? `Bearer ${credential.value}` : credential.value,
+    };
+  },
 
   searchIssues(
     searchTerm: string,
@@ -215,34 +260,7 @@ registerIssueProvider({
       throw new Error('No issue data returned from Linear');
     }
 
-    return {
-      id: issue.id,
-      title: issue.title,
-      body: issue.description || '',
-      url: issue.url,
-      state: issue.state?.name,
-      lastUpdated: new Date(issue.updatedAt).getTime(),
-      assignee: issue.assignee?.name,
-      labels: (issue.labels?.nodes || []).map((l) => l.name),
-      comments: (issue.comments?.nodes || [])
-        .filter((c) => !!c.user)
-        .map((c) => ({
-          author: c.user!.name,
-          body: c.body || '',
-          created: new Date(c.createdAt).getTime(),
-          avatarUrl: c.user!.avatarUrl,
-        })),
-
-      // Extended fields for display + isDone mapping.
-      identifier: issue.identifier,
-      number: issue.number,
-      summary: `${issue.identifier} ${issue.title}`,
-      stateType: issue.state?.type,
-      priority: issue.priority,
-      creator: issue.creator?.name,
-      createdAt: new Date(issue.createdAt).getTime(),
-      completedAt: issue.completedAt ? new Date(issue.completedAt).getTime() : undefined,
-    };
+    return mapIssue(issue);
   },
 
   // Linear issue URLs require the workspace slug, which can't be derived from the
@@ -273,7 +291,6 @@ registerIssueProvider({
 
   commentsConfig: COMMENTS_CONFIG,
 
-  // Read-only provider: pull-only mapping drives remote-update detection only.
   fieldMappings: [
     isDoneMapping({
       issueField: 'stateType',
@@ -281,7 +298,112 @@ registerIssueProvider({
       open: 'unstarted',
       isDone: (issueValue) => DONE_STATE_TYPES.includes(issueValue as string),
     }),
+    textMapping('title', 'title'),
+    textMapping('notes', 'body', 'off'),
   ],
 
-  extractSyncValues: pickSyncValues('stateType', 'title', 'body'),
+  async updateIssue(id, changes, _config, http): Promise<void> {
+    const input: Record<string, unknown> = {};
+    if ('title' in changes) input.title = changes.title;
+    if ('body' in changes) input.description = changes.body;
+    if ('stateType' in changes) {
+      const data = await graphql<{
+        issue: { team: { states: { nodes: { id: string; type: string }[] } } } | null;
+      }>(
+        http,
+        `
+          query IssueWorkflow($id: String!) {
+            issue(id: $id) {
+              team {
+                states {
+                  nodes {
+                    id
+                    type
+                  }
+                }
+              }
+            }
+          }
+        `,
+        { id },
+      );
+      const states = data.issue?.team.states.nodes ?? [];
+      const target = changes.stateType === 'completed' ? 'completed' : 'unstarted';
+      const state =
+        states.find((value) => value.type === target) ??
+        (target === 'unstarted'
+          ? states.find((value) => value.type === 'backlog')
+          : undefined);
+      if (!state) throw new Error('No matching Linear workflow state is available.');
+      input.stateId = state.id;
+    }
+    if (!Object.keys(input).length) return;
+    const data = await graphql<{ issueUpdate: { success: boolean } }>(
+      http,
+      `
+        mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
+          issueUpdate(id: $id, input: $input) {
+            success
+          }
+        }
+      `,
+      { id, input },
+    );
+    if (!data.issueUpdate?.success) throw new Error('Linear did not update the issue.');
+  },
+
+  async createIssue(title, config, http) {
+    const cfg = asConfig<LinearConfig>(config);
+    if (!cfg.teamId) throw new Error('Choose a Linear team before creating issues.');
+    const input = {
+      title,
+      teamId: cfg.teamId,
+      ...(cfg.projectId ? { projectId: cfg.projectId } : {}),
+    };
+    const data = await graphql<{
+      issueCreate: { success: boolean; issue?: LinearRawIssue };
+    }>(
+      http,
+      `
+        mutation CreateIssue($input: IssueCreateInput!) {
+          issueCreate(input: $input) {
+            success
+            issue {
+              id
+              identifier
+              number
+              title
+              description
+              priority
+              createdAt
+              updatedAt
+              url
+              state {
+                id
+                name
+                type
+              }
+            }
+          }
+        }
+      `,
+      { input },
+    );
+    if (!data.issueCreate?.success || !data.issueCreate.issue)
+      throw new Error('Linear did not create the issue.');
+    return {
+      issueId: data.issueCreate.issue.id,
+      issueNumber: data.issueCreate.issue.number,
+      issueData: mapIssue(data.issueCreate.issue),
+    };
+  },
+
+  extractSyncValues: (issue) => ({
+    ...pickSyncValues('title', 'body')(issue),
+    // Compare completion semantics, keeping started/backlog/cancelled workflow
+    // details intact unless the user actually changes completion.
+    stateType: DONE_STATE_TYPES.includes(String(issue.stateType))
+      ? 'completed'
+      : 'unstarted',
+  }),
 });

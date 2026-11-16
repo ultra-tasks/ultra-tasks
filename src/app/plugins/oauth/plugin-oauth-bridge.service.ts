@@ -17,6 +17,10 @@ import {
   IS_ANDROID_NATIVE,
 } from '../../util/is-native-platform';
 import { PluginLog } from '../../core/log';
+import {
+  GithubDeviceFlowService,
+  GitHubDeviceAuthorization,
+} from './github-device-flow.service';
 
 /**
  * Bridges OAuth operations between plugin API surface and the underlying
@@ -29,6 +33,33 @@ import { PluginLog } from '../../core/log';
 @Injectable({ providedIn: 'root' })
 export class PluginOAuthBridgeService {
   private _pluginOAuthService = inject(PluginOAuthService);
+  private readonly _githubDeviceFlow = inject(GithubDeviceFlowService);
+
+  async startGithubDeviceFlow(
+    clientId: string,
+    tokenKey: string,
+    onCode: (authorization: GitHubDeviceAuthorization) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (!IS_ELECTRON && !IS_NATIVE_PLATFORM)
+      throw new Error('GitHub browser sign-in requires the desktop or mobile app.');
+    const authorization = await this._githubDeviceFlow.requestCode(clientId, signal);
+    onCode(authorization);
+    this._openOAuthWindow(authorization.verificationUri);
+    const tokens = await this._githubDeviceFlow.poll(clientId, authorization, signal);
+    if (signal.aborted) throw new DOMException('Sign-in cancelled.', 'AbortError');
+    const key = this._oauthPersistenceKey('github-issue-provider', tokenKey);
+    this._pluginOAuthService.storeTokens(key, {
+      ...tokens,
+      clientId,
+      tokenUrl: 'https://github.com/login/oauth/access_token',
+    });
+    await this._persistOAuthTokens(key);
+    if (signal.aborted) {
+      await this.clearOAuthToken('github-issue-provider', tokenKey);
+      throw new DOMException('Sign-in cancelled.', 'AbortError');
+    }
+  }
 
   constructor() {
     // Clear persisted OAuth tokens once the authorization server rejects the grant

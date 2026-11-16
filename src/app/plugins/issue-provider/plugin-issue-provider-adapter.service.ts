@@ -1,4 +1,7 @@
-import { taskSyncPolicy } from '../../features/integrations/integration.model';
+import {
+  taskSyncPolicy,
+  managedSourceTagPrefix,
+} from '../../features/integrations/integration.model';
 import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -25,6 +28,7 @@ import { getDbDateStr } from '../../util/get-db-date-str';
 import { T } from '../../t.const';
 import { PluginLog } from '../../core/log';
 import { withPluginOAuthTokenKey } from '../oauth/plugin-oauth-token-key.util';
+import { IssueProviderOwnershipService } from '../../features/issue/issue-provider-ownership.service';
 
 // Same shape as short-syntax-shared.reducer.ts: Task's fields are readonly,
 // so a partial that fields can be deleted from needs the modifier stripped.
@@ -46,6 +50,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
   private _snackService = inject(SnackService);
   private _taskService = inject(TaskService);
   private _tagService = inject(TagService);
+  private readonly _ownership = inject(IssueProviderOwnershipService);
 
   // Not meaningful for a multi-plugin adapter, but required by interface
   pollInterval = 0;
@@ -68,7 +73,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
       return true;
     }
     try {
-      return await provider.definition.testConnection(pluginCfg.pluginConfig, http);
+      return await provider.definition.testConnection(resolved.pluginConfig, http);
     } catch (e) {
       PluginLog.err(
         `[PluginIssueAdapter] testConnection failed for ${pluginCfg.issueProviderKey}:`,
@@ -128,7 +133,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
     try {
       return await resolved.provider.definition.getById(
         String(id),
-        cfg.pluginConfig,
+        resolved.pluginConfig,
         resolved.http,
       );
     } catch (e) {
@@ -181,7 +186,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
     try {
       const results = await resolved.provider.definition.searchIssues(
         searchTerm,
-        cfg.pluginConfig,
+        resolved.pluginConfig,
         resolved.http,
       );
       return results.map((r) => ({
@@ -221,7 +226,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
     try {
       const issue = await resolved.provider.definition.getById(
         task.issueId,
-        cfg.pluginConfig,
+        resolved.pluginConfig,
         resolved.http,
       );
       return issue ? this._toFreshData(task, issue, cfg, resolved) : null;
@@ -274,7 +279,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
     }
     try {
       const ids = [...new Set(tasks.map((task) => task.issueId as string))];
-      const issues = await getByIds(ids, cfg.pluginConfig, resolved.http);
+      const issues = await getByIds(ids, resolved.pluginConfig, resolved.http);
       const issuesById = new Map(issues.map((issue) => [String(issue.id), issue]));
       return tasks.flatMap((task) => {
         const issue = issuesById.get(task.issueId as string);
@@ -306,7 +311,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
     }
     try {
       const results = await resolved.provider.definition.getNewIssuesForBacklog(
-        cfg.pluginConfig,
+        resolved.pluginConfig,
         resolved.http,
       );
       const existingIds = new Set(allExistingIssueIds.map(String));
@@ -422,6 +427,7 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
     | {
         provider: RegisteredPluginIssueProvider;
         http: PluginHttp;
+        pluginConfig: Record<string, unknown>;
       }
     | undefined {
     const provider = this._registry.getProvider(cfg.issueProviderKey);
@@ -434,10 +440,13 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
       cfg.id,
     );
     const http = this._pluginHttp.createHttpHelper(
-      () => provider.definition.getHeaders(pluginConfig),
+      async () => {
+        await this._ownership.assertOwner(cfg);
+        return provider.definition.getHeaders(pluginConfig);
+      },
       { allowPrivateNetwork: provider.allowPrivateNetwork },
     );
-    return { provider, http };
+    return { provider, http, pluginConfig };
   }
 
   private async _getCfg(
@@ -675,7 +684,11 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
       }
 
       const labels = sortTagLabels(mapping.toTaskValue(issueValue, ctx));
-      return this._mapLabelsToTagIds(labels, isAutoCreateTags);
+      const prefix = managedSourceTagPrefix(cfg);
+      return this._mapLabelsToTagIds(
+        prefix ? labels.map((label) => prefix + label) : labels,
+        !!prefix || isAutoCreateTags,
+      );
     }
 
     return undefined;
@@ -733,8 +746,21 @@ export class PluginIssueProviderAdapterService implements IssueServiceInterface 
         const isAutoCreateTags = !!(cfg.pluginConfig as Record<string, unknown>)?.[
           'isAutoCreateTags'
         ];
-        const tagIds = this._mapLabelsToTagIds(labels, isAutoCreateTags);
-        changes.tagIds = tagIds;
+        const prefix = managedSourceTagPrefix(cfg);
+        const tagIds = this._mapLabelsToTagIds(
+          prefix ? labels.map((label) => prefix + label) : labels,
+          !!prefix || isAutoCreateTags,
+        );
+        const localTagIds = prefix
+          ? task.tagIds.filter(
+              (id) =>
+                !this._tagService
+                  .tagsNoMyDayAndNoList()
+                  .find((tag) => tag.id === id)
+                  ?.title.startsWith(prefix),
+            )
+          : [];
+        changes.tagIds = [...localTagIds, ...tagIds];
         continue;
       }
 

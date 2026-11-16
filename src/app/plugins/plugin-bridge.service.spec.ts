@@ -34,7 +34,10 @@ import { TranslateService } from '@ngx-translate/core';
 import { SyncWrapperService } from '../imex/sync/sync-wrapper.service';
 import { GlobalThemeService } from '../core/theme/global-theme.service';
 import { PluginIssueProviderRegistryService } from './issue-provider/plugin-issue-provider-registry.service';
-import { IssueProviderPluginDefinition } from './issue-provider/plugin-issue-provider.model';
+import {
+  IssueProviderPluginDefinition,
+  PluginHttp,
+} from './issue-provider/plugin-issue-provider.model';
 import { IssueSyncAdapterRegistryService } from '../features/issue/two-way-sync/issue-sync-adapter-registry.service';
 import { PluginHttpService } from './issue-provider/plugin-http.service';
 import { PluginService } from './plugin.service';
@@ -144,6 +147,7 @@ describe('PluginBridgeService - Counter Methods', () => {
           useValue: jasmine.createSpyObj('PluginIssueProviderRegistryService', [
             'register',
             'getRegisteredKey',
+            'getProvider',
             'unregister',
           ]),
         },
@@ -151,6 +155,7 @@ describe('PluginBridgeService - Counter Methods', () => {
           provide: IssueSyncAdapterRegistryService,
           useValue: jasmine.createSpyObj('IssueSyncAdapterRegistryService', [
             'unregister',
+            'register',
           ]),
         },
         { provide: PluginHttpService, useValue: {} },
@@ -463,6 +468,53 @@ describe('PluginBridgeService - Counter Methods', () => {
       expect(registry.register).toHaveBeenCalledOnceWith(
         jasmine.objectContaining({ issueProviderKey: 'GITHUB' }),
       );
+    });
+
+    it('enforces ownership on remote deletion through the normally registered adapter', async () => {
+      registry.getRegisteredKey.and.returnValue('GITHUB');
+      const remoteDelete = jasmine.createSpy('remoteDelete');
+      const http = TestBed.inject(PluginHttpService);
+      http.createHttpHelper = (getHeaders) =>
+        ({
+          delete: async () => {
+            await getHeaders();
+            remoteDelete();
+          },
+        }) as unknown as PluginHttp;
+      const pluginService = TestBed.inject(
+        PluginService,
+      ) as jasmine.SpyObj<PluginService>;
+      pluginService.getPluginPath.and.returnValue('assets/bundled-plugins/test-plugin');
+      const getHeaders = jasmine.createSpy('getHeaders').and.returnValue({});
+      service
+        .createBoundMethods('test-plugin', {
+          id: 'test-plugin',
+          name: 'Test Plugin',
+          issueProvider: { issueProviderKey: 'GITHUB' },
+        } as PluginManifest)
+        .registerIssueProvider({
+          ...definition,
+          getHeaders,
+          deleteIssue: async (_id, _cfg, request) => {
+            await request.delete('https://api.github.com/issues/42');
+          },
+        });
+      const adapters = TestBed.inject(
+        IssueSyncAdapterRegistryService,
+      ) as jasmine.SpyObj<IssueSyncAdapterRegistryService>;
+      const adapter = adapters.register.calls.mostRecent().args[1];
+      await expectAsync(
+        adapter.deleteIssue!('42', {
+          id: 'connection',
+          isEnabled: true,
+          issueProviderKey: 'GITHUB',
+          pluginId: 'test-plugin',
+          pluginConfig: {},
+          integrationOwnerId: 'another-installation',
+        }),
+      ).toBeRejectedWithError('This connection is managed on another device.');
+      expect(getHeaders).not.toHaveBeenCalled();
+      expect(remoteDelete).not.toHaveBeenCalled();
     });
 
     it('rejects a built-in key even from a bundled plugin', () => {

@@ -5,7 +5,6 @@ import {
 import { Injectable, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { PluginBridgeService } from '../../../plugins/plugin-bridge.service';
-import { DialogEditIssueProviderComponent } from '../../issue/dialog-edit-issue-provider/dialog-edit-issue-provider.component';
 import { Store } from '@ngrx/store';
 import { createEffect, ofType } from '@ngrx/effects';
 import { EMPTY, Observable, from } from 'rxjs';
@@ -530,11 +529,14 @@ export class TimeBlockSyncEffects {
       ))
     ) {
       snack.actionStr = T.F.CALENDARS.S.CONNECT;
-      snack.actionFn = () =>
+      snack.actionFn = async () => {
+        const { DialogEditIssueProviderComponent } =
+          await import('../../issue/dialog-edit-issue-provider/dialog-edit-issue-provider.component');
         this._matDialog.open(DialogEditIssueProviderComponent, {
           restoreFocus: true,
           data: { issueProvider: ctx.issueProvider },
         });
+      };
     }
     this._snackService.open(snack);
   }

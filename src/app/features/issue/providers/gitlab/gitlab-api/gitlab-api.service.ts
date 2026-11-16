@@ -7,7 +7,8 @@ import {
   HttpRequest,
 } from '@angular/common/http';
 import { parseUrl, stringifyUrl } from 'query-string';
-import { EMPTY, Observable } from 'rxjs';
+import { EMPTY, Observable, from, of } from 'rxjs';
+import { IssueProviderCredentialsService } from '../../../issue-provider-credentials.service';
 import { SnackService } from 'src/app/core/snack/snack.service';
 
 import { GitlabCfg } from '../gitlab.model';
@@ -34,6 +35,7 @@ import { SearchResultItem } from '../../../issue.model';
 import { GITLAB_TYPE, ISSUE_PROVIDER_HUMANIZED } from '../../../issue.const';
 import { assertTruthy } from '../../../../../util/assert-truthy';
 import { handleIssueProviderHttpError$ } from '../../../handle-issue-provider-http-error';
+import { IssueProviderOwnershipService } from '../../../issue-provider-ownership.service';
 
 @Injectable({
   providedIn: 'root',
@@ -41,6 +43,88 @@ import { handleIssueProviderHttpError$ } from '../../../handle-issue-provider-ht
 export class GitlabApiService {
   private _snackService = inject(SnackService);
   private _http = inject(HttpClient);
+  private readonly _credentials = inject(IssueProviderCredentialsService);
+  private readonly _ownership = inject(IssueProviderOwnershipService);
+
+  private _authHeaders$(cfg: GitlabCfg): Observable<Record<string, string>> {
+    if (cfg.integrationOwnerId)
+      return from(this._ownership.assertOwner(cfg)).pipe(
+        mergeMap(() => this._resolveAuthHeaders$(cfg)),
+      );
+    return this._resolveAuthHeaders$(cfg);
+  }
+
+  private _resolveAuthHeaders$(cfg: GitlabCfg): Observable<Record<string, string>> {
+    if (!(cfg as GitlabCfg & { id?: string }).id) {
+      return of<Record<string, string>>(
+        cfg.token ? { ['PRIVATE-TOKEN']: cfg.token } : {},
+      );
+    }
+    return from(this._credentials.gitlabToken(cfg)).pipe(
+      map(
+        (credential): Record<string, string> =>
+          credential.value
+            ? credential.isOAuth
+              ? { Authorization: `Bearer ${credential.value}` }
+              : { ['PRIVATE-TOKEN']: credential.value }
+            : {},
+      ),
+    );
+  }
+
+  updateIssue$(
+    id: string,
+    changes: Record<string, unknown>,
+    cfg: GitlabCfg,
+  ): Observable<GitlabIssue> {
+    const { project } = getPartsFromGitlabIssueId(id);
+    const configuredProject = decodeURIComponent(cfg.project || '');
+    const isNumericProject = /^\d+$/.test(configuredProject);
+    if (!isNumericProject && project !== configuredProject)
+      throw new Error('The GitLab issue belongs to a different configured project.');
+    const body: Record<string, unknown> = {};
+    if ('title' in changes) body.title = changes.title;
+    if ('body' in changes) body.description = changes.body;
+    if ('state' in changes)
+      body['state_event'] = changes.state === 'closed' ? 'close' : 'reopen';
+    return this._authHeaders$(cfg).pipe(
+      mergeMap((headers) =>
+        isNumericProject
+          ? this._http
+              .get<{ path_with_namespace: string }>(this._apiLink(cfg), { headers })
+              .pipe(
+                map((result) => {
+                  if (result.path_with_namespace !== project)
+                    throw new Error(
+                      'The GitLab issue belongs to a different configured project.',
+                    );
+                  return headers;
+                }),
+              )
+          : of(headers),
+      ),
+      mergeMap((headers) =>
+        this._http.put<GitlabOriginalIssue>(this._issueApiLink(cfg, id), body, {
+          headers,
+        }),
+      ),
+      map((issue) => mapGitlabIssue(issue, cfg)),
+    );
+  }
+
+  createIssue$(title: string, cfg: GitlabCfg): Observable<GitlabIssue> {
+    if (!cfg.project) throw new Error('Choose a GitLab project before creating issues.');
+    return this._authHeaders$(cfg).pipe(
+      mergeMap((headers) =>
+        this._http.post<GitlabOriginalIssue>(
+          `${this._apiLink(cfg)}/issues`,
+          { title },
+          { headers },
+        ),
+      ),
+      map((issue) => mapGitlabIssue(issue, cfg)),
+    );
+  }
 
   getById$(id: string, cfg: GitlabCfg): Observable<GitlabIssue> {
     return this._sendIssuePaginatedRequest$(
@@ -317,7 +401,12 @@ export class GitlabApiService {
 
     const req = new HttpRequest(p.method, p.url, ...allArgs);
 
-    return this._http.request(req).pipe(
+    return this._authHeaders$(cfg).pipe(
+      mergeMap((headers) =>
+        this._http.request(
+          req.clone({ headers: new HttpHeaders({ ...headers, ...params.headers }) }),
+        ),
+      ),
       // Filter out HttpEventType.Sent (type: 0) events to only process actual responses
       filter((res) => !(res === Object(res) && res.type === 0)),
       catchError((err) =>

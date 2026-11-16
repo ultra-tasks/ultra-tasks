@@ -6,8 +6,16 @@ import {
 } from './plugin-oauth-token-key.util';
 
 describe('plugin-oauth-token-key.util', () => {
-  it('scopes OAuth only for the bundled Google Calendar plugin', () => {
+  it('scopes OAuth for bundled calendar and issue providers', () => {
     expect(shouldScopePluginOAuth(GOOGLE_CALENDAR_PLUGIN_ID)).toBeTrue();
+    for (const id of [
+      'github-issue-provider',
+      'gitlab-issue-provider',
+      'linear-issue-provider',
+      'trello-issue-provider',
+    ]) {
+      expect(shouldScopePluginOAuth(id)).toBeTrue();
+    }
     expect(shouldScopePluginOAuth('uploaded-oauth-plugin')).toBeFalse();
   });
 

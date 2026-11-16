@@ -87,7 +87,9 @@ import { GlobalThemeService } from '../core/theme/global-theme.service';
 import { IssueSyncAdapterRegistryService } from '../features/issue/two-way-sync/issue-sync-adapter-registry.service';
 import { PluginHttpService } from './issue-provider/plugin-http.service';
 import { createPluginSyncAdapter } from './issue-provider/plugin-sync-adapter.service';
+import { IssueProviderOwnershipService } from '../features/issue/issue-provider-ownership.service';
 import { PluginOAuthBridgeService } from './oauth/plugin-oauth-bridge.service';
+import { officialOAuthForPlugin } from './oauth/official-oauth-clients';
 import { PluginSecretService } from './secret/plugin-secret.service';
 import { ISSUE_PROVIDER_TYPES } from '../features/issue/issue.const';
 import { PluginService } from './plugin.service';
@@ -164,6 +166,7 @@ export class PluginBridgeService implements OnDestroy {
   private _globalThemeService = inject(GlobalThemeService);
   private _syncAdapterRegistry = inject(IssueSyncAdapterRegistryService);
   private _pluginHttpService = inject(PluginHttpService);
+  private readonly _issueOwnership = inject(IssueProviderOwnershipService);
   private _pluginOAuthBridge = inject(PluginOAuthBridgeService);
   private _pluginSecretService = inject(PluginSecretService);
   private _dataInitService = inject(DataInitService);
@@ -437,9 +440,6 @@ export class PluginBridgeService implements OnDestroy {
     return !!path && path.startsWith('assets/bundled-plugins/');
   }
 
-  /**
-   * Register an issue provider plugin.
-   */
   private _registerIssueProvider(
     pluginId: string,
     manifest: PluginManifest | undefined,
@@ -516,6 +516,7 @@ export class PluginBridgeService implements OnDestroy {
         (getHeaders) => this._pluginHttpService.createHttpHelper(getHeaders, httpOpts),
         this._tagService,
         pluginId,
+        (cfg) => this._issueOwnership.assertOwner(cfg),
       );
       this._syncAdapterRegistry.register(registeredKey, adapter);
       PluginLog.log(
@@ -628,13 +629,12 @@ export class PluginBridgeService implements OnDestroy {
   }
 
   private _getOAuthConfigForPlugin(pluginId: string): OAuthFlowConfig | undefined {
-    const registeredKey = this._pluginIssueProviderRegistry.getRegisteredKey(pluginId);
-    if (!registeredKey) {
-      return undefined;
-    }
-    return this._pluginIssueProviderRegistry
-      .getConfigFields(registeredKey)
-      .find((f) => f.type === 'oauthButton' && f.oauthConfig)?.oauthConfig;
+    const official = officialOAuthForPlugin(pluginId);
+    if (official) return official.config;
+    const registry = this._pluginIssueProviderRegistry;
+    return registry
+      .getConfigFields(registry.getRegisteredKey(pluginId) ?? '')
+      .find((field) => field.type === 'oauthButton' && field.oauthConfig)?.oauthConfig;
   }
 
   private async _downloadFile(filename: string, data: string): Promise<void> {

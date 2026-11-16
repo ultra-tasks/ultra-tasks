@@ -5,15 +5,20 @@
     "TOKEN": "Trello API token",
     "TOKEN_DESC": "Insert the Trello API token here.",
     "BOARD": "Trello board",
-    "BOARD_DESC": "Select the board to search and import cards from. Enter your API key and token first, then the list loads.",
+    "BOARD_DESC": "Sign in, or enter an API key and token and load options, then select the board to search and import cards from.",
     "FILTER_USERNAME": "Filter by Trello username",
     "FILTER_USERNAME_DESC": "If provided, only imports cards assigned to this Trello username.",
     "DEFAULT_LIST_ID": "Default Trello list",
     "DEFAULT_LIST_ID_DESC": "Select the list where automatically created Trello cards are added. If unset, the first open list on the board is used. Select a board and click \"Reload options\" to populate this dropdown.",
-    "HOW_TO_GET_TOKEN": "How to get a token?"
+    "HOW_TO_GET_TOKEN": "How to get a token?",
+    "MOVE_TO_DONE_LIST": "Complete cards by moving them to a Done list",
+    "DONE_LIST": "Done list",
+    "COMPLETION_PREVIEW": "Preview: completing a task moves its card to the Done list without archiving it. Reopening moves it to the default list and unarchives it. Choose two different lists on this board. Changes are sent only for fields whose sync direction allows write-back."
   },
   "ERRORS": {
-    "DEFAULT_LIST_ID_REQUIRED": "No open list found on the selected Trello board to create cards."
+    "DEFAULT_LIST_ID_REQUIRED": "No open list found on the selected Trello board to create cards.",
+    "COMPLETION_LISTS_REQUIRED": "Choose different open default and Done lists on the selected board before syncing completion.",
+    "WRONG_BOARD": "This card belongs to a different Trello board. No change was sent."
   },
   "DISPLAY": {
     "SUMMARY": "Summary",
@@ -24,5 +29,5 @@
     "ATTACHMENTS": "Attachments",
     "DESCRIPTION": "Description"
   },
-  "FORM_HELP": "<p>Configure Ultra Tasks to list and import cards from a Trello board in the task creation panel. Generate an API key and token at <a href=\"https://trello.com/power-ups/admin\">trello.com/power-ups/admin</a>, then load and select your board. See the <a href=\"https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/\">Trello REST API docs</a> for details.</p>"
+  "FORM_HELP": "<p>Sign in to select your Trello board, or use an API key and token from <a href=\"https://trello.com/power-ups/admin\">trello.com/power-ups/admin</a>. Load options again after selecting a board to choose its lists. See the <a href=\"https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/\">Trello REST API docs</a> for details.</p>"
 }

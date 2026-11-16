@@ -31,6 +31,92 @@ const trelloCard = {
 };
 
 describe('Trello issue provider write operations', () => {
+  it('moves completed cards to the selected Done list without archiving', async () => {
+    const get = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/cards/')
+          ? trelloCard
+          : [
+              { id: 'list-id', name: 'Open' },
+              { id: 'done-list', name: 'Done' },
+            ],
+      ),
+    );
+    const put = vi.fn().mockResolvedValue(undefined);
+    await definition.updateIssue!(
+      'abc123',
+      { state: 'closed' },
+      {
+        boardId: 'board-id',
+        isMoveToDoneList: true,
+        doneListId: 'done-list',
+        defaultListId: 'list-id',
+      },
+      { get, put } as unknown as PluginHttp,
+    );
+    expect(put).toHaveBeenCalledWith('https://api.trello.com/1/cards/abc123', {
+      idList: 'done-list',
+    });
+  });
+
+  it('moves reopened cards to the default list and explicitly unarchives them', async () => {
+    const get = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/cards/')
+          ? { ...trelloCard, idList: 'done-list' }
+          : [
+              { id: 'list-id', name: 'Open' },
+              { id: 'done-list', name: 'Done' },
+            ],
+      ),
+    );
+    const put = vi.fn().mockResolvedValue(undefined);
+    await definition.updateIssue!(
+      'abc123',
+      { state: 'open' },
+      {
+        boardId: 'board-id',
+        isMoveToDoneList: true,
+        doneListId: 'done-list',
+        defaultListId: 'list-id',
+      },
+      { get, put } as unknown as PluginHttp,
+    );
+    expect(put).toHaveBeenCalledWith('https://api.trello.com/1/cards/abc123', {
+      idList: 'list-id',
+      closed: false,
+    });
+  });
+
+  it('pulls Done-list membership as completed while retaining card identity', async () => {
+    const get = vi.fn().mockResolvedValue({ ...trelloCard, idList: 'done-list' });
+    const result = await definition.getById(
+      'abc123',
+      { isMoveToDoneList: true, doneListId: 'done-list' },
+      { get } as unknown as PluginHttp,
+    );
+    expect(result).toMatchObject({ id: 'abc123', state: 'closed' });
+  });
+
+  it('refuses to move a card or list outside the configured board', async () => {
+    const get = vi.fn().mockResolvedValue({ ...trelloCard, idBoard: 'other-board' });
+    const put = vi.fn();
+    await expect(
+      definition.updateIssue!(
+        'abc123',
+        { state: 'closed' },
+        {
+          boardId: 'board-id',
+          isMoveToDoneList: true,
+          doneListId: 'done-list',
+          defaultListId: 'list-id',
+        },
+        { get, put } as unknown as PluginHttp,
+      ),
+    ).rejects.toThrow(/board/i);
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it('updates card status and title', async () => {
     const put = vi.fn().mockResolvedValue(undefined);
     const http = { put } as unknown as PluginHttp;

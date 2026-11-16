@@ -20,6 +20,14 @@ on:
 permissions:
   contents: read
 
+# Public OAuth client ids for the official sign-in buttons (repository variables OAUTH_<PROVIDER>_CLIENT_ID, not secrets; GitHub forbids a GITHUB_ prefix on variable names).
+# Read by tools/load-env.js during `npm run env`; an unset variable hides that provider's button.
+env:
+  GITHUB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITHUB_CLIENT_ID }}
+  GITLAB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITLAB_CLIENT_ID }}
+  LINEAR_OAUTH_CLIENT_ID: ${{ vars.OAUTH_LINEAR_CLIENT_ID }}
+  TRELLO_OAUTH_CLIENT_ID: ${{ vars.OAUTH_TRELLO_CLIENT_ID }}
+
 jobs:
   ios-app-store-release:
     runs-on: macos-26

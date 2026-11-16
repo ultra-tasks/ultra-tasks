@@ -65,6 +65,11 @@ export class IntegrationsPageComponent {
   readonly search = signal('');
   readonly providerId = signal('');
   readonly selected = signal<Set<string>>(new Set());
+  readonly selectedSourcesReady = computed(() =>
+    this.rows()
+      .filter((row) => this.selected().has(row.task.id))
+      .every((row) => this.capabilities.isReady(row.link.providerKey)),
+  );
   readonly busy = signal(false);
   readonly error = signal(false);
   readonly result = signal(false);

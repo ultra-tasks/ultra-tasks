@@ -145,13 +145,22 @@ export class IntegrationService {
     mode: IntegrationMode,
     importTags: boolean,
   ): Promise<string | undefined> {
+    const detail = importTags
+      ? await this._issues.getById(
+          provider.issueProviderKey,
+          String(item.issueData.id),
+          provider.id,
+        )
+      : null;
+    if (
+      importTags &&
+      !detail &&
+      ['GITHUB', 'GITLAB', 'LINEAR', 'TRELLO'].includes(provider.issueProviderKey)
+    )
+      throw new Error('Source item is unavailable.');
+    const issueData = detail ?? item.issueData;
     let tagIds: string[] = [];
     if (importTags) {
-      const detail = await this._issues.getById(
-        provider.issueProviderKey,
-        String(item.issueData.id),
-        provider.id,
-      );
       const labels = detail && 'labels' in detail ? detail.labels : [];
       if (Array.isArray(labels)) {
         tagIds = labels.flatMap((label: unknown) => {
@@ -172,7 +181,8 @@ export class IntegrationService {
       }
     }
     return this._issues.addTaskFromIssue({
-      issueDataReduced: item.issueData,
+      issueDataReduced: issueData,
+      isSourceDetail: !!detail,
       issueProviderId: provider.id,
       issueProviderKey: provider.issueProviderKey,
       isForceDefaultProject: true,

@@ -224,7 +224,10 @@
               <div class="actions">
                 <button
                   mat-button
-                  [disabled]="!provider.isEnabled"
+                  [disabled]="
+                    !provider.isEnabled ||
+                    !capabilities.isReady(provider.issueProviderKey)
+                  "
                   (click)="openSource(provider)"
                 >
                   {{ I.BROWSE | translate }}</button

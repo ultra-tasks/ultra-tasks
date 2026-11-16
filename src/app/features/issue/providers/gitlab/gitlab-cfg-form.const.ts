@@ -4,6 +4,7 @@ import {
   LimitedFormlyFieldConfig,
 } from '../../../config/global-config.model';
 import { IssueProviderGitlab } from '../../issue.model';
+import { GitlabCfg } from './gitlab.model';
 import {
   CROSS_ORIGIN_WARNING,
   ISSUE_PROVIDER_COMMON_FORM_FIELDS,
@@ -28,7 +29,12 @@ import {
 export const GITLAB_PROJECT_REGEX = /^(?:[1-9][0-9]*|(?=.*(?:\/|%2[Ff]))[\w.%\/\-]+)$/;
 
 export const GITLAB_CONFIG_FORM: LimitedFormlyFieldConfig<IssueProviderGitlab>[] = [
-  ...CROSS_ORIGIN_WARNING,
+  ...CROSS_ORIGIN_WARNING.map((field) => ({
+    ...field,
+    hideExpression: (model: GitlabCfg) =>
+      !model.gitlabBaseUrl ||
+      model.gitlabBaseUrl.replace(/\/+$/, '') === 'https://gitlab.com',
+  })),
   {
     key: 'project',
     type: 'input',
@@ -58,7 +64,10 @@ export const GITLAB_CONFIG_FORM: LimitedFormlyFieldConfig<IssueProviderGitlab>[]
       // It's not a fancy trick using model.project alone gets the required case right but won't remove it
       // if the project field is empty so this is needed for the wanted behavior
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      'templateOptions.required': '!!model.project',
+      'props.required': (
+        model: GitlabCfg,
+        formState?: { hasLocalCredentials?: () => boolean },
+      ) => !!model.project && !formState?.hasLocalCredentials?.(),
     },
   },
   {

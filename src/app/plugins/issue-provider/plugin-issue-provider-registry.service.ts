@@ -11,6 +11,7 @@ import {
 import { IssueProviderKey } from '../../features/issue/issue.model';
 import { PluginLog } from '../../core/log';
 import { BUILT_IN_SVG_ICON_NAMES } from '../../core/theme/built-in-svg-icons.const';
+import { officialOAuthForPlugin } from '../oauth/official-oauth-clients';
 
 /**
  * Returns `icon` only if it is a registered SVG icon: the plugin's own uploaded SVG or
@@ -152,7 +153,20 @@ export class PluginIssueProviderRegistryService {
   }
 
   getConfigFields(key: string): IssueProviderPluginDefinition['configFields'] {
-    return this._providers.get(key)?.definition.configFields ?? [];
+    const provider = this._providers.get(key);
+    const fields = provider?.definition.configFields ?? [];
+    const official = provider && officialOAuthForPlugin(provider.pluginId);
+    return official
+      ? [
+          {
+            key: 'officialOAuth',
+            type: 'oauthButton',
+            label: official.label,
+            oauthConfig: official.config,
+          },
+          ...fields.filter((field) => field.type !== 'oauthButton'),
+        ]
+      : fields;
   }
 
   getCommentsConfig(key: string): PluginCommentsConfig | undefined {

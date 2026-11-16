@@ -118,6 +118,8 @@ Already two-way. What remains for "fully working":
 
 ### C2. Integration write-back for the four providers
 
+Implementation update (2026-11-16): official public-client sign-in, local credentials, four-provider write/create hooks, owner-device handoff, scoped labels and Trello Done-list mapping are implemented. Automated acceptance and compatibility evidence, review fixes and remaining real-account gates are tracked in [four-provider connections](2026-11-16-four-provider-connections.md). Keep C2 open until live acceptance is recorded for all four.
+
 Targets, from the [provider audit](2026-11-08-unified-integrations.md#provider-capability-audit-and-quirks) and the [OAuth plan](2026-11-10-oauth-first-connections.md). "Two-way" means the user chooses per field which direction changes flow, and no write happens just by connecting.
 
 | Provider | Today                                                                   | 0.4.0 target                                                                               | Work                                                                                                                                    | Sign-in                                                        |

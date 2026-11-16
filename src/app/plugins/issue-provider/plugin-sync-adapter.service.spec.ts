@@ -376,6 +376,28 @@ describe('createPluginSyncAdapter', () => {
   });
 
   describe('tagIds mapping', () => {
+    it('pushes only the connection-managed labels and strips their local prefix', () => {
+      const adapter = createPluginSyncAdapter(
+        createMockDefinition({ fieldMappings: [MOCK_TAG_IDS_FIELD_MAPPING] }),
+        () => mockHttpHelper,
+        {
+          tags: () => [
+            { id: 'local', title: 'Personal' },
+            { id: 'own', title: 'first1 / bug' },
+            { id: 'peer', title: 'second / feature' },
+          ],
+        } as unknown as TagService,
+        'github-issue-provider',
+      );
+      const mapping = adapter.getFieldMappings()[0];
+      expect(
+        mapping.toIssueValue(['local', 'own', 'peer'], {
+          issueId: '42',
+          managedTagPrefix: 'first1 / ',
+        }),
+      ).toEqual(['bug']);
+    });
+
     const tagIdA = 'tag-a';
     const tagIdB = 'tag-b';
     const tagServiceWithTags = {

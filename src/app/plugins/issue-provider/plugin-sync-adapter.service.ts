@@ -46,6 +46,12 @@ const convertMapping = (
         const labels = tagIds
           .filter((id) => id !== TODAY_TAG.id)
           .map((id) => allTags.find((t) => t.id === id)?.title || id)
+          .filter(
+            (title) => !ctx.managedTagPrefix || title.startsWith(ctx.managedTagPrefix),
+          )
+          .map((title) =>
+            ctx.managedTagPrefix ? title.slice(ctx.managedTagPrefix.length) : title,
+          )
           .sort();
         return pm.toIssueValue(labels, ctx);
       },
@@ -82,6 +88,7 @@ export const createPluginSyncAdapter = (
   ) => PluginHttp,
   tagService: TagService,
   pluginId: string,
+  assertOwner: (cfg: IssueProviderPluginType) => Promise<void> = async () => undefined,
 ): IssueSyncAdapter<IssueProviderPluginType> => {
   const isPushSupported = !!definition.updateIssue;
   const fieldMappings: FieldMapping[] = (definition.fieldMappings ?? []).map((pm) =>
@@ -93,9 +100,12 @@ export const createPluginSyncAdapter = (
   );
 
   const createHttp = (cfg: IssueProviderPluginType): PluginHttp =>
-    createHttpHelper(() =>
-      definition.getHeaders(withPluginOAuthTokenKey(pluginId, cfg.pluginConfig, cfg.id)),
-    );
+    createHttpHelper(async () => {
+      await assertOwner(cfg);
+      return definition.getHeaders(
+        withPluginOAuthTokenKey(pluginId, cfg.pluginConfig, cfg.id),
+      );
+    });
 
   return {
     getFieldMappings: (): FieldMapping[] => fieldMappings,
@@ -126,7 +136,11 @@ export const createPluginSyncAdapter = (
       cfg: IssueProviderPluginType,
     ): Promise<Record<string, unknown>> => {
       const http = createHttp(cfg);
-      const issue = await definition.getById(issueId, cfg.pluginConfig, http);
+      const issue = await definition.getById(
+        issueId,
+        withPluginOAuthTokenKey(pluginId, cfg.pluginConfig, cfg.id),
+        http,
+      );
       return issue as Record<string, unknown>;
     },
 
@@ -139,7 +153,12 @@ export const createPluginSyncAdapter = (
         throw new Error('Plugin does not implement updateIssue');
       }
       const http = createHttp(cfg);
-      await definition.updateIssue(issueId, changes, cfg.pluginConfig, http);
+      await definition.updateIssue(
+        issueId,
+        changes,
+        withPluginOAuthTokenKey(pluginId, cfg.pluginConfig, cfg.id),
+        http,
+      );
     },
 
     extractSyncValues: (issue: Record<string, unknown>): Record<string, unknown> => {
@@ -180,7 +199,11 @@ export const createPluginSyncAdapter = (
         throw new Error('Plugin does not implement createIssue');
       }
       const http = createHttp(cfg);
-      const result = await definition.createIssue(title, cfg.pluginConfig, http);
+      const result = await definition.createIssue(
+        title,
+        withPluginOAuthTokenKey(pluginId, cfg.pluginConfig, cfg.id),
+        http,
+      );
       return {
         issueId: result.issueId,
         issueNumber: result.issueNumber,

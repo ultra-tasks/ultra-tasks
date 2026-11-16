@@ -19,6 +19,9 @@
 >
   <mat-dialog-content>
     <p class="callout">{{ integrationQuirk(issueProviderKey) | translate }}</p>
+    @if (isEdit && (issueProviderKey === 'GITHUB' || issueProviderKey === 'GITLAB')) {
+      <p>{{ T.F.ISSUE.DIALOG.SOURCE_SCOPE_FIXED | translate }}</p>
+    }
     @if (configFormSection?.help || configFormSection?.helpArr) {
       <help-section>
         @if (configFormSection?.help) {
@@ -100,7 +103,37 @@
           <p [innerHTML]="T.G.EXTENSION_INFO | translate"></p>
         </div>
       }
-      @for (btn of oauthButtons; track btn.label) {
+      @if (!ownership.isOwner(model)) {
+        <p>
+          {{
+            T.F.ISSUE.DIALOG.CONNECTED_ON_DEVICE
+              | translate
+                : {
+                    device:
+                      model.integrationOwnerLabel ||
+                      (T.F.ISSUE.DIALOG.OTHER_DEVICE | translate),
+                  }
+          }}
+        </p>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="moveConnectionHere()"
+        >
+          {{ T.F.ISSUE.DIALOG.MOVE_DEVICE | translate }}
+        </button>
+      }
+      @if (
+        oauthButtons.length &&
+        ownership.isOwner(model) &&
+        (issueProviderKey === 'GITHUB' ||
+          issueProviderKey === 'GITLAB' ||
+          issueProviderKey === 'LINEAR' ||
+          issueProviderKey === 'TRELLO')
+      ) {
+        <p>{{ T.F.ISSUE.DIALOG.SIGN_IN_OR_TOKEN | translate }}</p>
+      }
+      @for (btn of ownership.isOwner(model) ? oauthButtons : []; track btn.label) {
         <div class="action-row">
           @if (isOAuthUnavailableInWeb(btn.oauthConfig)) {
             <button
@@ -109,7 +142,7 @@
               disabled
             >
               <mat-icon>block</mat-icon>
-              {{ btn.label }}
+              {{ btn.label | translate }}
             </button>
             <span class="error-status">
               <mat-icon class="error-status-icon">info</mat-icon>
@@ -138,10 +171,31 @@
               (click)="connectOAuth(btn.oauthConfig)"
             >
               <mat-icon>login</mat-icon>
-              {{ btn.label }}
+              {{ btn.label | translate }}
             </button>
           }
         </div>
+      }
+      @if (deviceAuthorization(); as authorization) {
+        <p>{{ T.F.ISSUE.DIALOG.DEVICE_CODE_HELP | translate }}</p>
+        <p>
+          <a
+            [href]="authorization.verificationUri"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ authorization.verificationUri }}</a
+          >
+        </p>
+        <p>
+          <code>{{ authorization.userCode }}</code>
+        </p>
+        <button
+          mat-button
+          type="button"
+          (click)="cancelDeviceSignIn()"
+        >
+          {{ T.G.CANCEL | translate }}
+        </button>
       }
       @if (showLoadOptionsButton) {
         <div class="action-row">
@@ -221,6 +275,8 @@
         </div>
       }
       <formly-form
+        #providerForm
+        [options]="formlyOptions"
         [model]="model"
         (modelChange)="formlyModelChange($event)"
         [fields]="fields"
@@ -310,7 +366,7 @@
       color="primary"
       mat-flat-button
       type="submit"
-      [disabled]="form.invalid"
+      [disabled]="form.invalid || isSavingCredential()"
     >
       {{ T.G.SAVE | translate }}
     </button>

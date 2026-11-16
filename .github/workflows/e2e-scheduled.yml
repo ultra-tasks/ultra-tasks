@@ -66,6 +66,13 @@ on:
       - 'tools/sync-server-source.json'
       - 'packages/shared-schema/**'
 
+# These IDs are public. Intercepted OAuth tests also run in forks without registrations.
+env:
+  GITHUB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITHUB_CLIENT_ID || 'e2e-github-public-client' }}
+  GITLAB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITLAB_CLIENT_ID || 'e2e-gitlab-public-client' }}
+  LINEAR_OAUTH_CLIENT_ID: ${{ vars.OAUTH_LINEAR_CLIENT_ID || 'e2e-linear-public-client' }}
+  TRELLO_OAUTH_CLIENT_ID: ${{ vars.OAUTH_TRELLO_CLIENT_ID || 'e2e-trello-public-client' }}
+
 permissions:
   contents: read
 

@@ -1,6 +1,7 @@
 import {
   sameIntegrationLink,
   integrationSyncPolicy,
+  managedSourceTagPrefix,
 } from '../../integrations/integration.model';
 import { Injectable, inject } from '@angular/core';
 import { Store } from '@ngrx/store';
@@ -63,6 +64,7 @@ import { T } from '../../../t.const';
 import { PlannerActions } from '../../planner/store/planner.actions';
 import { deleteTag, deleteTags } from '../../tag/store/tag.actions';
 import { IssueSyncAdapterResolverService } from './issue-sync-adapter-resolver.service';
+import { IssueProviderOwnershipService } from '../issue-provider-ownership.service';
 import { shortSyntaxForNewWords } from '../../tasks/util/short-syntax-for-new-words';
 import { IssueSharedTitleService } from './issue-shared-title.service';
 import { LocalExternalSyncSuppressionService } from '../../integrations/local-external-sync-suppression.service';
@@ -185,6 +187,7 @@ export class IssueTwoWaySyncEffects {
   private readonly _pendingRemoteIssueDelete = inject(PendingRemoteIssueDeleteService);
   private readonly _deletedTagTitlesSidecar = inject(DeletedTagTitlesSidecarService);
   private readonly _adapterResolver = inject(IssueSyncAdapterResolverService);
+  private readonly _ownership = inject(IssueProviderOwnershipService);
   private readonly _pluginRegistry = inject(PluginIssueProviderRegistryService);
   private readonly _syncState = inject(IssueSyncStateService);
   private readonly _issueSharedTitleService = inject(IssueSharedTitleService);
@@ -760,7 +763,7 @@ export class IssueTwoWaySyncEffects {
     const currentTask = await firstValueFrom(this._taskService.getByIdOnce$(task.id));
     const fieldMappings = adapter.getFieldMappings();
     const syncConfig = integrationSyncPolicy(task, adapter, cfg);
-    const ctx = { issueId };
+    const ctx = { issueId, managedTagPrefix: managedSourceTagPrefix(cfg) };
     const toPush: Record<string, unknown> = {};
 
     for (const mapping of fieldMappings) {
@@ -820,6 +823,7 @@ export class IssueTwoWaySyncEffects {
   }
 
   private _hasAutoCreateEnabled(provider: IssueProvider, task: Task): boolean {
+    if (!this._ownership.isOwner(provider)) return false;
     if (task.integration?.mode === 'import' || task.integration?.stopped) return false;
     // Agenda-view providers (e.g. Google Calendar) should never auto-create issues
     if (this._pluginRegistry.getUseAgendaView(provider.issueProviderKey)) {
@@ -843,6 +847,7 @@ export class IssueTwoWaySyncEffects {
         !task.repeatCfgId
       );
     }
+    if (provider.issueProviderKey === 'GITLAB') return !!provider.isAutoCreateIssues;
     // Check for plugin providers (both plugin:* and migrated keys like GITHUB)
     const pluginCfg = (provider as { pluginConfig?: Record<string, unknown> })
       .pluginConfig;
@@ -949,6 +954,7 @@ export class IssueTwoWaySyncEffects {
 
     return this._issueProviderService.getCfgOnce$(issueProviderId, issueType).pipe(
       concatMap(async (cfg) => {
+        await this._ownership.assertOwner(cfg);
         const fieldMappings = adapter.getFieldMappings();
         const syncConfig = integrationSyncPolicy(task, adapter, cfg);
 
@@ -964,6 +970,8 @@ export class IssueTwoWaySyncEffects {
           return;
         }
 
+        const beforeFetch = await firstValueFrom(this._taskService.getByIdOnce$(task.id));
+        if (!sameIntegrationLink(beforeFetch, task)) return;
         const freshIssue = await adapter.fetchIssue(issueId, cfg);
         const freshValues = adapter.extractSyncValues(freshIssue);
         // Re-read the task after the external read, before deciding or sending a write.
@@ -993,7 +1001,11 @@ export class IssueTwoWaySyncEffects {
 
         const parsed = parseInt(issueId, 10);
         const issueNumber = Number.isNaN(parsed) ? undefined : parsed;
-        const ctx = { issueId, issueNumber };
+        const ctx = {
+          issueId,
+          issueNumber,
+          managedTagPrefix: managedSourceTagPrefix(cfg),
+        };
 
         const decisions = computePushDecisions(
           taskFieldChanges,
@@ -1122,14 +1134,17 @@ export class IssueTwoWaySyncEffects {
         concatMap((cfg) =>
           this._taskService.getByIdOnce$(task.id).pipe(
             concatMap((current) => {
-              if (!current) {
+              if (!current || !sameIntegrationLink(current, task)) {
                 return EMPTY;
               }
               const pending = computePendingLocalChanges(
                 current,
                 adapter.getFieldMappings(),
                 integrationSyncPolicy(current, adapter, cfg),
-                { issueId: current.issueId! },
+                {
+                  issueId: current.issueId!,
+                  managedTagPrefix: managedSourceTagPrefix(cfg),
+                },
               );
               return Object.keys(pending).length
                 ? this._pushChanges$(current, pending)

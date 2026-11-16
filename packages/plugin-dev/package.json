@@ -12,6 +12,7 @@
     "clean:dist": "rm -rf */dist",
     "install:all": "npm ci",
     "test": "echo 'No tests configured yet'",
+    "test:integrations": "vitest run github-issue-provider/src/plugin.spec.ts linear-issue-provider/src/plugin.spec.ts trello-issue-provider/src/plugin.spec.ts",
     "list": "echo 'Available plugins:' && ls -d */ | grep -v node_modules | grep -v scripts"
   },
   "workspaces": [

@@ -252,6 +252,8 @@ const BOARD_FIELDS: Required<BoardCfg> = {
 };
 // The shared and plugin fields, plus every key of each built-in provider.
 const PROVIDER_BASE_FIELDS: Required<IssueProviderPluginType> = {
+  integrationOwnerId: 'changed-owner',
+  integrationOwnerLabel: 'Changed device',
   id: 'a',
   isEnabled: false,
   issueProviderKey: 'plugin:changed',

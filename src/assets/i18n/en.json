@@ -630,7 +630,19 @@
         "OPTIONS_LOADED": "Options loaded",
         "RELOAD_OPTIONS": "Reload Options",
         "SETUP_TITLE": "Setup {{title}} Config",
-        "TEST_CONNECTION": "Test Connection"
+        "TEST_CONNECTION": "Test Connection",
+        "SIGN_IN_GITHUB": "Sign in with GitHub",
+        "SIGN_IN_GITLAB": "Sign in with GitLab",
+        "SIGN_IN_LINEAR": "Sign in with Linear",
+        "SIGN_IN_TRELLO": "Sign in with Trello",
+        "DEVICE_CODE_HELP": "Enter this code on GitHub’s sign-in page, then approve Ultra Tasks. This window will continue when you finish.",
+        "CONNECTED_ON_DEVICE": "Connected on {{device}}. This device receives linked tasks through app sync.",
+        "OTHER_DEVICE": "another device",
+        "WAITING_FOR_DEVICE": "Waiting for {{device}} to send your changes.",
+        "MOVE_DEVICE": "Move connection to this device",
+        "MOVE_DEVICE_CONFIRM": "After you save, the previous device will stop contacting this source. Sign in or provide a token on this device; credentials are not transferred. Requests already in progress may still finish.",
+        "SOURCE_SCOPE_FIXED": "To use a different server or GitHub repository, duplicate this connection. Existing task links keep their original source.",
+        "SIGN_IN_OR_TOKEN": "Sign in, or enter a token below. New credentials are saved only on this device."
       },
       "DIALOG_TRACK_TIME": {
         "ACTIVITY": "Activity",
@@ -2713,13 +2725,13 @@
       "MODE": "Mode",
       "CURRENT_PROJECT": "Destination project",
       "SOURCE_TAGS": "Source tags",
-      "Q_TRELLO": "Trello completion currently means archiving a card, not moving it to a Done list. Choose Keep local for completion if you do not want cards archived. Moving to a Done list is not supported by this connector.",
+      "Q_TRELLO": "Completion archives a Trello card by default. Connection settings can instead map completion to a Done list and reopening to the default list. Review the mapping preview before allowing write-back. Keep completion local to leave cards unchanged.",
       "Q_PLAINSPACE": "Plainspace is a shared workspace. Its existing workflow can create or delete shared items and synchronizes completion, title, and schedule. Stop tracking detaches a task without deleting the shared item. Review connection settings before changing shared work.",
       "Q_JIRA": "Jira transitions and worklogs use the workflow configured on your instance. Required fields, permissions, and custom fields vary. Review Transition Handling in connection settings; generic field directions do not replace those workflow controls.",
       "Q_ICAL": "An iCal or Outlook calendar feed receives updates only. It cannot change your calendar. Export ICS creates a separate snapshot; use a writable calendar connector for outbound changes.",
       "Q_CALENDAR": "Calendar events have no standard completed state. Keep completion and private notes local unless you explicitly configure a conversion. Google account connection is currently available on desktop and mobile, not web. Generated time blocks send updates from UltraTasks.",
       "Q_GITHUB": "GitHub issue identity includes its repository. Completion write-back closes or reopens the issue. Private repositories and outbound edits require suitable token permissions. Repository scope is separate from GitHub Projects.",
-      "Q_GITLAB": "GitLab scope and permissions vary by instance and project. This connector receives issue updates; a visible source field does not imply write-back support.",
+      "Q_GITLAB": "GitLab can receive and send completion, title and description changes. Project scope and permissions vary by instance. Weight stays issue weight and is never converted to a time estimate. Issue creation requires a separate opt-in.",
       "Q_DECK": "Nextcloud Deck can mark cards done and optionally move them to a configured done stack. Those are different operations. Description writes preserve other card fields through the connector’s existing update path.",
       "Q_READ_ONLY": "Available field directions reflect this connector’s capabilities. Some platforms currently receive updates only. Source-specific workflows and worklogs remain in connection settings.",
       "PROVIDER_UNAVAILABLE": "The connection is unavailable. Reconnect or enable its plugin before resuming.",
@@ -2728,7 +2740,8 @@
       "REMOVE_HELP": "Stop tracking before deleting a local task if you want to leave the source item unchanged.",
       "COMPLETION_LOCAL": "Completion follows this item’s field policy. A local completion does not necessarily close the source issue.",
       "MORE": "More actions",
-      "REFRESH": "Refresh selected"
+      "REFRESH": "Refresh selected",
+      "Q_LINEAR": "Linear can receive and send completion, title and description changes. Completing uses the team’s completed state, not its cancelled state. Creating an issue requires a team; an optional project is selected separately. Other workflow states and project membership stay intact."
     }
   },
   "FILE_IMEX": {

@@ -28,6 +28,9 @@ import {
 } from '../../plugins/issue-provider/plugin-issue-provider.model';
 
 export interface BaseIssueProviderCfg {
+  /** Absent on legacy connections; new official connections contact the source only here. */
+  integrationOwnerId?: string;
+  integrationOwnerLabel?: string;
   integrationFieldPolicy?: FieldSyncConfig;
   isEnabled: boolean;
 }

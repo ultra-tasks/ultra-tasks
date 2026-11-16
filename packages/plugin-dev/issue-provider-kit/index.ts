@@ -49,6 +49,31 @@ export const toMs = (date: unknown): number =>
 export const tokenAuth = (token: string | undefined): Record<string, string> =>
   token ? { Authorization: `token ${token}` } : {};
 
+/** Internal bundled-provider contract: the host supplies the connection key transiently. */
+export const connectionCredential = async (
+  config: Record<string, unknown>,
+  field: string,
+  allowOAuth = true,
+  sourceUrl?: string,
+): Promise<{ value: string; isOAuth: boolean }> => {
+  const key = config['__spOAuthTokenKey'];
+  const api = PluginAPI as unknown as {
+    getOAuthToken?: (key?: string) => Promise<string | null>;
+    getSecret?: (key: string) => Promise<string | null>;
+  };
+  if (typeof key === 'string' && key) {
+    const token = allowOAuth ? await api.getOAuthToken?.(key) : null;
+    if (token) return { value: token, isOAuth: true };
+    const scope = sourceUrl ? `__${encodeURIComponent(new URL(sourceUrl).origin)}` : '';
+    const secret = await api.getSecret?.(`connection__${key}__${field}${scope}`);
+    if (secret) return { value: secret, isOAuth: false };
+  }
+  return {
+    value: typeof config[field] === 'string' ? (config[field] as string) : '',
+    isOAuth: false,
+  };
+};
+
 /** HTTP Basic credentials, UTF-8 encoded (`btoa` alone only accepts Latin-1). */
 export const basicAuth = (username: string, password: string): string => {
   let binary = '';

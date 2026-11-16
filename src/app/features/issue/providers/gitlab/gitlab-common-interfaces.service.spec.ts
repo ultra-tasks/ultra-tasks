@@ -130,6 +130,52 @@ describe('GitlabCommonInterfacesService', () => {
   });
 
   describe('getFreshDataForIssueTask', () => {
+    it('pulls only explicitly enabled completion and notes fields', async () => {
+      issueProviderService.getCfgOnce$.and.returnValue(
+        of({
+          ...BASE_CFG,
+          integrationFieldPolicy: { isDone: 'both', title: 'off', notes: 'both' },
+        }),
+      );
+      gitlabApiService.getById$.and.returnValue(
+        of({ ...makeIssue(NEWER_UPDATED_AT), state: 'closed' }),
+      );
+      const task = {
+        ...makeTask(new Date(BASE_UPDATED_AT).getTime()),
+        issueLastSyncedValues: { state: 'opened', title: 'Old', body: 'Old notes' },
+      };
+      const result = await service.getFreshDataForIssueTask(task);
+      expect(result?.taskChanges.isDone).toBeTrue();
+      expect(result?.taskChanges.notes).toBe(ISSUE_BODY);
+      expect(result?.taskChanges.title).toBeUndefined();
+    });
+
+    it('seeds imported descriptions only when the connection explicitly receives notes', () => {
+      const issue = makeIssue(BASE_UPDATED_AT);
+      expect(service.getAddTaskDataForCfg(issue, BASE_CFG).notes).toBeUndefined();
+      expect(
+        service.getAddTaskDataForCfg(issue, {
+          ...BASE_CFG,
+          integrationFieldPolicy: { notes: 'both' },
+        }).notes,
+      ).toBe(ISSUE_BODY);
+    });
+
+    it('preserves an unpushed title when only remote notes changed', async () => {
+      issueProviderService.getCfgOnce$.and.returnValue(
+        of({ ...BASE_CFG, integrationFieldPolicy: { title: 'both', notes: 'both' } }),
+      );
+      const issue = makeIssue(NEWER_UPDATED_AT);
+      gitlabApiService.getById$.and.returnValue(of(issue));
+      const task = {
+        ...makeTask(new Date(BASE_UPDATED_AT).getTime()),
+        title: 'Unsent local title',
+        issueLastSyncedValues: { state: 'opened', title: issue.title, body: 'Old notes' },
+      };
+      const result = await service.getFreshDataForIssueTask(task);
+      expect(result?.taskChanges.title).toBeUndefined();
+      expect(result?.taskChanges.notes).toBe(ISSUE_BODY);
+    });
     it('does not flag an update when only a GitLab comment timestamp is later than issue.updated_at', async () => {
       const issueLastUpdated = new Date(BASE_UPDATED_AT).getTime();
       gitlabApiService.getById$.and.returnValue(

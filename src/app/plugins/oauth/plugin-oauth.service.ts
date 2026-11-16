@@ -197,6 +197,10 @@ export class PluginOAuthService {
       expires_in: number;
     }>(opts.tokenUrl, params);
 
+    if (typeof response.access_token !== 'string' || !response.access_token) {
+      throw new Error('OAuth response carried no access_token.');
+    }
+
     const expiresInMs = response.expires_in * 1000;
     return {
       accessToken: response.access_token,
@@ -210,7 +214,7 @@ export class PluginOAuthService {
     clientId: string,
     refreshToken: string,
     clientSecret?: string,
-  ): Promise<{ accessToken: string; expiresAt: number }> {
+  ): Promise<{ accessToken: string; expiresAt: number; refreshToken?: string }> {
     const params: Record<string, string> = {
       grant_type: 'refresh_token',
       client_id: clientId,
@@ -223,6 +227,7 @@ export class PluginOAuthService {
     const response = await this._postTokenRequest<{
       access_token?: unknown;
       expires_in?: unknown;
+      refresh_token?: unknown;
       error?: unknown;
     }>(tokenUrl, params);
 
@@ -248,6 +253,9 @@ export class PluginOAuthService {
     return {
       accessToken: response.access_token,
       expiresAt: Date.now() + expiresInMs,
+      ...(typeof response.refresh_token === 'string' && response.refresh_token
+        ? { refreshToken: response.refresh_token }
+        : {}),
     };
   }
 
@@ -256,6 +264,9 @@ export class PluginOAuthService {
     params: Record<string, string>,
   ): Promise<T> {
     this._validateHttpsUrl(tokenUrl, 'tokenUrl');
+    if (tokenUrl === 'https://auth.atlassian.com/oauth/token') {
+      return firstValueFrom(this._http.post<T>(tokenUrl, params));
+    }
     const body = new URLSearchParams(params);
     const headers = new HttpHeaders().set(
       'Content-Type',
@@ -296,7 +307,7 @@ export class PluginOAuthService {
       const tokens = JSON.parse(serialized) as PluginOAuthTokens;
       if (
         !tokens?.accessToken ||
-        !tokens?.refreshToken ||
+        (!tokens?.refreshToken && tokens?.expiresAt !== Number.MAX_SAFE_INTEGER) ||
         !tokens?.tokenUrl ||
         !tokens?.clientId ||
         typeof tokens?.expiresAt !== 'number' ||
@@ -367,6 +378,7 @@ export class PluginOAuthService {
         ...tokens,
         accessToken: refreshed.accessToken,
         expiresAt: refreshed.expiresAt,
+        refreshToken: refreshed.refreshToken ?? tokens.refreshToken,
       });
       this.tokensRefreshed$.next(pluginId);
       return refreshed.accessToken;

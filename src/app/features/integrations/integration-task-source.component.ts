@@ -8,13 +8,17 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Task } from '../tasks/task.model';
 import { integrationForTask } from './integration.model';
 import { IntegrationService } from './integration.service';
 import { IntegrationCapabilityService } from './integration-capability.service';
 import { IntegrationItemDialogComponent } from './integration-item-dialog.component';
 import { T } from '../../t.const';
+import { IssueProviderOwnershipService } from '../issue/issue-provider-ownership.service';
+import { IssueSyncAdapterResolverService } from '../issue/two-way-sync/issue-sync-adapter-resolver.service';
+import { computePendingLocalChanges } from '../issue/two-way-sync/compute-field-pull';
+import { integrationSyncPolicy, managedSourceTagPrefix } from './integration.model';
 
 @Component({
   selector: 'integration-task-source',
@@ -40,6 +44,11 @@ import { T } from '../../t.const';
           ) | translate
         }}
       </p>
+      @if (waitingFor(); as device) {
+        <p role="status">
+          {{ T.F.ISSUE.DIALOG.WAITING_FOR_DEVICE | translate: { device } }}
+        </p>
+      }
       @if (provider(); as connection) {
         <button
           mat-button
@@ -81,6 +90,10 @@ import { T } from '../../t.const';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class IntegrationTaskSourceComponent {
+  readonly T = T;
+  private readonly _translate = inject(TranslateService);
+  private readonly _ownership = inject(IssueProviderOwnershipService);
+  private readonly _adapters = inject(IssueSyncAdapterResolverService);
   readonly I = T.F.INTEGRATIONS;
   readonly task = input.required<Task>();
   readonly data = inject(IntegrationService);
@@ -90,6 +103,30 @@ export class IntegrationTaskSourceComponent {
   readonly provider = computed(() =>
     this.data.providers().find((p) => p.id === this.link()?.providerId),
   );
+  readonly waitingFor = computed(() => {
+    const provider = this.provider();
+    const task = this.task();
+    if (
+      !provider ||
+      this._ownership.isOwner(provider) ||
+      !task.issueId ||
+      this.link()?.mode !== 'sync' ||
+      this.link()?.stopped
+    )
+      return null;
+    const adapter = this._adapters.getAdapter(provider.issueProviderKey);
+    if (!adapter) return null;
+    const pending = computePendingLocalChanges(
+      task,
+      adapter.getFieldMappings(),
+      integrationSyncPolicy(task, adapter, provider),
+      { issueId: task.issueId, managedTagPrefix: managedSourceTagPrefix(provider) },
+    );
+    return Object.keys(pending).length
+      ? provider.integrationOwnerLabel ||
+          this._translate.instant(T.F.ISSUE.DIALOG.OTHER_DEVICE)
+      : null;
+  });
   edit(): void {
     const provider = this.provider();
     if (provider)

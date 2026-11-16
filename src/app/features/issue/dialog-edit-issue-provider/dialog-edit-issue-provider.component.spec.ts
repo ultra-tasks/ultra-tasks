@@ -118,6 +118,58 @@ describe('DialogEditIssueProviderComponent', () => {
     return bridge;
   };
 
+  it('keeps a saved GitHub repository and enterprise server fixed', async () => {
+    const registered = createProvider('GITHUB', 'github-issue-provider');
+    registered.definition.configFields = [
+      { key: 'repo', type: 'input', label: 'Repository' },
+      { key: 'apiBaseUrl', type: 'input', label: 'Server' },
+    ];
+    const provider = {
+      ...createIssueProvider('GITHUB', 'github-issue-provider'),
+      pluginConfig: { repo: 'team/repo', apiBaseUrl: 'https://git.example.test/api/v3' },
+    } as IssueProvider;
+    await setup({ data: { issueProvider: provider }, pluginProvider: registered });
+    for (const key of ['pluginConfig.repo', 'pluginConfig.apiBaseUrl']) {
+      const field = component.fields.find((value) => value.key === key);
+      expect(field?.templateOptions?.readonly).toBeTrue();
+    }
+  });
+
+  it('duplicates with a new identity, editable scope, no credentials and creation off', async () => {
+    const registered = createProvider('GITHUB', 'github-issue-provider');
+    registered.definition.configFields = [
+      { key: 'repo', type: 'input', label: 'Repository' },
+    ];
+    const provider = {
+      ...createIssueProvider('GITHUB', 'github-issue-provider'),
+      integrationOwnerId: 'previous-device',
+      integrationOwnerLabel: 'Previous device',
+      pluginConfig: {
+        repo: 'team/repo',
+        token: 'legacy-synced-token',
+        isAutoCreateIssues: true,
+      },
+    } as IssueProvider;
+    await setup({
+      data: { issueProvider: provider, isDuplicate: true },
+      pluginProvider: registered,
+    });
+    const model = component.model as {
+      id: string;
+      integrationOwnerId?: string;
+      pluginConfig: Record<string, unknown>;
+    };
+    expect(model.id).not.toBe(provider.id);
+    expect(model.integrationOwnerId).toBeUndefined();
+    expect(model.pluginConfig['token']).toBeNull();
+    expect(model.pluginConfig['isAutoCreateIssues']).toBeFalse();
+    expect(
+      component.fields.find((value) => String(value.key) === 'pluginConfig.repo')
+        ?.templateOptions?.readonly,
+    ).toBeUndefined();
+    expect(JSON.stringify(provider)).toContain('legacy-synced-token');
+  });
+
   const setup = async ({
     data = { issueProviderKey: ICAL_TYPE },
     pluginProvider,

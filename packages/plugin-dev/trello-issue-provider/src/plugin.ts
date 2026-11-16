@@ -6,6 +6,7 @@ import type {
 import {
   asConfig,
   canConnect,
+  connectionCredential,
   isDoneMapping,
   pickSyncValues,
   registerIssueProvider,
@@ -32,6 +33,8 @@ interface TrelloConfig {
   boardName?: string;
   filterUsername?: string;
   defaultListId?: string;
+  isMoveToDoneList?: boolean;
+  doneListId?: string;
 }
 
 interface TrelloList {
@@ -125,18 +128,21 @@ const trelloHeaders = (cfg: TrelloConfig): Record<string, string> => ({
   )}"`,
 });
 
-const mapSearchResult = (card: TrelloCard): PluginSearchResult => {
+const mapSearchResult = (card: TrelloCard, cfg: TrelloConfig): PluginSearchResult => {
   const key = cardKey(card);
   return {
     id: card.shortLink,
     title: `${key} ${card.name}`.trim(),
     url: card.url,
-    status: card.closed ? 'closed' : 'open',
+    status:
+      card.closed || (cfg.isMoveToDoneList && card.idList === cfg.doneListId)
+        ? 'closed'
+        : 'open',
     lastUpdated: toMs(card.dateLastActivity),
   };
 };
 
-const mapIssue = (card: TrelloCard): PluginIssue => {
+const mapIssue = (card: TrelloCard, cfg?: TrelloConfig): PluginIssue => {
   const key = cardKey(card);
   const labels = (card.labels || []).map((l) => l.name).filter(Boolean);
   const members = (card.members || [])
@@ -152,7 +158,10 @@ const mapIssue = (card: TrelloCard): PluginIssue => {
     title: card.name,
     body: card.desc || '',
     url: card.url,
-    state: card.closed ? 'closed' : 'open',
+    state:
+      card.closed || (cfg?.isMoveToDoneList && card.idList === cfg.doneListId)
+        ? 'closed'
+        : 'open',
     lastUpdated: toMs(card.dateLastActivity),
     assignee: members.join(', '),
     labels,
@@ -161,7 +170,11 @@ const mapIssue = (card: TrelloCard): PluginIssue => {
     // Extended fields for display + field mappings.
     key,
     summary: `${key} ${card.name}`.trim(),
-    statusLabel: card.closed ? 'Closed' : 'Open',
+    statusLabel: card.closed
+      ? 'Archived'
+      : cfg?.isMoveToDoneList && card.idList === cfg.doneListId
+        ? 'Done'
+        : 'Open',
     due: card.due || '',
     attachmentsMarkdown,
   };
@@ -210,7 +223,8 @@ const loadBoards = async (
   http: PluginHttp,
 ): Promise<{ label: string; value: string }[]> => {
   const cfg = asConfig<TrelloConfig>(config);
-  if (!cfg.apiKey || !cfg.token) {
+  const credential = await connectionCredential(config, 'token');
+  if (!credential.value || (!credential.isOAuth && !cfg.apiKey)) {
     return [];
   }
 
@@ -261,7 +275,8 @@ const loadLists = async (
   http: PluginHttp,
 ): Promise<{ label: string; value: string }[]> => {
   const cfg = asConfig<TrelloConfig>(config);
-  if (!cfg.apiKey || !cfg.token || !cfg.boardId) {
+  const credential = await connectionCredential(config, 'token');
+  if (!credential.value || (!credential.isOAuth && !cfg.apiKey) || !cfg.boardId) {
     return [];
   }
 
@@ -307,6 +322,20 @@ registerIssueProvider({
       loadOptions: loadLists,
     },
     {
+      key: 'isMoveToDoneList',
+      type: 'checkbox',
+      label: t('CFG.MOVE_TO_DONE_LIST'),
+      description: t('CFG.COMPLETION_PREVIEW'),
+    },
+    {
+      key: 'doneListId',
+      type: 'select',
+      label: t('CFG.DONE_LIST'),
+      showIf: 'isMoveToDoneList',
+      required: true,
+      loadOptions: loadLists,
+    },
+    {
       key: 'filterUsername',
       type: 'input',
       label: t('CFG.FILTER_USERNAME'),
@@ -315,7 +344,12 @@ registerIssueProvider({
     },
   ],
 
-  getHeaders: (config) => trelloHeaders(asConfig<TrelloConfig>(config)),
+  getHeaders: async (config) => {
+    const credential = await connectionCredential(config, 'token');
+    return credential.isOAuth
+      ? { Authorization: `Bearer ${credential.value}` }
+      : trelloHeaders({ ...asConfig<TrelloConfig>(config), token: credential.value });
+  },
 
   async searchIssues(
     searchTerm: string,
@@ -327,7 +361,7 @@ registerIssueProvider({
 
     if (!term) {
       const cards = await fetchBoardCards(cfg, http, 25);
-      return dedupeByShortLink(cards).map(mapSearchResult);
+      return dedupeByShortLink(cards).map((card) => mapSearchResult(card, cfg));
     }
 
     const params: Record<string, string> = {
@@ -344,12 +378,12 @@ registerIssueProvider({
     }
 
     const res = await http.get<TrelloSearchResponse>(`${TRELLO_API}/search`, { params });
-    return dedupeByShortLink(res?.cards || []).map(mapSearchResult);
+    return dedupeByShortLink(res?.cards || []).map((card) => mapSearchResult(card, cfg));
   },
 
   async getById(
     issueId: string,
-    _config: Record<string, unknown>,
+    config: Record<string, unknown>,
     http: PluginHttp,
   ): Promise<PluginIssue> {
     const card = await http.get<TrelloCard>(`${TRELLO_API}/cards/${issueId}`, {
@@ -363,7 +397,7 @@ registerIssueProvider({
         member_fields: MEMBER_FIELDS,
       },
     });
-    return mapIssue(card);
+    return mapIssue(card, asConfig<TrelloConfig>(config));
   },
 
   // The card id used throughout the app is the shortLink, which is exactly what
@@ -396,11 +430,11 @@ registerIssueProvider({
       if (memberId) {
         return cards
           .filter((card) => (card.members || []).some((m) => m.id === memberId))
-          .map(mapSearchResult);
+          .map((card) => mapSearchResult(card, cfg));
       }
     }
 
-    return cards.map(mapSearchResult);
+    return cards.map((card) => mapSearchResult(card, cfg));
   },
 
   issueDisplay: [
@@ -424,12 +458,39 @@ registerIssueProvider({
   async updateIssue(
     id: string,
     changes: Record<string, unknown>,
-    _config: Record<string, unknown>,
+    config: Record<string, unknown>,
     http: PluginHttp,
   ): Promise<void> {
     const cardChanges: Record<string, unknown> = {};
     if ('state' in changes) {
-      cardChanges['closed'] = changes['state'] === 'closed';
+      const cfg = asConfig<TrelloConfig>(config);
+      if (cfg.isMoveToDoneList) {
+        if (
+          !cfg.boardId ||
+          !cfg.doneListId ||
+          !cfg.defaultListId ||
+          cfg.doneListId === cfg.defaultListId
+        ) {
+          throw new Error(t('ERRORS.COMPLETION_LISTS_REQUIRED'));
+        }
+        const card = await http.get<TrelloCard>(`${TRELLO_API}/cards/${id}`, {
+          params: { fields: 'idBoard' },
+        });
+        if (card.idBoard !== cfg.boardId) throw new Error(t('ERRORS.WRONG_BOARD'));
+        const lists = await fetchBoardLists(cfg.boardId, http);
+        if (
+          ![cfg.doneListId, cfg.defaultListId].every((listId) =>
+            lists.some((list) => list.id === listId),
+          )
+        ) {
+          throw new Error(t('ERRORS.COMPLETION_LISTS_REQUIRED'));
+        }
+        cardChanges['idList'] =
+          changes['state'] === 'closed' ? cfg.doneListId : cfg.defaultListId;
+        if (changes['state'] !== 'closed') cardChanges['closed'] = false;
+      } else {
+        cardChanges['closed'] = changes['state'] === 'closed';
+      }
     }
     if ('title' in changes) {
       cardChanges['name'] = changes['title'];
@@ -457,7 +518,7 @@ registerIssueProvider({
     });
     return {
       issueId: card.shortLink,
-      issueData: mapIssue(card),
+      issueData: mapIssue(card, cfg),
     };
   },
 

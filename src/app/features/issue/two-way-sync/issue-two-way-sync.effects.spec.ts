@@ -1730,6 +1730,40 @@ describe('IssueTwoWaySyncEffects', () => {
       expect(current.issueLastSyncedValues).toEqual({ ...baseline, summary: 'New' });
     }));
 
+    for (const change of ['relink', 'stop'] as const) {
+      it(`cancels a queued pending request after ${change} without contacting its source`, fakeAsync(() => {
+        let current = linkedTask();
+        let finishRead!: (issue: Record<string, unknown>) => void;
+        (adapter.fetchIssue as jasmine.Spy).and.returnValue(
+          new Promise<Record<string, unknown>>((resolve) => {
+            finishRead = resolve;
+          }),
+        );
+        taskServiceSpy.getByIdOnce$.and.callFake(() => of(current));
+        effects.pushFieldsOnTaskUpdate$.subscribe();
+        syncState.requestPush('task-1', true);
+        syncState.requestPush('task-1', true);
+        tick();
+        expect(adapter.fetchIssue).toHaveBeenCalledTimes(1);
+        current =
+          change === 'relink'
+            ? linkedTask({ issueId: 'issue-2' })
+            : linkedTask({
+                integration: {
+                  providerId: 'provider-1',
+                  providerKey: 'CALDAV',
+                  remoteId: 'issue-1',
+                  mode: 'sync',
+                  stopped: true,
+                },
+              });
+        finishRead(baseline);
+        tick();
+        expect(adapter.fetchIssue).toHaveBeenCalledTimes(1);
+        expect(adapter.pushChanges).not.toHaveBeenCalled();
+      }));
+    }
+
     it('a second device whose edit already reached the provider sends nothing', fakeAsync(() => {
       // Both devices have the rename pending; the other one pushed first. The
       // fetch sees the provider already holds the value: provider-changed skip,

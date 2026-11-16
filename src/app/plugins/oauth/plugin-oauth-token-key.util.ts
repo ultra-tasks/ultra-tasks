@@ -3,7 +3,13 @@ export const PLUGIN_OAUTH_TOKEN_KEY_CFG_KEY = '__spOAuthTokenKey';
 export const GOOGLE_CALENDAR_PLUGIN_ID = 'google-calendar-provider';
 
 export const shouldScopePluginOAuth = (pluginId: string): boolean =>
-  pluginId === GOOGLE_CALENDAR_PLUGIN_ID;
+  [
+    GOOGLE_CALENDAR_PLUGIN_ID,
+    'github-issue-provider',
+    'gitlab-issue-provider',
+    'linear-issue-provider',
+    'trello-issue-provider',
+  ].includes(pluginId);
 
 export const withPluginOAuthTokenKey = (
   pluginId: string,

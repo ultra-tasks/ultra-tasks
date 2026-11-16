@@ -23,6 +23,7 @@ export const mapGitlabIssue = (
     created_at: issue.created_at,
     updated_at: issue.updated_at,
     due_date: issue.due_date,
+    weight: issue.weight,
 
     // added
     wasUpdated: false,

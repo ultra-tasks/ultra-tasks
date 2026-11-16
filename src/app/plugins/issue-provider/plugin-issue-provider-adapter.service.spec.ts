@@ -1143,6 +1143,54 @@ describe('PluginIssueProviderAdapterService', () => {
         expect(result!.taskChanges['dueWithTime' as keyof Task]).toBeUndefined();
       });
 
+      for (const owner of [undefined, 'owner-device']) {
+        it(`preserves local tags while replacing GitHub-managed tags (owner: ${owner ?? 'legacy'})`, async () => {
+          const freshIssue: PluginIssue = {
+            id: '42',
+            title: 'Tagged',
+            lastUpdated: 2000,
+            labels: ['bug'],
+          };
+          registrySpy.getProvider.and.returnValue(
+            createMockProvider({
+              getById: jasmine.createSpy('getById').and.resolveTo(freshIssue),
+              fieldMappings: [
+                {
+                  taskField: 'tagIds',
+                  issueField: 'labels',
+                  defaultDirection: 'both',
+                  toIssueValue: (v: unknown) => v,
+                  toTaskValue: (v: unknown) => v,
+                },
+              ],
+            }),
+          );
+          storeSpy.select.and.returnValue(
+            of({
+              ...mockPluginCfg,
+              issueProviderKey: 'GITHUB',
+              integrationOwnerId: owner,
+              pluginConfig: { twoWaySync: { tagIds: 'both' } },
+            }),
+          );
+          tagServiceSpy.tagsNoMyDayAndNoList.and.returnValue([
+            { id: 'local', title: 'Personal' },
+            { id: 'old-managed', title: 'provid / feature' },
+            { id: 'bug', title: 'provid / bug' },
+          ] as ReturnType<TagService['tagsNoMyDayAndNoList']>);
+          const result = await service.getFreshDataForIssueTask({
+            id: 'task-1',
+            issueId: '42',
+            issueProviderId: PROVIDER_ID,
+            issueLastUpdated: 1000,
+            tagIds: ['local', 'old-managed'],
+            issueLastSyncedValues: { labels: ['feature'] },
+          } as unknown as Task);
+          expect(result?.taskChanges.tagIds).toEqual(['local', 'bug']);
+          expect(tagServiceSpy.addTag).not.toHaveBeenCalled();
+        });
+      }
+
       it('should use issue field fallback for tagIds when extractSyncValues is absent', async () => {
         const freshIssue: PluginIssue = {
           id: 'ISS-1',
