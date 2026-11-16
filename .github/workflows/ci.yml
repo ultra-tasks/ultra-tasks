@@ -7,6 +7,13 @@ on:
     inputs: {}
   release:
     types: [published]
+# Public IDs for intercepted sign-in tests; fixture fallbacks never ship as a release.
+env:
+  GITHUB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITHUB_CLIENT_ID || 'e2e-github-public-client' }}
+  GITLAB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITLAB_CLIENT_ID || 'e2e-gitlab-public-client' }}
+  LINEAR_OAUTH_CLIENT_ID: ${{ vars.OAUTH_LINEAR_CLIENT_ID || 'e2e-linear-public-client' }}
+  TRELLO_OAUTH_CLIENT_ID: ${{ vars.OAUTH_TRELLO_CLIENT_ID || 'e2e-trello-public-client' }}
+
 permissions:
   contents: read
 
