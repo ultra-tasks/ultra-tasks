@@ -166,4 +166,144 @@ describe('CalendarPublicationService', () => {
     flushMicrotasks();
     expect(native.account.request).not.toHaveBeenCalled();
   }));
+  it('publishes a schedule edit while ordinary time-tracking ticks continue', fakeAsync(() => {
+    TestBed.tick();
+    flushMicrotasks();
+    void service.create('Work', 'busy', { type: 'all' });
+    flushMicrotasks();
+    tasks.update((current) =>
+      current.map((task) => ({
+        ...task,
+        dueDay: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      })),
+    );
+    TestBed.tick();
+    for (let i = 0; i < 5; i++) {
+      tick(500);
+      tasks.update((current) =>
+        current.map((task) => ({ ...task, timeSpent: task.timeSpent + 500 })),
+      );
+      TestBed.tick();
+      flushMicrotasks();
+    }
+    expect(
+      native.account.request.calls.allArgs().filter((args) => args[2] === 'PUT').length,
+    ).toBe(1);
+    native.unlocked.set(false);
+    TestBed.tick();
+  }));
+  it('publishes once sync settles without starting another debounce window', fakeAsync(() => {
+    TestBed.tick();
+    flushMicrotasks();
+    void service.create('Work', 'busy', { type: 'all' });
+    flushMicrotasks();
+    tasks.update((current) =>
+      current.map((task) => ({ ...task, timeEstimate: 60000, dueWithTime: Date.now() })),
+    );
+    TestBed.tick();
+    tick(1000);
+    native.busy.set(true);
+    TestBed.tick();
+    tick(1100);
+    flushMicrotasks();
+    expect(
+      native.account.request.calls.allArgs().filter((args) => args[2] === 'PUT').length,
+    ).toBe(0);
+    native.busy.set(false);
+    TestBed.tick();
+    flushMicrotasks();
+    expect(
+      native.account.request.calls.allArgs().filter((args) => args[2] === 'PUT').length,
+    ).toBe(1);
+    native.unlocked.set(false);
+    TestBed.tick();
+  }));
+  it('uses the acknowledged revision and latest data after a slow upload', fakeAsync(() => {
+    TestBed.tick();
+    flushMicrotasks();
+    void service.create('Work', 'busy', { type: 'all' });
+    flushMicrotasks();
+    let finishFirst: (() => void) | undefined;
+    let uploads = 0;
+    native.account.request.and.callFake(
+      async (_path: string, data: { revision: number }) => {
+        uploads++;
+        const result = {
+          id: 'feed',
+          label: 'Work',
+          privacy: 'busy',
+          revision: data.revision,
+          generation: 1,
+        };
+        if (uploads === 1) await new Promise<void>((resolve) => (finishFirst = resolve));
+        return result;
+      },
+    );
+    tasks.update((current) =>
+      current.map((task) => ({ ...task, dueWithTime: Date.now(), timeEstimate: 60000 })),
+    );
+    TestBed.tick();
+    tick(2001);
+    TestBed.tick();
+    flushMicrotasks();
+    expect(uploads).toBe(1);
+    tasks.update((current) => current.map((task) => ({ ...task, timeEstimate: 120000 })));
+    TestBed.tick();
+    tick(2001);
+    TestBed.tick();
+    flushMicrotasks();
+    expect(uploads).toBe(1);
+    finishFirst!();
+    flushMicrotasks();
+    const writes = native.account.request.calls
+      .allArgs()
+      .filter((args) => args[2] === 'PUT');
+    expect(writes.map((args) => (args[1] as { revision: number }).revision)).toEqual([
+      1, 2,
+    ]);
+    expect((writes[1][1] as { body: string }).body).toContain('SEQUENCE:2');
+    native.unlocked.set(false);
+    TestBed.tick();
+  }));
+  it('retries a failed publication after connectivity returns', fakeAsync(() => {
+    TestBed.tick();
+    flushMicrotasks();
+    void service.create('Work', 'busy', { type: 'all' });
+    flushMicrotasks();
+    let uploads = 0;
+    native.account.request.and.callFake(
+      async (_path: string, data: { revision: number }) => {
+        if (++uploads === 1) throw new Error('offline');
+        return {
+          id: 'feed',
+          label: 'Work',
+          privacy: 'busy',
+          revision: data.revision,
+          generation: 1,
+        };
+      },
+    );
+    tasks.update((current) =>
+      current.map((task) => ({ ...task, dueWithTime: Date.now() })),
+    );
+    TestBed.tick();
+    tick(2001);
+    TestBed.tick();
+    flushMicrotasks();
+    expect(uploads).toBe(1);
+    expect(service.error()).toBeTrue();
+    tick(10000);
+    TestBed.tick();
+    flushMicrotasks();
+    expect(uploads).toBe(1);
+    window.dispatchEvent(new Event('online'));
+    TestBed.tick();
+    tick(2001);
+    TestBed.tick();
+    flushMicrotasks();
+    expect(uploads).toBe(2);
+    expect(service.error()).toBeFalse();
+    native.unlocked.set(false);
+    TestBed.tick();
+  }));
 });

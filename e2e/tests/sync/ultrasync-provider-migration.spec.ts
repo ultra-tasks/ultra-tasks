@@ -80,7 +80,7 @@ test.describe('@webdav UltraSync provider migration', () => {
         page.getByRole('option', { name: 'UltraTasks Account', exact: true }),
       ).toBeEnabled();
       await page.getByRole('option', { name: 'UltraTasks Account', exact: true }).click();
-      await expect(dialog).toContainText('UltraSync');
+      await expect(dialog).toContainText('UltraTasks Account');
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
       await expect(page.locator('task').filter({ hasText: title })).toBeVisible();
     } finally {

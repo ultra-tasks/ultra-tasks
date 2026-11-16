@@ -1,4 +1,12 @@
-import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
+import {
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  Injectable,
+  signal,
+  untracked,
+} from '@angular/core';
 import { Store } from '@ngrx/store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { IS_SYNC_AVAILABLE } from '../../app.constants';
@@ -8,6 +16,7 @@ import { NativeSyncService } from '../native-sync/native-sync.service';
 import { selectAllTasks } from '../tasks/store/task.selectors';
 import { Task } from '../tasks/task.model';
 import { createIntegrationCalendar } from './integration-calendar';
+import { fromEvent } from 'rxjs';
 
 export interface PublishedCalendar {
   id: string;
@@ -30,11 +39,33 @@ const DAY = 86400000;
 const PAST_WINDOW = 30 * DAY;
 const FUTURE_WINDOW = 180 * DAY;
 
+const sameCalendarTasks = (previous: Task[], next: Task[]): boolean =>
+  previous.length === next.length &&
+  previous.every((task, index) => {
+    const other = next[index];
+    return (
+      task === other ||
+      (task.id === other.id &&
+        task.title === other.title &&
+        task.dueDay === other.dueDay &&
+        task.dueWithTime === other.dueWithTime &&
+        task.timeEstimate === other.timeEstimate &&
+        task.isDone === other.isDone &&
+        task.projectId === other.projectId &&
+        (task.tagIds === other.tagIds ||
+          (task.tagIds.length === other.tagIds.length &&
+            task.tagIds.every((id, tagIndex) => id === other.tagIds[tagIndex]))))
+    );
+  });
+
 /** Device-local publishing ownership; no publication or secret enters synced state. */
 @Injectable({ providedIn: 'root' })
 export class CalendarPublicationService {
   private readonly _native = inject(NativeSyncService);
-  private readonly _tasks = inject(Store).selectSignal(selectAllTasks);
+  private readonly _taskState = inject(Store).selectSignal(selectAllTasks);
+  private readonly _tasks = computed(() => this._taskState(), {
+    equal: sameCalendarTasks,
+  });
   private readonly _ready = toSignal(
     inject(DataInitStateService).isAllDataLoadedInitially$,
     { initialValue: false },
@@ -43,6 +74,10 @@ export class CalendarPublicationService {
   private readonly _owned = signal<OwnedCalendar[]>([]);
   private _key = '';
   private _queue: Promise<unknown> = Promise.resolve();
+  private _timer?: ReturnType<typeof setTimeout>;
+  private _retryTimer?: ReturnType<typeof setTimeout>;
+  private readonly _onlineEvent = toSignal(fromEvent(window, 'online'));
+  private readonly _publicationDue = signal(false);
   private readonly _lastBodies = new Map<string, string>();
   readonly feeds = signal<PublishedCalendar[]>([]);
   readonly available = signal(false);
@@ -51,6 +86,7 @@ export class CalendarPublicationService {
   readonly ownedIds = computed(() => new Set(this._owned().map((feed) => feed.id)));
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this._cancelScheduledPublication());
     effect(() => {
       const unlocked = this._native.unlocked();
       const linked = this._native.linked();
@@ -69,51 +105,96 @@ export class CalendarPublicationService {
         void this.refresh();
       }
     });
-    effect((onCleanup) => {
+    effect(() => {
+      if (!this._ready() || !this._native.unlocked() || !this._native.linked()) {
+        this._cancelScheduledPublication();
+        return;
+      }
+      this._tasks();
+      this._onlineEvent();
+      if (!this._owned().length) {
+        this._cancelScheduledPublication();
+        return;
+      }
+      // A bounded audit window, not a quiet-period debounce: regular sync and
+      // tracking activity must not postpone a calendar change indefinitely.
+      if (!this._timer && !untracked(this._publicationDue)) {
+        this._timer = setTimeout(() => {
+          this._timer = undefined;
+          this._publicationDue.set(true);
+        }, 2000);
+      }
+    });
+    effect(() => {
       if (
-        !this._ready() ||
-        !this._native.unlocked() ||
-        !this._native.linked() ||
+        !this._publicationDue() ||
         this._native.busy() ||
         this._hydration.isInSyncWindow()
       )
         return;
-      const tasks = this._tasks();
-      const owned = this._owned();
       const account = this._native.account;
       const key = this._key;
-      const timer = setTimeout(() => {
-        void this._serial(async () => {
-          if (
-            key !== this._key ||
-            account !== this._native.account ||
-            !this._native.unlocked()
-          )
-            return;
-          for (const feed of owned) {
-            const comparison = this._calendar(tasks, feed, 0, 0);
-            if (this._lastBodies.get(feed.id) === comparison) continue;
-            const next = await account!.request<PublishedCalendar>(
-              `/calendar-feeds/${feed.id}`,
-              {
-                body: this._calendar(tasks, feed, feed.revision + 1, Date.now()),
-                revision: feed.revision + 1,
-                generation: feed.generation,
-              },
-              'PUT',
-            );
-            if (key !== this._key) return;
-            this._saveOwned(
-              this._owned().map((existing) =>
-                existing.id === feed.id ? { ...existing, ...next } : existing,
-              ),
-            );
-            this._lastBodies.set(feed.id, comparison);
-          }
-        }).catch(() => this.error.set(true));
-      }, 2000);
-      onCleanup(() => clearTimeout(timer));
+      this._publicationDue.set(false);
+      void this._serial(async () => {
+        if (
+          key !== this._key ||
+          account !== this._native.account ||
+          !this._native.unlocked()
+        )
+          return;
+        // Read when this serialized write starts, so a slow earlier upload
+        // cannot leave a queued publication using its old revision.
+        const tasks = this._tasks();
+        const owned = this._owned();
+        for (const feed of owned) {
+          const comparison = this._calendar(tasks, feed, 0, 0);
+          if (this._lastBodies.get(feed.id) === comparison) continue;
+          const next = await account!.request<PublishedCalendar>(
+            `/calendar-feeds/${feed.id}`,
+            {
+              body: this._calendar(tasks, feed, feed.revision + 1, Date.now()),
+              revision: feed.revision + 1,
+              generation: feed.generation,
+            },
+            'PUT',
+          );
+          if (key !== this._key) return;
+          this._saveOwned(
+            this._owned().map((existing) =>
+              existing.id === feed.id ? { ...existing, ...next } : existing,
+            ),
+          );
+          this._lastBodies.set(feed.id, comparison);
+        }
+        this.error.set(false);
+        if (this._retryTimer !== undefined) clearTimeout(this._retryTimer);
+        this._retryTimer = undefined;
+      }).catch((error: unknown) => {
+        if (key !== this._key) return;
+        this.error.set(true);
+        const status =
+          error && typeof error === 'object' && 'status' in error
+            ? error.status
+            : undefined;
+        // Conflicts need a reload/decision. Transport and server failures can
+        // retry quietly; an online event also schedules an earlier attempt.
+        if (typeof status === 'number' && status < 500) return;
+        if (this._retryTimer === undefined) {
+          this._retryTimer = setTimeout(() => {
+            this._retryTimer = undefined;
+            if (key === this._key) this._publicationDue.set(true);
+          }, 60000);
+        }
+      });
     });
+  }
+
+  private _cancelScheduledPublication(): void {
+    if (this._timer !== undefined) clearTimeout(this._timer);
+    if (this._retryTimer !== undefined) clearTimeout(this._retryTimer);
+    this._timer = undefined;
+    this._retryTimer = undefined;
+    this._publicationDue.set(false);
   }
 
   async refresh(): Promise<void> {
