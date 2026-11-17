@@ -40,14 +40,21 @@ export class ImportPage extends BasePage {
    * no expander to open.
    */
   async navigateToImportPage(): Promise<void> {
-    await this.page.goto('/#/config', { waitUntil: 'domcontentloaded' });
-    await this.page.locator('config-page').waitFor({ state: 'visible', timeout: 10000 });
+    const settings = this.page.locator('config-page');
+    // Export followed by import keeps this dialog open. Navigating to its route
+    // again emits a location change that dismisses the existing window.
+    if (!(await settings.isVisible())) {
+      await this.page.goto('/#/config', { waitUntil: 'domcontentloaded' });
+      await settings.waitFor({ state: 'visible', timeout: 10000 });
+    }
 
     const syncBackupCategory = this.page
       .locator('config-page .settings-categories')
       .getByRole('button', { name: 'Import & export', exact: true });
-    await syncBackupCategory.waitFor({ state: 'visible', timeout: 10000 });
-    await syncBackupCategory.click();
+    if (!(await this.importFromFileBtn.isVisible())) {
+      await syncBackupCategory.waitFor({ state: 'visible', timeout: 10000 });
+      await syncBackupCategory.click();
+    }
     await this.importFromFileBtn.waitFor({ state: 'visible', timeout: 10000 });
     // On narrow (mobile) viewports the category list collapses into a drill-down and
     // is gone once the page opens, so only assert the selected state where it stays.
