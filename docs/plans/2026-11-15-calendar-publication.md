@@ -1,6 +1,6 @@
 # Opt-in calendar publications
 
-Implemented for 0.4.0; live subscription acceptance and production rollout remain pending. The existing account page owns publication controls; this keeps authentication and revocation together without adding a new settings category. The hosted local-only app has no publication controls.
+Implemented for 0.4.0; production rollout completed November 17 with server beta 3. Subscriptions and polling in external calendar apps remain manual beta acceptance work. The existing account page owns publication controls; this keeps authentication and revocation together without adding a new settings category. The hosted local-only app has no publication controls.
 
 ## Prior art
 
@@ -30,5 +30,12 @@ Take: explicit subscription, stable event IDs, simple revocation. Deliberately d
 Real PostgreSQL-compatible route tests cover create/fetch/update/rotate/revoke, stale revisions/generations, consent, size/count limits, cross-account isolation and account deletion. App tests cover device-local metadata, busy-only generation and hydration gating. Browser acceptance runs the Angular client against real account routes.
 
 Before enabling the server feature: apply the migration, set `ULTRA_CALENDAR_FEEDS_ENABLED=true`, update the operator privacy notice, and exclude `/cal/*` from proxy access logs and caches. Verify TLS and service-worker routing through the deployed proxy. Test subscriptions and polling in Google Calendar, Apple Calendar, Outlook and Thunderbird; these manual checks are not replaced by automated tests.
+
+The November 17 deployment completed the migration, feature enablement, privacy
+notices and proxy requirements. Real HTTPS acceptance passed conditional fetch,
+updates, stale-write rejection, rotation and revocation; revoked links were
+absent from proxy and application logs. A returning browser with an active
+service worker preserved calendar, account, health, API and OAuth routes.
+See the [deployment record](2026-11-16-040-beta1-release.md#server-beta-3-and-hosted-web-deployment--2026-11-17).
 
 The clean production web bundle measures approximately 6.2515 MB with these additions. Production desktop/web, standalone web and staging initial-bundle limits increase from 6.25 to 6.26 MB (10 KB) for the calendar controls and translated privacy text; the warning limit stays unchanged. Calendar publishing resumes lazily for existing account profiles.

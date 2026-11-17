@@ -18,6 +18,23 @@ CI evidence on client `e14d39eb38`: [private account acceptance](https://github.
 
 Still required for B acceptance: subscriptions in Google Calendar, Apple Calendar, Outlook and Thunderbird; production proxy/service-worker verification and operator privacy review. Maintainer decision, 2026-11-15: 0.4.0 publishes already-created scheduled instances within 30 days past and 180 days ahead. Future recurrence projections are deferred to a follow-up. The release checklist remains open until these gates pass or scope is explicitly revised.
 
+## Production deployment update — 2026-11-17
+
+The maintainer authorized server beta publication, a backed-up live upgrade,
+the 0.4.0-beta.1 web install and calendar feed enablement. Server
+`server-v0.1.0-beta.3` is published and deployed; the official origin serves the
+beta web bundle. The calendar migration, operator and website privacy notices,
+TLS, proxy log/cache exclusions and active-service-worker route checks passed.
+Real HTTPS two-client encrypted sync and calendar create/update/rotate/revoke
+checks passed. Registration remains closed. Backups were copied off-machine,
+decrypted for recovery verification and restored into a disposable database.
+See the [beta release record](2026-11-16-040-beta1-release.md#server-beta-3-and-hosted-web-deployment--2026-11-17).
+
+Subscriptions and polling in Google Calendar, Apple Calendar, Outlook and
+Thunderbird remain manual beta acceptance work. The production rollout gates
+listed in the historical November 15 update above are now complete; that does
+not complete those external calendar-client checks or stable-release acceptance.
+
 ## Sections
 
 - [Requested scope](#requested-scope)
