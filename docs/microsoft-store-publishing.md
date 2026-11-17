@@ -66,6 +66,16 @@ for the current review result; submission does not establish certification.
 Installed-package acceptance testing and Windows App Certification Kit testing
 have not been completed locally for these artifacts.
 
+The `0.3.0` review was subsequently withdrawn and replaced with application source
+`0.4.0-beta.1`, using Windows package version `0.4.0.0`, for both x64 and ARM64.
+The replacement came from [Store build 44019453730](https://github.com/ultra-tasks/ultra-tasks/actions/runs/44019453730)
+at commit `542a82a171a45593ce757d1ccdbecc1d7318faaa`. Both replacement packages
+passed checksum, manifest, embedded source-version and frontend beta-label
+verification, and Partner Center validation. The old packages were removed from
+the draft, beta release notes and reviewer instructions were saved, and the
+replacement was submitted for certification with the manual publication hold
+retained. Approval is still determined by Microsoft's review.
+
 ### What Microsoft approves and signs
 
 Account identity verification and app certification are separate steps. First
