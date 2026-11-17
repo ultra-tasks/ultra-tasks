@@ -58,6 +58,7 @@ test.describe('@supersync four-provider owner handoff', () => {
         await openLinkedTaskList(peer.page);
         const task = peer.page.locator(`task[data-task-id="${original.id}"]`);
         await task.locator('task-title').click();
+        await expect(task.locator('textarea')).toBeFocused();
         await task.locator('textarea').fill(`${key} peer edit`);
         await peer.page.keyboard.press('Tab');
         await expect
