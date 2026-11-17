@@ -260,9 +260,9 @@ export const connectProvider = async (
   await openIntegrationSetup(page);
   await page.locator('.provider-choice').filter({ hasText: NAMES[key] }).click();
   const dialog = page.locator('mat-dialog-container');
-  // MatDialog focuses its first input after opening. Wait for that handoff so
-  // it cannot redirect a token fill into the repository field mid-action.
-  await expect(dialog.locator('input').first()).toBeFocused();
+  // GitHub focuses the repository field after opening. Wait for that handoff
+  // so it cannot redirect a token fill into that field mid-action.
+  if (key === 'GITHUB') await expect(dialog.locator('input').first()).toBeFocused();
   if (key === 'GITHUB' || key === 'GITLAB') {
     await dialog.locator('input').first().fill('demo/product-app');
     if (!signIn)
