@@ -53,6 +53,10 @@ describe('extractSemver', () => {
     expect(extractSemver('18.22.0_L1')).toBe('18.22.0');
   });
 
+  it('reports the base version of a prerelease', () => {
+    expect(extractSemver('0.4.0-beta.1')).toBe('0.4.0');
+  });
+
   it('returns undefined when no version leads the string', () => {
     expect(extractSemver('')).toBeUndefined();
     expect(extractSemver('dev')).toBeUndefined();
@@ -61,7 +65,7 @@ describe('extractSemver', () => {
 });
 
 describe('getAppSemver', () => {
-  it('reports the bare package version in a browser context, without the channel suffix', () => {
-    expect(getAppSemver()).toBe(environment.version);
+  it('reports the base package version in a browser context, without release or channel suffixes', () => {
+    expect(getAppSemver()).toBe(environment.version.split('-')[0]);
   });
 });

@@ -79,7 +79,8 @@ jobs:
           subprocess.run(['xcrun', 'simctl', 'install', os.environ['ULTRA_NATIVE_SIM_ID'], '/tmp/ultra-native-ios/Build/Products/Debug-iphonesimulator/App.app'], check=True, timeout=180)
           PY
       - name: Exercise Keychain and offline session handoff
-        timeout-minutes: 4
+        # Hosted cold launch has taken nearly four minutes before the first screenshot.
+        timeout-minutes: 8
         shell: bash
         run: |
           set -euxo pipefail
