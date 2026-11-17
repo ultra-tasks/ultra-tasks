@@ -245,7 +245,7 @@ jobs:
       # it for review with automatic release on approval. Pre-release tags (any
       # version containing "-", e.g. -rc.0/-beta.1) and manual runs only upload the
       # build (TestFlight). Classification ignores hyphens in the product prefix.
-      - name: Upload to App Store Connect and submit for review
+      - name: Upload beta to TestFlight or submit stable release
         if: inputs.distribution != 'ad-hoc' && !inputs.build_only
         env:
           ASC_KEY_ID: ${{ secrets.mac_api_key_id }}
@@ -261,5 +261,22 @@ jobs:
             exit 1
           fi
           export IPA_PATH="${ipas[0]}"
-          echo "Submitting $IPA_PATH (submit_for_review=$SUBMIT_FOR_REVIEW)"
-          bundle exec fastlane ios release
+          if [ "$SUBMIT_FOR_REVIEW" = true ]; then
+            bundle exec fastlane ios release
+          else
+            # TestFlight uploads must not depend on App Store listing metadata.
+            # Deliver fails fetching missing review details for a brand-new app.
+            asc_key="$RUNNER_TEMP/asc-upload-key.json"
+            trap 'rm -f "$asc_key"' EXIT
+            node - <<'NODE'
+          const fs = require('node:fs');
+          fs.writeFileSync(`${process.env.RUNNER_TEMP}/asc-upload-key.json`, JSON.stringify({
+            key_id: process.env.ASC_KEY_ID,
+            issuer_id: process.env.ASC_ISSUER_ID,
+            key: process.env.ASC_KEY_CONTENT,
+            in_house: false,
+          }), { mode: 0o600 });
+          NODE
+            bundle exec fastlane pilot upload --api_key_path "$asc_key" \
+              --ipa "$IPA_PATH" --app_identifier app.ultratasks --skip_submission
+          fi

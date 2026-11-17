@@ -50,6 +50,11 @@ match `package.json`; hyphens in the `ultra-tasks-v` prefix are ignored.
   upload only (build lands in App Store Connect / TestFlight, no store
   submission).
 
+Upload-only runs use `fastlane pilot upload`, wait for processing, and leave tester
+distribution manual. They do not read or update App Store listing metadata or
+release notes. This also supports a new app whose App Store review details have
+not been created yet. Stable submissions continue through the release lane above.
+
 Manual runs default to `distribution=ad-hoc` and `build_only=true`.
 For a manual App Store Connect upload, select `app-store-connect` and set
 `build_only=false`. `build_only=true` exports an IPA without uploading. `distribution=ad-hoc`
