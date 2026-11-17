@@ -533,4 +533,56 @@ describe('OnboardingHintService', () => {
     addFirstTask();
     expect(service.shouldAutoCloseFirstTaskComposer('task-1')).toBeFalse();
   });
+
+  // The tips that point into a task list belong to the pages that have one: the
+  // chip used to stay where it was on Upcoming, Search, History, Metrics...
+  describe('work view', () => {
+    it('is true on the pages with a task list and false everywhere else', () => {
+      const service = createService();
+
+      for (const url of [
+        '/tag/TODAY/tasks',
+        '/project/INBOX_PROJECT/tasks',
+        '/tag/some-tag/tasks',
+        '/active/tasks',
+        '/tag/TODAY/tasks?focus=1',
+      ]) {
+        navigateTo(url);
+        expect(service.isOnWorkView()).withContext(url).toBe(true);
+      }
+      for (const url of [
+        '/planner',
+        '/search',
+        '/tag/TODAY/metrics',
+        '/tag/TODAY/history',
+        '/tag/TODAY/daily-summary',
+        '/scheduled-list',
+        '/config',
+        '/tag/TODAY/tasks-archive',
+      ]) {
+        navigateTo(url);
+        expect(service.isOnWorkView()).withContext(url).toBe(false);
+      }
+    });
+
+    it('follows the user back to a list', () => {
+      const service = createService();
+
+      navigateTo('/planner');
+      expect(service.isOnWorkView()).toBe(false);
+
+      navigateTo('/tag/TODAY/tasks');
+      expect(service.isOnWorkView()).toBe(true);
+    });
+
+    // The route only decides where the chip shows; the step itself is unchanged,
+    // so the first-run welcome (it opens on this step) is not held back by it.
+    it('leaves the current step alone off the work view', () => {
+      const service = createService();
+
+      navigateTo('/planner');
+
+      expect(service.currentStep()).toBe('create-task');
+    });
+  });
 });

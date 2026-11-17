@@ -2,6 +2,7 @@ import { test, expect } from '../../fixtures/test.fixture';
 import { WorkViewPage } from '../../pages/work-view.page';
 import { cssSelectors } from '../../constants/selectors';
 import { fillMarkdownEditor } from '../../utils/markdown-editor';
+import { expandTaskNotes } from '../../utils/task-notes';
 
 /**
  * Regression for issue #8434 (follow-up): a note edited in the fullscreen
@@ -31,6 +32,7 @@ test.describe('Detail panel fullscreen note - resize', () => {
 
     const detailPanel = page.locator(cssSelectors.DETAIL_PANEL);
     await expect(detailPanel).toBeVisible();
+    await expandTaskNotes(page);
 
     // Open the fullscreen markdown editor from the notes inline-markdown.
     // The controls are opacity:0 until the notes area is hovered.
@@ -56,12 +58,13 @@ test.describe('Detail panel fullscreen note - resize', () => {
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
 
     // The note panel re-renders in the mobile bottom sheet, now backed by the
-    // persisted task notes: the typed text must have survived the resize.
-    await expect(detailPanel.locator('inline-markdown').first()).toContainText(
-      NOTE_TEXT,
-      {
-        timeout: 5000,
-      },
-    );
+    // persisted task notes: the typed text must have survived the resize. The new
+    // panel opens its Description folded when it is built before the note has
+    // reached the store (a task without notes does), so open it first, once the
+    // side panel has gone and the sheet has taken over.
+    await expect(page.locator('.bottom-panel-sheet task-detail-panel')).toBeVisible();
+    await expect(page.locator('right-panel task-detail-panel')).toHaveCount(0);
+    const notes = await expandTaskNotes(page);
+    await expect(notes).toContainText(NOTE_TEXT, { timeout: 5000 });
   });
 });

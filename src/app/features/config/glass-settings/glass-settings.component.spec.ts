@@ -46,12 +46,18 @@ describe('GlassSettingsComponent', () => {
   const el = (selector: string): HTMLElement | null =>
     fixture.nativeElement.querySelector(selector);
 
-  it('switches glass from the checkbox', () => {
+  it('switches glass from the toggle', () => {
     setup();
-    const checkbox = el('.st-glass-setting input') as HTMLInputElement;
-    expect(checkbox.checked).toBeTrue();
-    checkbox.click();
+    const toggle = el('.st-glass-setting [role="switch"]') as HTMLButtonElement;
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    toggle.click();
     expect(setGlass).toHaveBeenCalledWith(false);
+  });
+
+  it('is one toggle in a field box, not a bare checkbox', () => {
+    setup();
+    expect(el('input[type="checkbox"]')).toBeNull();
+    expect(el('mat-form-field.st-glass-setting mat-slide-toggle')).not.toBeNull();
   });
 
   it('shows the image rows only with glass on and a drawn backdrop', () => {

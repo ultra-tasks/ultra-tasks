@@ -22,6 +22,7 @@ import { TaskDetailItemComponent } from './task-additional-info-item/task-detail
 import { TaskContextMenuComponent } from '../task-context-menu/task-context-menu.component';
 import { Navigation, provideRouter, Router } from '@angular/router';
 import { HISTORY_STATE } from '../../../app.constants';
+import { TaskFocusService } from '../task-focus.service';
 
 const MOCK_TASK: TaskWithSubTasks = {
   ...(DEFAULT_TASK as TaskWithSubTasks),
@@ -39,9 +40,11 @@ describe('TaskDetailPanelComponent', () => {
   let mockAttachmentService: jasmine.SpyObj<TaskAttachmentService>;
   let mockTaskService: jasmine.SpyObj<TaskService>;
   let isXs: WritableSignal<boolean>;
+  let isCompactShell: WritableSignal<boolean>;
 
   beforeEach(async () => {
     isXs = signal(true);
+    isCompactShell = signal(true);
     mockClipboardImageService = jasmine.createSpyObj('ClipboardImageService', [
       'handlePasteWithProgress',
     ]);
@@ -60,6 +63,7 @@ describe('TaskDetailPanelComponent', () => {
     const mockLayoutService = jasmine.createSpyObj('LayoutService', [], {
       isShowList: jasmine.createSpy().and.returnValue(true),
       isXs,
+      isCompactShell,
     });
     const mockGlobalConfigService = jasmine.createSpyObj('GlobalConfigService', [], {
       cfg: jasmine.createSpy().and.returnValue({ keyboard: {} }),
@@ -323,18 +327,79 @@ describe('TaskDetailPanelComponent', () => {
       expect(moreButton.getAttribute('aria-expanded')).toBe('true');
     });
 
-    it('hides the mobile actions above the mobile breakpoint', () => {
+    it('hides the mobile actions above the compact shell breakpoint', () => {
       isXs.set(false);
+      isCompactShell.set(false);
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('.task-detail-more-btn')).toBeNull();
     });
 
+    it('keeps the actions in a 600-959px window, where the panel is a sheet too', () => {
+      isXs.set(false);
+      isCompactShell.set(true);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.task-detail-more-btn')).not.toBeNull();
+    });
+
     it('uses the responsive layout signal for mobile panel defaults', () => {
       expect(component.panelState.isExpandedAttachmentPanel()).toBeFalse();
       expect(component.isExpandedIssuePanel()).toBeFalse();
+      expect(component.isExpandedNotesPanel()).toBeFalse();
+    });
+  });
+
+  describe('notes panel', () => {
+    it('opens collapsed, without an editor, for a task without notes', () => {
+      expect(component.isExpandedNotesPanel()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('inline-markdown')).toBeNull();
+    });
+
+    it('opens expanded, with the editor, for a task with notes', () => {
+      componentRef.setInput('task', { ...MOCK_TASK, id: 'with-notes', notes: 'Notes' });
+      fixture.detectChanges();
+
+      expect(component.isExpandedNotesPanel()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('inline-markdown')).not.toBeNull();
+    });
+
+    it('resets for the next task when the panel is reused', () => {
+      componentRef.setInput('task', { ...MOCK_TASK, id: 'with-notes', notes: 'Notes' });
+      fixture.detectChanges();
+      expect(component.isExpandedNotesPanel()).toBeTrue();
+
+      componentRef.setInput('task', { ...MOCK_TASK, id: 'without-notes', notes: '' });
+      fixture.detectChanges();
+      expect(component.isExpandedNotesPanel()).toBeFalse();
+    });
+
+    it('does not fold away when the notes of the same task are cleared', () => {
+      componentRef.setInput('task', { ...MOCK_TASK, id: 'with-notes', notes: 'Notes' });
+      fixture.detectChanges();
+
+      componentRef.setInput('task', { ...MOCK_TASK, id: 'with-notes', notes: '' });
+      fixture.detectChanges();
+
       expect(component.isExpandedNotesPanel()).toBeTrue();
     });
+
+    it('keeps a manual open while the notes of the same task are still empty', () => {
+      component.isExpandedNotesPanel.set(true);
+      componentRef.setInput('task', { ...MOCK_TASK, notes: '' });
+      fixture.detectChanges();
+
+      expect(component.isExpandedNotesPanel()).toBeTrue();
+    });
+
+    it('opens for a description focus request on a task without notes', fakeAsync(() => {
+      component.ngAfterViewInit();
+      TestBed.inject(TaskFocusService).requestDescriptionFocus(MOCK_TASK.id);
+      tick(50);
+
+      expect(component.isExpandedNotesPanel()).toBeTrue();
+      expect(component.panelState.isFocusNotes()).toBeTrue();
+    }));
   });
 
   // A won't-do task is one whose `wontDoOn` matches its `doneOn`.
@@ -515,7 +580,10 @@ describe('TaskDetailPanelComponent stale-focus guard', () => {
         },
         { provide: TaskAttachmentService, useValue: {} },
         { provide: ClipboardImageService, useValue: {} },
-        { provide: LayoutService, useValue: { isXs: () => false } },
+        {
+          provide: LayoutService,
+          useValue: { isXs: () => false, isCompactShell: () => false },
+        },
         {
           provide: GlobalConfigService,
           useValue: {
@@ -709,7 +777,10 @@ describe('TaskDetailPanelComponent description target focuses the editor', () =>
         },
         { provide: TaskAttachmentService, useValue: {} },
         { provide: ClipboardImageService, useValue: {} },
-        { provide: LayoutService, useValue: { isXs: () => false } },
+        {
+          provide: LayoutService,
+          useValue: { isXs: () => false, isCompactShell: () => false },
+        },
         {
           provide: GlobalConfigService,
           useValue: {
@@ -822,7 +893,10 @@ describe('TaskDetailPanelComponent add sub-task', () => {
         },
         { provide: TaskAttachmentService, useValue: {} },
         { provide: ClipboardImageService, useValue: {} },
-        { provide: LayoutService, useValue: { isXs: () => false } },
+        {
+          provide: LayoutService,
+          useValue: { isXs: () => false, isCompactShell: () => false },
+        },
         {
           provide: GlobalConfigService,
           useValue: {

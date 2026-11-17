@@ -78,7 +78,7 @@
 
         <div
           #routeWrapper
-          [@warpRoute]="getPage(o)"
+          [@warpRoute]="{ value: getPage(o), params: { skip: isSkipRouteAnimation() } }"
           class="route-wrapper"
         >
           <router-outlet #o="outlet"></router-outlet>

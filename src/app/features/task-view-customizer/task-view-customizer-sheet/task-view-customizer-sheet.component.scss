@@ -1,0 +1,159 @@
+// The bottom sheet gives its content the full height and lets it scroll
+// (bottom-panel-container), so the host is the scroller.
+:host {
+  display: block;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--s2);
+}
+
+// Stays in view while the list scrolls under it.
+.sheet-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--s);
+  min-height: var(--ctl-lg);
+  padding-inline: var(--s2);
+  background: var(--bottom-panel-bg);
+
+  // A back arrow takes the title's start edge: pull the title toward it.
+  .sheet-back {
+    margin-inline-start: calc(-1 * var(--s2));
+  }
+}
+
+.sheet-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: var(--type-title);
+  letter-spacing: var(--track-title);
+}
+
+.sheet-reset {
+  flex: 0 0 auto;
+  min-height: var(--ctl-lg);
+  padding: 0 var(--s);
+  border: 0;
+  background: transparent;
+  color: var(--text-color);
+  font: var(--type-label);
+  letter-spacing: var(--track-label);
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--text-color-muted);
+    cursor: default;
+  }
+}
+
+.sheet-list {
+  display: flex;
+  flex-direction: column;
+}
+
+// A 48px row, the sheet's touch size.
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s1-5);
+  width: 100%;
+  min-height: var(--ctl-lg);
+  padding: var(--s-half) var(--s2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-color);
+  font: var(--type-body);
+  text-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  // Touch has no hover, so :active carries the tap feedback.
+  &:active {
+    background: var(--state-hover);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background: var(--state-hover);
+    }
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  &:disabled {
+    color: var(--text-color-muted);
+    cursor: default;
+    background: transparent;
+  }
+
+  // The chosen row is the tonal "selected" role, like the menu cascade's.
+  &.is-selected {
+    background: var(--palette-selected);
+    color: var(--palette-selected-ink);
+    font: var(--type-body-strong);
+  }
+
+  mat-icon {
+    flex: 0 0 auto;
+    font-size: var(--icon-md);
+    width: var(--icon-md);
+    height: var(--icon-md);
+    line-height: var(--icon-md);
+  }
+}
+
+// Under the list, apart from the choices.
+.sheet-row--action {
+  margin-top: var(--s);
+}
+
+.sheet-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+// What a row is set to: muted at the end, shortened before the label is.
+.sheet-value {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--s-half);
+  min-width: 0;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--type-meta);
+  color: var(--text-color-muted);
+
+  .sheet-value-icon {
+    font-size: var(--icon-sm);
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    line-height: var(--icon-sm);
+  }
+}
+
+.is-selected .sheet-value {
+  color: inherit;
+}
+
+.sheet-chevron {
+  color: var(--text-color-muted);
+}
+
+.sheet-field {
+  width: calc(100% - 2 * var(--s2));
+  margin: var(--s-half) var(--s2) var(--s);
+}

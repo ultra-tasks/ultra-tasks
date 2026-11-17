@@ -157,10 +157,10 @@
       height: var(--s2);
       box-sizing: border-box;
       border: 1px solid var(--c-warn);
-      border-radius: 50%;
+      border-radius: var(--r-full);
       background: var(--schedule-event-bg);
       color: var(--c-warn);
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       font-weight: 900;
       line-height: 1;
       pointer-events: none;
@@ -266,7 +266,7 @@
   bottom: calc(-1 * var(--s-quarter));
   width: calc(var(--s2) - var(--s-quarter));
   height: calc(var(--s2) - var(--s-quarter));
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 
 .ico-wrapper {
@@ -310,9 +310,10 @@
   z-index: 1;
   text-align: center;
   padding-top: 1px;
-  font-size: 9px;
+  // The smallest step on the type scale; it was a 9px (8px on a phone) literal.
+  font-size: var(--font-size-xs);
   line-height: 10px;
-  min-width: 14px;
+  min-width: var(--s2);
   width: auto;
   font-weight: 900;
   border: 1px solid var(--text-color-muted);
@@ -325,9 +326,6 @@
     border-radius: 1px;
     border-left: 0;
     border-right: 0;
-    min-width: 12px;
-    font-size: 8px;
-    line-height: 8px;
     border-top-width: 2px;
   }
 }

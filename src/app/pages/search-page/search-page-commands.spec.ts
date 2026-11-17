@@ -149,30 +149,62 @@ describe('SearchPageComponent commands (real template)', () => {
     return ev;
   };
 
-  it('lists the places and actions while the field is empty', fakeAsync(() => {
+  it('lists the actions, then the places, while the field is empty', fakeAsync(() => {
     open();
     const titles = Array.from(el().querySelectorAll('.search-group-title')).map((h) =>
       h.textContent?.trim(),
     );
-    expect(titles).toEqual(['F.SEARCH_BAR.GO_TO', 'F.SEARCH_BAR.ACTIONS']);
-    // Destinations then actions; Calendar is off in this suite, Upcoming is on.
+    // Actions first: "Add new task" must not sit below the popup's fold.
+    expect(titles).toEqual(['F.SEARCH_BAR.ACTIONS', 'F.SEARCH_BAR.GO_TO']);
+    // Calendar is off in this suite, Upcoming is on.
     expect(rowLabels()).toEqual([
-      'G.TODAY',
-      'G.INBOX_PROJECT_TITLE',
-      'MH.PLANNER',
-      'F.INTEGRATIONS.TITLE',
-      'MH.SETTINGS',
       'GCF.KEYBOARD.ADD_NEW_TASK',
       'GCF.KEYBOARD.GO_TO_FOCUS_MODE',
       'PS.SYNC.SET_UP_SYNC',
       'GCF.KEYBOARD.UNDO_TITLE',
       'GCF.KEYBOARD.SHOW_HELP',
+      'G.TODAY',
+      'G.INBOX_PROJECT_TITLE',
+      'MH.PLANNER',
+      'F.INTEGRATIONS.TITLE',
+      'MH.SETTINGS',
     ]);
     // The user's own shortcut is shown beside a command that has one.
-    const upcoming = el().querySelectorAll('.search-result-main')[2];
+    const upcoming = el().querySelectorAll('.search-result-main')[7];
     expect(upcoming.querySelector('kbd')?.textContent).toBe('Shift+P');
     // Nothing is highlighted as "the one Enter opens" until something is typed.
     expect(el().querySelector('.search-results.has-default')).toBeNull();
+  }));
+
+  it('lists the places before the actions once something is typed', fakeAsync(() => {
+    open();
+    // Matches Today (places) and the Sync action, whatever their stand-in labels.
+    type('S');
+    const titles = Array.from(el().querySelectorAll('.search-group-title')).map((h) =>
+      h.textContent?.trim(),
+    );
+    expect(titles.indexOf('F.SEARCH_BAR.GO_TO')).toBeLessThan(
+      titles.indexOf('F.SEARCH_BAR.ACTIONS'),
+    );
+  }));
+
+  it('marks the shortcut chips and the cheat sheet row as keyboard-only', fakeAsync(() => {
+    open();
+    // show-only-on-mouse-primary hides them under touch intent (global utility).
+    const chips = Array.from(el().querySelectorAll('kbd'));
+    expect(chips.length).toBeGreaterThan(0);
+    expect(
+      chips.every((kbd) => kbd.classList.contains('show-only-on-mouse-primary')),
+    ).toBe(true);
+    const cheatSheetRow = Array.from(el().querySelectorAll('.search-result')).find((li) =>
+      li.textContent?.includes('GCF.KEYBOARD.SHOW_HELP'),
+    );
+    expect(cheatSheetRow?.classList).toContain('show-only-on-mouse-primary');
+    // Every other row stays visible on touch.
+    const addTaskRow = Array.from(el().querySelectorAll('.search-result')).find((li) =>
+      li.textContent?.includes('GCF.KEYBOARD.ADD_NEW_TASK'),
+    );
+    expect(addTaskRow?.classList).not.toContain('show-only-on-mouse-primary');
   }));
 
   it('shows matching commands above matching tasks, with the first match highlighted', fakeAsync(() => {

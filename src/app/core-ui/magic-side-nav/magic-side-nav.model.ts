@@ -32,6 +32,9 @@ export interface NavBaseItem {
   // reaches it there (Today, Inbox, Upcoming), or it has a closer home (Support
   // us under Help, Plugins and Account under Settings).
   desktopOnly?: true;
+  // Phone drawer only: kept in a footer that stays on screen while the list
+  // scrolls (Help, Settings). Elsewhere the row sits in the list as usual.
+  pinBottom?: true;
 }
 
 export interface NavSeparatorItem extends NavBaseItem {

@@ -127,6 +127,7 @@
       <button
         mat-icon-button
         class="search-toggle-btn"
+        [class.no-issue-provider]="!hasIssueProvider() && !isSearchMode()"
         [class.active]="isSearchMode()"
         [attr.aria-pressed]="isSearchMode()"
         (click)="toggleSearchMode()"
@@ -211,7 +212,11 @@
       >
         <!-- Placeholder only while empty — same caret-preserving reason as the
              main input above. -->
-        @let notePlaceholder = T.F.TASK.ADD_TASK_BAR.NOTE_PLACEHOLDER | translate;
+        @let notePlaceholder =
+          (isTouchActive()
+            ? T.F.TASK.ADD_TASK_BAR.NOTE_PLACEHOLDER_TOUCH
+            : T.F.TASK.ADD_TASK_BAR.NOTE_PLACEHOLDER
+          ) | translate;
         <textarea
           #noteEl
           class="note-input"

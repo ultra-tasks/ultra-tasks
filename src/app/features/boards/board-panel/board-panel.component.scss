@@ -14,8 +14,13 @@
   // space for outline
   padding: 1px;
 
+  // Phone: panels stack and the board scrolls as one page. A panel that scrolls
+  // inside itself would make a swipe on a task move the card first and the page
+  // only at its end, so each panel is as tall as its tasks.
   @include mq(xs, max) {
-    min-height: 300px;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
 
   planner-task {
@@ -98,6 +103,11 @@ header {
   min-height: 100px;
   flex-grow: 1;
   //border-color: var(--extra-border-color);
+
+  // Phone: the panel grows with its tasks, so this is no longer a scroller.
+  @include mq(xs, max) {
+    overflow: visible;
+  }
 }
 
 .empty {
@@ -112,6 +122,11 @@ header {
   margin-bottom: auto;
   height: 100% !important;
   border-radius: var(--r-md);
+
+  // On touch the chip is a 48x40 target (it was 48x24, its content height).
+  @media (pointer: coarse) {
+    min-height: var(--ctl-md);
+  }
 
   ::ng-deep {
     .mat-mdc-button-persistent-ripple {

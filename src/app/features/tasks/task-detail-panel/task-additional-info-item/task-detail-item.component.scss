@@ -87,18 +87,10 @@
   }
 }
 
-// Consolidate hover states
-:host-context(.isNoTouchOnly.isLightTheme) {
-  mat-expansion-panel::ng-deep .mat-expansion-panel-header:not(.mat-expanded),
-  .input-item.standard-size {
-    &:hover,
-    &:focus {
-      background: var(--task-detail-bg-hover);
-    }
-  }
-}
-
-:host-context(.isNoTouchOnly.isDarkTheme) {
+// Hover state, for both themes: only while a mouse or pen is the active input, so
+// a tap on a row does not leave it tinted (`.isNoTouchOnly` only excluded pure
+// touch devices, and a phone's browser is never one).
+:host-context(.isMousePrimary) {
   mat-expansion-panel::ng-deep .mat-expansion-panel-header:not(.mat-expanded),
   .input-item.standard-size {
     &:hover,

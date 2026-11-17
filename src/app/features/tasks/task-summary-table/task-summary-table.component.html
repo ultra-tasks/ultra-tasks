@@ -1,4 +1,4 @@
-<div class="table-wrapper mat-elevation-z1">
+<div class="table-wrapper material-table">
   <table
     [dataSource]="flatTasks()"
     class="summary-table"
@@ -54,6 +54,7 @@
       <td
         *matCellDef="let task"
         mat-cell
+        [attr.data-label]="T.F.TASK.SUMMARY_TABLE.SPENT_TODAY | translate"
       >
         @if (!task.subTaskIds?.length) {
           <inline-input
@@ -95,6 +96,7 @@
       <td
         *matCellDef="let task"
         mat-cell
+        [attr.data-label]="T.F.TASK.SUMMARY_TABLE.ESTIMATE | translate"
       >
         {{ task.timeEstimate | msToClockString }}
       </td>

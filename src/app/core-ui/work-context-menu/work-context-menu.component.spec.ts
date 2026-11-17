@@ -18,6 +18,9 @@ import { DialogPromptComponent } from '../../ui/dialog-prompt/dialog-prompt.comp
 import { DateService } from '../../core/date/date.service';
 import { DialogProjectCompleteComponent } from '../../features/project/dialog-project-complete/dialog-project-complete.component';
 import { PlainspaceShareService } from '../../features/issue/providers/plainspace/plainspace-share.service';
+import { INBOX_PROJECT } from '../../features/project/project.const';
+import { TODAY_TAG } from '../../features/tag/tag.const';
+import { T } from '../../t.const';
 
 describe('WorkContextMenuComponent', () => {
   let component: WorkContextMenuComponent;
@@ -566,6 +569,129 @@ describe('WorkContextMenuComponent', () => {
     it('hides the action while no invite URL resolves (not shared, offline)', () => {
       fixture.detectChanges();
       expect(copyInviteButton()).toBeNull();
+    });
+  });
+  // The menu reads as five groups set apart by dividers: name and history, list
+  // actions, settings, project lifecycle, delete. A divider only renders where
+  // the group after it does, so none is left dangling under a short menu.
+  describe('rendered groups', () => {
+    // One word per row (its icon) and `|` for a divider.
+    const layout = (): string[] =>
+      Array.from<HTMLElement>(fixture.nativeElement.children).map((el) =>
+        el.tagName === 'MAT-DIVIDER'
+          ? '|'
+          : (el.querySelector('mat-icon')?.textContent?.trim() ?? el.tagName),
+      );
+
+    const setContext = (id: string, type: WorkContextType): void => {
+      component.contextId = id;
+      component.contextTypeSet = type;
+      mockProjectService.getByIdLive$.and.returnValue(
+        of({ id, isArchived: false } as any),
+      );
+    };
+
+    it('groups a project: name | list | settings | lifecycle | delete', () => {
+      setContext('project-123', WorkContextType.PROJECT);
+      fixture.detectChanges();
+
+      expect(layout()).toEqual([
+        'edit',
+        'history',
+        'bar_chart',
+        '|',
+        'playlist_add',
+        'content_copy',
+        'group_add',
+        '|',
+        'settings',
+        '|',
+        'check_circle',
+        'library_add',
+        '|',
+        'delete_forever',
+      ]);
+    });
+
+    it('has no lifecycle or delete group for the Inbox, so nothing dangles', () => {
+      setContext(INBOX_PROJECT.id, WorkContextType.PROJECT);
+      fixture.detectChanges();
+
+      expect(layout()).toEqual([
+        'history',
+        'bar_chart',
+        '|',
+        'playlist_add',
+        'content_copy',
+        '|',
+        'settings',
+      ]);
+    });
+
+    it('groups Today, which cannot be renamed or deleted', () => {
+      setContext(TODAY_TAG.id as string, WorkContextType.TAG);
+      fixture.detectChanges();
+
+      expect(layout()).toEqual([
+        'history',
+        'bar_chart',
+        '|',
+        'playlist_add',
+        'event_busy',
+        'content_copy',
+        '|',
+        'settings',
+      ]);
+    });
+
+    it('groups a tag, which has no metrics and no sections, with Delete last', () => {
+      setContext('tag-1', WorkContextType.TAG);
+      fixture.detectChanges();
+
+      expect(layout()).toEqual([
+        'edit',
+        'history',
+        '|',
+        'content_copy',
+        '|',
+        'settings',
+        '|',
+        'delete_forever',
+      ]);
+    });
+
+    it('says whose settings these are', () => {
+      setContext('project-123', WorkContextType.PROJECT);
+      fixture.detectChanges();
+      expect(menuButtonByIcon('settings')!.textContent).toContain(
+        T.MH.CONTEXT_MENU.PROJECT_SETTINGS,
+      );
+
+      setContext('tag-1', WorkContextType.TAG);
+      fixture = TestBed.createComponent(WorkContextMenuComponent);
+      component = fixture.componentInstance;
+      component.contextId = 'tag-1';
+      component.contextTypeSet = WorkContextType.TAG;
+      fixture.detectChanges();
+      expect(menuButtonByIcon('settings')!.textContent).toContain(
+        T.MH.CONTEXT_MENU.TAG_SETTINGS,
+      );
+    });
+
+    it('gives Delete the warn role and Duplicate its own glyph', () => {
+      setContext('project-123', WorkContextType.PROJECT);
+      fixture.detectChanges();
+
+      expect(menuButtonByIcon('delete_forever')!.classList).toContain(
+        'mat-menu-item-warn',
+      );
+      // the clipboard copy keeps `content_copy`; Duplicate must not share it
+      expect(menuButtonByIcon('library_add')!.textContent).toContain(
+        T.MH.DUPLICATE_PROJECT,
+      );
+      expect(menuButtonByIcon('content_copy')!.textContent).not.toContain(
+        T.MH.DUPLICATE_PROJECT,
+      );
     });
   });
 });

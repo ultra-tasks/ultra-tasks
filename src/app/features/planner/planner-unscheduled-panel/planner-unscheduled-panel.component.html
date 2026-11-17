@@ -8,7 +8,7 @@
     type="button"
     class="close-btn"
     [attr.aria-label]="T.G.CLOSE | translate"
-    (click)="panel.close()"
+    (click)="close()"
   >
     <mat-icon>close</mat-icon>
   </button>
@@ -61,19 +61,21 @@
   [cdkDropListEnterPredicate]="rejectIncoming"
 >
   @for (task of rows(); track task.id) {
+    <!-- The project, only for tasks outside the Inbox: the Inbox is the
+         default, and a label on every row would only crowd the titles. It sits
+         under the title so a long name can never squeeze the title narrow. -->
+    @let project =
+      activeFilter() === ALL && task.projectId && task.projectId !== inboxId
+        ? projectTitles().get(task.projectId)
+        : undefined;
     <div
       class="row"
       cdkDrag
       [cdkDragData]="task"
+      [cdkDragDisabled]="isSheet()"
+      [class.has-meta]="project || task.timeEstimate"
     >
       <span class="title">{{ task.title }}</span>
-      <!-- The project, only for tasks outside the Inbox: the Inbox is the
-           default, and a label on every row would only crowd the titles. It sits
-           under the title so a long name can never squeeze the title narrow. -->
-      @let project =
-        activeFilter() === ALL && task.projectId && task.projectId !== inboxId
-          ? projectTitles().get(task.projectId)
-          : undefined;
       @if (project || task.timeEstimate) {
         <span class="meta-line">
           @if (project) {
@@ -104,4 +106,6 @@
     {{ T.F.PLANNER.UNSCHEDULED_MORE | translate: { count: hiddenCount() } }}
   </p>
 }
-<p class="note hint">{{ T.F.PLANNER.UNSCHEDULED_HINT | translate }}</p>
+@if (!isSheet()) {
+  <p class="note hint">{{ T.F.PLANNER.UNSCHEDULED_HINT | translate }}</p>
+}

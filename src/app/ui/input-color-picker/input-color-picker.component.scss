@@ -92,3 +92,12 @@
   width: 0;
   height: 0;
 }
+
+// Touch: the trigger and every swatch are 40px targets (they were 36 and 32).
+@media (pointer: coarse) {
+  .color-trigger,
+  .color-swatch {
+    width: var(--ctl-md);
+    height: var(--ctl-md);
+  }
+}

@@ -56,7 +56,8 @@ import { TaskViewCustomizerService } from '../../task-view-customizer/task-view-
 import { TaskLog } from '../../../core/log';
 import { TaskExternalDragService } from '../task-external-drag.service';
 import { DEFAULT_OPTIONS, NO_TAG_GROUP_ID } from '../../task-view-customizer/types';
-import { dragDelayForTouch, isTouchActive } from '../../../util/input-intent';
+import { isTouchActive } from '../../../util/input-intent';
+import { DRAG_DELAY_FOR_TOUCH } from '../../../app.constants';
 import { performHapticFeedback } from '../../../util/haptic-feedback';
 import { DateService } from '../../../core/date/date.service';
 import { canConvertTaskToSubTask } from '../util/can-convert-task-to-sub-task';
@@ -132,7 +133,10 @@ export class TaskListComponent implements OnDestroy, AfterViewInit {
   private _ngZone = inject(NgZone);
   dropListService = inject(DropListService);
   private _layoutService = inject(LayoutService);
-  protected readonly dragDelayForTouch = dragDelayForTouch;
+  // A constant for the template's {touch, mouse} form: CDK picks the delay from the
+  // event's own type, so it cannot go stale when the input intent flips (and the
+  // rows no longer read a signal each).
+  protected readonly DRAG_DELAY_FOR_TOUCH = DRAG_DELAY_FOR_TOUCH;
   private readonly _taskMultiSelectService = inject(TaskMultiSelectService);
   protected readonly isTouchSelectionMode =
     this._taskMultiSelectService.isTouchSelectionMode;

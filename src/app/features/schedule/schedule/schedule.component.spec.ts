@@ -216,6 +216,22 @@ describe('ScheduleComponent', () => {
       expect(navigate).toHaveBeenCalledWith('/planner');
       panel.close();
     });
+
+    // A phone has no panel beside the days, so the action used to land on an
+    // Upcoming where nothing happened.
+    it('opens the unscheduled list as a sheet over this page on a phone', () => {
+      mockIsXs.set(true);
+      const navigate = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+      const panel = TestBed.inject(PlannerUnscheduledPanelService);
+      const openSheet = spyOn(panel, 'openSheet').and.resolveTo();
+      panel.close();
+
+      component.planUnscheduled();
+
+      expect(openSheet).toHaveBeenCalledTimes(1);
+      expect(navigate).not.toHaveBeenCalled();
+      expect(panel.isOpen()).toBeFalse();
+    });
   });
 
   describe('headerTitle computed', () => {
@@ -1653,10 +1669,9 @@ describe('ScheduleComponent', () => {
       expect(component.isMonthView()).toBe(false);
     });
 
-    it('renders the full single-date header when roomy', () => {
-      // Force the roomy (non-tablet) state so the full form is deterministic
-      // regardless of the test runner's window width.
-      component['_isTablet'] = signal(false);
+    it('renders the full single-date header whatever the window width', () => {
+      // The toolbar gives the title its own row on a narrow page, so it is never
+      // shortened to month and day (S1).
       mockScheduleService.getDaysToShow.and.returnValue(['2026-01-20']);
       mockLayoutService.selectedTimeView.set('day');
       fixture.detectChanges();
@@ -1664,13 +1679,26 @@ describe('ScheduleComponent', () => {
       expect(component.headerTitle()).toBe('Tue, Jan 20, 2026');
     });
 
-    it('compacts the day header to month and day when tight', () => {
-      component['_isTablet'] = signal(true);
-      mockScheduleService.getDaysToShow.and.returnValue(['2026-01-20']);
-      mockLayoutService.selectedTimeView.set('day');
+    it('uses the long week label and the date range, never the short "W17" form', () => {
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', {
+        F: { WORKLOG: { CMP: { WEEK_NR: 'Week {{nr}}', WEEK_NR_SHORT: 'W{{nr}}' } } },
+      });
+      translate.use('en');
+      mockLayoutService.selectedTimeView.set('week');
+      mockScheduleService.getDaysToShow.and.returnValue([
+        '2026-04-20',
+        '2026-04-21',
+        '2026-04-22',
+        '2026-04-23',
+        '2026-04-24',
+        '2026-04-25',
+        '2026-04-26',
+      ]);
+      component['_selectedDate'].set(new Date(2026, 3, 20));
       fixture.detectChanges();
-      // Compact form is month + day only (no weekday, no year).
-      expect(component.headerTitle()).toBe('Jan 20');
+      expect(component.headerTitle()).toMatch(/^Week 17 · .+ – .+$/);
+      expect(component.headerTitle()).not.toMatch(/^W17/);
     });
 
     it('exposes mutually exclusive view-mode flags', () => {

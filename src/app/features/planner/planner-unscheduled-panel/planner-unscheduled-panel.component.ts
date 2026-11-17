@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
 import { CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -27,12 +33,20 @@ export const UNSCHEDULED_MAX_ROWS = 100;
  * use its Schedule button (the keyboard and touch path). Sub-tasks, done tasks,
  * hidden integration tasks and the projects' backlogs are left out: a backlog is
  * already a deliberate "later" list.
+ *
+ * On a phone the same rows fill the bottom sheet (`isSheet`), where there are no
+ * day columns to drag onto: the Schedule button is the one way, and it stays
+ * visible.
  */
 @Component({
   selector: 'planner-unscheduled-panel',
   templateUrl: './planner-unscheduled-panel.component.html',
   styleUrl: './planner-unscheduled-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    '[class.is-sheet]': 'isSheet()',
+  },
   imports: [
     CdkDrag,
     CdkDropList,
@@ -50,6 +64,9 @@ export class PlannerUnscheduledPanelComponent {
   private readonly _store = inject(Store);
   private readonly _dialog = inject(MatDialog);
   protected readonly panel = inject(PlannerUnscheduledPanelService);
+
+  /** Filling the phone's bottom sheet rather than sitting beside the days. */
+  readonly isSheet = input(false);
 
   protected readonly T = T;
   protected readonly ALL = UNSCHEDULED_FILTER_ALL;
@@ -107,5 +124,13 @@ export class PlannerUnscheduledPanelComponent {
 
   protected openSchedule(task: Task): void {
     this._dialog.open(DialogScheduleTaskComponent, { data: { task } });
+  }
+
+  protected close(): void {
+    if (this.isSheet()) {
+      this.panel.closeSheet();
+    } else {
+      this.panel.close();
+    }
   }
 }

@@ -11,6 +11,7 @@ import { PluginBridgeService } from '../plugin-bridge.service';
       <button
         mat-icon-button
         [matTooltip]="button.label"
+        [attr.aria-label]="button.label"
         (click)="button.onClick()"
       >
         <mat-icon>{{ button.icon }}</mat-icon>

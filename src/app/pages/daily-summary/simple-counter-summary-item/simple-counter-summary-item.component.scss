@@ -1,3 +1,5 @@
+@use '../../../../styles/_globals.scss' as *;
+
 :host {
   margin: var(--s) var(--s2);
   cursor: pointer;
@@ -21,6 +23,77 @@
       margin-left: var(--s-half);
       //font-size: 16px;
       font-weight: bold;
+    }
+  }
+}
+
+// Phone: each habit is a chip in a wrapping row (icon, title, today's figure and,
+// when there is one, the streak as a calendar glyph and a number).
+@include mq(xs, max) {
+  :host {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-half);
+    min-width: 0;
+    min-height: var(--ctl-sm);
+    margin: 0;
+    padding: 0 var(--s2);
+    border: 1px solid var(--palette-border);
+    border-radius: var(--r-full);
+    background: var(--card-bg);
+    font: var(--type-body);
+
+    > mat-icon {
+      flex: none;
+      width: var(--icon-sm);
+      height: var(--icon-sm);
+      font-size: var(--icon-sm);
+      line-height: var(--icon-sm);
+      color: var(--text-color-muted);
+    }
+
+    .title {
+      min-width: 0;
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .value-wrapper {
+      flex: none;
+
+      mat-icon {
+        display: none;
+      }
+
+      .summary-val {
+        margin-left: 0;
+        font: var(--type-body-strong);
+      }
+
+      &.streak {
+        gap: var(--s-quarter);
+        color: var(--text-color-muted);
+
+        mat-icon {
+          display: inline-block;
+          width: var(--icon-sm);
+          height: var(--icon-sm);
+          font-size: var(--icon-sm);
+          line-height: var(--icon-sm);
+        }
+      }
+    }
+
+    // Kept for assistive tech ("5 consecutive days"), not drawn.
+    .streak-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 }

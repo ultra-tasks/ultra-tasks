@@ -38,10 +38,19 @@ export interface CalendarGestureCallbacks {
   /** False where not even `MIN_ROW_HEIGHT` rows fit, leaving nothing to expand into. */
   canExpand(): boolean;
   onExpandChanged(expanded: boolean): void;
+  /**
+   * A tap on the handle that never became a drag: the toggle. On touch this is
+   * the only path, because the handle's `touchend` is cancelled (it ends a drag)
+   * and a cancelled `touchend` yields no `click`.
+   */
+  onHandleTap(): void;
   onVerticalSwipe(isDown: boolean): void;
   onHorizontalSwipe(dir: 1 | -1): void;
   detectChanges(): void;
 }
+
+/** A `click` this soon after a handled touch tap is the same tap, not a second one. */
+const HANDLE_TAP_CLICK_GUARD_MS = 600;
 
 export class CalendarGestureHandler {
   private _touchStartY = 0;
@@ -52,6 +61,7 @@ export class CalendarGestureHandler {
   private _isDragging = false;
   private _isSnapping = false;
   private _touchActive = false;
+  private _lastHandleTapAt = Number.NEGATIVE_INFINITY;
   private _dragStartHeight = 0;
   private _dragActiveIdx = 0;
   /** Sampled once per drag: reading it per touchmove interleaves layout reads with writes. */
@@ -76,6 +86,15 @@ export class CalendarGestureHandler {
     this._el.removeEventListener('touchmove', this._onTouchMove);
     this._el.removeEventListener('touchend', this._onTouchEnd);
     this._el.removeEventListener('touchcancel', this._onTouchCancel);
+  }
+
+  /**
+   * True right after a touch tap on the handle was handled. The toggle's own
+   * `click` handler asks, so a `click` that still follows that tap (a browser
+   * that did not honour the cancelled `touchend`) does not toggle a second time.
+   */
+  wasHandleTapJustHandled(): boolean {
+    return Date.now() - this._lastHandleTapAt < HANDLE_TAP_CLICK_GUARD_MS;
   }
 
   snapTo(requestExpanded: boolean, activeIdx?: number): void {
@@ -285,6 +304,9 @@ export class CalendarGestureHandler {
           snapExpanded = currentHeight > (ROW_HEIGHT + expandedHeight) / 2;
         }
         this.snapTo(snapExpanded);
+      } else {
+        this._lastHandleTapAt = Date.now();
+        this._cb.onHandleTap();
       }
       return;
     }

@@ -1,4 +1,6 @@
-@media (min-width: var(--layout-xs)) {
+@use '../../../../styles/_globals.scss' as *;
+
+@include mq(xs) {
   .row {
     display: flex;
   }
@@ -9,7 +11,7 @@
 
 #task-textarea {
   width: 100%;
-  @media (min-width: var(--layout-xs)) {
+  @include mq(xs) {
     min-width: 70vw;
   }
 }

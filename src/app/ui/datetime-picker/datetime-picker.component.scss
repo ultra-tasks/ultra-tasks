@@ -63,6 +63,13 @@
       // than that (360–390px phones). Cap the width; min-height still reserves
       // the 6-row height on its own.
       max-width: 100%;
+
+      // Touch: seven 40px days. In a 307px dialog (a 320px phone) the calendar
+      // takes the few pixels it lacks from the dialog's gutter (the shared
+      // calendar rules in _overwrite-material.scss) instead of shrinking the days.
+      @media (pointer: coarse) {
+        max-width: max(100%, calc(7 * var(--ctl-md)));
+      }
     }
 
     .mat-calendar-header {

@@ -1,0 +1,239 @@
+<div
+  class="sheet"
+  role="group"
+  [attr.aria-label]="T.MH.SORT_GROUP_FILTER | translate"
+>
+  <header class="sheet-header">
+    @if (view() !== 'root') {
+      <button
+        mat-icon-button
+        type="button"
+        class="sheet-back"
+        [attr.aria-label]="T.G.BACK | translate"
+        (click)="back()"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    }
+    <h2 class="sheet-title">{{ title() | translate }}</h2>
+    @if (view() === 'root') {
+      <button
+        type="button"
+        class="sheet-reset"
+        [disabled]="!customizerService.isCustomized()"
+        (click)="resetAll()"
+      >
+        {{ T.F.TASK_VIEW.CUSTOMIZER.RESET_ALL | translate }}
+      </button>
+    }
+  </header>
+
+  @switch (view()) {
+    @case ('root') {
+      <!-- The three choices and what each is set to. -->
+      <button
+        type="button"
+        class="sheet-row"
+        (click)="go('sort')"
+      >
+        <mat-icon>sort</mat-icon>
+        <span class="sheet-label">{{ T.F.TASK_VIEW.CUSTOMIZER.SORT | translate }}</span>
+        @if (customizerService.selectedSort(); as sort) {
+          @if (sort.type) {
+            <span class="sheet-value">
+              {{ sort.label | translate }}
+              <mat-icon class="sheet-value-icon">{{
+                sort.order === SORT_ORDER.ASC ? 'arrow_downward' : 'arrow_upward'
+              }}</mat-icon>
+            </span>
+          }
+        }
+        <mat-icon class="sheet-chevron">chevron_right</mat-icon>
+      </button>
+
+      <button
+        type="button"
+        class="sheet-row"
+        (click)="go('group')"
+      >
+        <mat-icon>view_agenda</mat-icon>
+        <span class="sheet-label">{{
+          T.F.TASK_VIEW.CUSTOMIZER.GROUP_BY | translate
+        }}</span>
+        @if (customizerService.selectedGroup().type) {
+          <span class="sheet-value">{{
+            customizerService.selectedGroup().label | translate
+          }}</span>
+        }
+        <mat-icon class="sheet-chevron">chevron_right</mat-icon>
+      </button>
+
+      <button
+        type="button"
+        class="sheet-row"
+        (click)="go('filter')"
+      >
+        <mat-icon>filter_alt</mat-icon>
+        <span class="sheet-label">{{
+          T.F.TASK_VIEW.CUSTOMIZER.FILTER_BY | translate
+        }}</span>
+        @if (customizerService.selectedFilter().type) {
+          <span class="sheet-value">
+            {{ customizerService.selectedFilter().label | translate }}
+            @if (filterValueKey(); as key) {
+              · {{ key | translate }}
+            } @else if (filterValueText(); as text) {
+              · {{ text }}
+            }
+          </span>
+        }
+        <mat-icon class="sheet-chevron">chevron_right</mat-icon>
+      </button>
+    }
+
+    @case ('sort') {
+      <div
+        class="sheet-list"
+        role="radiogroup"
+        [attr.aria-label]="T.F.TASK_VIEW.CUSTOMIZER.SORT | translate"
+      >
+        @for (option of OPTIONS.sort.list; track option.label) {
+          <button
+            type="button"
+            class="sheet-row"
+            role="radio"
+            [class.is-selected]="customizerService.selectedSort().type === option.type"
+            [attr.aria-checked]="customizerService.selectedSort().type === option.type"
+            (click)="setSort(option)"
+          >
+            <span class="sheet-label">{{ option.label | translate }}</span>
+            @if (customizerService.selectedSort().type === option.type) {
+              @if (option.type) {
+                <!-- Choosing the chosen one again flips the direction. -->
+                <span class="sheet-value">
+                  {{
+                    (customizerService.selectedSort().order === SORT_ORDER.ASC
+                      ? T.F.BOARDS.FORM.SORT_DIR_ASC
+                      : T.F.BOARDS.FORM.SORT_DIR_DESC
+                    ) | translate
+                  }}
+                  <mat-icon class="sheet-value-icon">{{
+                    customizerService.selectedSort().order === SORT_ORDER.ASC
+                      ? 'arrow_downward'
+                      : 'arrow_upward'
+                  }}</mat-icon>
+                </span>
+              } @else {
+                <mat-icon class="sheet-check">check</mat-icon>
+              }
+            }
+          </button>
+        }
+      </div>
+      <button
+        type="button"
+        class="sheet-row sheet-row--action"
+        [disabled]="customizerService.selectedSort().type === DEFAULT.sort.type"
+        (click)="saveSort()"
+      >
+        <mat-icon>save</mat-icon>
+        <span class="sheet-label">{{
+          T.F.TASK_VIEW.CUSTOMIZER.SAVE_SORT | translate
+        }}</span>
+      </button>
+    }
+
+    @case ('group') {
+      <div
+        class="sheet-list"
+        role="radiogroup"
+        [attr.aria-label]="T.F.TASK_VIEW.CUSTOMIZER.GROUP_BY | translate"
+      >
+        @for (option of customizerService.availableGroupOptions(); track option.label) {
+          <button
+            type="button"
+            class="sheet-row"
+            role="radio"
+            [class.is-selected]="customizerService.selectedGroup().type === option.type"
+            [attr.aria-checked]="customizerService.selectedGroup().type === option.type"
+            (click)="setGroup(option)"
+          >
+            <span class="sheet-label">{{ option.label | translate }}</span>
+            @if (customizerService.selectedGroup().type === option.type) {
+              <mat-icon class="sheet-check">check</mat-icon>
+            }
+          </button>
+        }
+      </div>
+    }
+
+    @case ('filter') {
+      <!-- Step one: which property to filter by. -->
+      <div
+        class="sheet-list"
+        role="radiogroup"
+        [attr.aria-label]="T.F.TASK_VIEW.CUSTOMIZER.FILTER_BY | translate"
+      >
+        @for (kind of OPTIONS.filter.list; track kind.label) {
+          <button
+            type="button"
+            class="sheet-row"
+            role="radio"
+            [class.is-selected]="customizerService.selectedFilter().type === kind.type"
+            [attr.aria-checked]="customizerService.selectedFilter().type === kind.type"
+            (click)="chooseFilterKind(kind)"
+          >
+            <span class="sheet-label">{{ kind.label | translate }}</span>
+            @if (kind.type) {
+              <mat-icon class="sheet-chevron">chevron_right</mat-icon>
+            } @else if (!customizerService.selectedFilter().type) {
+              <mat-icon class="sheet-check">check</mat-icon>
+            }
+          </button>
+        }
+      </div>
+    }
+
+    @case ('filter-values') {
+      <!-- Step two: the value. A typed filter keeps its field at the top of the
+           list, where the keyboard cannot hide it, and applies as you type. -->
+      @if (isTextFilter()) {
+        <mat-form-field
+          class="sheet-field"
+          subscriptSizing="dynamic"
+        >
+          <input
+            matInput
+            type="text"
+            autocomplete="off"
+            [ngModel]="filterText()"
+            (ngModelChange)="onFilterTextChange($event)"
+            [placeholder]="textFilterPlaceholder() | translate"
+            [attr.aria-label]="textFilterPlaceholder() | translate"
+          />
+        </mat-form-field>
+      }
+      <div
+        class="sheet-list"
+        role="radiogroup"
+        [attr.aria-label]="title() | translate"
+      >
+        @for (preset of activePresets(); track preset.label) {
+          <button
+            type="button"
+            class="sheet-row"
+            role="radio"
+            [class.is-selected]="isFilterPresetSelected(preset)"
+            [attr.aria-checked]="isFilterPresetSelected(preset)"
+            (click)="chooseFilterPreset(preset)"
+          >
+            <span class="sheet-label">{{ preset.label | translate }}</span>
+            @if (isFilterPresetSelected(preset)) {
+              <mat-icon class="sheet-check">check</mat-icon>
+            }
+          </button>
+        }
+      </div>
+    }
+  }
+</div>

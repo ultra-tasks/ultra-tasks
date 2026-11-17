@@ -8,6 +8,7 @@ import { T } from '../../../t.const';
 import { Task } from '../../../features/tasks/task.model';
 import { WorkContext } from '../../../features/work-context/work-context.model';
 import { NavigateToTaskService } from '../../navigate-to-task/navigate-to-task.service';
+import { LayoutService } from '../../layout/layout.service';
 
 /**
  * The pill naming the tracked task.
@@ -47,6 +48,7 @@ import { NavigateToTaskService } from '../../navigate-to-task/navigate-to-task.s
         @fade
         type="button"
         class="current-task-title"
+        [class.is-phone-chip]="isXs()"
         (click)="navigateToTask(task.id)"
         [attr.aria-label]="T.MH.SHOW_TRACKED_TASK | translate"
         matTooltip="{{ T.MH.SHOW_TRACKED_TASK | translate }}"
@@ -182,17 +184,41 @@ import { NavigateToTaskService } from '../../navigate-to-task/navigate-to-task.s
           pointer-events: none;
         }
 
-        /* Below the XS breakpoint the bottom nav owns the actions and the play
-           button is the tracked-task affordance. A product decision rather than
-           a fit one, so it stays a media query.
+        /* Below the XS breakpoint (the layout's isXs, bound as a class because
+           inline styles get no Sass mq()) the row has no leftover to hold the
+           pill: the title floor and the actions fill it. It used to be hidden
+           there, so on any page but the task's own nothing said which task was
+           running and nothing jumped to it. It is a chip now: one line, hung
+           under the header band at the row's end (main-header lays the slot out
+           there), the project chip dropped and the tuck under Play given up.
 
-           599px, not 600px: LayoutService.isXs is max-width 599px and the
-           vertical rail starts at min-width 600px, so a 600px window is
-           desktop everywhere else. Written out because this block is inline
-           styles in a .ts and so gets no Sass -- mq(xs, max) is the same
-           number. */
-        @media (max-width: 599px) {
-          display: none;
+           A tap navigates, as the pill always did. */
+        &.is-phone-chip {
+          --tracked-pill-tuck: 0px;
+          position: relative;
+          inset: auto;
+          transform: none;
+          width: fit-content;
+          max-width: 60%;
+          margin-inline-start: auto;
+          padding: var(--s-quarter) var(--s);
+          border-radius: var(--r-full);
+          box-shadow: var(--elev-1);
+          font: var(--type-meta);
+          /* The slot passes taps through to the page; the chip takes its own. */
+          pointer-events: auto;
+
+          /* 32px of chip, 40px of hit area: the same touch floor as the rest. */
+          &::before {
+            content: '';
+            position: absolute;
+            inset-block: calc(-1 * var(--s-half));
+            inset-inline: 0;
+          }
+
+          .project {
+            display: none;
+          }
         }
 
         /* No width of its own: it takes what the pill has after the chip, and
@@ -234,6 +260,7 @@ export class TrackedTaskPillComponent {
   private readonly _navigateToTaskService = inject(NavigateToTaskService);
 
   readonly T = T;
+  readonly isXs = inject(LayoutService).isXs;
 
   readonly currentTask = input<Task | null>();
   readonly currentTaskContext = input<WorkContext | null>();

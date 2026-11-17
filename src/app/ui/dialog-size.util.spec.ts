@@ -1,6 +1,11 @@
 import { Injector, runInInjectionContext } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
-import { dialogSize, useDialogSize } from './dialog-size.util';
+import {
+  dialogSize,
+  dialogWindowHeight,
+  useDialogSize,
+  viewportHeight,
+} from './dialog-size.util';
 
 describe('dialogSize', () => {
   it('should map each size to its panel class', () => {
@@ -34,5 +39,36 @@ describe('useDialogSize', () => {
   it('should do nothing outside a dialog or with a ref that cannot take classes', () => {
     expect(() => run(undefined)).not.toThrow();
     expect(() => run({})).not.toThrow();
+  });
+});
+
+describe('viewportHeight', () => {
+  it('uses dvh where the browser knows it', () => {
+    spyOn(CSS, 'supports').and.returnValue(true);
+    expect(viewportHeight(86)).toBe('86dvh');
+  });
+
+  it('falls back to vh in a WebView older than Chrome 108', () => {
+    spyOn(CSS, 'supports').and.returnValue(false);
+    expect(viewportHeight(86)).toBe('86vh');
+  });
+
+  it('asks for the unit it may return', () => {
+    const supports = spyOn(CSS, 'supports').and.returnValue(true);
+    viewportHeight(10);
+    // `CSS.supports` has two overloads; the spy is typed after the one-argument form.
+    expect(supports.calls.mostRecent().args as unknown[]).toEqual(['height', '1dvh']);
+  });
+});
+
+describe('dialogWindowHeight', () => {
+  it('is 86% of the viewport, 96% at most', () => {
+    spyOn(CSS, 'supports').and.returnValue(true);
+    expect(dialogWindowHeight()).toEqual({ height: '86dvh', maxHeight: '96dvh' });
+  });
+
+  it('keeps both in vh when dvh is unknown', () => {
+    spyOn(CSS, 'supports').and.returnValue(false);
+    expect(dialogWindowHeight()).toEqual({ height: '86vh', maxHeight: '96vh' });
   });
 });

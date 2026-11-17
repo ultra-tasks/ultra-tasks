@@ -14,10 +14,13 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { MatIcon } from '@angular/material/icon';
+import { TranslatePipe } from '@ngx-translate/core';
 import { DEFAULT_FIRST_DAY_OF_WEEK } from '../../../core/locale.constants';
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
 import { GlobalConfigService } from '../../config/global-config.service';
 import { GlobalTrackingIntervalService } from '../../../core/global-tracking-interval/global-tracking-interval.service';
+import { T } from '../../../t.const';
 import { getWeekRange } from '../../../util/get-week-range';
 import { getWeekdaysMin } from '../../../util/get-weekdays-min';
 import { getDbDateStr } from '../../../util/get-db-date-str';
@@ -30,8 +33,11 @@ import {
   WEEKS_SHOWN,
 } from './planner-calendar-gesture-handler';
 
-/** The collapse handle, which sits below the week rows and must stay tappable. */
-export const HANDLE_HEIGHT = 28;
+/**
+ * The expand toggle below the week rows: one 48px touch row (`--ctl-lg`), which
+ * must stay tappable, so the room measurement reserves all of it.
+ */
+export const HANDLE_HEIGHT = 48;
 /** One task row of the plan list must stay visible behind an expanded calendar. */
 const MIN_PLAN_VIEW_HEIGHT = 40;
 
@@ -48,6 +54,7 @@ interface CalendarDay {
   templateUrl: './planner-calendar-nav.component.html',
   styleUrl: './planner-calendar-nav.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatIcon, TranslatePipe],
 })
 export class PlannerCalendarNavComponent {
   private _globalConfigService = inject(GlobalConfigService);
@@ -59,6 +66,8 @@ export class PlannerCalendarNavComponent {
   private _gesture!: CalendarGestureHandler;
   private _resizeObserver?: ResizeObserver;
 
+  protected readonly T = T;
+
   private _firstDayOfWeek = computed(() => {
     const cfg = this._globalConfigService.localization()?.firstDayOfWeek;
     return cfg !== null && cfg !== undefined ? cfg : DEFAULT_FIRST_DAY_OF_WEEK;
@@ -66,7 +75,10 @@ export class PlannerCalendarNavComponent {
 
   visibleDayDate = input<string | null>(null);
   daysWithTasks = input<ReadonlySet<string>>(new Set());
+  /** Offers the Unscheduled chip, which opens the list of tasks without a day. */
+  showUnscheduled = input(false);
   dayTapped = output<string>();
+  unscheduledTapped = output<void>();
 
   isExpanded = signal(false);
   /**
@@ -238,10 +250,24 @@ export class PlannerCalendarNavComponent {
     // sentinel, so the name isn't shown in Swedish either. #8987 follow-up.
     const locale = this._dateTimeFormatService.textLocale();
     const allWeeks = this.weeks();
-    const weekIdx = this.isExpanded()
-      ? Math.floor(allWeeks.length / 2)
-      : this.activeWeekIndex();
-    const week = allWeeks[weekIdx];
+    // Expanded, the window is named by the dates it spans. A month name would be
+    // wrong for one of its two kinds: the window that opens on today's week
+    // starts in the current month but its middle week can sit in the next one
+    // ("December" over a row starting 9 Nov), while a window anchored on the
+    // week of the 1st can start in the previous month ("November" over a window
+    // that is mostly December). A range is right for both.
+    if (this.isExpanded()) {
+      const first = allWeeks[0]?.[0];
+      const last = allWeeks[allWeeks.length - 1]?.at(-1);
+      if (first && last) {
+        return new Intl.DateTimeFormat(locale, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }).formatRange(parseDbDateStr(first.dateStr), parseDbDateStr(last.dateStr));
+      }
+    }
+    const week = allWeeks[this.activeWeekIndex()];
     if (week?.length > 0) {
       const date = parseDbDateStr(week[Math.floor(week.length / 2)].dateStr);
       return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
@@ -256,6 +282,21 @@ export class PlannerCalendarNavComponent {
 
   onDayTap(dateStr: string): void {
     this.dayTapped.emit(dateStr);
+  }
+
+  /**
+   * The toggle's `click`: a mouse, the keyboard or assistive tech. A touch tap
+   * never gets here: the handle's `touchend` is cancelled for its drag, so the
+   * gesture handler reports that tap through `onHandleTap` instead.
+   */
+  onHandleClick(): void {
+    if (this._gesture.wasHandleTapJustHandled()) return;
+    this._toggleExpanded();
+  }
+
+  private _toggleExpanded(): void {
+    // Collapsing keeps the strip on the week that is showing.
+    this._gesture.snapTo(!this.isExpanded(), this.activeWeekIndex());
   }
 
   constructor() {
@@ -294,6 +335,7 @@ export class PlannerCalendarNavComponent {
         getRowHeight: () => this.rowHeight(),
         canExpand: () => this.canExpand(),
         onExpandChanged: (expanded) => this.isExpanded.set(expanded),
+        onHandleTap: () => this._toggleExpanded(),
         onVerticalSwipe: (isDown) => this._handleVerticalSwipe(isDown),
         onHorizontalSwipe: (dir) => this._handleHorizontalSwipe(dir),
         detectChanges: () => this._cdr.detectChanges(),
@@ -309,15 +351,23 @@ export class PlannerCalendarNavComponent {
 
   // Observes the box the measurement is taken against, rather than the window:
   // the route content also shrinks when a banner appears above it (`<banner>`
-  // sits above `.route-wrapper`), which fires no resize event. It cannot see the
-  // rows' own top move, which is why the gesture handler re-measures too.
+  // sits above `.route-wrapper`), which fires no resize event. The strip is
+  // observed too, because its month label wrapping moves the rows' top without
+  // resizing the container; the gesture handler re-measures before it acts as
+  // well.
+  //
+  // No measurement is taken here: the observer's own first callback is the first
+  // one. It is delivered after the frame's layout, so the offsets read in it come
+  // for free, whereas reading `offsetTop` straight from `afterNextRender` forced a
+  // synchronous layout of the whole document while the page being left (Today,
+  // 291 rows) was still in it: 390-615ms at 4x CPU on Today to Upcoming (PF5).
   private _observeAvailableForRows(): void {
     const container = this._parentEl();
-    this._measureAvailableForRows();
     if (!container || this._resizeObserver) return;
 
     this._resizeObserver = new ResizeObserver(() => this._measureAvailableForRows());
     this._resizeObserver.observe(container);
+    this._resizeObserver.observe(this._elRef.nativeElement);
     this._destroyRef.onDestroy(() => this._resizeObserver?.disconnect());
   }
 

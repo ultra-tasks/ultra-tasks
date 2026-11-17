@@ -238,6 +238,39 @@
     </style>
   </head>
   <body class="mat-typography ultra-tasks">
+    <script>
+      // Icon font. styles.css declares it with `font-display: block`, and a browser
+      // fetches a font only once something that uses it is laid out, i.e. after
+      // Angular has rendered the shell: every icon is a blank slot until then
+      // (0.1-0.45s on a mid-range phone). Request the font as soon as the face is
+      // declared instead. A <link rel="preload"> cannot do this: the stylesheet's
+      // font URL carries a content hash in production builds, and a preload of any
+      // other URL would download the 467KB file twice. ES5 only, like the check below.
+      (function () {
+        var FONT = '24px "Material Symbols Outlined"';
+        if (!document.fonts || !document.fonts.load) {
+          return;
+        }
+        var started = false;
+        function onFont(faces) {
+          started = faces.length > 0;
+        }
+        function ignore() {}
+        function startFont() {
+          if (!started) {
+            document.fonts.load(FONT).then(onFont, ignore);
+          }
+        }
+        startFont();
+        // The stylesheet may still be loading (production builds load it
+        // asynchronously): try again as each one arrives.
+        var links = document.querySelectorAll('link[rel="stylesheet"]');
+        for (var i = 0; i < links.length; i++) {
+          links[i].addEventListener('load', startFont);
+        }
+        document.addEventListener('DOMContentLoaded', startFont);
+      })();
+    </script>
     <app-root>
       <div class="loading-full-page-wrapper">
         <div class="app-loading">

@@ -1,15 +1,23 @@
 <div class="setting-row">
-  <label class="st-glass-setting setting-control">
-    <input
-      #glassToggle
-      type="checkbox"
-      [checked]="appearance.glassEnabled()"
-      (change)="appearance.setGlass(glassToggle.checked)"
-    />
-    <span
-      ><strong>{{ T.F.ULTRA_TASKS.GLASS | translate }}</strong></span
-    >
-  </label>
+  <div class="setting-control">
+    <!-- One boolean control: a toggle in a field-height box, like every other
+         toggle row of Settings. The hidden input only gives the box something to focus. -->
+    <mat-form-field class="st-glass-setting">
+      <mat-slide-toggle
+        color="primary"
+        [checked]="appearance.glassEnabled()"
+        (change)="appearance.setGlass($event.checked)"
+        >{{ T.F.ULTRA_TASKS.GLASS | translate }}</mat-slide-toggle
+      >
+      <input
+        aria-hidden="true"
+        matInput
+        tabindex="-1"
+        readonly
+        class="toggle-field-input"
+      />
+    </mat-form-field>
+  </div>
   <setting-help
     [label]="T.F.ULTRA_TASKS.GLASS | translate"
     [text]="glassHint | translate"

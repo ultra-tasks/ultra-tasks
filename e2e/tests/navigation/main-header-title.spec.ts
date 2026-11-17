@@ -305,7 +305,8 @@ test.describe('main header title and action row', () => {
   test('scrolls the action row with a plain wheel', async ({ page, workViewPage }) => {
     await workViewPage.waitForTaskList();
     await createHeaderCounters(page, ['Counter one', 'Counter two']);
-    await page.setViewportSize({ width: 700, height: 860 });
+    // The narrowest window that still has a side panel (below 960px it is a sheet).
+    await page.setViewportSize({ width: 960, height: 860 });
     await openNotesPanel(page);
 
     const scroller = page.locator('.action-nav-scroll');

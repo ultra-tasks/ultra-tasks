@@ -6,7 +6,7 @@ import {
   MatDialogState,
 } from '@angular/material/dialog';
 import { DialogFullscreenMarkdownComponent } from './dialog-fullscreen-markdown.component';
-import { dialogSize } from '../dialog-size.util';
+import { dialogSize, dialogWindowHeight } from '../dialog-size.util';
 
 type FullscreenMarkdownData = {
   content: string;
@@ -57,8 +57,7 @@ export const openFullscreenMarkdownDialog = (
       ...(data.taskId
         ? {
             ...dialogSize('window'),
-            height: '86dvh',
-            maxHeight: '96dvh',
+            ...dialogWindowHeight(),
             backdropClass: 'settings-backdrop',
             restoreFocus: true,
             autoFocus: false,

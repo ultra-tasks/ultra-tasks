@@ -4,7 +4,10 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslateModule } from '@ngx-translate/core';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { ArchivedProjectsPageComponent } from './archived-projects-page.component';
+import {
+  ARCHIVED_SEARCH_MIN_PROJECTS,
+  ArchivedProjectsPageComponent,
+} from './archived-projects-page.component';
 import { ProjectService } from '../../features/project/project.service';
 import { Project } from '../../features/project/project.model';
 import { selectArchivedProjectsSortedByTitle } from '../../features/project/store/project.selectors';
@@ -62,19 +65,66 @@ describe('ArchivedProjectsPageComponent', () => {
     expect(rows[1].nativeElement.textContent).toContain('Beta');
   });
 
+  const manyProjects = (): Project[] => [
+    ...['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta'].map((title, i) =>
+      makeProject(`p-${i}`, title),
+    ),
+  ];
+
   it('filters rows by the search term (case-insensitive substring)', async () => {
-    await setUp([
-      makeProject('p-a', 'Alpha'),
-      makeProject('p-b', 'Beta'),
-      makeProject('p-c', 'Gamma'),
-    ]);
+    await setUp(manyProjects());
 
     component.searchTerm.set('ET');
     fixture.detectChanges();
 
     const rows = fixture.debugElement.queryAll(By.css('.project-row'));
-    expect(rows.length).toBe(1);
-    expect(rows[0].nativeElement.textContent).toContain('Beta');
+    expect(
+      rows.map((r) => r.query(By.css('.project-title')).nativeElement.textContent.trim()),
+    ).toEqual(['Beta', 'Zeta', 'Eta']);
+  });
+
+  it('shows no search field when there is nothing, or little, to search', async () => {
+    await setUp([]);
+    expect(fixture.debugElement.query(By.css('.search-header'))).toBeNull();
+  });
+
+  it('shows no search field up to the threshold, and one above it', async () => {
+    await setUp(manyProjects().slice(0, ARCHIVED_SEARCH_MIN_PROJECTS));
+    expect(component.showSearch()).toBeFalse();
+    expect(fixture.debugElement.query(By.css('.search-header'))).toBeNull();
+  });
+
+  it('shows the search field once the list is longer than the threshold', async () => {
+    await setUp(manyProjects());
+    expect(manyProjects().length).toBeGreaterThan(ARCHIVED_SEARCH_MIN_PROJECTS);
+    expect(component.showSearch()).toBeTrue();
+    expect(fixture.debugElement.query(By.css('.search-header'))).not.toBeNull();
+  });
+
+  it('ignores a leftover term when the list has no search field', async () => {
+    await setUp(manyProjects().slice(0, 3));
+    component.searchTerm.set('zzz');
+    fixture.detectChanges();
+    expect(fixture.debugElement.queryAll(By.css('.project-row')).length).toBe(3);
+  });
+
+  it('offers a Restore text button on a phone and the icon button elsewhere', async () => {
+    await setUp([makeProject('p-a', 'Alpha')]);
+    const iconBtn = fixture.debugElement.query(By.css('.project-row button.hide-xs'));
+    const textBtn = fixture.debugElement.query(
+      By.css('.project-row button.show-xs-only'),
+    );
+    expect(iconBtn).not.toBeNull();
+    expect(textBtn).not.toBeNull();
+    expect(textBtn.nativeElement.textContent.trim()).toBe(
+      'F.PROJECT.ARCHIVED_PROJECTS.RESTORE',
+    );
+    // the visible word is part of the accessible name
+    expect(textBtn.nativeElement.getAttribute('aria-label')).toBe(
+      'F.PROJECT.ARCHIVED_PROJECTS.UNARCHIVE',
+    );
+    textBtn.nativeElement.click();
+    expect(projectService.unarchive).toHaveBeenCalledWith('p-a');
   });
 
   it('links each row to /project/<id>/tasks', async () => {

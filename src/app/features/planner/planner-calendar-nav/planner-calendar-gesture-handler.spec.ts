@@ -60,6 +60,7 @@ const createMockCallbacks = (): jasmine.SpyObj<CalendarGestureCallbacks> =>
     'getRowHeight',
     'canExpand',
     'onExpandChanged',
+    'onHandleTap',
     'onVerticalSwipe',
     'onHorizontalSwipe',
     'detectChanges',
@@ -506,6 +507,55 @@ describe('CalendarGestureHandler', () => {
       handleEl.dispatchEvent(moveEvent);
 
       expect(moveEvent.preventDefault).toHaveBeenCalled();
+    });
+
+    // A cancelled touchend yields no click, so a tap on the handle (the expand
+    // toggle) can only reach the component through this callback.
+    describe('tap on the handle', () => {
+      it('should report a tap that never became a drag, and cancel its click', () => {
+        handleEl.dispatchEvent(makeTouchEvent('touchstart', 100, 100));
+        const endEvent = makeTouchEvent('touchend', 100, 100);
+        spyOn(endEvent, 'preventDefault');
+        handleEl.dispatchEvent(endEvent);
+
+        expect(cb.onHandleTap).toHaveBeenCalledTimes(1);
+        expect(endEvent.preventDefault).toHaveBeenCalled();
+      });
+
+      it('should still call it for a finger that wobbled under the drag threshold', () => {
+        handleEl.dispatchEvent(makeTouchEvent('touchstart', 100, 100));
+        handleEl.dispatchEvent(makeTouchEvent('touchmove', 100, 103));
+        handleEl.dispatchEvent(makeTouchEvent('touchend', 100, 103));
+
+        expect(cb.onHandleTap).toHaveBeenCalledTimes(1);
+        expect(cb.onExpandChanged).not.toHaveBeenCalled();
+      });
+
+      it('should not call it for a drag', () => {
+        handleEl.dispatchEvent(makeTouchEvent('touchstart', 100, 100));
+        handleEl.dispatchEvent(makeTouchEvent('touchmove', 100, 180));
+        handleEl.dispatchEvent(makeTouchEvent('touchend', 100, 180));
+
+        expect(cb.onHandleTap).not.toHaveBeenCalled();
+      });
+
+      it('should not call it for a tap elsewhere in the strip', () => {
+        el.dispatchEvent(makeTouchEvent('touchstart', 100, 100));
+        el.dispatchEvent(makeTouchEvent('touchend', 100, 100));
+
+        expect(cb.onHandleTap).not.toHaveBeenCalled();
+      });
+
+      it('should let the toggle ignore a click that follows the tap, then take clicks again', () => {
+        expect(handler.wasHandleTapJustHandled()).toBe(false);
+
+        handleEl.dispatchEvent(makeTouchEvent('touchstart', 100, 100));
+        handleEl.dispatchEvent(makeTouchEvent('touchend', 100, 100));
+        expect(handler.wasHandleTapJustHandled()).toBe(true);
+
+        jasmine.clock().tick(1000);
+        expect(handler.wasHandleTapJustHandled()).toBe(false);
+      });
     });
 
     it('should not throw on non-cancelable touchmove', () => {

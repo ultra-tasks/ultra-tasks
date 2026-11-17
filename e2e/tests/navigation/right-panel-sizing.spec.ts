@@ -11,6 +11,10 @@ import type { Page } from '@playwright/test';
  * under the panel's own `MIN_WIDTH`. So a window narrowed with the panel open
  * left it holding ~270px of a ~460px row and the header with ~190px — enough to
  * push every header action, overflow trigger included, out of reach (#9480).
+ *
+ * Below 960px (the compact shell) the panel is a bottom sheet and takes no width
+ * from the row at all, so 960px is the narrowest window that still has a side
+ * column; the widths under it check that the column gives its whole row back.
  */
 const measure = async (
   page: Page,
@@ -38,7 +42,7 @@ test.describe('right panel sizing', () => {
     await expect(page.locator('right-panel.isOpen')).toBeVisible();
     await expect(page.locator('right-panel.isPanelAnimating')).toHaveCount(0);
 
-    for (const width of [900, 800, 720, 650]) {
+    for (const width of [1000, 960, 900, 650]) {
       await page.setViewportSize({ width, height: 860 });
       await expect(async () => {
         const m = await measure(page);

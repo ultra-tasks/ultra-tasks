@@ -3,6 +3,7 @@ import { expect, test } from '../../fixtures/test.fixture';
 import { cssSelectors } from '../../constants/selectors';
 import { type TaskPage } from '../../pages/task.page';
 import { type WorkViewPage } from '../../pages/work-view.page';
+import { expandTaskNotes } from '../../utils/task-notes';
 
 const { DETAIL_PANEL, DETAIL_PANEL_BTN } = cssSelectors;
 
@@ -31,6 +32,8 @@ const selectTask = async (page: Page, task: Locator, title: string): Promise<voi
 };
 
 const replaceNote = async (page: Page, text: string): Promise<void> => {
+  // A task without notes opens with the Description row folded.
+  await expandTaskNotes(page);
   const editor = notesEditor(page);
   await editor.waitFor({ state: 'visible' });
   await editor.click();

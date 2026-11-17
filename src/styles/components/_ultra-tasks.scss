@@ -131,6 +131,30 @@ body.ultra-tasks {
   task .time-wrapper {
     font-variant-numeric: tabular-nums;
   }
+  // Long lists: rows off the screen skip layout and paint (`auto` renders the rows
+  // near the screen and remembers what it measured). A row that has not been
+  // rendered yet holds a typical one, not a guess: the box a one-line row has
+  // (a title line, the title's 8px of chrome, a 4px gap, a 16px meta line and 8px
+  // of padding is 56px, 60px on touch) less its border, which the intrinsic size
+  // does not include, so the scroll height moves little when real heights replace
+  // it. Not while the row is animating: the list's enter animation starts every
+  // new row at `height: 0`, and a row skipped in that state would remember a
+  // 2px box for good (a 79-row list measured 45 of them, and the scroll range
+  // fell from 6.7k to 4.3k px until each row had been on screen once). Only the
+  // list's own rows: a subtask lives inside its parent, which is skipped whole.
+  // The block sits in @supports because an engine that knows `content-visibility`
+  // but not `contain-intrinsic-size: auto` would collapse a skipped row to
+  // nothing, and a `var()` value cannot fall back to a plain line before it.
+  @supports (content-visibility: auto) and (contain-intrinsic-size: auto 1px) {
+    .task-list-wrapper task:not(.sub-tasks task):not(.ng-animating) {
+      --task-row-estimate: calc(
+        var(--task-title-line-height) + var(--s4) + var(--s-half) - 2 *
+          var(--st-line-width)
+      );
+      content-visibility: auto;
+      contain-intrinsic-size: auto var(--task-row-estimate);
+    }
+  }
   // Detail panel title: flat, a heading in the same 56px band as the page
   // header, one hairline under it (no box, no second rule).
   task-detail-panel .task-title-wrapper {

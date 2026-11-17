@@ -5,7 +5,7 @@ import * as path from 'path';
 import { waitForPluginManagementInit } from '../../helpers/plugin-test.helpers';
 
 // Plugin-related selectors
-const UPLOAD_PLUGIN_BTN = 'plugin-management button[mat-raised-button]'; // The "Choose Plugin File" button
+const UPLOAD_PLUGIN_BTN = 'plugin-management button[mat-flat-button]'; // The "Choose Plugin File" button
 const FILE_INPUT = 'input[type="file"][accept=".zip"]';
 const PLUGIN_CARD = 'plugin-management .installed-plugin';
 

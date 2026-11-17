@@ -40,6 +40,7 @@
 // -----------------------------------------------------------------------------
 
 @use 'fonts';
+@use './mixins/media-queries';
 
 // ===============================
 // CORE DESIGN TOKENS
@@ -327,6 +328,9 @@
   --z-search-bar: 999;
   --z-mobile-bottom-nav: 50;
   --z-right-panel: 44;
+  // A list's "Add task" row pinned above the phone's nav: over every task row
+  // (their highest layer is --z-task-title-focus), under the multi-select bar.
+  --z-pinned-add-row: 40;
   --z-multi-select-bar: 45;
   --z-right-panel-resize-handle: 65;
   --z-right-panel-edge-handle: 66;
@@ -517,7 +521,7 @@
 }
 // Declared on `body`, not `:root`: --bottom-nav-height lives in the body-scoped
 // block below, which `:root` cannot read.
-@media (max-width: 599px) {
+@include media-queries.mq(xs, max) {
   body {
     --body-inset-top: 0px;
     --shell-inset-top: calc(var(--bar-height-large) + var(--safe-area-top));
@@ -526,16 +530,22 @@
         var(--bottom-nav-extra-offset)
     );
   }
+
+  // Keyboard up: the floating nav is hidden (mobile-bottom-nav.component.scss), so the
+  // page reclaims the strip it reserved for it.
+  body.isKeyboardVisible {
+    --shell-inset-bottom: 0px;
+  }
 }
 
 // Scale steps that follow the viewport or the input device.
-@media (min-width: 600px) {
+@include media-queries.mq(xs) {
   :root {
     --page-gutter: var(--s2);
     --dialog-gutter: var(--s3);
   }
 }
-@media (min-width: 960px) {
+@include media-queries.mq(sm) {
   :root {
     --page-gutter: var(--s3);
   }

@@ -30,11 +30,11 @@ test.describe('Fullscreen note editor toolbar on a phone', () => {
     await workViewPage.waitForTaskList();
 
     // The notes page object drives the desktop side panel; on the phone layout
-    // Project Notes is a row in the Browse drawer.
+    // Notes is a row in the Browse drawer ("Project Notes" on a project).
     await page.locator('mobile-bottom-nav .e2e-bottom-nav-browse').tap();
     await page
       .locator('.nav-sidenav.mobile')
-      .getByRole('menuitem', { name: /Project Notes/ })
+      .getByRole('menuitem', { name: /(^|\s)Notes$/ })
       .tap();
 
     const noteText = `${testPrefix}-toolbar-note`;
@@ -77,8 +77,14 @@ test.describe('Fullscreen note editor toolbar on a phone', () => {
     );
     expect(blockedButtonCount).toBe(0);
 
+    // The keyboard shortcuts button is a keyboard thing: it is not shown on touch, so
+    // the last control is the last one that is shown.
+    await expect(
+      toolbar.getByRole('button', { name: 'Keyboard shortcuts' }),
+    ).toBeHidden();
+
     // …and scrolling actually brings the hidden controls into view.
-    const lastButton = toolbar.locator('button').last();
+    const lastButton = toolbar.locator('button:visible').last();
     await expect(lastButton).not.toBeInViewport();
     await toolbar.evaluate((el) => {
       el.scrollLeft = el.scrollWidth;

@@ -55,7 +55,7 @@
       [isBacklog]="isBacklog()"
       [task]="task"
       cdkDrag
-      [cdkDragStartDelay]="dragDelayForTouch()"
+      [cdkDragStartDelay]="{ touch: DRAG_DELAY_FOR_TOUCH, mouse: 0 }"
       [cdkDragLockAxis]="isXs() ? 'y' : ''"
       [cdkDragDisabled]="listModelId() === 'LATER_TODAY' || isTouchSelectionMode()"
       [cdkDragData]="task"

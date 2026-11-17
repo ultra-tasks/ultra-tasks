@@ -7,6 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
+import { MatFormField } from '@angular/material/form-field';
+import { MatInput } from '@angular/material/input';
+import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { TranslatePipe } from '@ngx-translate/core';
 import { T } from '../../../t.const';
 import { SettingHelpComponent } from '../../../ui/setting-help/setting-help.component';
@@ -42,7 +45,14 @@ interface ImageSlot {
 @Component({
   selector: 'glass-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatButton, TranslatePipe, SettingHelpComponent],
+  imports: [
+    MatButton,
+    MatFormField,
+    MatInput,
+    MatSlideToggle,
+    TranslatePipe,
+    SettingHelpComponent,
+  ],
   templateUrl: './glass-settings.component.html',
   styleUrl: './glass-settings.component.scss',
 })

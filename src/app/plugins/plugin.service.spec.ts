@@ -1,5 +1,8 @@
-import { provideHttpClient, withXhr } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideMockStore } from '@ngrx/store/testing';
@@ -24,6 +27,8 @@ import { NodeExecutionConsentDeniedError, PluginService } from './plugin.service
 import { PluginState } from './plugin-state.model';
 import { PluginBridgeService } from './plugin-bridge.service';
 import { T } from '../t.const';
+import { PluginLog } from '../core/log';
+import { BUNDLED_PLUGIN_PATHS } from './bundled-plugins.const';
 
 describe('PluginService', () => {
   let service: PluginService;
@@ -742,5 +747,127 @@ describe('PluginService', () => {
     expect(snack.open).not.toHaveBeenCalled();
     expect(pluginRunner.unloadPlugin).toHaveBeenCalledOnceWith(manifest.id);
     expect(service.getLoadedPlugins()).toEqual([]);
+  });
+
+  describe('built-in plugin discovery', () => {
+    const ALL_PATHS = [
+      ...BUNDLED_PLUGIN_PATHS,
+      'assets/bundled-plugins/ai-productivity-prompts',
+    ];
+    const idOf = (path: string): string => `id-of-${path.split('/').pop()}`;
+    const isManifestRequest = (r: { url: string }): boolean =>
+      r.url.endsWith('/manifest.json');
+    const isIconRequest = (r: { url: string }): boolean => r.url.endsWith('/icon.svg');
+    const discover = (): Promise<void> =>
+      (
+        service as unknown as { _discoverBuiltInPlugins(): Promise<void> }
+      )._discoverBuiltInPlugins();
+    // Lets the awaiting discovery code run until it waits for HTTP again.
+    const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve));
+    let http: HttpTestingController;
+
+    beforeEach(() => {
+      http = TestBed.inject(HttpTestingController);
+    });
+
+    it('requests every manifest at once and every icon as soon as its manifest is there', async () => {
+      const done = discover();
+
+      const manifestRequests = http.match(isManifestRequest);
+      expect(manifestRequests.map((r) => r.request.url)).toEqual(
+        ALL_PATHS.map((path) => `${path}/manifest.json`),
+      );
+      // The slowest request first: arrival order must not decide the apply order.
+      [...manifestRequests].reverse().forEach((r) => {
+        const path = r.request.url.replace('/manifest.json', '');
+        r.flush({ ...mockManifest, id: idOf(path) });
+      });
+      await settle();
+
+      // The icon requests come in manifest arrival order (reversed), all open together.
+      const iconRequests = http.match(isIconRequest);
+      expect(iconRequests.length).toBe(ALL_PATHS.length);
+      iconRequests.forEach((r) => {
+        const path = r.request.url.replace('/icon.svg', '');
+        if (path === ALL_PATHS[1]) {
+          r.flush('', { status: 404, statusText: 'Not Found' });
+        } else {
+          r.flush(`<svg data-path="${path}"></svg>`);
+        }
+      });
+      await done;
+      http.verify();
+
+      const states = service.getAllPluginStates();
+      expect([...states.keys()]).toEqual(ALL_PATHS.map(idOf));
+      expect(states.get(idOf(ALL_PATHS[0]))).toEqual(
+        jasmine.objectContaining({
+          path: ALL_PATHS[0],
+          type: 'built-in',
+          status: 'not-loaded',
+          isEnabled: false,
+          icon: `<svg data-path="${ALL_PATHS[0]}"></svg>`,
+        }),
+      );
+      // A missing icon is optional.
+      expect(states.get(idOf(ALL_PATHS[1]))?.icon).toBeUndefined();
+      expect(states.get(idOf(ALL_PATHS[2]))?.icon).toBe(
+        `<svg data-path="${ALL_PATHS[2]}"></svg>`,
+      );
+      expect(
+        pluginMetaPersistenceService.isPluginEnabled.calls
+          .allArgs()
+          .map(([pluginId]) => pluginId),
+      ).toEqual(ALL_PATHS.map(idOf));
+    });
+
+    it('skips a bundled plugin whose manifest is missing and still discovers the others', async () => {
+      const warn = spyOn(PluginLog, 'warn');
+      const err = spyOn(PluginLog, 'err');
+      const done = discover();
+
+      http.match(isManifestRequest).forEach((r) => {
+        const path = r.request.url.replace('/manifest.json', '');
+        if (path === ALL_PATHS[3]) {
+          r.flush('', { status: 404, statusText: 'Not Found' });
+        } else {
+          r.flush({ ...mockManifest, id: idOf(path) });
+        }
+      });
+      await settle();
+      http.match(isIconRequest).forEach((r) => r.flush('<svg></svg>'));
+      await done;
+
+      expect([...service.getAllPluginStates().keys()]).toEqual(
+        ALL_PATHS.filter((path) => path !== ALL_PATHS[3]).map(idOf),
+      );
+      expect(warn).toHaveBeenCalledOnceWith(
+        `Optional built-in plugin manifest missing at ${ALL_PATHS[3]} (status 404). Skipping.`,
+      );
+      expect(err).not.toHaveBeenCalled();
+    });
+
+    it('logs a failing manifest request other than a missing file as an error and goes on', async () => {
+      const err = spyOn(PluginLog, 'err');
+      const done = discover();
+
+      http.match(isManifestRequest).forEach((r) => {
+        const path = r.request.url.replace('/manifest.json', '');
+        if (path === ALL_PATHS[0]) {
+          r.flush('boom', { status: 500, statusText: 'Server Error' });
+        } else {
+          r.flush({ ...mockManifest, id: idOf(path) });
+        }
+      });
+      await settle();
+      http.match(isIconRequest).forEach((r) => r.flush('<svg></svg>'));
+      await done;
+
+      expect(err).toHaveBeenCalledOnceWith(
+        `Failed to discover plugin at ${ALL_PATHS[0]}:`,
+        jasmine.any(HttpErrorResponse),
+      );
+      expect(service.getAllPluginStates().size).toBe(ALL_PATHS.length - 1);
+    });
   });
 });

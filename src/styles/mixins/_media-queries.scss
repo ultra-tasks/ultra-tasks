@@ -39,3 +39,26 @@ $component-max-width: 800px;
     @error 'Invalid size for mq';
   }
 }
+
+// A short window on a touch screen: a phone in landscape, or any phone with the
+// keyboard up. The Settings and Plugins windows give it the whole screen
+// (docs/styling-guide.md § Settings layout). ConfigPageComponent asks the same
+// question in TypeScript (SHORT_TOUCH_MEDIA_QUERY): keep the two in step.
+@mixin mq-short-touch {
+  @media screen and (max-height: 500px) and (pointer: coarse) {
+    @content;
+  }
+}
+
+// Where Settings is a full-screen drill-down (a category list, then one category
+// at a time): below the `xs` breakpoint, where the shell is a phone, and in a
+// short touch window.
+@mixin mq-drill-down {
+  @include mq(xs, max) {
+    @content;
+  }
+
+  @include mq-short-touch {
+    @content;
+  }
+}

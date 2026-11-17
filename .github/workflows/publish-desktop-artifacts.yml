@@ -50,6 +50,7 @@ jobs:
           jq -e '.files | all(.filename | startswith(".github/workflows/") or startswith("docs/"))' /tmp/changes.json
           VERSION=$(node -p "require('./package.json').version")
           TAG="ultra-tasks-v${VERSION}"
+          PRERELEASE=$(node -p "require('./tools/release-version').getReleaseInfo('ultra-tasks-v'+require('./package.json').version).prerelease")
           test "$(find downloads -name '*.exe' | wc -l)" -eq 2
           test "$(find downloads -name '*.dmg' | wc -l)" -eq 3
           test "$(find downloads -name '*.zip' | wc -l)" -eq 2
@@ -61,5 +62,9 @@ jobs:
           printf '\nA Universal Mac DMG supporting both Intel and Apple Silicon is also included.\n' >> /tmp/notes.md
           printf '\nPackages were built and tested from commit `%s`; subsequent changes affect release automation and documentation only.\n' "$SOURCE_SHA" >> /tmp/notes.md
           # GITHUB_TOKEN avoids triggering the inherited store-publishing workflows.
-          gh release create "$TAG" downloads/* --target "$GITHUB_SHA" --title "Ultra Tasks ${VERSION}" --notes-file /tmp/notes.md --draft
-          gh release edit "$TAG" --draft=false --latest
+          gh release create "$TAG" downloads/* --target "$GITHUB_SHA" --title "Ultra Tasks ${VERSION}" --notes-file /tmp/notes.md --draft --prerelease="$PRERELEASE"
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$TAG" --draft=false --latest=false
+          else
+            gh release edit "$TAG" --draft=false --latest
+          fi

@@ -352,8 +352,9 @@
           </span>
         }
         @if (showLabels() && shortcut()) {
+          <!-- A keyboard chip: nothing to press under touch -->
           <kbd
-            class="nav-shortcut"
+            class="nav-shortcut show-only-on-mouse-primary"
             aria-hidden="true"
             >{{ shortcut() }}</kbd
           >

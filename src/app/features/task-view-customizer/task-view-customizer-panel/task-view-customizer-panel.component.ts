@@ -62,12 +62,7 @@ export class TaskViewCustomizerPanelComponent {
   }
 
   onFilterInputChange(filterType: FILTER_OPTION_TYPE, value: string | null): void {
-    if (!value) return this.customizerService.setFilter(DEFAULT_OPTIONS.filter);
-
-    const foundFilter = OPTIONS.filter.list.find((x) => x.type === filterType);
-    if (!foundFilter) return;
-
-    this.customizerService.setFilter({ ...foundFilter, preset: value });
+    this.customizerService.setFilterPreset(filterType, value);
   }
 
   onFilterWithValue(val: {

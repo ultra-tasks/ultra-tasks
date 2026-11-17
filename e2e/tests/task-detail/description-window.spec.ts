@@ -2,6 +2,7 @@ import type { Store } from '@ngrx/store';
 import type { RootState } from '../../../src/app/root-store/root-state';
 import { expect, test } from '../../fixtures/test.fixture';
 import { fillMarkdownEditor, markdownEditor } from '../../utils/markdown-editor';
+import { expandTaskNotes } from '../../utils/task-notes';
 import { flushPendingWrites } from '../../utils/waits';
 
 test('task description uses a bounded window and preserves formatting and saved content', async ({
@@ -35,7 +36,7 @@ test('task description uses a bounded window and preserves formatting and saved 
   await settingsPage.closeSettings();
 
   await taskPage.openTaskDetail(taskPage.getTaskByText('Description window task'));
-  const markdown = page.locator('task-detail-panel inline-markdown').first();
+  const markdown = await expandTaskNotes(page);
   await markdown.hover();
   await markdown.getByRole('button', { name: 'Open description editor' }).click();
   const dialog = page.locator('dialog-fullscreen-markdown');
@@ -115,7 +116,7 @@ test.describe('touch description editor', () => {
     const task = taskPage.getTaskByText('Mobile description task');
     await expect(task.locator('task-title')).toHaveCSS('pointer-events', 'none');
     await task.tap();
-    const markdown = page.locator('task-detail-panel inline-markdown').first();
+    const markdown = await expandTaskNotes(page);
     await expect(markdown).toBeVisible();
     await markdown.getByRole('button', { name: 'Open description editor' }).click();
     const dialog = page.locator('dialog-fullscreen-markdown');

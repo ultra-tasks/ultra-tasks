@@ -1,3 +1,6 @@
+<!-- Five groups, set apart by dividers so a long menu reads as a few choices:
+     name and history | list actions | settings | project lifecycle | delete. A
+     divider only renders where the group after it does. -->
 @if (isForProject ? contextId !== INBOX_PROJECT.id : contextId !== TODAY_TAG_ID) {
   <button
     (click)="rename()"
@@ -23,6 +26,18 @@
   >
     <mat-icon>bar_chart</mat-icon>
     <span class="text">{{ T.MH.METRICS | translate }}</span>
+  </button>
+}
+
+<mat-divider></mat-divider>
+
+@if (isForProject || contextId === TODAY_TAG_ID) {
+  <button
+    (click)="addSection()"
+    mat-menu-item
+  >
+    <mat-icon>playlist_add</mat-icon>
+    <span class="text">{{ T.MH.ADD_SECTION | translate }}</span>
   </button>
 }
 
@@ -76,34 +91,23 @@
   </button>
 }
 
-@if (isForProject || contextId === TODAY_TAG_ID) {
-  <button
-    (click)="addSection()"
-    mat-menu-item
-  >
-    <mat-icon>playlist_add</mat-icon>
-    <span class="text">{{ T.MH.ADD_SECTION | translate }}</span>
-  </button>
-}
+<mat-divider></mat-divider>
 
+<!-- "Settings" alone repeated the global Settings name and gear; saying whose
+     settings these are keeps the two apart. -->
 <button
   (click)="openSettings()"
   mat-menu-item
 >
   <mat-icon>settings</mat-icon>
-  <span class="text">{{ T.MH.SETTINGS | translate }}</span>
+  <span class="text">{{
+    (isForProject ? T.MH.CONTEXT_MENU.PROJECT_SETTINGS : T.MH.CONTEXT_MENU.TAG_SETTINGS)
+      | translate
+  }}</span>
 </button>
 
-@if (!isForProject && contextId !== TODAY_TAG_ID) {
-  <button
-    (click)="deleteTag()"
-    mat-menu-item
-  >
-    <mat-icon class="color-warn-i">delete_forever</mat-icon>
-    <span class="text">{{ T.MH.DELETE_TAG | translate }}</span>
-  </button>
-}
 @if (isForProject && contextId !== INBOX_PROJECT.id) {
+  <mat-divider></mat-divider>
   @if (isArchived$ | async) {
     <button
       (click)="restoreProject()"
@@ -128,18 +132,35 @@
       <span class="text">{{ T.MH.COMPLETE_PROJECT | translate }}</span>
     </button>
   }
+  <!-- Its own glyph: "Copy task list" above is the clipboard copy. -->
   <button
     (click)="duplicateProject()"
     mat-menu-item
   >
-    <mat-icon>content_copy</mat-icon>
+    <mat-icon>library_add</mat-icon>
     <span class="text">{{ T.MH.DUPLICATE_PROJECT | translate }}</span>
   </button>
-  <button
-    (click)="deleteProject()"
-    mat-menu-item
-  >
-    <mat-icon class="color-warn-i">delete_forever</mat-icon>
-    <span class="text">{{ T.MH.DELETE_PROJECT | translate }}</span>
-  </button>
+}
+
+@if (isForProject ? contextId !== INBOX_PROJECT.id : contextId !== TODAY_TAG_ID) {
+  <mat-divider></mat-divider>
+  @if (isForProject) {
+    <button
+      (click)="deleteProject()"
+      class="mat-menu-item-warn"
+      mat-menu-item
+    >
+      <mat-icon>delete_forever</mat-icon>
+      <span class="text">{{ T.MH.DELETE_PROJECT | translate }}</span>
+    </button>
+  } @else {
+    <button
+      (click)="deleteTag()"
+      class="mat-menu-item-warn"
+      mat-menu-item
+    >
+      <mat-icon>delete_forever</mat-icon>
+      <span class="text">{{ T.MH.DELETE_TAG | translate }}</span>
+    </button>
+  }
 }

@@ -217,6 +217,39 @@
   }
 }
 
+// Nothing hovers on a phone, so a tap can never reveal the overlay above and edit,
+// copy and delete would have no way in. The controls become a permanent strip
+// under the card instead, 40px buttons that always show; the card itself still
+// opens the attachment, so the overlay's "open" button goes.
+@media (hover: none) {
+  .controls {
+    position: static;
+    visibility: visible;
+    flex-wrap: nowrap;
+    box-shadow: inset 0 var(--st-line-width) 0 var(--attachment-border);
+
+    a,
+    button {
+      flex: 1 1 0;
+      width: auto;
+      min-width: var(--ctl-md);
+      height: var(--ctl-md);
+      min-height: var(--ctl-md);
+      margin: 0;
+      line-height: normal;
+      border-radius: 0;
+      background: transparent;
+      opacity: 1;
+      transform: none;
+      pointer-events: all;
+    }
+  }
+
+  .controls .view-btn {
+    display: none;
+  }
+}
+
 .image-loading {
   display: flex;
   flex-direction: column;

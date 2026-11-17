@@ -1,3 +1,5 @@
+@use '../../../../styles/_globals.scss' as *;
+
 :host {
   display: block;
 }
@@ -28,6 +30,9 @@
   th,
   td {
     min-width: 50px;
+    // The `.material-table` card pads its cells 8px top and bottom; these rows are
+    // the table's own 36px, which that padding made 57px tall.
+    padding-block: 0;
   }
 
   td:first-child {
@@ -151,5 +156,83 @@
       width: 100%;
       text-align: start;
     }
+  }
+}
+
+// Phone: the 525px-wide table is a card of two-line rows instead of a sideways
+// scroller. Each task is its title and done toggle, then the time spent today and
+// the estimate under the title; the total spent stays a desktop column.
+@include mq(xs, max) {
+  .summary-table {
+    // The cells carry their own labels; the header row is for assistive tech.
+    tr.mat-mdc-header-row {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+
+    tr.mat-mdc-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      grid-template-areas:
+        'title title done'
+        'spent estimate done';
+      align-items: center;
+      height: auto !important;
+      padding: var(--s-half) var(--s);
+
+      & + tr.mat-mdc-row {
+        border-top: 1px solid var(--extra-border-color);
+      }
+    }
+
+    td,
+    td:first-child {
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      text-align: start;
+      white-space: normal;
+    }
+
+    .cdk-column-title {
+      grid-area: title;
+    }
+
+    .cdk-column-timeSpentToday {
+      grid-area: spent;
+    }
+
+    .cdk-column-timeEstimate {
+      grid-area: estimate;
+    }
+
+    .cdk-column-done {
+      grid-area: done;
+    }
+
+    .cdk-column-timeSpentTotal {
+      display: none;
+    }
+
+    td[data-label] {
+      display: flex;
+      align-items: baseline;
+      gap: var(--s);
+
+      &::before {
+        content: attr(data-label);
+        color: var(--text-color-muted);
+        font: var(--type-meta);
+      }
+    }
+  }
+
+  // Nothing reveals the done toggle on hover here, so its check always shows
+  // (dimmed until the task is done).
+  .check-done .check {
+    opacity: 1;
   }
 }

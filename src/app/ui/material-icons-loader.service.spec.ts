@@ -118,7 +118,7 @@ describe('MaterialIconsLoaderService', () => {
     const rawFontIcon = document.createElement('span');
     rawFontIcon.classList.add('material-icons');
     const pseudoFontIcon = document.createElement('div');
-    pseudoFontIcon.classList.add('sync-warning');
+    pseudoFontIcon.classList.add('info-panel', 'info-panel--warning');
     const inlineFontIcon = document.createElement('mat-icon');
     inlineFontIcon.setAttribute('data-mat-icon-type', 'font');
     inlineFontIcon.classList.add('material-icons', 'mat-icon-inline');

@@ -990,6 +990,7 @@
       }
     },
     "PLANNER": {
+      "COLLAPSE_CALENDAR": "Collapse calendar",
       "D": {
         "ADD_PLANNED": {
           "RE_PLAN_ALL": "Reschedule all"
@@ -998,6 +999,7 @@
       "DAY_LOAD": "Planned: {{planned}} / Available: {{available}}",
       "DEADLINES": "Deadlines",
       "EDIT_REPEATED_TASK": "Edit recurring task \"{{taskName}}\"",
+      "EXPAND_CALENDAR": "Expand calendar",
       "ITEMS_TOTAL": "Tasks and events: {{count}}",
       "NO_TASKS": "No tasks",
       "NO_UNSCHEDULED": "No unscheduled tasks",
@@ -1123,6 +1125,7 @@
       "ARCHIVED_PROJECTS": {
         "EMPTY": "No archived projects.",
         "NAV_LABEL": "Archived",
+        "RESTORE": "Restore",
         "SEARCH": "Search archived projects",
         "UNARCHIVE": "Restore project"
       }
@@ -1171,6 +1174,10 @@
       "ANY_TIME": "Any time",
       "CALENDAR_VISIBILITY": "Calendar visibility",
       "CLICK_TO_CREATE_TASK": "click to create task",
+      "DAY_EVENTS": {
+        "ONE": "{{date}}, {{count}} event",
+        "OTHER": "{{date}}, {{count}} events"
+      },
       "DEADLINE_TASKS_TOOLTIP": "{{count}} tasks with deadlines: {{titles}}",
       "DEADLINE_TASKS_TOOLTIP_ONE": "{{count}} task with a deadline: {{titles}}",
       "D_INITIAL": {
@@ -1208,6 +1215,7 @@
       "SCHEDULE_TASK_PLACEHOLDER": "Schedule task...",
       "SHIFT_KEY_INFO": "Hold Shift to toggle day planning mode",
       "START": "Work Start",
+      "TAP_TO_CREATE_TASK": "Tap to add a task",
       "TOGGLE_DAY_PLANNING_HINT": "Ctrl+1 to toggle day planning",
       "TOGGLE_TIME_SCHEDULING_HINT": "Ctrl+1 to toggle time scheduling",
       "AUTOMATICALLY_PLACED": "Automatically placed",
@@ -1867,6 +1875,7 @@
         "DUE_BUTTON": "Schedule",
         "ESTIMATE_BUTTON": "Estimate",
         "NOTE_PLACEHOLDER": "Add a note… (Ctrl+Enter to add task)",
+        "NOTE_PLACEHOLDER_TOUCH": "Add a note…",
         "PLACEHOLDER_CREATE": "A task title #tag @16:00 t25m ",
         "PLACEHOLDER_SEARCH": "Add an existing task or issue…",
         "REPEAT_BUTTON": "Repeat",
@@ -2643,6 +2652,7 @@
       "SETTINGS": "Connection settings",
       "BROWSE": "Browse source items",
       "EMPTY": "No matching tasks. Connect a source or change your filters.",
+      "EMPTY_NO_SOURCE": "Nothing is connected yet. Connect an account to import or sync its tasks.",
       "AUTO_SECTION": "Automatic section",
       "SAME_TASKS": "The same tasks, everywhere",
       "SAME_TASKS_HELP": "Plan this work in Today, projects, or the calendar. Source sections are another view of your ordinary tasks.",
@@ -2778,12 +2788,14 @@
     "ADD": "Add",
     "ADVANCED_CFG": "Advanced config",
     "APPLY": "Apply",
+    "BACK": "Back",
     "CANCEL": "Cancel",
     "CLEAR": "Clear",
     "CLOSE": "Close",
     "COMMENT": "Comment",
     "COMPLETE": "Complete",
     "CONFIRM": "Confirm",
+    "CONFIRM_DISCARD_CHANGES": "You have unsaved changes. Discard them?",
     "CONTINUE": "Continue",
     "DELETE": "Delete",
     "DISCARD": "Discard",
@@ -2799,6 +2811,7 @@
     "HIDE": "Hide",
     "ICON_INP_DESCRIPTION": "All UTF-8 emojis are also supported!",
     "INBOX_PROJECT_TITLE": "Inbox",
+    "KEEP_EDITING": "Keep editing",
     "MINUTES": "{{m}} minutes",
     "MORE_ACTIONS": "More actions",
     "MOVE_BACKWARD": "Move backward",
@@ -3436,9 +3449,14 @@
     "ADD_SECTION": "Add section",
     "BOARDS": "Boards",
     "BROWSE": "Browse",
+    "CONTEXT_MENU": {
+      "PROJECT_SETTINGS": "Project settings",
+      "TAG_SETTINGS": "Tag settings"
+    },
     "COPY_TASK_LIST_MARKDOWN": "Copy task list",
     "CREATE_PROJECT": "Create project",
     "CREATE_TAG": "Create tag",
+    "DAILY_SUMMARY": "Daily summary",
     "ARCHIVE_PROJECT": "Archive project",
     "COMPLETE_PROJECT": "Complete project",
     "DELETE_PROJECT": "Delete project",
@@ -3471,10 +3489,15 @@
     "NOTES_PANEL_INFO": "Notes can only be shown in the calendar and the regular task list views.",
     "OPEN_APP_FEATURES": "Open Settings",
     "OPEN_NAVIGATION": "Open navigation",
+    "PAGE_OPTIONS": "Page options",
+    "PAGE_OPTIONS_ACTIVE": "Page options (sort, group or filter is on)",
+    "PAUSE_TRACKING_TASK": "Pause tracking: {{title}}",
     "PLANNER": "Upcoming",
     "PROJECT_SETTINGS": "Project Settings",
+    "RESUME_TRACKING_TASK": "Resume tracking: {{title}}",
     "PROJECTS": "Projects",
     "RESIZE_SIDE_NAV": "Resize side navigation",
+    "ROW_MENU_HINT": "Press and hold a project or tag for its menu",
     "SCHEDULE": "Calendar",
     "SEARCH": "Search",
     "SETTINGS": "Settings",
@@ -3482,6 +3505,7 @@
     "SHOW_TRACKED_TASK": "Show tracked task",
     "SIDE_PANEL_MENU": "Side Panel Menu",
     "SKIP_TO_CONTENT": "Skip to main content",
+    "SORT_GROUP_FILTER": "Sort, group and filter",
     "SWITCH_TO_COMPACT_MODE": "Switch to compact mode",
     "SWITCH_TO_FULL_MODE": "Switch to full mode",
     "SYNC_STATE": {
@@ -4015,6 +4039,8 @@
       "SOUND": "Sound",
       "DATA": "Import & export",
       "ACCOUNT": "Account",
+      "ABOUT": "About",
+      "VERSION": "Version",
       "IMPORT": "Import",
       "EXPORT": "Export",
       "RECOVERY": "Recovery",
@@ -4126,6 +4152,7 @@
     "SECTION_OPTIONS": "Section options",
     "DONE_TASKS": "Completed tasks",
     "DONE_TASKS_IN_ARCHIVE": "There are currently no completed tasks here, but there are some already archived.",
+    "ESTIMATE_LEFT": "left",
     "ESTIMATE_REMAINING": "Estimate remaining:",
     "FINISH_DAY": "Finish day",
     "FINISH_DAY_TOOLTIP": "Evaluate your day, move all completed tasks to the archive (optionally) and/or plan your next day.",

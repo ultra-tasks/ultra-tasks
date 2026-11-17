@@ -6,13 +6,21 @@
 // path subject to shell expansion. execFileSync + node keeps argv literal on
 // every platform.
 const { execFileSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const { ESLint } = require('eslint');
 
+// A JSON list avoids Windows' shell limit when a release touches many files.
+const fileArgs = process.argv.slice(2);
+if (fileArgs[0] === '--files-from') {
+  const listed = JSON.parse(fs.readFileSync(fileArgs[1], 'utf8'));
+  if (!Array.isArray(listed) || listed.some((file) => typeof file !== 'string')) {
+    throw new Error('--files-from must name a JSON array of file paths');
+  }
+  fileArgs.splice(0, 2, ...listed);
+}
 // Dedupe by resolved path so `./a.ts a.ts` is checked once.
-const files = [
-  ...new Map(process.argv.slice(2).map((f) => [path.resolve(f), f])).values(),
-];
+const files = [...new Map(fileArgs.map((f) => [path.resolve(f), f])).values()];
 if (!files.length) {
   console.error('❌ Please provide at least one file path');
   process.exit(1);

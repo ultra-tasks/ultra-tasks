@@ -39,6 +39,7 @@
   @if (showCalFilterBtn()) {
     <button
       mat-icon-button
+      class="cal-filter-btn"
       [matMenuTriggerFor]="calFilterMenu"
       [matTooltip]="T.F.SCHEDULE.CALENDAR_VISIBILITY | translate"
       [attr.aria-label]="T.F.SCHEDULE.CALENDAR_VISIBILITY | translate"
@@ -164,6 +165,7 @@
       [weeksToShow]="weeksToShow()"
       [firstDayOfWeek]="firstDayOfWeek()"
       [deadlineTasksByDay]="deadlineTasksByDay()"
+      (openDay)="openDayView($event)"
     ></schedule-month>
   } @else if (isDayView()) {
     @if (currentDayPage(); as current) {

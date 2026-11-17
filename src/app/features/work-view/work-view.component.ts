@@ -106,7 +106,8 @@ import {
 import { TaskRepeatCfg } from '../task-repeat-cfg/task-repeat-cfg.model';
 import { RepeatCfgPreviewComponent } from '../task-repeat-cfg/repeat-cfg-preview/repeat-cfg-preview.component';
 import { recordSearchNavDebug } from '../../util/search-nav-debug';
-import { dragDelayForTouch } from '../../util/input-intent';
+import { DRAG_DELAY_FOR_TOUCH } from '../../app.constants';
+import { keepCentered } from './keep-centered.util';
 import { DateService } from '../../core/date/date.service';
 import { PluginIndexComponent } from '../../plugins/ui/plugin-index/plugin-index.component';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
@@ -180,7 +181,9 @@ export class WorkViewComponent implements OnInit, OnDestroy {
   private _pluginBridge = inject(PluginBridgeService);
   private _calendarIntegrationService = inject(CalendarIntegrationService);
   private _globalTrackingIntervalService = inject(GlobalTrackingIntervalService);
-  protected readonly dragDelayForTouch = dragDelayForTouch;
+  // A constant for the template's {touch, mouse} form: CDK picks the delay from the
+  // event's own type, so it cannot go stale when the input intent flips.
+  protected readonly DRAG_DELAY_FOR_TOUCH = DRAG_DELAY_FOR_TOUCH;
 
   isProjectContext = toSignal(this.workContextService.isActiveWorkContextProject$, {
     initialValue: false,
@@ -423,6 +426,7 @@ export class WorkViewComponent implements OnInit, OnDestroy {
    */
   private _isPendingFocusItemFromSearch = false;
   private _pendingFocusItemTimeout?: number;
+  private _stopKeepCentered?: () => void;
   private _splitTopElement?: HTMLElement;
   private _switchListAnimationTimeout?: number;
 
@@ -431,11 +435,13 @@ export class WorkViewComponent implements OnInit, OnDestroy {
   @ViewChild('splitTopEl', { read: ElementRef }) set splitTopElRef(ref: ElementRef) {
     if (ref) {
       this._splitTopElement = ref.nativeElement;
-      recordSearchNavDebug('workView:splitTopElReady', {
+      // A function: the reads force a layout, and this runs on every Today and
+      // project creation.
+      recordSearchNavDebug('workView:splitTopElReady', () => ({
         selectedTaskId: this.selectedTaskId(),
         clientHeight: ref.nativeElement.clientHeight,
         scrollHeight: ref.nativeElement.scrollHeight,
-      });
+      }));
       this.splitTopEl$.next(ref.nativeElement);
       if (this._pendingFocusItemTaskId) {
         this._focusItemInWorkViewWhenReady(this._pendingFocusItemTaskId);
@@ -562,6 +568,7 @@ export class WorkViewComponent implements OnInit, OnDestroy {
     if (this._switchListAnimationTimeout) {
       window.clearTimeout(this._switchListAnimationTimeout);
     }
+    this._stopKeepCentered?.();
     this._subs.unsubscribe();
     this.layoutService.isWorkViewScrolled.set(false);
   }
@@ -728,7 +735,7 @@ export class WorkViewComponent implements OnInit, OnDestroy {
     const matchedElement = directMatch ?? selectedMatch;
     const el =
       matchedElement && this._isTaskElementReady(matchedElement) ? matchedElement : null;
-    recordSearchNavDebug('workView:focusAttempt', {
+    recordSearchNavDebug('workView:focusAttempt', () => ({
       taskId,
       retriesLeft,
       selectedTaskId: this.selectedTaskId(),
@@ -739,13 +746,17 @@ export class WorkViewComponent implements OnInit, OnDestroy {
       containerScrollTop: container?.scrollTop ?? null,
       containerClientHeight: container?.clientHeight ?? null,
       containerScrollHeight: container?.scrollHeight ?? null,
-    });
+    }));
     if (container && el) {
       const relativeTop = this._getRelativeTopWithinContainer(el, container);
-      const containerCenterOffset = container.clientHeight / 2;
-      const elementCenterOffset = el.offsetHeight / 2;
-      const centeredTop = relativeTop - containerCenterOffset + elementCenterOffset;
-      container.scrollTop = Math.max(centeredTop, 0);
+      const centeredTop = this._getCenteredTop(el, container);
+      container.scrollTop = centeredTop;
+      // Far down a long list the rows above are still estimates (content-visibility)
+      // and shift this one as they render: keep it centred until they have.
+      this._stopKeepCentered?.();
+      this._stopKeepCentered = keepCentered(container, () =>
+        el.isConnected ? this._getCenteredTop(el, container) : null,
+      );
       el.focus({ preventScroll: true });
       // Search only: every other `focusItem` caller (reminder snacks, tracked-task
       // pill, issue creation, calendar banner) navigates without the user having
@@ -753,7 +764,7 @@ export class WorkViewComponent implements OnInit, OnDestroy {
       if (this._isPendingFocusItemFromSearch) {
         this.layoutService.highlightTaskBriefly(el);
       }
-      recordSearchNavDebug('workView:focusSuccess', {
+      recordSearchNavDebug('workView:focusSuccess', () => ({
         taskId,
         selectedTaskId: this.selectedTaskId(),
         matchedElementId: el.id,
@@ -761,16 +772,16 @@ export class WorkViewComponent implements OnInit, OnDestroy {
         elementOffsetHeight: el.offsetHeight,
         centeredTop,
         appliedScrollTop: container.scrollTop,
-      });
+      }));
       window.setTimeout(() => {
-        recordSearchNavDebug('workView:focusPostTick', {
+        recordSearchNavDebug('workView:focusPostTick', () => ({
           taskId,
           selectedTaskId: this.selectedTaskId(),
           matchedElementId: el.id,
           containerScrollTop: container.scrollTop,
           containerClientHeight: container.clientHeight,
           containerScrollHeight: container.scrollHeight,
-        });
+        }));
       }, 0);
       this._pendingFocusItemTaskId = null;
       this._isPendingFocusItemFromSearch = false;
@@ -905,6 +916,14 @@ export class WorkViewComponent implements OnInit, OnDestroy {
       }
     }
     return false;
+  }
+
+  /** The scroll position that puts `el` in the middle of `container`. */
+  private _getCenteredTop(el: HTMLElement, container: HTMLElement): number {
+    const relativeTop = this._getRelativeTopWithinContainer(el, container);
+    const containerCenterOffset = container.clientHeight / 2;
+    const elementCenterOffset = el.offsetHeight / 2;
+    return Math.max(relativeTop - containerCenterOffset + elementCenterOffset, 0);
   }
 
   private _getRelativeTopWithinContainer(

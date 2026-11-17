@@ -11,12 +11,12 @@ import { NgTemplateOutlet } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject, Subject, of } from 'rxjs';
 import { NavigationEnd, Router } from '@angular/router';
-import { BreakpointObserver } from '@angular/cdk/layout';
 import { TranslateModule, TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { MatMenu } from '@angular/material/menu';
 import { Store } from '@ngrx/store';
 
 import { PageTitleComponent } from './page-title.component';
+import { LayoutService } from '../../layout/layout.service';
 import { NAV_SECTION_ICON } from '../../magic-side-nav/nav-section-icons.const';
 import { WorkContextService } from '../../../features/work-context/work-context.service';
 import {
@@ -50,7 +50,7 @@ describe('PageTitleComponent', () => {
   let typeAndId$: BehaviorSubject<{ activeId: string; activeType: WorkContextType }>;
   let activeWorkContext$: BehaviorSubject<WorkContext>;
   let isShared$: BehaviorSubject<boolean>;
-  let isXxxs$: BehaviorSubject<{ matches: boolean }>;
+  let isXs: WritableSignal<boolean>;
   let openSpy: jasmine.Spy;
   let pluginMenuEntries: WritableSignal<PluginMenuEntryCfg[]>;
   let pluginStates: Map<string, PluginState>;
@@ -66,10 +66,7 @@ describe('PageTitleComponent', () => {
 
   const stubProviders = (opts: { realTranslate?: boolean } = {}): Provider[] => [
     { provide: Router, useValue: routerStub },
-    {
-      provide: BreakpointObserver,
-      useValue: { observe: () => isXxxs$ },
-    },
+    { provide: LayoutService, useValue: { isXs } },
     {
       provide: WorkContextService,
       useValue: {
@@ -132,7 +129,7 @@ describe('PageTitleComponent', () => {
     isShared$ = new BehaviorSubject(false);
     pluginMenuEntries = signal<PluginMenuEntryCfg[]>([]);
     pluginStates = new Map();
-    isXxxs$ = new BehaviorSubject<{ matches: boolean }>({ matches: false });
+    isXs = signal(false);
     openSpy = jasmine
       .createSpy('openProjectOnPlainspace')
       .and.returnValue(Promise.resolve());
@@ -167,6 +164,35 @@ describe('PageTitleComponent', () => {
     it('falls through to activeWorkContextTitle for non-special routes', () => {
       const c = setupComponent('/active/tasks');
       expect(c.displayTitle()).toBe('Today');
+    });
+
+    // History, Metrics and the daily summary are pages OF a context with a name
+    // of their own: the header names the page and adds the context as a suffix.
+    const contextSectionCases: Array<[string, string]> = [
+      ['/project/p1/history', T.MH.HISTORY],
+      ['/tag/TODAY/history', T.MH.HISTORY],
+      ['/project/p1/worklog', T.MH.HISTORY],
+      ['/project/p1/quick-history', T.MH.HISTORY],
+      ['/project/p1/metrics', T.MH.METRICS],
+      ['/tag/TODAY/metrics', T.MH.METRICS],
+      ['/tag/TODAY/daily-summary', T.MH.DAILY_SUMMARY],
+      ['/tag/TODAY/daily-summary/2026-11-15', T.MH.DAILY_SUMMARY],
+    ];
+    contextSectionCases.forEach(([url, expectedKey]) => {
+      it(`names ${url} and keeps the context as a suffix`, () => {
+        const c = setupComponent(url);
+        expect(c.displayTitle()).toBe(expectedKey);
+        expect(c.titleSuffix()).toBe('Today');
+      });
+    });
+
+    it('has no suffix on a task list, where the context is the title', () => {
+      expect(setupComponent('/project/p1/tasks').titleSuffix()).toBeNull();
+      expect(setupComponent('/config').titleSuffix()).toBeNull();
+    });
+
+    it('does not take a task page whose context is named like a section', () => {
+      expect(setupComponent('/project/history/tasks').displayTitle()).toBe('Today');
     });
 
     it('matches /config#plugins (URL with fragment)', () => {
@@ -238,6 +264,21 @@ describe('PageTitleComponent', () => {
     it('is false for /active/tasks', () => {
       const c = setupComponent('/active/tasks');
       expect(c.isSpecialSection()).toBe(false);
+    });
+
+    it('is false for the pages of a context, which keep the work-context menu', () => {
+      ['/project/p1/history', '/project/p1/metrics', '/tag/TODAY/daily-summary'].forEach(
+        (url) => {
+          const c = setupComponent(url);
+          expect(c.isSpecialSection()).toBe(false);
+          expect(c.isStaticTitle()).toBe(true);
+        },
+      );
+    });
+
+    it('is a plain heading on a page of a context, a link on its task list', () => {
+      expect(setupComponent('/project/p1/tasks').isStaticTitle()).toBe(false);
+      expect(setupComponent('/config').isStaticTitle()).toBe(true);
     });
 
     it('does not collide /scheduled-list with /schedule', () => {
@@ -401,6 +442,12 @@ describe('PageTitleComponent', () => {
       });
     });
 
+    it('has an icon for each page of a context', () => {
+      expect(setupComponent('/project/p1/history').sectionIcon()).toBe('history');
+      expect(setupComponent('/project/p1/metrics').sectionIcon()).toBe('bar_chart');
+      expect(setupComponent('/tag/TODAY/daily-summary').sectionIcon()).toBe('done_all');
+    });
+
     it('is unset on a work context route, which shows the context icon', () => {
       expect(setupComponent('/tag/TODAY/tasks').sectionIcon()).toBeUndefined();
     });
@@ -478,9 +525,43 @@ describe('PageTitleComponent', () => {
       expect(buttons(await renderAt('/config')).length).toBe(0);
     });
 
-    it('renders no actions at the smallest breakpoint', async () => {
-      isXxxs$.next({ matches: true });
-      expect(buttons(await renderAt('/active/tasks')).length).toBe(0);
+    it('keeps the menu and the filter at every desktop width, with no 350px special case', async () => {
+      // `isXs` is the only width the actions look at: there is no smaller one
+      // that drops them (a 320px phone could not reach either before).
+      isXs.set(false);
+      const actions = buttons(await renderAt('/active/tasks'));
+      expect(actions).toContain('project-settings-btn');
+      expect(actions).toContain('task-filter-btn');
+    });
+
+    it('renders one page-options control on a phone, in place of the two buttons', async () => {
+      isXs.set(true);
+      const host = await renderAt('/active/tasks');
+      expect(host.querySelectorAll('.page-title-actions page-options-menu').length).toBe(
+        1,
+      );
+      expect(buttons(host)).not.toContain('project-settings-btn');
+      expect(buttons(host)).not.toContain('task-filter-btn');
+    });
+
+    it('keeps the work-context menu on History, Metrics and the daily summary', async () => {
+      for (const url of [
+        '/project/p1/history',
+        '/project/p1/metrics',
+        '/tag/TODAY/daily-summary',
+      ]) {
+        const actions = buttons(await renderAt(url));
+        expect(actions).toContain('project-settings-btn');
+        expect(actions).not.toContain('task-filter-btn');
+      }
+    });
+
+    it('names the buttons for what they open', async () => {
+      const host = await renderAt('/active/tasks');
+      const labels = Array.from(host.querySelectorAll('.page-title-actions button')).map(
+        (b) => b.getAttribute('aria-label'),
+      );
+      expect(labels).toEqual([T.MH.PAGE_OPTIONS, T.MH.SORT_GROUP_FILTER]);
     });
   });
 
@@ -500,7 +581,7 @@ describe('PageTitleComponent', () => {
       expect(el.tagName).toBe('A');
     });
 
-    ['/planner', '/search', '/config'].forEach((url) => {
+    ['/planner', '/search', '/config', '/project/p1/history'].forEach((url) => {
       it(`is a plain heading on ${url}, a page of its own with no task list to go to`, async () => {
         const el = await titleEl(url);
         expect(el.tagName).toBe('H1');

@@ -1,7 +1,8 @@
 @use '../../../../styles/_globals.scss' as *;
 
 :host {
-  --note-font-size: 14px;
+  // The body role: 14 with a pointer, 16 on touch (docs/styling-guide.md, Touch scale).
+  --note-font-size: var(--font-size-md);
 
   display: block;
 
@@ -74,7 +75,7 @@
 
   inline-markdown ::ng-deep {
     .markdown-wrapper {
-      min-height: 40px;
+      min-height: var(--ctl-md);
     }
 
     .markdown-unparsed,
@@ -109,7 +110,7 @@
   overflow-wrap: break-word;
   display: block;
   resize: none;
-  min-height: 40px;
+  min-height: var(--ctl-md);
   overflow: hidden;
   cursor: text;
 
@@ -176,8 +177,8 @@
   }
 
   .mat-mdc-icon-button {
-    height: 36px;
-    width: 36px;
-    line-height: 36px;
+    height: var(--ctl-md);
+    width: var(--ctl-md);
+    line-height: var(--ctl-md);
   }
 }

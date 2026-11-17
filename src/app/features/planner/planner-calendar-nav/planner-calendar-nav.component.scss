@@ -1,5 +1,3 @@
-@use '../../../../styles/_globals.scss' as *;
-
 :host {
   display: block;
   padding: var(--s-half) var(--s) 0;
@@ -8,11 +6,12 @@
   touch-action: none;
 }
 
+// The month label, the weekday row and the day numbers use the type roles, so
+// they step up on touch with the rest of the scale (they were 15 / 11 / 14).
 .month-label {
-  font-size: 15px;
-  font-weight: 500;
   padding: var(--s-half) var(--s);
   text-align: center;
+  font: var(--type-body-strong);
 }
 
 .day-labels,
@@ -23,9 +22,9 @@
 }
 
 .day-labels {
-  font-size: 11px;
   color: var(--text-color-muted);
   padding-bottom: var(--s-quarter);
+  font: var(--type-meta);
 }
 
 .weeks {
@@ -39,32 +38,48 @@
   height: var(--row-height);
 }
 
+// A day is a 40px hit box (the control height, and the row's own height), with
+// the 36px circle drawn inside it. On a shrunken row the box follows the row.
 .week button {
   appearance: none;
-  border: 2px solid transparent;
+  position: relative;
+  // Own stacking context, so the circle can sit behind the number.
+  isolation: isolate;
   box-sizing: border-box;
+  width: min(var(--ctl-md), var(--row-height));
+  height: min(var(--ctl-md), var(--row-height));
+  margin: auto;
+  padding: 0;
+  border: 0;
   background: none;
   color: inherit;
-  font-size: 14px;
-  width: min(36px, calc(var(--row-height) - 2 * var(--s-quarter)));
-  height: min(36px, calc(var(--row-height) - 2 * var(--s-quarter)));
-  margin: auto;
-  border-radius: 50%;
+  font: var(--type-body);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 
-  &.is-today {
+  &::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: var(--s-quarter);
+    border: var(--st-focus-width) solid transparent;
+    border-radius: var(--r-full);
+  }
+
+  &.is-today::before {
     border-color: var(--c-primary);
   }
 
   &.is-active {
-    border-color: var(--c-primary);
-    background: var(--c-primary);
     color: var(--c-contrast);
+
+    &::before {
+      border-color: var(--c-primary);
+      background: var(--c-primary);
+    }
   }
 
   // Muted rather than faded: opacity took past days below 3:1 in both themes.
@@ -72,67 +87,115 @@
     color: var(--text-color-muted);
   }
 
-  // Grow the hit area past the 36px circle without moving the grid: wider
-  // into the column gap, and no taller than the row so rows never overlap.
-  @include touchOnlyDevice {
-    &::before {
-      content: '';
-      position: absolute;
-      inset: calc(var(--s-quarter) * -1) calc(var(--s-half) * -1);
-    }
-  }
-
   &:disabled {
     cursor: default;
   }
 }
 
-// Touch: month, weekday and day numbers step up with the rest of the type scale
-// (they were 15 / 11 / 14).
-@media (pointer: coarse) {
-  .month-label {
-    font-size: var(--font-size-lg);
-  }
-
-  .day-labels {
-    font-size: var(--font-size-sm);
-  }
-
-  .week button {
-    font-size: var(--font-size-md);
-  }
-}
-
 .task-dot {
   position: absolute;
-  bottom: 2px;
+  bottom: var(--s-half);
   left: 50%;
   transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
+  width: var(--s-half);
+  height: var(--s-half);
+  border-radius: var(--r-full);
   background: var(--c-primary);
 }
 
-.handle {
-  display: flex;
-  justify-content: center;
-  padding: 12px 0;
-  cursor: pointer;
+// The strip's foot: the expand toggle across the whole row, and the Unscheduled
+// chip at the end of it (a phone has no Unscheduled panel beside the days).
+.strip-footer {
+  display: grid;
+  // The middle column keeps the chip off the chevron.
+  grid-template-columns: minmax(0, 1fr) var(--ctl-md) minmax(0, 1fr);
+  align-items: center;
+}
 
-  &::after {
-    content: '';
-    width: 32px;
-    height: 4px;
-    border-radius: 2px;
-    background: currentColor;
-    opacity: 0.3;
+// A button for assistive tech and keyboards, a 48px touch row for thumbs. The
+// chevron points down to open and up to close.
+.handle {
+  grid-area: 1 / 1 / 2 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ctl-lg);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--text-color-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  mat-icon {
+    width: var(--icon-md);
+    height: var(--icon-md);
+    font-size: var(--icon-md);
+    transition: transform var(--transition-duration-m) var(--ani-standard-timing);
+  }
+
+  &.is-expanded mat-icon {
+    transform: rotate(180deg);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: var(--state-disabled-alpha);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+}
+
+.unscheduled-chip {
+  grid-area: 1 / 3;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-half);
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--ctl-sm);
+  padding: 0 var(--s);
+  border: 1px solid var(--palette-border);
+  border-radius: var(--r-full);
+  background: var(--card-bg);
+  color: var(--text-color);
+  font: var(--type-meta);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  mat-icon {
+    flex: none;
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    font-size: var(--icon-sm);
+    color: var(--text-color-muted);
+  }
+
+  .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    background: var(--state-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .weeks,
-  .weeks * {
+  .weeks *,
+  .handle mat-icon {
     transition: none !important;
   }
 }

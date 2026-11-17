@@ -34,11 +34,17 @@
 
 // position:fixed bypasses body's safe-area padding, so apply it here so the
 // formatting toolbar and controls stay clear of the status bar / home indicator.
+// Not for the windowed variant: it sits inside a dialog pane whose overlay
+// wrapper the shared styles already pad by the insets, so this padding counted
+// them twice (a blank band above "Description" and below Save). It is its own
+// rule, not a reset, because `:host-context` outranks `:host(.is-windowed)`.
 :host-context(body.isNativeMobile) {
-  padding-top: var(--safe-area-top);
-  padding-bottom: var(--safe-area-bottom);
-  padding-left: var(--safe-area-left);
-  padding-right: var(--safe-area-right);
+  &:not(.is-windowed) {
+    padding-top: var(--safe-area-top);
+    padding-bottom: var(--safe-area-bottom);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
+  }
 }
 
 // Keyboard open: shrink the dialog above the IME, or its textarea + Close/Save
@@ -96,6 +102,27 @@
 
   > button {
     flex-shrink: 0;
+  }
+}
+
+// A window under 400px tall (the keyboard up, a phone in landscape) is for
+// typing: the 885px-wide toolbar and the title give the editor their rows. The
+// title stays in the accessibility tree, it is the dialog's accessible name.
+@media (max-height: 400px) {
+  .formatting-toolbar {
+    display: none;
+  }
+
+  h2[mat-dialog-title] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 }
 

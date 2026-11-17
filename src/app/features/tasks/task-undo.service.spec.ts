@@ -620,6 +620,39 @@ describe('TaskUndoService', () => {
     const add = (id = 'a', isShowSnack = false): boolean =>
       service.addToToday(tasks()[id], todayStr, 0, isShowSnack);
 
+    it('binds a plan Undo to its exact task, day and history entry', () => {
+      expect(add()).toBeTrue();
+      expect(service.capturePlanUndo('b', todayStr)).toBeUndefined();
+      expect(service.capturePlanUndo('a', '2026-11-11')).toBeUndefined();
+      const undoPlan = service.capturePlanUndo('a', todayStr)!;
+      expect(undoPlan()).toBeTrue();
+      expect(tasks().a.dueDay).toBeNull();
+      expect(undoPlan()).toBeFalse();
+    });
+
+    it('does not undo a different task through an older plan callback', () => {
+      expect(add()).toBeTrue();
+      const undoPlan = service.capturePlanUndo('a', todayStr)!;
+      expect(add('b')).toBeTrue();
+      dispatch.calls.reset();
+      expect(undoPlan()).toBeFalse();
+      expect(tasks().a.dueDay).toBe(todayStr);
+      expect(tasks().b.dueDay).toBe(todayStr);
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    it('does not undo a later unrelated edit through an older plan callback', () => {
+      expect(add()).toBeTrue();
+      const undoPlan = service.capturePlanUndo('a', todayStr)!;
+      expect(service.updateEstimate('b', 20, 30)).toBeTrue();
+      dispatch.calls.reset();
+      expect(undoPlan()).toBeFalse();
+      expect(tasks().b.timeEstimate).toBe(30);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(service.undo()).toBeTrue();
+      expect(tasks().b.timeEstimate).toBe(20);
+    });
+
     it('dispatches the Today plan with its declaration, then undoes and redoes it', () => {
       expect(add('a', true)).toBeTrue();
       expect(tasks().a.dueDay).toBe(todayStr);

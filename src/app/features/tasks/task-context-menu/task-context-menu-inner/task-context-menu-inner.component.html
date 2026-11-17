@@ -40,7 +40,7 @@
       [matTooltip]="T.F.TASK.D_SCHEDULE_TASK.QA_TOMORROW | translate"
     >
       <mat-icon aria-hidden="true">event_upcoming</mat-icon>
-      <span class="quick-access-label">{{ tomorrowLabel }}</span>
+      <span class="quick-access-label">{{ T.G.TOMORROW | translate }}</span>
     </button>
     <button
       type="button"
@@ -48,7 +48,7 @@
       [matTooltip]="T.F.TASK.D_SCHEDULE_TASK.QA_NEXT_WEEK | translate"
     >
       <mat-icon aria-hidden="true">date_range</mat-icon>
-      <span class="quick-access-label">{{ nextWeekLabel }}</span>
+      <span class="quick-access-label">{{ T.G.NEXT_WEEK | translate }}</span>
     </button>
     <button
       type="button"
@@ -78,7 +78,11 @@
     }
   </div>
 
-  @if (!isTouchActive() && !isAdvancedControls()) {
+  <!-- Five groups, set apart by dividers: do it now | details | integrations |
+       duplicate and won't do | delete. A divider only renders where the group
+       before it does, and Delete is always last. The shortcut hints are for a
+       keyboard (`show-only-on-mouse-primary`); a touch screen has none. -->
+  @if (isMarkDoneShown) {
     <button
       (click)="toggleTaskDone()"
       mat-menu-item
@@ -93,16 +97,13 @@
           (task.isDone ? T.F.TASK.CMP.MARK_UNDONE : T.F.TASK.CMP.MARK_DONE) | translate
         }}
       </span>
-      <span class="key-i">{{ kb.taskToggleDone }}</span>
+      <span class="key-i show-only-on-mouse-primary">{{ kb.taskToggleDone }}</span>
     </button>
   }
 
-  @if (
-    isFocusModeEnabled() &&
-    isAdvancedControls() &&
-    !task.isDone &&
-    !task.subTaskIds.length
-  ) {
+  <!-- Not on touch: the header has the Focus button, and an entry here was the
+       first row of a menu a thumb scrolls. -->
+  @if (isFocusShown) {
     <button
       (click)="goToFocusMode()"
       mat-menu-item
@@ -114,13 +115,7 @@
       <!--    <span class="key-i">{{ kb.goToFocusMode }}</span>-->
     </button>
   }
-  @if (
-    isTimeTrackingEnabled() &&
-    ((isAdvancedControls() && isTouchActive()) || !isAdvancedControls()) &&
-    !task.isDone &&
-    !isCurrent &&
-    !task.subTaskIds.length
-  ) {
+  @if (isTrackShown) {
     <button
       (click)="startTask()"
       mat-menu-item
@@ -129,16 +124,10 @@
         <mat-icon class="play-icon">play_arrow</mat-icon>
         {{ T.F.TASK.CMP.TRACK_TIME | translate }}
       </span>
-      <span class="key-i">{{ kb.togglePlay }}</span>
+      <span class="key-i show-only-on-mouse-primary">{{ kb.togglePlay }}</span>
     </button>
   }
-  @if (
-    isAdvancedControls() &&
-    isTouchActive() &&
-    !task.isDone &&
-    isCurrent &&
-    !task.subTaskIds.length
-  ) {
+  @if (isPauseShown) {
     <button
       (click)="pauseTask()"
       mat-menu-item
@@ -147,11 +136,11 @@
         <mat-icon>pause</mat-icon>
         {{ T.F.TASK.CMP.TRACK_TIME_STOP | translate }}
       </span>
-      <span class="key-i">{{ kb.togglePlay }}</span>
+      <span class="key-i show-only-on-mouse-primary">{{ kb.togglePlay }}</span>
     </button>
   }
 
-  @if (isAdvancedControls() && !task.parentId && !task.isDone) {
+  @if (isSubtaskShown) {
     <button
       (click)="addSubTask()"
       mat-menu-item
@@ -160,8 +149,26 @@
         <mat-icon>playlist_add</mat-icon>
         {{ T.F.TASK.CMP.ADD_SUB_TASK | translate }}
       </span>
-      <span class="key-i">{{ kb.taskAddSubTask }}</span>
+      <span class="key-i show-only-on-mouse-primary">{{ kb.taskAddSubTask }}</span>
     </button>
+  }
+
+  <!-- Touch's only way into multi-selection (there is no modifier key), so it
+       sits with the actions a person comes here for, not under the plugins. -->
+  @if (isSelectShown) {
+    <button
+      (click)="enterSelectionMode()"
+      mat-menu-item
+    >
+      <span class="menuItemLeft">
+        <mat-icon>select_check_box</mat-icon>
+        {{ T.F.TASK.MULTI_SELECT.SELECT_ENTRY | translate }}
+      </span>
+    </button>
+  }
+
+  @if (hasQuickActions) {
+    <mat-divider></mat-divider>
   }
 
   @if (!task.subTaskIds.length) {
@@ -175,7 +182,9 @@
         <mat-icon>hourglass_empty</mat-icon>
         {{ T.F.TASK.CMP.ESTIMATE | translate }}
       </span>
-      <span class="key-i">{{ kb.taskOpenEstimationDialog }}</span>
+      <span class="key-i show-only-on-mouse-primary">{{
+        kb.taskOpenEstimationDialog
+      }}</span>
     </button>
   }
 
@@ -191,7 +200,7 @@
       <mat-icon>label</mat-icon>
       {{ T.F.TASK.CMP.TOGGLE_TAGS | translate }}
     </span>
-    <span class="key-i">{{ kb.taskEditTags }}</span>
+    <span class="key-i show-only-on-mouse-primary">{{ kb.taskEditTags }}</span>
   </button>
 
   <button
@@ -225,7 +234,7 @@
           ) | translate
         }}
       </span>
-      <span class="key-i">{{ kb.taskMoveToProject }}</span>
+      <span class="key-i show-only-on-mouse-primary">{{ kb.taskMoveToProject }}</span>
     </button>
   }
   @if (task.parentId) {
@@ -252,7 +261,7 @@
         <mat-icon>move_down</mat-icon>
         {{ T.F.TASK.CMP.MOVE_TO_BACKLOG | translate }}
       </span>
-      <span class="key-i">{{ kb.moveToBacklog }}</span>
+      <span class="key-i show-only-on-mouse-primary">{{ kb.moveToBacklog }}</span>
     </button>
   }
   @if (
@@ -304,90 +313,83 @@
     </button>
   }
 
-  <!--TODO maybe handle dynamically -->
-  @if (task.issueId && task.issueType !== ICAL_TYPE) {
-    <a
-      [href]="issueUrl$ | async"
-      mat-menu-item
-      style="color: inherit"
-      target="_blank"
-    >
-      <mat-icon [svgIcon]="task.issueType | issueIcon"></mat-icon>
-      {{ T.F.TASK.CMP.OPEN_ISSUE | translate }}
-    </a>
-  }
-  @if (task.issueId && task.issueType !== ICAL_TYPE) {
-    <button
-      (click)="updateIssueData()"
-      mat-menu-item
-    >
-      <mat-icon [svgIcon]="task.issueType | issueIcon"></mat-icon>
-      {{ T.F.TASK.CMP.UPDATE_ISSUE_DATA | translate }}
-    </button>
-  }
-  @if (isPlainspaceHandoff) {
-    <button
-      #plainspaceAssignMenuTrigger="matMenuTrigger"
-      [matMenuTriggerFor]="plainspaceAssignMenu"
-      mat-menu-item
-      [menuTouchFix]="plainspaceAssignMenuTrigger"
-      (menuOpened)="loadPlainspaceMembers()"
-    >
-      <span class="menuItemLeft">
-        <mat-icon>person_add</mat-icon>
-        {{ T.PLAINSPACE.HANDOFF.ASSIGN_TO | translate }}
-      </span>
-    </button>
-    <button
-      (click)="handOffPlainspaceTask(null)"
-      mat-menu-item
-    >
-      <mat-icon>person_remove</mat-icon>
-      {{ T.PLAINSPACE.HANDOFF.RELEASE | translate }}
-    </button>
-  }
-  @if (pluginTaskContextMenuEntries().length) {
-    <button
-      #pluginTaskActionsMenuTrigger="matMenuTrigger"
-      [matMenuTriggerFor]="pluginTaskActionsMenu"
-      mat-menu-item
-      [menuTouchFix]="pluginTaskActionsMenuTrigger"
-      (menuOpened)="focusFirstSubmenuItem(pluginTaskActionsMenu)"
-    >
-      <span class="menuItemLeft">
-        <mat-icon>extension</mat-icon>
-        {{ T.PLUGINS.TASK_CONTEXT_MENU_ACTIONS | translate }}
-      </span>
-    </button>
-  }
+  <mat-divider></mat-divider>
 
-  @if (isTouchActive() && isInTaskRow) {
-    <button
-      (click)="enterSelectionMode()"
-      mat-menu-item
-    >
-      <span class="menuItemLeft">
-        <mat-icon>select_check_box</mat-icon>
-        {{ T.F.TASK.MULTI_SELECT.SELECT_ENTRY | translate }}
-      </span>
-    </button>
-  }
-
-  <!-- Only show the duplicate command if it is a parent unfinished task -->
-  @if (isAdvancedControls() && !task.parentId && !task.isDone) {
-    <button
-      (click)="duplicate()"
-      mat-menu-item
-    >
-      <span class="menuItemLeft">
-        <mat-icon>content_copy</mat-icon>
-        {{ T.F.TASK.CMP.DUPLICATE | translate }}
-      </span>
-      <span class="key-i">{{ kb.taskDuplicate }}</span>
-    </button>
+  @if (hasIntegrationActions) {
+    <!--TODO maybe handle dynamically -->
+    @if (task.issueId && task.issueType !== ICAL_TYPE) {
+      <a
+        [href]="issueUrl$ | async"
+        mat-menu-item
+        style="color: inherit"
+        target="_blank"
+      >
+        <mat-icon [svgIcon]="task.issueType | issueIcon"></mat-icon>
+        {{ T.F.TASK.CMP.OPEN_ISSUE | translate }}
+      </a>
+    }
+    @if (task.issueId && task.issueType !== ICAL_TYPE) {
+      <button
+        (click)="updateIssueData()"
+        mat-menu-item
+      >
+        <mat-icon [svgIcon]="task.issueType | issueIcon"></mat-icon>
+        {{ T.F.TASK.CMP.UPDATE_ISSUE_DATA | translate }}
+      </button>
+    }
+    @if (isPlainspaceHandoff) {
+      <button
+        #plainspaceAssignMenuTrigger="matMenuTrigger"
+        [matMenuTriggerFor]="plainspaceAssignMenu"
+        mat-menu-item
+        [menuTouchFix]="plainspaceAssignMenuTrigger"
+        (menuOpened)="loadPlainspaceMembers()"
+      >
+        <span class="menuItemLeft">
+          <mat-icon>person_add</mat-icon>
+          {{ T.PLAINSPACE.HANDOFF.ASSIGN_TO | translate }}
+        </span>
+      </button>
+      <button
+        (click)="handOffPlainspaceTask(null)"
+        mat-menu-item
+      >
+        <mat-icon>person_remove</mat-icon>
+        {{ T.PLAINSPACE.HANDOFF.RELEASE | translate }}
+      </button>
+    }
+    @if (pluginTaskContextMenuEntries().length) {
+      <button
+        #pluginTaskActionsMenuTrigger="matMenuTrigger"
+        [matMenuTriggerFor]="pluginTaskActionsMenu"
+        mat-menu-item
+        [menuTouchFix]="pluginTaskActionsMenuTrigger"
+        (menuOpened)="focusFirstSubmenuItem(pluginTaskActionsMenu)"
+      >
+        <span class="menuItemLeft">
+          <mat-icon>extension</mat-icon>
+          {{ T.PLUGINS.TASK_CONTEXT_MENU_ACTIONS | translate }}
+        </span>
+      </button>
+    }
+    <mat-divider></mat-divider>
   }
 
   @if (!task.isDone) {
+    <!-- Only show the duplicate command if it is a parent unfinished task -->
+    @if (isAdvancedControls() && !task.parentId) {
+      <button
+        (click)="duplicate()"
+        mat-menu-item
+      >
+        <span class="menuItemLeft">
+          <mat-icon>content_copy</mat-icon>
+          {{ T.F.TASK.CMP.DUPLICATE | translate }}
+        </span>
+        <span class="key-i show-only-on-mouse-primary">{{ kb.taskDuplicate }}</span>
+      </button>
+    }
+
     <button
       (click)="setWontDo()"
       mat-menu-item
@@ -397,21 +399,24 @@
         {{ T.F.TASK.CMP.MARK_WONT_DO | translate }}
       </span>
     </button>
+    <mat-divider></mat-divider>
   }
 
+  <!-- `color-warn` carries no style: it is the long-standing hook the e2e specs
+       (and recently-deleted-helpers) use to find this button. -->
   <button
     (click)="deleteTask()"
-    class="color-warn"
+    class="color-warn mat-menu-item-warn"
     mat-menu-item
   >
     <span class="menuItemLeft">
-      <mat-icon class="color-warn-i">delete</mat-icon>
+      <mat-icon>delete</mat-icon>
       {{
         (task.repeatCfgId ? T.F.TASK.CMP.DELETE_REPEAT_INSTANCE : T.F.TASK.CMP.DELETE)
           | translate
       }}
     </span>
-    <span class="key-i">{{ kb.taskDelete }}</span>
+    <span class="key-i show-only-on-mouse-primary">{{ kb.taskDelete }}</span>
   </button>
 </mat-menu>
 

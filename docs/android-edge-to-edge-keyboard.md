@@ -651,6 +651,94 @@ items to **check**, not to blind-fix — a blind fix risks re-creating #8508.
    so connected overlays clamp below the status bar. Likely more correct; re-test
    the overlay matrix.
 
+## SystemBars re-applies its own bar style on every configuration change (implemented 2026-11, unconfirmed on a device)
+
+From the [mobile UI audit](research/2026-11-15-mobile-ui-ux-audit.md#the-android-top-bar),
+item A1. Read off the bundled Capacitor `SystemBars.java`: the plugin keeps **its
+own copy** of the bar icon style (seeded from `plugins.SystemBars.style` in
+`capacitor.config.ts`, `'DARK'`) and, on every configuration change (a rotation, a
+system dark-mode flip, a hardware keyboard, a display-size change, a fold), re-runs
+`setStyle` for both bars from that copy and resets the window background to the
+system-theme colour. The app used to set the icon style only through
+`StatusBar.setStyle` and its own `NavigationBar` plugin, which `SystemBars` does
+not know. Capacitor visits its plugins in `HashMap` order, and a JVM run with the
+app's 16 plugin ids put `StatusBar` before `SystemBars`, so `SystemBars` would have
+won by accident of that order (it changes with 12 or fewer plugins), not by design.
+All of this is from the source and that JVM run. Expected on a device, in the light
+app theme: after any of those changes the clock and battery turn white on the
+near-white header, and on the non-passthrough bands (WebView < 140) the strip
+colour reverts to the system theme.
+
+What the app does now (`src/app/core/theme/android-system-bars.util.ts`, called
+from `GlobalThemeService._initMobileStatusBar`):
+
+- `applyAndroidBarAppearance()` also calls `SystemBars.setStyle` for the status
+  bar and for the navigation bar, so the copy `SystemBars` re-applies is the right
+  one, and then `NavigationBar.setColor` and `NavigationBar.setWebViewBackgroundColor`.
+  **The order matters:** `SystemBars.setStyle` resets the window decor background,
+  so the two calls that paint the app theme go after it.
+- `androidBarReapply$()` runs that effect again, debounced by 250ms, on
+  `orientationchange`, `resize` and the `prefers-color-scheme` change (a system
+  dark-mode flip fires neither of the first two). `resize` also fires when the
+  keyboard opens or closes, so each of those costs one burst of 4–5 bridge calls.
+  It is skipped in the legacy Android WebView.
+- `values-v35/styles.xml` must mirror `values/styles.xml`. A qualified resource
+  **replaces** the style of the same name, it does not merge, and the v35 file
+  carried only `windowOptOutEdgeToEdgeEnforcement`: API 35 lost `statusBarColor`
+  at launch and showed the AppCompat default dark-blue bar until the StatusBar
+  plugin loaded. It now has every item of `AppTheme`; change one file, change both.
+- `style: 'DARK'` in `capacitor.config.ts` is only the value before the theme
+  service boots.
+
+**Status: implemented and unit-tested; the call sequence was shown on a simulated
+`androidBridge` only.** There: 3 bar calls at start and none after a rotation or a
+dark-mode flip before, 5 at start and the full set again after both now. Whether
+the icons and the strip colour are right on a device is **not confirmed**. Do the
+five-minute phone check from the audit's
+[The Android top bar](research/2026-11-15-mobile-ui-ux-audit.md#the-android-top-bar)
+before calling it fixed: screenshot in portrait, rotate and rotate back, screenshot
+again (the icons are its item 2); and compare the light and dark app theme against
+the light and dark system theme, a hardware keyboard, and an AVD with API 34 and
+WebView 113 for the strip colour. No inset code changed.
+
+**The Back button closes what is on top first.** `AndroidBackButtonService`
+(`handleBackButton`) works down a fixed order: the focus overlay, the task context
+menus, then (step 2b) the top CDK overlay that has a backdrop and is not a dialog
+(a header, drawer-row or picker menu, a select, a sheet with no history entry of its
+own), closed with Escape on `<body>`, and it stops there; while a history-backed
+panel is open it leaves a non-transparent backdrop to that panel, which pops its own
+history entry in step 3. The backdrop is looked up as a _descendant_ of
+`.cdk-overlay-container`: with the Popover API (Chromium 114 and later, so nearly every
+Android WebView) the CDK puts it inside the overlay's host element, and only an older
+WebView leaves it a direct child. A backdrop that has already had its Escape is skipped on
+the next press (it is closing, or it ignores Escape), so one overlay cannot trap the
+button; `android-back-button.service.spec.ts` opens a real CDK overlay to cover the
+layout the browser actually builds. Step 2c lets the top dialog answer for itself
+(`src/app/ui/dialog-back-handler.util.ts`: a create or edit dialog with typed text
+asks "Discard?" instead of closing). Only then come the history overlay, the
+dialog, the store-backed popups, a multi-selection and navigation. Leaving the
+phone shell with the Browse drawer open (a rotation) also pops the drawer's history
+entry, so the next Back is not spent on a page that looks the same. Unit-tested
+only; a desktop browser cannot send the Capacitor back event. On a device: open the
+project menu, press Back, and the menu closes while the page stays.
+
+Known limits of the chain, found reading it (none loses a saved change):
+
+- Any `popstate` disposes every dialog that closes on navigation, without the discard
+  question, which only the Back key asks. New `history.back()` callers are the drawer
+  leaving the phone shell (a rotation), Settings closing, and the task panel handing
+  over between sheet and column. A dirty dialog opened from the drawer is lost if the
+  phone is rotated past 600px with it open.
+- Step 3 (a history-backed overlay) runs before step 4 (a plain dialog), and the `popstate`
+  disposes the dialog too, so one press closes both: for example "Browse backups" inside
+  a Settings category also drops the category to the list.
+- The notes sheet pushes a history entry that nothing pops when it is dismissed by its
+  backdrop, a swipe or Escape, so the next Back does nothing visible (as before this work).
+- A Settings category opened from a `?tab=` or `?section=` link is not a history entry:
+  Back closes Settings, while the header arrow goes to the list.
+- A first colour pick in a Create dialog does not arm its discard question
+  (`useFormsDirty` reads `dirty` before the colour input marks it).
+
 ## Nav-bar overlap check
 
 For reports like "the system's back/home/recents buttons cover the app's

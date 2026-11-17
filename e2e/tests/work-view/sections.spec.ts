@@ -391,6 +391,10 @@ test.describe('Sections', () => {
     const ty = tBox.y + tBox.height / 2;
     /* eslint-enable no-mixed-operators */
 
+    // A menu that has just closed keeps its transparent backdrop until its exit ends
+    // (seconds, with animations disabled): a press in that window lands on the backdrop
+    // and never reaches the drag handle.
+    await expect(page.locator('.cdk-overlay-backdrop')).toHaveCount(0);
     await page.mouse.move(sx, sy);
     await page.mouse.down();
     // Initial nudge past CDK's drag threshold (5px by default).

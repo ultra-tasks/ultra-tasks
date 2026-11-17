@@ -14,6 +14,7 @@ import { registerTranslateExtension } from './formly-translate-extension/formly-
 import { FormlyTranslatedTemplateComponent } from './formly-translated-template/formly-translated-template.component';
 import { FormlyMatToggleModule } from '@ngx-formly/material/toggle';
 import { FormlyLinkWidgetComponent } from './formly-link-widget/formly-link-widget.component';
+import { mobileInputHintsExtension } from './formly-input-hints/input-hints.util';
 
 import { FormlyCollapsibleComponent } from './formly-collapsible/formly-collapsible.component';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- grandfathered layer-boundary debt
@@ -163,6 +164,8 @@ import { FormlyLabelledGroupWrapperComponent } from './formly-labelled-group/for
             },
           },
         },
+        // inputmode, autocapitalize, spellcheck and enterkeyhint of every text input
+        { name: 'mobile-input-hints', extension: mobileInputHintsExtension },
       ],
       wrappers: [
         { name: 'setting', component: FormlySettingWrapperComponent },

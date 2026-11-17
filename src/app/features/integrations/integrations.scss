@@ -1,3 +1,5 @@
+@use '../../../styles/_globals.scss' as *;
+
 :host {
   display: block;
 }
@@ -19,6 +21,11 @@ h3 {
 }
 p {
   margin: var(--s) 0 var(--s2);
+}
+// The shared .empty-state sets its own spacing; the paragraph margin above must
+// not add to it.
+.empty-state > p {
+  margin: 0;
 }
 .heading,
 .toolbar,
@@ -283,7 +290,7 @@ dd {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-@media (max-width: 600px) {
+@include mq(xs, max) {
   .surface {
     padding: var(--s2);
   }

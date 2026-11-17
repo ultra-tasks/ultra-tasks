@@ -1,7 +1,15 @@
 import { expect, Page } from '@playwright/test';
 
+// Below 600px (the phone breakpoint) the header has room for one button beside the
+// title, so the project view lives in the single "Page options" menu instead of its
+// own "Project view" button.
+const PHONE_MAX_WIDTH = 599;
+
 export const openProjectViewMenu = async (page: Page): Promise<void> => {
-  const button = page.getByRole('button', { name: 'Project view', exact: true });
+  const isPhone = (page.viewportSize()?.width ?? Infinity) <= PHONE_MAX_WIDTH;
+  const button = isPhone
+    ? page.getByRole('button', { name: /^Page options/ })
+    : page.getByRole('button', { name: 'Project view', exact: true });
   const list = page.getByRole('menuitemradio', { name: 'List', exact: true });
   if (!(await list.isVisible())) await button.click();
   await expect(list).toBeVisible();

@@ -1,34 +1,35 @@
-# Ultra Tasks 0.3.0
+# Ultra Tasks 0.4.0-beta.1
 
-This beta introduces the **UltraTasks Account**: private, end-to-end encrypted sync across your devices, with a self-hostable server and an account dashboard.
+First testing release of Ultra Tasks 0.4.0. Export a backup before upgrading and keep your account recovery key.
 
 ## What's new
 
-- Your UltraTasks account is the default in new sync setup. Use the official service or a custom HTTPS endpoint for your own Docker installation.
-- Sign in directly in the app or continue in your browser, complete two-factor authentication, and return to the requesting app. The encrypted handoff supports cold starts and a polling fallback when return links are blocked.
-- The account dashboard supports TOTP, passkeys/security keys as second factors, recovery keys, device-session management, and encrypted-storage usage.
-- Private changes sync automatically while unlocked, with live notifications and a 60-second HTTP fallback. Mobile suspension, network conditions and account size affect delivery time.
-- New registrations on the official server remain closed while outgoing account email and the operator privacy notice are finalized. Self-hosted servers can enable registration after their own setup.
-- OneDrive and WebDAV are the basic personal-only alternatives. Saved SuperSync, Dropbox, Nextcloud and local-file configurations remain usable as deprecated connections. Export/backup remains available.
-- Switching providers requires disconnecting first. It does not migrate or delete the previous remote dataset. Choose explicitly between this device's tasks and existing account data.
-- A unified integrations workspace groups connected services with guided setup, project links and field policies.
-- Mobile header glass now extends behind the status bar, notch and island, alongside navigation and persistence fixes.
+- A calmer interface across desktop and mobile: compact navigation, page actions, settings organization, task details, notes, calendar and planning improvements.
+- Improved Android edge-to-edge layout, keyboard handling, system bars and back navigation.
+- Task planning messages now offer Undo without accidentally reversing a later task edit.
+- GitHub, GitLab, Linear and Trello connections support explicit field directions and creation where available. Official sign-in uses configured public app registrations; manual token setup remains available.
+- New connection credentials stay on the device. One device owns source communication; edits from other devices wait for that owner. Ownership can be moved explicitly.
+- GitLab and Linear gain title, description and completion write-back. Trello can optionally move completed cards to a selected Done list instead of archiving them. GitHub label mapping preserves unrelated local tags.
+- Opt-in calendar publication is implemented with busy-only output by default, stable event identities and URL rotation/revocation. It requires a compatible server with the feature enabled and an updated operator privacy notice.
+- Native credential-storage, recovery and iOS bridge fixes from the remaining worktrees are included.
 
-## Beta scope
+## Beta limits and testing
 
-Your UltraTasks account supports private personal sync. Team collaboration, the full hosted task application, and Google Drive integration follow later. Keep your recovery key and an exported backup. Large accounts still use full-head catch-up and can incur substantial transfer and latency; this beta does not promise sub-two-second convergence for every dataset. Physical-device acceptance and independent specialist cryptographic review remain outstanding.
+- Live provider consent, registered callbacks and real-account write-back still need testing for all four providers. Automated mocked-provider checks do not certify account permissions.
+- Calendar subscriptions still need acceptance in Google Calendar, Apple Calendar, Outlook and Thunderbird. This beta publishes existing scheduled instances only; future recurrence projections are deferred.
+- The hosted web build is local-only. Browser account sync and calendar publishing from that build are outside this beta.
+- Physical Android/iOS acceptance, independent security review and the remaining documented sync-order limitations are not certified by this testing release.
+- Official account registration remains closed until the operator enables it. Keep an exported backup and your recovery key.
 
-The official dashboard is at [app.ultratasks.app/account](https://app.ultratasks.app/account). Self-hosting code and Docker installation instructions are in [ultra-tasks-server](https://github.com/ultra-tasks/ultra-tasks-server).
+## Distribution
 
-## Downloads
+- Windows: unsigned Setup and Portable executables for x64 and ARM64.
+- macOS: Developer ID signed, notarized and stapled Intel, Apple Silicon and Universal DMGs, plus architecture-specific ZIPs. Publication requires signature and Gatekeeper checks to pass.
+- Linux x64: AppImage, DEB and RPM.
+- Android: signed standard and F-Droid-flavor APKs for direct installation. No Google Play submission or promotion is part of this beta.
+- Web: a versioned standalone bundle for operator installation.
+- iOS: TestFlight distribution is being prepared through the separate Apple signing pipeline; availability is recorded with the beta artifacts once upload succeeds.
 
-- **Windows:** Setup and Portable executables for Intel/AMD x64 and Windows ARM64.
-- **macOS:** Intel, Apple Silicon and Universal DMGs, plus architecture-specific ZIPs.
-- **Linux x64:** AppImage, DEB and RPM packages.
-- `SHA256SUMS.txt` provides download checksums.
+SHA256SUMS.txt covers the published direct-download files. Native installers and live accounts should be tested before any stable release or Android store submission.
 
-Windows downloads are unsigned. macOS downloads are ad-hoc signed without Apple notarization, matching the previous beta's packaging. Android APKs are signed with the project's release key and provided as direct downloads. This GitHub release does not publish to app stores; iOS source includes the sync implementation, with platform CI coverage.
-
-Ultra Tasks remains [AGPL-3.0-only](https://github.com/ultra-tasks/ultra-tasks/blob/ultra-tasks-v0.3.0/LICENSING.md), with preserved upstream and third-party rights.
-
-[Full changelog from 0.2.0](https://github.com/ultra-tasks/ultra-tasks/compare/ultra-tasks-v0.2.0...ultra-tasks-v0.3.0). Upstream provenance is recorded in [build/upstream-base.json](https://github.com/ultra-tasks/ultra-tasks/blob/ultra-tasks-v0.3.0/build/upstream-base.json).
+Ultra Tasks remains AGPL-3.0-only, with preserved upstream and third-party rights. This beta does not change the license or declare the server production ready.

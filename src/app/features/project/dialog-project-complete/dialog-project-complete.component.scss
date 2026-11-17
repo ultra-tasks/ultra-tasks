@@ -1,3 +1,5 @@
+@use '../../../../styles/_globals.scss' as *;
+
 :host {
   display: block;
   width: 100%;
@@ -214,7 +216,7 @@
   }
 }
 
-@media (max-width: 599px) {
+@include mq(xs, max) {
   .close-btn {
     top: calc(var(--safe-area-top, 0px) + var(--s));
     right: calc(var(--safe-area-right, 0px) + var(--s));

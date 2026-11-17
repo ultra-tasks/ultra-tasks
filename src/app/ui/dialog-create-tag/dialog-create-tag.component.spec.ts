@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslateModule } from '@ngx-translate/core';
+import { EMPTY } from 'rxjs';
 
 import { DialogCreateTagComponent } from './dialog-create-tag.component';
 
@@ -11,7 +12,14 @@ describe('DialogCreateTagComponent', () => {
   let mockDialogRef: jasmine.SpyObj<MatDialogRef<DialogCreateTagComponent>>;
 
   beforeEach(async () => {
-    mockDialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
+    mockDialogRef = jasmine.createSpyObj('MatDialogRef', [
+      'close',
+      'backdropClick',
+      'keydownEvents',
+    ]);
+    // the discard guard listens to both
+    mockDialogRef.backdropClick.and.returnValue(EMPTY);
+    mockDialogRef.keydownEvents.and.returnValue(EMPTY);
 
     await TestBed.configureTestingModule({
       imports: [

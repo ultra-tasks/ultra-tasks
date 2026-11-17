@@ -26,13 +26,16 @@ test('top search and device-local glass control work and persist', async ({
   await searchDialog.press('Escape');
   await expect(searchDialog).toBeHidden();
   await page.goto('/#/config?section=appearance');
-  const toggle = page.getByRole('checkbox', { name: 'Glass appearance' });
+  const toggle = page.getByRole('switch', { name: 'Glass appearance' });
   await expect(toggle).toBeChecked();
   // The web app draws its own blurred backdrop behind the glass surfaces.
   await expect(page.locator('body')).toHaveClass(/st-glass-bitmap/);
   await expect(page.locator('glass-backdrop canvas')).toBeAttached();
   await expect(page.locator('glass-settings .st-glass-background')).toBeVisible();
-  await toggle.uncheck();
+  // A Material switch updates its state a tick after the click, so click and then
+  // wait for it instead of uncheck()/check(), which read the state right away.
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
   await expect(page.locator('body')).toHaveClass(/st-solid/);
   await expect(page.locator('glass-backdrop')).toHaveCount(0);
   await expect(page.locator('glass-settings .st-glass-background')).toHaveCount(0);
@@ -40,7 +43,8 @@ test('top search and device-local glass control work and persist', async ({
   // Settings opens as a dialog; reopen it after the route restores the workspace.
   await page.goto('/#/config?section=appearance');
   await expect(toggle).not.toBeChecked();
-  await toggle.check();
+  await toggle.click();
+  await expect(toggle).toBeChecked();
   await page.goto('/#/project/INBOX_PROJECT/tasks');
   await workViewPage.waitForTaskList();
   for (const dark of [false, true]) {
@@ -61,7 +65,8 @@ test('top search and device-local glass control work and persist', async ({
   await expect(page.locator('.nav-sidenav')).toHaveCSS('backdrop-filter', 'none');
   await page.emulateMedia({ forcedColors: 'none' });
   await page.goto('/#/config?section=appearance');
-  await toggle.uncheck();
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
   await page.goto('/#/project/INBOX_PROJECT/tasks');
   await workViewPage.waitForTaskList();
   await expect(page.locator('.nav-sidenav')).toHaveCSS('backdrop-filter', 'none');

@@ -36,3 +36,20 @@ export const dialogSize = (
 export const useDialogSize = (size: DialogSize): void => {
   inject(MatDialogRef, { optional: true })?.addPanelClass?.(`dialog-${size}`);
 };
+
+/**
+ * A share of the viewport height as `dvh`, which follows the visible viewport
+ * (browser bars, the keyboard), or as `vh` in a WebView older than Chrome 108,
+ * which does not know the unit and would drop the declaration.
+ */
+export const viewportHeight = (percent: number): string =>
+  `${percent}${typeof CSS !== 'undefined' && CSS.supports?.('height', '1dvh') ? 'dvh' : 'vh'}`;
+
+/**
+ * The tall window the Settings, Plugins and task-notes dialogs share: 86% of the
+ * viewport height and never more than 96%. Spread it into `MatDialog.open()`.
+ */
+export const dialogWindowHeight = (): Pick<MatDialogConfig, 'height' | 'maxHeight'> => ({
+  height: viewportHeight(86),
+  maxHeight: viewportHeight(96),
+});

@@ -10,7 +10,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormlyModule } from '@ngx-formly/core';
-import { of, Subject } from 'rxjs';
+import { EMPTY, of, Subject } from 'rxjs';
 import { DialogSyncCfgComponent } from './dialog-sync-cfg.component';
 import { SyncConfigService } from '../sync-config.service';
 import { SyncWrapperService } from '../sync-wrapper.service';
@@ -54,7 +54,14 @@ describe('DialogSyncCfgComponent', () => {
   } as SyncConfig;
 
   beforeEach(async () => {
-    mockDialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
+    mockDialogRef = jasmine.createSpyObj('MatDialogRef', [
+      'close',
+      'backdropClick',
+      'keydownEvents',
+    ]);
+    // the discard guard listens to both
+    mockDialogRef.backdropClick.and.returnValue(EMPTY);
+    mockDialogRef.keydownEvents.and.returnValue(EMPTY);
     mockSyncConfigService = jasmine.createSpyObj('SyncConfigService', [
       'updateSettingsFromForm',
     ]);

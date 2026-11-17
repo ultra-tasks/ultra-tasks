@@ -18,6 +18,14 @@
   --task-button-spacer: 1px;
   --play-icon-size: 22px;
   --mini-badge-size: var(--s2);
+  // How far the date, deadline and count chips sit below the centre of their icon
+  // button. 10px leaves them over 40% of the glyph, which turns a flag into a
+  // bracket; on a phone, where glyph and chip are both larger, they sit lower.
+  --task-badge-offset: calc(var(--s) + var(--s-quarter));
+
+  @include mq(xs, max) {
+    --task-badge-offset: calc(var(--s1-5) + var(--s-quarter));
+  }
 
   display: block;
   position: relative;
@@ -90,6 +98,9 @@
   // it stays clearly visible even once focus moves elsewhere, and it
   // traces whatever radius the box already has — no border-radius of its own, so
   // nothing can leak into the sub-task boxes (which are deliberately square).
+  // Drawn inside the box, like the keyboard focus ring: rows in a long list are
+  // painted with `content-visibility: auto`, which clips anything outside the
+  // row's own box.
   :host.highlight-searched-task
     > swipe-block
     ::ng-deep
@@ -97,6 +108,7 @@
     > .inner-wrapper
     > & {
     outline: var(--focus-ring-width) solid var(--palette-focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
   :host.isCurrent.isCurrent.isCurrent.isCurrent.isCurrent
@@ -225,8 +237,12 @@
     flex-basis: 50%;
   }
 
+  // A finished row is quieter, not faint: the strike-through and the muted ink
+  // (the text tier that holds its contrast on the card) instead of dimming the
+  // whole line to 30% opacity, which left the title at 2.1:1 and the tags at
+  // 1.6:1 in light, and made the toggle that reopens it hard to find.
   @include isDoneForFirstLine {
-    opacity: var(--task-is-done-dim-opacity);
+    color: var(--text-color-muted);
 
     ::ng-deep .display-value {
       text-decoration: line-through;

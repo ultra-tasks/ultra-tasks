@@ -20,8 +20,11 @@ import { LongPressDirective } from '../../../ui/longpress/longpress.directive';
 import { MagicNavConfigService } from '../../magic-side-nav/magic-nav-config.service';
 import { T } from '../../../t.const';
 import { TaskService } from '../../../features/tasks/task.service';
+import { selectLastCurrentTask } from '../../../features/tasks/store/task.selectors';
+import { Store } from '@ngrx/store';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { animationFrameScheduler, Subscription } from 'rxjs';
-import { distinctUntilChanged, observeOn } from 'rxjs/operators';
+import { distinctUntilChanged, map, observeOn } from 'rxjs/operators';
 
 @Component({
   selector: 'play-button',
@@ -70,10 +73,10 @@ import { distinctUntilChanged, observeOn } from 'rxjs/operators';
         (contextmenu)="$event.preventDefault(); openFeatureMenu()"
         (longPress)="onLongPress()"
         [color]="currentTaskId() ? 'accent' : 'primary'"
-        [matTooltip]="tooltipText() | translate"
-        [attr.aria-label]="tooltipText() | translate"
+        [matTooltip]="tooltipKey() | translate: tooltipParams()"
+        [attr.aria-label]="tooltipKey() | translate: tooltipParams()"
         matTooltipPosition="below"
-        class="play-btn tour-playBtn mat-elevation-z3"
+        class="play-btn tour-playBtn mat-elevation-z3 mat-mini-fab-touch"
         [class.mat-mini-fab-icon]="isIconButton()"
         mat-mini-fab
         [disabled]="isDisabled()"
@@ -192,12 +195,15 @@ export class PlayButtonComponent implements OnInit, OnDestroy {
   private _cd = inject(ChangeDetectorRef);
   private _navConfigService = inject(MagicNavConfigService);
   private _translateService = inject(TranslateService);
+  private _store = inject(Store);
   private _isLongPressClick = false;
 
   readonly T = T;
   readonly taskService = inject(TaskService);
 
   readonly currentTaskId = input<string | null>();
+  /** Names the task the button would pause, for the accessible name. */
+  readonly currentTaskTitle = input<string | null>();
   readonly isMobile = input(false);
   readonly isIconButton = computed(() => this.isMobile() && !this.currentTaskId());
   readonly hasTrackableTasks = input<boolean>(true);
@@ -209,8 +215,40 @@ export class PlayButtonComponent implements OnInit, OnDestroy {
   readonly isDisabled = computed(
     () => !this.currentTaskId() && !this.hasTrackableTasks(),
   );
-  readonly tooltipText = computed(() =>
-    this.isDisabled() ? T.MH.NO_TASKS_TO_TRACK : T.MH.TOGGLE_TRACK_TIME,
+  /**
+   * What the button does right now, not what it might do: a static "Start/stop
+   * tracking time" said neither, and with a task running said nothing about which.
+   */
+  readonly tooltipKey = computed(() => {
+    if (this.isDisabled()) {
+      return T.MH.NO_TASKS_TO_TRACK;
+    }
+    if (!this.currentTaskId()) {
+      return this._resumeTitle() ? T.MH.RESUME_TRACKING_TASK : T.F.TASK.CMP.TRACK_TIME;
+    }
+    return this.currentTaskTitle()
+      ? T.MH.PAUSE_TRACKING_TASK
+      : T.F.TASK.CMP.TRACK_TIME_STOP;
+  });
+  readonly tooltipParams = computed(() => ({
+    title: (this.currentTaskId() ? this.currentTaskTitle() : this._resumeTitle()) ?? '',
+  }));
+
+  /**
+   * The task a press would pick up while idle: the one tracked last, as long as
+   * it can still be tracked (not done, no subtasks). That is the rule the toggle
+   * effect applies before it falls back to the first task of the list, so the
+   * name is only given where it is certain.
+   */
+  private readonly _resumeTitle = toSignal(
+    this._store
+      .select(selectLastCurrentTask)
+      .pipe(
+        map((task) =>
+          task && !task.isDone && !task.subTaskIds.length ? task.title : null,
+        ),
+      ),
+    { initialValue: null },
   );
 
   private _subs = new Subscription();

@@ -19,15 +19,16 @@ import {
 import { MAT_BOTTOM_SHEET_DATA, MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { TaskDetailPanelComponent } from '../tasks/task-detail-panel/task-detail-panel.component';
 import { NotesComponent } from '../note/notes/notes.component';
-import { TaskViewCustomizerPanelComponent } from '../task-view-customizer/task-view-customizer-panel/task-view-customizer-panel.component';
+import { TaskViewCustomizerSheetComponent } from '../task-view-customizer/task-view-customizer-sheet/task-view-customizer-sheet.component';
 import { PluginPanelContainerComponent } from '../../plugins/ui/plugin-panel-container/plugin-panel-container.component';
+import { PlannerUnscheduledPanelComponent } from '../planner/planner-unscheduled-panel/planner-unscheduled-panel.component';
 import { fadeAnimation } from '../../ui/animations/fade.ani';
 import { taskDetailPanelTaskChangeAnimation } from '../tasks/task-detail-panel/task-detail-panel.ani';
 import { TaskService } from '../tasks/task.service';
 import { Log } from '../../core/log';
 import { PanelContentService, PanelContentType } from '../panels/panel-content.service';
 import { BottomPanelStateService } from '../../core-ui/bottom-panel-state.service';
-import { IS_TOUCH_ONLY } from '../../util/is-touch-only';
+import { IS_TOUCH_PRIMARY } from '../../util/is-mouse-primary';
 import { BodyClass } from '../../app.constants';
 
 export interface BottomPanelData {
@@ -39,6 +40,9 @@ const PANEL_HEIGHTS = {
   MAX_HEIGHT_ABSOLUTE: 0.98,
   TASK_PANEL_HEIGHT: 0.6,
   NOTES_PANEL_HEIGHT: 0.6,
+  // Sort, group and filter apply as they are picked: leave the list above the
+  // sheet in view to show it.
+  CUSTOMIZER_PANEL_HEIGHT: 0.6,
   OTHER_PANEL_HEIGHT: 0.9,
   // Upward fling → expand to MAX_HEIGHT.
   VELOCITY_THRESHOLD: 0.5, // px/ms
@@ -74,6 +78,8 @@ export const getInitialBottomPanelHeightRatio = (
       return PANEL_HEIGHTS.TASK_PANEL_HEIGHT;
     case 'NOTES':
       return PANEL_HEIGHTS.NOTES_PANEL_HEIGHT;
+    case 'TASK_VIEW_CUSTOMIZER_PANEL':
+      return PANEL_HEIGHTS.CUSTOMIZER_PANEL_HEIGHT;
     default:
       return PANEL_HEIGHTS.OTHER_PANEL_HEIGHT;
   }
@@ -111,8 +117,9 @@ const KEYBOARD_RESIZE_DEBOUNCE_MS = 100;
   imports: [
     TaskDetailPanelComponent,
     NotesComponent,
-    TaskViewCustomizerPanelComponent,
+    TaskViewCustomizerSheetComponent,
     PluginPanelContainerComponent,
+    PlannerUnscheduledPanelComponent,
   ],
   standalone: true,
 })
@@ -170,12 +177,15 @@ export class BottomPanelContainerComponent implements AfterViewInit, OnDestroy {
   private readonly _boundOnPointerUp = this._onPointerUp.bind(this);
   private readonly _boundOnPointerCancel = this._onPointerCancel.bind(this);
   private readonly _boundOnViewportResize = this._onViewportResize.bind(this);
+  private readonly _boundOnOrientationResize = this._onOrientationResize.bind(this);
+  private _lastInnerWidth = window.innerWidth;
 
   ngAfterViewInit(): void {
     this._bottomPanelState.isOpen.set(true);
     this._setupDragListeners();
     this._setupKeyboardWatcher();
     this._setInitialHeight();
+    window.addEventListener('resize', this._boundOnOrientationResize);
 
     this._disableAniTimeout = window.setTimeout(() => {
       this.isDisableTaskPanelAni.set(false);
@@ -183,6 +193,7 @@ export class BottomPanelContainerComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    window.removeEventListener('resize', this._boundOnOrientationResize);
     this._removeDragListeners();
     this._removeKeyboardWatcher();
     window.clearTimeout(this._disableAniTimeout);
@@ -441,6 +452,21 @@ export class BottomPanelContainerComponent implements AfterViewInit, OnDestroy {
     }, dur);
   }
 
+  /**
+   * The sheet is sized in pixels when it opens. An open panel now survives a rotation or
+   * an unfolding, and would keep the height it had for the old screen, which can be
+   * taller than the new one. Those change the width; the keyboard changes the height
+   * alone and is handled by `_handleViewportResize`.
+   */
+  private _onOrientationResize(): void {
+    const width = window.innerWidth;
+    if (width === this._lastInnerWidth) return;
+    this._lastInnerWidth = width;
+    if (!this._isDragging) {
+      this._setInitialHeight();
+    }
+  }
+
   private _setInitialHeight(): void {
     const container = this._getSheetContainer();
     if (container) {
@@ -466,8 +492,11 @@ export class BottomPanelContainerComponent implements AfterViewInit, OnDestroy {
   }
 
   private _setupKeyboardWatcher(): void {
+    // Touch PRIMARY, not touch only: a phone's Chrome or an installed PWA is a
+    // hybrid device to the detection library and never counted as touch only,
+    // yet it has the on-screen keyboard this watcher exists for.
     if (
-      !IS_TOUCH_ONLY ||
+      !IS_TOUCH_PRIMARY ||
       this._isKeyboardWatcherInitialized ||
       typeof window === 'undefined'
     ) {

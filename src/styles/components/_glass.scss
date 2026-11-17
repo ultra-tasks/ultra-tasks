@@ -14,9 +14,10 @@
 // Surfaces: the shell frame (side nav, header, side-by-side right panel, the
 // phone's floating nav pill) is the most see-through glass. On a phone the header
 // and the pill hover over the page, so what scrolls behind them is blurred. The
-// content sheet behind the task list is the same frosted glass one step denser;
-// task cards, dialogs and menus stay opaque. Only static strips, side panels,
-// the pill and the content sheet blur. The phone drawer, which slides over the task list, is solid; the
+// content sheet behind the task list is the same tint one step denser, without a
+// blur of its own (what is behind it is the drawn backdrop, already blurred);
+// task cards, dialogs and menus stay opaque. Only static strips, side panels
+// and the pill blur. The phone drawer, which slides over the task list, is solid; the
 // full-width phone right panel gets a stronger tint without blur.
 //
 // Tokens come from palette roles: PaletteThemeService writes the normalised
@@ -24,6 +25,8 @@
 // text on glass), `--glass-ink-muted`, `--glass-focus-ring` and
 // `--glass-edge-line` inline on the root element, overriding these defaults
 // (docs/theming-contract.md § Glass roles).
+@use '../mixins/_media-queries';
+
 :root {
   --glass-panel-tint: var(--palette-background);
   --glass-canvas-tint: var(--palette-background);
@@ -126,18 +129,26 @@ body.ultra-tasks.st-glass {
     backdrop-filter: none !important;
   }
 
-  // The content sheet behind the task list: frosted like the frame, one step
-  // denser (canvas alpha), so the window reads as one pane of glass with the
-  // focus area standing out. The blur is on the wrapper itself, never on the
-  // routed page inside it, so route animations do not animate a blur.
+  // The content sheet behind the task list: the frame's tint one step denser
+  // (canvas alpha), so the window reads as one pane of glass with the focus area
+  // standing out. Tint only: behind it is the drawn backdrop, already blurred into
+  // a tiny canvas, so a live blur here changed at most 3/255 per channel yet was
+  // about half of the GPU work of the three blur layers on a phone. Keep it off:
+  // never put `backdrop-filter` on this wrapper or on the routed page inside it
+  // (route animations would animate a blur).
+  // `contain: layout` keeps what the filter also did here: the wrapper is the
+  // containing block for `position: fixed` descendants (e.g. the multi-select bar
+  // centres on the content column, not on the window) and a stacking context
+  // for their z-index. `container-type` (app.component.scss) does neither in
+  // current Chromium. Glass off never had either, as before.
   .route-wrapper {
     background: var(--glass-canvas-bg);
-    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    contain: layout;
   }
 }
 // The full-width (phone) right panel replaces the column, so only the backdrop
 // is behind it: a stronger tint, never an animated blur.
-@media (max-width: 599px) {
+@include media-queries.mq(xs, max) {
   body.ultra-tasks.st-glass .right-panel {
     background: var(--glass-overlay-bg) !important;
     backdrop-filter: none !important;
@@ -152,6 +163,25 @@ body.ultra-tasks.st-glass {
     .right-panel,
     .mobile-bottom-nav {
       background: var(--glass-overlay-bg) !important;
+    }
+  }
+}
+// No `color-mix()` (Chromium / Android WebView 107-110, below the 111 the stylesheet
+// needs): the three tokens above would be invalid at computed-value time, so every
+// glass surface would compute transparent while its blur stayed on. Fall back to the
+// opaque page background, and drop the blur that an opaque fill would hide anyway.
+@supports not (color: color-mix(in srgb, red, red)) {
+  body.ultra-tasks {
+    --glass-panel-bg: var(--bg);
+    --glass-canvas-bg: var(--bg);
+    --glass-overlay-bg: var(--bg);
+  }
+  body.ultra-tasks.st-glass {
+    .nav-sidenav,
+    main-header .wrapper,
+    .right-panel,
+    .mobile-bottom-nav {
+      backdrop-filter: none !important;
     }
   }
 }

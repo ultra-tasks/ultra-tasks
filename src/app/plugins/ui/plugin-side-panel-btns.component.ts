@@ -13,7 +13,6 @@ import {
 } from '../../core-ui/layout/store/layout.reducer';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs/operators';
-import { BreakpointObserver } from '@angular/cdk/layout';
 import { PluginLog } from '../../core/log';
 
 /**
@@ -29,6 +28,8 @@ import { PluginLog } from '../../core/log';
       <button
         mat-icon-button
         [matTooltip]="button.label"
+        [attr.aria-label]="button.label"
+        [attr.aria-pressed]="activePluginId() === button.pluginId && isShowPanel()"
         (click)="onButtonClick(button)"
         class="plugin-side-panel-btn"
         [class.active]="activePluginId() === button.pluginId && isShowPanel()"
@@ -85,8 +86,11 @@ import { PluginLog } from '../../core/log';
         z-index: -1;
       }
 
-      .plugin-side-panel-btn:hover:not(.active) {
-        background-color: var(--state-hover);
+      /* A finger has no hover: after a tap this would stay on. */
+      @media (hover: hover) {
+        .plugin-side-panel-btn:hover:not(.active) {
+          background-color: var(--state-hover);
+        }
       }
     `,
   ],
@@ -95,18 +99,13 @@ import { PluginLog } from '../../core/log';
 export class PluginSidePanelBtnsComponent {
   private _pluginBridge = inject(PluginBridgeService);
   private _router = inject(Router);
-  private _breakpointObserver = inject(BreakpointObserver);
 
   private _store = inject(Store);
-  private _isXs$ = this._breakpointObserver.observe('(max-width: 600px)');
 
   sidePanelButtons = this._pluginBridge.sidePanelButtons;
 
   activePluginId = toSignal(this._store.select(selectActivePluginId));
   isShowPanel = toSignal(this._store.select(selectIsShowPluginPanel));
-  isXs = toSignal(this._isXs$.pipe(map((result) => result.matches)), {
-    initialValue: false,
-  });
 
   readonly currentRoute = toSignal(
     this._router.events.pipe(

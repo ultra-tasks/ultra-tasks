@@ -33,8 +33,10 @@
   }
 }
 
+// Mouse intent, not the legacy `.isNoTouchOnly` classifier: that one is never set on
+// Android Chrome or a PWA, and says nothing about a hybrid device used by touch.
 @include media-queries.mq(xs, max) {
-  .isNoTouchOnly {
+  .isMousePrimary {
     @include scrollBarStyles;
   }
 }

@@ -1,4 +1,5 @@
 import { expect, test } from '../../fixtures/test.fixture';
+import { expandTaskNotes } from '../../utils/task-notes';
 import { cssSelectors } from '../../constants/selectors';
 import { waitForStatePersistence } from '../../utils/waits';
 
@@ -129,7 +130,7 @@ test.describe('Keyboard Shortcuts', () => {
     await workViewPage.addTask(title);
     const task = taskPage.getTaskByText(title);
     await taskPage.openTaskDetail(task);
-    const notes = page.locator('task-detail-panel inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.click();
     await page.keyboard.type('A saved note');

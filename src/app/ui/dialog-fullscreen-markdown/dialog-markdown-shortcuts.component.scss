@@ -1,8 +1,7 @@
+// No `display` on the host: it stays Material's `display: contents`, so the
+// title, content and actions are flex items of the dialog surface and the
+// content scrolls between the pinned title and actions (_overwrite-material.scss).
 :host {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-
   .keyboard-shortcuts-dialog-content {
     max-width: 500px;
     width: 100%;

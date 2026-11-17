@@ -81,6 +81,13 @@ main {
       display: none;
     }
   }
+
+  // Short windows: icon only, so the centred mode selector clears it.
+  @media (max-height: 500px) {
+    .close-label {
+      display: none;
+    }
+  }
 }
 
 .pomodoro-info-wrapper {

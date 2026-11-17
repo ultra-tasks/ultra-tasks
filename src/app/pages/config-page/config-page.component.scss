@@ -19,6 +19,13 @@
   margin: var(--s2) var(--dialog-gutter);
   flex-shrink: 0;
 }
+// In the short drill-down the search field is a part of the header's row, between
+// the title and the close button: it keeps no margin of its own and gives way first.
+.settings-window-header .settings-search {
+  flex: 0 1 var(--dialog-w-s);
+  min-width: 0;
+  margin: 0;
+}
 .settings-layout {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);
@@ -27,6 +34,8 @@
 }
 .settings-categories {
   padding: var(--s) var(--s) var(--s) var(--s2);
+  // The divider and the selected row belong to the two-pane window; the drill-down
+  // (see mq-drill-down below) is one list, and nothing in it is open.
   border-inline-end: 1px solid var(--separator);
   overflow: auto;
 }
@@ -76,9 +85,6 @@
   min-width: 0;
   scrollbar-gutter: stable;
 }
-.settings-back {
-  display: none;
-}
 // One left edge: the category title, section headings, fields and disclosures
 // all start at the content padding.
 .section-title {
@@ -118,10 +124,18 @@
     vertical-align: middle;
   }
 }
-@media (max-width: 600px) {
+// The full-screen drill-down: the category list, then one category at a time
+// (a phone, or a short touch window). The footer is gone (About holds its links)
+// and so is the page's own category title: the window header names the category
+// and carries the way back.
+@include mq-drill-down {
   .settings-layout {
     display: block;
     overflow: auto;
+  }
+  .settings-categories {
+    padding-inline: var(--dialog-gutter);
+    border-inline-end: 0;
   }
   .settings-content {
     display: none;
@@ -132,9 +146,8 @@
   .category-visible .settings-categories {
     display: none;
   }
-  .settings-back {
-    display: inline-flex;
-    margin-bottom: var(--s2);
+  .section-title {
+    display: none;
   }
   .version-footer {
     display: none;
@@ -196,8 +209,7 @@
 }
 :host .account-view {
   .settings-search,
-  .settings-categories,
-  .settings-back {
+  .settings-categories {
     display: none;
   }
   .settings-layout {

@@ -13,11 +13,13 @@
 </div>
 
 @if (simpleCounter().streakDuration) {
-  <div class="value-wrapper">
+  <div class="value-wrapper streak">
     <mat-icon>calendar_month</mat-icon>
     <div class="summary-val">
       {{ simpleCounter().streakDuration }}
-      {{ T.F.SIMPLE_COUNTER.CONSECUTIVE_DAYS | translate }}
+      <span class="streak-label">{{
+        T.F.SIMPLE_COUNTER.CONSECUTIVE_DAYS | translate
+      }}</span>
     </div>
   </div>
 }

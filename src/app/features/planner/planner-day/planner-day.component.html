@@ -67,7 +67,7 @@
       <planner-task
         cdkDrag
         [cdkDragData]="task"
-        [cdkDragStartDelay]="dragDelayForTouch()"
+        [cdkDragStartDelay]="{ touch: DRAG_DELAY_FOR_TOUCH, mouse: 0 }"
         [cdkDragDisabled]="multiSelect.isTouchSelectionMode()"
         [cdkDragLockAxis]="isXs() ? 'y' : ''"
         [task]="task"
@@ -158,7 +158,7 @@
               [day]="day.dayDate"
               [focusable]="true"
               [cdkDragData]="scheduledItem.task"
-              [cdkDragStartDelay]="dragDelayForTouch()"
+              [cdkDragStartDelay]="{ touch: DRAG_DELAY_FOR_TOUCH, mouse: 0 }"
               [cdkDragDisabled]="multiSelect.isTouchSelectionMode()"
               [cdkDragLockAxis]="isXs() ? 'y' : ''"
             ></planner-task>

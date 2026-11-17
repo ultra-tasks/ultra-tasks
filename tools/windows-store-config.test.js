@@ -45,11 +45,17 @@ test('missing Store configuration fails with actionable Partner Center fields', 
 test('Store configuration passes the installed builder schema without changing direct targets', async () => {
   const before = readFileSync(join(root, 'electron-builder.yaml'), 'utf8');
   const previousEnv = { ...process.env };
+  // Store packaging deliberately rejects prereleases. Exercise the actual
+  // builder config with a stable fixture even while preparing a beta app.
+  const packageMetadata = require('../package.json');
+  const previousVersion = packageMetadata.version;
+  packageMetadata.version = '0.3.0';
   Object.assign(process.env, env);
   let config;
   try {
     config = await getConfig(root, 'build/electron-builder.appx.cjs');
   } finally {
+    packageMetadata.version = previousVersion;
     for (const key of Object.keys(env)) {
       if (previousEnv[key] === undefined) delete process.env[key];
       else process.env[key] = previousEnv[key];

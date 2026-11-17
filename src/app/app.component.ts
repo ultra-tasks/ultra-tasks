@@ -15,7 +15,7 @@ import {
   signal,
   ViewChild,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ShortcutService } from './core-ui/shortcut/shortcut.service';
 import { GlobalConfigService } from './features/config/global-config.service';
 import { TaskWidgetSettingsService } from './features/config/task-widget-settings.service';
@@ -38,8 +38,8 @@ import { GlassBackdropComponent } from './core/theme/glass-backdrop/glass-backdr
 import { LanguageService } from './core/language/language.service';
 import { WorkContextService } from './features/work-context/work-context.service';
 import { SyncTriggerService } from './imex/sync/sync-trigger.service';
-import { ActivatedRoute, RouterOutlet } from '@angular/router';
-import { first, take } from 'rxjs/operators';
+import { ActivatedRoute, NavigationStart, Router, RouterOutlet } from '@angular/router';
+import { distinctUntilChanged, filter, first, map, take } from 'rxjs/operators';
 
 import { recordSearchNavDebug } from './util/search-nav-debug';
 import { warpAnimation, warpInAnimation } from './ui/animations/warp.ani';
@@ -101,6 +101,8 @@ import { BrowserTitleService } from './core/browser-title/browser-title.service'
 import { isAnimationDisabled } from './util/prefers-reduced-motion';
 
 const ENTRANCE_ANIMATION_DURATION = 1500;
+// A route switch that involves a list of more rows than this goes without its animation.
+const ROUTE_ANIMATION_MAX_ROWS = 40;
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -151,6 +153,7 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   readonly iosShellHeight = this._iosKeyboardService.shellHeight;
   private _languageService = inject(LanguageService);
   private _activatedRoute = inject(ActivatedRoute);
+  private _router = inject(Router);
   private _matDialog = inject(MatDialog);
   private _markdownPasteService = inject(MarkdownPasteService);
   private _taskClipboard = inject(TaskClipboardService);
@@ -194,6 +197,28 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   readonly layoutService = inject(LayoutService);
   readonly globalThemeService = inject(GlobalThemeService);
   readonly _store = inject(Store);
+
+  // Rows of the active list (a project, a tag, Today): what the page entering renders,
+  // and, as of the start of a navigation, what the page leaving still holds.
+  private readonly _activeListRows = toSignal(
+    this.workContextService.activeWorkContext$.pipe(
+      map((context) => context.taskIds.length),
+      distinctUntilChanged(),
+    ),
+    { initialValue: 0 },
+  );
+  private readonly _leavingListRows = signal(0);
+
+  /**
+   * No route animation on a phone, and none when a big list is on either side of the
+   * switch (state binding in app.component.html; see `warpRouteAnimation`).
+   */
+  readonly isSkipRouteAnimation = computed(
+    () =>
+      this.layoutService.isXs() ||
+      Math.max(this._leavingListRows(), this._activeListRows()) >
+        ROUTE_ANIMATION_MAX_ROWS,
+  );
   private _sectionService = inject(SectionService);
   private _browserTitleService = inject(BrowserTitleService);
   private _hasShownLegacyFileBgSnack = false;
@@ -280,6 +305,13 @@ export class AppComponent implements OnDestroy, AfterViewInit {
         }
       }),
     );
+
+    this._router.events
+      .pipe(
+        filter((event): event is NavigationStart => event instanceof NavigationStart),
+        takeUntilDestroyed(this._destroyRef),
+      )
+      .subscribe(() => this._leavingListRows.set(this._activeListRows()));
 
     // init theme and body class handlers
     this._globalThemeService.init();

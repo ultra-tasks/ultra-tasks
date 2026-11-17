@@ -1,8 +1,8 @@
 @use '../../../../styles/_globals.scss' as *;
 
+// No `display` on the host: it stays Material's `display: contents`, so the
+// title, form content and actions fit the dialog surface (_overwrite-material.scss).
 :host {
-  display: block;
-
   .help-heading {
     font: var(--type-label);
     letter-spacing: var(--track-label);

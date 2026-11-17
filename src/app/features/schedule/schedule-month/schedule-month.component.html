@@ -1,4 +1,5 @@
-@let maxEvents = maxVisibleEvents();
+@let maxEvents = maxEventsShown();
+@let isPhone = isXs();
 <div class="month-grid-container">
   @for (header of weekdayHeaders(); track $index) {
     <div class="weekday-header">{{ header }}</div>
@@ -14,6 +15,15 @@
         [attr.data-day]="day"
         style="grid-row: {{ weekIndex + 2 }}; grid-column: {{ dayIndex + 1 }}"
       >
+        @if (isPhone) {
+          <!-- The whole cell is the tap target on a phone: it opens the day. -->
+          <button
+            type="button"
+            class="month-day-open"
+            [attr.aria-label]="openDayLabelByDay()[day]"
+            (click)="openDay.emit(day)"
+          ></button>
+        }
         <div class="month-day-header">
           <span class="month-day-number">{{ dayNumberByDay()[day] }}</span>
           @if (dayEvents.length > maxEvents) {
@@ -49,23 +59,39 @@
             </span>
           }
         </div>
-        <div class="month-day-events">
-          @for (ev of dayEvents; track ev.id) {
-            @if ($index < maxEvents) {
-              <div
-                class="month-event"
-                [class]="ev.type"
-              >
-                <schedule-event
-                  [event]="ev"
-                  [isMonthView]="true"
-                  [cdkDragDisabled]="true"
-                  class="month-schedule-event"
-                ></schedule-event>
-              </div>
+        @if (isPhone) {
+          <div
+            class="month-day-dots"
+            aria-hidden="true"
+          >
+            @for (ev of dayEvents; track ev.id) {
+              @if ($index < maxEvents) {
+                <span
+                  class="month-day-dot"
+                  [class.is-projected]="isProjected(ev)"
+                ></span>
+              }
             }
-          }
-        </div>
+          </div>
+        } @else {
+          <div class="month-day-events">
+            @for (ev of dayEvents; track ev.id) {
+              @if ($index < maxEvents) {
+                <div
+                  class="month-event"
+                  [class]="ev.type"
+                >
+                  <schedule-event
+                    [event]="ev"
+                    [isMonthView]="true"
+                    [cdkDragDisabled]="true"
+                    class="month-schedule-event"
+                  ></schedule-event>
+                </div>
+              }
+            }
+          </div>
+        }
       </div>
     }
   }

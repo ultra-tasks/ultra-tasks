@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { Store } from '@ngrx/store';
-import { MatIconButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatFormField, MatLabel, MatSuffix } from '@angular/material/form-field';
@@ -21,6 +21,9 @@ import { Project } from '../../features/project/project.model';
 import { DEFAULT_PROJECT_ICON } from '../../features/project/project.const';
 import { T } from '../../t.const';
 
+/** The search field appears above this many archived projects. */
+export const ARCHIVED_SEARCH_MIN_PROJECTS = 6;
+
 @Component({
   selector: 'archived-projects-page',
   templateUrl: './archived-projects-page.component.html',
@@ -28,6 +31,7 @@ import { T } from '../../t.const';
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
   imports: [
+    MatButton,
     MatIconButton,
     MatIcon,
     MatTooltip,
@@ -54,10 +58,16 @@ export class ArchivedProjectsPageComponent {
     selectArchivedProjectsSortedByTitle,
   );
 
+  /** Searching a short list is noise: the field is for a long one. */
+  readonly showSearch = computed(
+    () => this._archivedProjectsSorted().length > ARCHIVED_SEARCH_MIN_PROJECTS,
+  );
+
   readonly filteredProjects = computed(() => {
     const term = this.searchTerm().trim().toLowerCase();
     const projects = this._archivedProjectsSorted();
-    if (!term) return projects;
+    // A term typed earlier must not filter a list that now has no field to clear it.
+    if (!term || !this.showSearch()) return projects;
     return projects.filter((p) => p.title.toLowerCase().includes(term));
   });
 

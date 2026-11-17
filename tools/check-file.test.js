@@ -80,6 +80,26 @@ test('checkFile checks several files in one run', () => {
   }
 });
 
+test('checkFile reads a JSON file list without a long shell command', () => {
+  const valid = tempFile(`check-file-list-valid-${process.pid}.ts`);
+  const invalid = tempFile(`check-file-list-invalid-${process.pid}.ts`);
+  const list = tempFile(`check-file-list-${process.pid}.json`);
+  try {
+    fs.writeFileSync(valid, 'export const checkFileListValue = 1;\n');
+    fs.writeFileSync(invalid, 'const unusedListValue = 1;\n');
+    fs.writeFileSync(list, JSON.stringify([valid]));
+    const passing = run('--files-from', list);
+    assert.equal(passing.status, 0, passing.stdout + passing.stderr);
+    fs.writeFileSync(list, JSON.stringify([valid, invalid]));
+    const failing = run('--files-from', list);
+    assert.notEqual(failing.status, 0, failing.stdout + failing.stderr);
+    assert.match(failing.stderr, /no-unused-vars/);
+    assert.match(failing.stderr, new RegExp(path.basename(invalid)));
+  } finally {
+    for (const file of [valid, invalid, list]) fs.rmSync(file, { force: true });
+  }
+});
+
 test('checkFile names a file prettier cannot parse in a multi-file run', () => {
   const valid = tempFile(`check-file-syntax-valid-${process.pid}.ts`);
   const broken = tempFile(`check-file-syntax-broken-${process.pid}.ts`);

@@ -1,5 +1,27 @@
 <header class="settings-window-header">
-  <h1>{{ (isAccount ? T.PS.REFINEMENT.ACCOUNT : T.PS.GLOBAL_SETTINGS) | translate }}</h1>
+  @if (isCategoryOpen) {
+    <!-- The drill-down is inside a category: the header is its way back to the
+         list (one step, also what the system Back does), the close button still
+         closes the whole window. -->
+    <button
+      class="settings-back"
+      mat-icon-button
+      type="button"
+      [attr.aria-label]="T.PS.GLOBAL_SETTINGS | translate"
+      (click)="backToList()"
+    >
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+  }
+  <h1
+    #settingsTitle
+    tabindex="-1"
+  >
+    {{ headerTitle | translate }}
+  </h1>
+  @if (isSearchInHeader) {
+    <ng-container [ngTemplateOutlet]="searchField" />
+  }
   <button
     mat-icon-button
     mat-dialog-close
@@ -8,63 +30,73 @@
     <mat-icon>close</mat-icon>
   </button>
 </header>
+
+<!-- One search field: under the header, or in it in the short drill-down. -->
+<ng-template #searchField>
+  <mat-form-field
+    class="settings-search"
+    subscriptSizing="dynamic"
+  >
+    <mat-icon matPrefix>search</mat-icon>
+    <input
+      matInput
+      autocomplete="off"
+      autocapitalize="none"
+      spellcheck="false"
+      enterkeyhint="search"
+      [attr.aria-label]="T.PS.SEARCH_PLACEHOLDER | translate"
+      [placeholder]="T.PS.SEARCH_PLACEHOLDER | translate"
+      [matAutocomplete]="settingsSearchAutoEl"
+      [ngModel]="searchQuery"
+      (ngModelChange)="onSearchChange($event)"
+    />
+    @if (searchQuery) {
+      <button
+        (click)="onSearchChange('')"
+        [attr.aria-label]="T.G.CLEAR | translate"
+        mat-icon-button
+        matSuffix
+        type="button"
+      >
+        <mat-icon>clear</mat-icon>
+      </button>
+    }
+  </mat-form-field>
+</ng-template>
+
+<mat-autocomplete
+  #settingsSearchAutoEl="matAutocomplete"
+  class="settings-search-panel"
+  (optionSelected)="goToSearchResult($event.option.value)"
+  [autoActiveFirstOption]="true"
+>
+  <!-- Guarded so an empty panel (and "no results") can't pop open on focus. -->
+  @if (searchQuery) {
+    @for (result of searchResults; track $index) {
+      <mat-option [value]="result">
+        <span>{{ result.labelKey | translate }}</span>
+        <span class="search-result__path">
+          {{ result.tabLabelKey | translate }}
+          @if (result.matchedLabelKey) {
+            › {{ result.matchedLabelKey | translate }}
+          }
+        </span>
+      </mat-option>
+    } @empty {
+      <mat-option [disabled]="true">{{ T.PS.SEARCH_NO_RESULTS | translate }}</mat-option>
+    }
+  }
+</mat-autocomplete>
+
 <div class="page-settings">
   @if (globalCfg) {
     <div
       class="settings-container"
       [class.account-view]="isAccount"
     >
-      <mat-form-field
-        class="settings-search"
-        subscriptSizing="dynamic"
-      >
-        <mat-icon matPrefix>search</mat-icon>
-        <input
-          matInput
-          [attr.aria-label]="T.PS.SEARCH_PLACEHOLDER | translate"
-          [placeholder]="T.PS.SEARCH_PLACEHOLDER | translate"
-          [matAutocomplete]="settingsSearchAutoEl"
-          [ngModel]="searchQuery"
-          (ngModelChange)="onSearchChange($event)"
-        />
-        @if (searchQuery) {
-          <button
-            (click)="onSearchChange('')"
-            [attr.aria-label]="T.G.CLEAR | translate"
-            mat-icon-button
-            matSuffix
-            type="button"
-          >
-            <mat-icon>clear</mat-icon>
-          </button>
-        }
-      </mat-form-field>
-
-      <mat-autocomplete
-        #settingsSearchAutoEl="matAutocomplete"
-        class="settings-search-panel"
-        (optionSelected)="goToSearchResult($event.option.value)"
-        [autoActiveFirstOption]="true"
-      >
-        <!-- Guarded so an empty panel (and "no results") can't pop open on focus. -->
-        @if (searchQuery) {
-          @for (result of searchResults; track $index) {
-            <mat-option [value]="result">
-              <span>{{ result.labelKey | translate }}</span>
-              <span class="search-result__path">
-                {{ result.tabLabelKey | translate }}
-                @if (result.matchedLabelKey) {
-                  › {{ result.matchedLabelKey | translate }}
-                }
-              </span>
-            </mat-option>
-          } @empty {
-            <mat-option [disabled]="true">{{
-              T.PS.SEARCH_NO_RESULTS | translate
-            }}</mat-option>
-          }
-        }
-      </mat-autocomplete>
+      @if (!isAccount && !isSearchInHeader && !isCategoryOpen) {
+        <ng-container [ngTemplateOutlet]="searchField" />
+      }
 
       <div
         #settingsLayout
@@ -75,19 +107,23 @@
           class="settings-categories"
           [attr.aria-label]="T.PS.GLOBAL_SETTINGS | translate"
         >
-          @for (category of categories; track category.index) {
+          @for (category of categories(); track category.index) {
+            <!-- The open category is marked in the two-pane window only: in the
+                 drill-down the list is shown while nothing is open. -->
             <button
               type="button"
-              [attr.aria-current]="selectedTabIndex === category.index ? 'page' : null"
+              [attr.aria-current]="
+                !isDrillDown() && selectedTabIndex === category.index ? 'page' : null
+              "
               (click)="selectCategory(category.index)"
             >
               <mat-icon aria-hidden="true">{{ category.icon }}</mat-icon
               >{{ category.label | translate }}
             </button>
           }
-          <!-- Windows of their own, reached from here: Plugins & integrations
-               on every screen size, Account on a phone (the drawer has no
-               row for either). -->
+          <!-- Windows of their own, reached from here: Plugins & integrations on
+               every screen size, Account on a phone (the drawer has no row for
+               either). -->
           @if (!isAccount) {
             @for (link of visibleWindowLinks(); track link.path; let first = $first) {
               <button
@@ -106,14 +142,6 @@
           #settingsContent
           class="settings-content"
         >
-          <button
-            class="settings-back"
-            mat-button
-            type="button"
-            (click)="mobileCategoryVisible = false"
-          >
-            <mat-icon>arrow_back</mat-icon>{{ T.PS.GLOBAL_SETTINGS | translate }}
-          </button>
           @if (selectedTabIndex === 0) {
             <div class="tab-content">
               <h2 class="section-title">
@@ -304,6 +332,78 @@
               </section>
             </div>
           }
+          @if (selectedTabIndex === aboutCategoryIndex) {
+            <!-- What the window footer holds on a desktop, for the drill-down where
+                 the footer is gone: the version (tap to copy), the changelog, the
+                 update check, the logs and the privacy policy. -->
+            <div class="tab-content about-section">
+              <h2 class="section-title">{{ T.PS.REFINEMENT.ABOUT | translate }}</h2>
+              <section class="config-section">
+                <button
+                  class="settings-link-row"
+                  type="button"
+                  [attr.aria-label]="
+                    (T.PS.REFINEMENT.VERSION | translate) +
+                    ' ' +
+                    appVersion +
+                    ' — ' +
+                    (T.PS.CLICK_TO_COPY_VERSION | translate)
+                  "
+                  (click)="copyVersionToClipboard(appVersion)"
+                >
+                  <span class="settings-link-row__label">{{
+                    T.PS.REFINEMENT.VERSION | translate
+                  }}</span>
+                  <span class="settings-link-row__value">{{ appVersion }}</span>
+                  <mat-icon aria-hidden="true">content_copy</mat-icon>
+                </button>
+                <a
+                  class="settings-link-row"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [href]="changelogUrl"
+                >
+                  <span class="settings-link-row__label">{{
+                    T.PS.CHANGELOG | translate
+                  }}</span>
+                  <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                </a>
+                @if (isUpdateCheckPossible) {
+                  <button
+                    class="settings-link-row"
+                    type="button"
+                    (click)="checkForUpdates()"
+                  >
+                    <span class="settings-link-row__label">{{
+                      T.PS.CHECK_FOR_UPDATES | translate
+                    }}</span>
+                    <mat-icon aria-hidden="true">system_update_alt</mat-icon>
+                  </button>
+                }
+                <button
+                  class="settings-link-row"
+                  type="button"
+                  (click)="showLogs()"
+                >
+                  <span class="settings-link-row__label">{{
+                    T.DIALOG_LOGS.TITLE | translate
+                  }}</span>
+                  <mat-icon aria-hidden="true">chevron_right</mat-icon>
+                </button>
+                <a
+                  class="settings-link-row"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [href]="privacyPolicyUrl"
+                >
+                  <span class="settings-link-row__label">{{
+                    T.PS.PRIVACY_POLICY | translate
+                  }}</span>
+                  <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                </a>
+              </section>
+            </div>
+          }
         </main>
       </div>
     </div>
@@ -324,7 +424,7 @@
   >
   –
   <a
-    href="https://github.com/ac9492/ultra-tasks/releases/latest"
+    [href]="changelogUrl"
     target="_blank"
     >{{ T.PS.CHANGELOG | translate }}</a
   >
@@ -344,13 +444,13 @@
   >
   –
   <a
-    href="https://github.com/ac9492/ultra-tasks/blob/main/docs/privacy.md"
+    [href]="privacyPolicyUrl"
     target="_blank"
     >{{ T.PS.PRIVACY_POLICY | translate }}</a
   >
   –
   <a
-    href="https://github.com/ac9492/ultra-tasks/issues/new?template=question.yml"
+    [href]="feedbackUrl"
     target="_blank"
     >{{ T.PS.PROVIDE_FEEDBACK | translate }}</a
   >

@@ -1,3 +1,5 @@
+@use '../../../styles/_globals.scss' as *;
+
 // Same column as the list below (.component-wrapper), so field and rows align.
 .search-header {
   max-width: var(--component-max-width);
@@ -41,6 +43,11 @@
   &:hover,
   &:focus-visible {
     background: var(--state-hover);
+  }
+
+  // Phone: a row is a thumb-sized target.
+  @include mq(xs, max) {
+    min-height: var(--ctl-lg);
   }
 }
 

@@ -206,6 +206,11 @@ $this-stroke-width: 4px;
   caret-color: var(--text-color-most-intense);
   color: var(--text-color-most-intense);
 
+  // Touch: the value is a 40px target, not a 21px line of text (the dial is 130px).
+  @media (pointer: coarse) {
+    min-height: var(--ctl-md);
+  }
+
   &:focus {
     @include inlineEditElevation();
     outline: none;
@@ -217,7 +222,8 @@ $this-stroke-width: 4px;
       opacity: 1;
     }
 
-    @media (max-width: var(--layout-xs)) {
+    // A phone: the focused handle grows less (a CSS variable cannot be a media query).
+    @include mq(xs, max) {
       transform: scale(1.05);
     }
   }

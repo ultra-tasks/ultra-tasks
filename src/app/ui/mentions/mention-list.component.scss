@@ -83,3 +83,13 @@
   top: auto;
   margin-bottom: var(--s-quarter);
 }
+
+// Touch: a row is a 48px target, like a menu item or a select option (it was
+// about 36px, a line of text).
+@media (pointer: coarse) {
+  .mention-item {
+    display: flex;
+    align-items: center;
+    min-height: var(--ctl-lg);
+  }
+}

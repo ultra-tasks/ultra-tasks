@@ -23,15 +23,20 @@ import {
 import { map } from 'rxjs/operators';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { PREFERS_REDUCED_MOTION } from '../../util/prefers-reduced-motion';
 
+// Mirror $layout-xs and $layout-sm in styles/mixins/_media-queries.scss: `mq(xs, max)`
+// and `mq(sm, max)` are exactly these two queries.
 const XS_BREAKPOINT = 600;
-const XXXS_BREAKPOINT = 398;
+const SM_BREAKPOINT = 960;
 const maxWidthMediaQuery = (breakpoint: number): string =>
   `(max-width: ${breakpoint - 1}px)`;
 const XS_MEDIA_QUERY = maxWidthMediaQuery(XS_BREAKPOINT);
-const XXXS_MEDIA_QUERY = maxWidthMediaQuery(XXXS_BREAKPOINT);
-const initialXsMatch =
-  typeof window !== 'undefined' ? window.matchMedia(XS_MEDIA_QUERY).matches : false;
+const COMPACT_SHELL_MEDIA_QUERY = maxWidthMediaQuery(SM_BREAKPOINT);
+const initialMatch = (query: string): boolean =>
+  typeof window !== 'undefined' ? window.matchMedia(query).matches : false;
+const initialXsMatch = initialMatch(XS_MEDIA_QUERY);
+const initialCompactShellMatch = initialMatch(COMPACT_SHELL_MEDIA_QUERY);
 
 @Injectable({
   providedIn: 'root',
@@ -42,6 +47,8 @@ export class LayoutService {
   private static readonly _TASK_FOCUS_MAX_RETRIES = 16;
   private static readonly _TASK_HIGHLIGHT_DURATION = 3000;
   private static readonly _TASK_HIGHLIGHT_CLASS = 'highlight-searched-task';
+  // How far below the routed page's host element its scroller can sit (Today: 3, Upcoming: 2).
+  private static readonly _PAGE_SCROLLER_MAX_DEPTH = 5;
 
   private _store$ = inject<Store<LayoutState>>(Store);
   private _breakPointObserver = inject(BreakpointObserver);
@@ -73,6 +80,7 @@ export class LayoutService {
   readonly isMobileSideNavOpen = signal<boolean>(false);
   readonly isShowAddTaskBar = toSignal(this.isShowAddTaskBar$, { initialValue: false });
 
+  /** The phone shell: bottom nav, drawer and full-screen pages (below 600px). */
   readonly isXs = toSignal(
     this._breakPointObserver
       .observe(XS_MEDIA_QUERY)
@@ -80,11 +88,19 @@ export class LayoutService {
     { initialValue: initialXsMatch },
   );
 
-  readonly isXxxs = toSignal(
+  /**
+   * Phones in landscape, small tablets, unfolded foldables and split-screen
+   * windows (below 960px, which includes the phone shell). The desktop shell
+   * still renders here, but its side nav is the 56px rail and the right panel
+   * (task, notes, plugin panels) is a bottom sheet: an expanded nav and a side
+   * panel leave a list column too narrow to read. `isXs` stays the switch for
+   * the phone-only shell (bottom nav, drawer).
+   */
+  readonly isCompactShell = toSignal(
     this._breakPointObserver
-      .observe(XXXS_MEDIA_QUERY)
+      .observe(COMPACT_SHELL_MEDIA_QUERY)
       .pipe(map((result) => result.matches)),
-    { initialValue: false },
+    { initialValue: initialCompactShellMatch },
   );
 
   // Computed signal for mobile bottom nav visibility
@@ -237,6 +253,30 @@ export class LayoutService {
         this._highlightedTaskEl = null;
       }
     }, LayoutService._TASK_HIGHLIGHT_DURATION);
+  }
+
+  /**
+   * Scrolls the routed page back to its top, wherever its scroller is: the page itself
+   * (secondary pages, Calendar, Boards) or one of the boxes inside it (the task list,
+   * Upcoming). What the bottom nav does when its active tab is tapped again.
+   */
+  scrollPageToTop(): void {
+    const page = document.querySelector('.route-wrapper > router-outlet + *');
+    if (!page) {
+      return;
+    }
+    const behavior: ScrollBehavior = PREFERS_REDUCED_MOTION() ? 'auto' : 'smooth';
+    const scrollUp = (el: Element, depthLeft: number): void => {
+      if (el.scrollTop > 0) {
+        el.scrollTo({ top: 0, behavior });
+      }
+      if (depthLeft > 0) {
+        for (const child of Array.from(el.children)) {
+          scrollUp(child, depthLeft - 1);
+        }
+      }
+    };
+    scrollUp(page, LayoutService._PAGE_SCROLLER_MAX_DEPTH);
   }
 
   private _runForTaskElement(

@@ -5,8 +5,14 @@ import {
   signal,
   WritableSignal,
 } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { SystemBarsStyle, SystemBarType } from '@capacitor/core';
 import { GlobalThemeService, resolveSystemSurfaceColor } from './global-theme.service';
+import {
+  ANDROID_BAR_PLUGINS,
+  ANDROID_BAR_REAPPLY_DEBOUNCE_MS,
+} from './android-system-bars.util';
+import { Log } from '../log';
 import { GlassBackdrop } from './ultra-tasks-appearance.service';
 import { NativeGlassState } from '../../../../electron/shared-with-frontend/native-glass.model';
 
@@ -279,4 +285,124 @@ describe('GlobalThemeService.registerSvgIconFromContent()', () => {
     expect(rendered.querySelector('svg')?.getAttribute('onload')).toBeNull();
     expect(rendered.querySelector('circle')?.getAttribute('r')).toBe('4');
   });
+});
+
+describe('GlobalThemeService mobile bars', () => {
+  interface MobileBarsHarness {
+    _initMobileStatusBar(): void;
+    document: Document;
+    isDarkTheme: WritableSignal<boolean>;
+    _paletteThemeService: {
+      appliedVersion: WritableSignal<number>;
+      roles: (isDark: boolean) => { backgroundInk: string };
+    };
+    _platformService: { isAndroid: () => boolean; isLegacyAndroidWebView: boolean };
+  }
+
+  let barsInjector: EnvironmentInjector | undefined;
+  let setSystemBarStyle: jasmine.Spy;
+  let setNavigationBarColor: jasmine.Spy;
+  let setWebViewBackgroundColor: jasmine.Spy;
+
+  const initBars = (platform: {
+    isAndroid: boolean;
+    isLegacyAndroidWebView?: boolean;
+  }): MobileBarsHarness => {
+    const service = Object.create(GlobalThemeService.prototype) as MobileBarsHarness;
+    service.document = document;
+    service.isDarkTheme = signal(false);
+    service._paletteThemeService = {
+      appliedVersion: signal(0),
+      roles: (isDark) => ({ backgroundInk: isDark ? '#ffffff' : '#000000' }),
+    };
+    service._platformService = {
+      isAndroid: () => platform.isAndroid,
+      isLegacyAndroidWebView: !!platform.isLegacyAndroidWebView,
+    };
+    // Own injector per test, so the effect and the listeners are destroyed with it.
+    barsInjector = createEnvironmentInjector([], TestBed.inject(EnvironmentInjector));
+    runInInjectionContext(barsInjector, () => service._initMobileStatusBar());
+    TestBed.tick();
+    return service;
+  };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    // The web fallback of the StatusBar plugin rejects; that is logged, not thrown.
+    spyOn(Log, 'warn');
+    setSystemBarStyle = spyOn(ANDROID_BAR_PLUGINS, 'setSystemBarStyle').and.resolveTo();
+    setNavigationBarColor = spyOn(
+      ANDROID_BAR_PLUGINS,
+      'setNavigationBarColor',
+    ).and.resolveTo();
+    setWebViewBackgroundColor = spyOn(
+      ANDROID_BAR_PLUGINS,
+      'setWebViewBackgroundColor',
+    ).and.resolveTo();
+  });
+  afterEach(() => {
+    barsInjector?.destroy();
+    barsInjector = undefined;
+  });
+
+  it('stores the icon style in SystemBars for both bars on Android', () => {
+    initBars({ isAndroid: true });
+    expect(setSystemBarStyle.calls.allArgs()).toEqual([
+      [{ style: SystemBarsStyle.Light, bar: SystemBarType.StatusBar }],
+      [{ style: SystemBarsStyle.Light, bar: SystemBarType.NavigationBar }],
+    ]);
+    expect(setNavigationBarColor.calls.mostRecent().args[0].style).toBe('LIGHT');
+    expect(setWebViewBackgroundColor.calls.mostRecent().args[0].color).toMatch(
+      /^#[\da-f]{6}$/i,
+    );
+  });
+
+  it('follows the app theme, not the system theme', () => {
+    const service = initBars({ isAndroid: true });
+    service.isDarkTheme.set(true);
+    TestBed.tick();
+    expect(setSystemBarStyle.calls.allArgs().slice(-2)).toEqual([
+      [{ style: SystemBarsStyle.Dark, bar: SystemBarType.StatusBar }],
+      [{ style: SystemBarsStyle.Dark, bar: SystemBarType.NavigationBar }],
+    ]);
+    expect(setNavigationBarColor.calls.mostRecent().args[0].style).toBe('DARK');
+  });
+
+  it('applies the theme again once a native configuration change has settled', fakeAsync(() => {
+    initBars({ isAndroid: true });
+    expect(setWebViewBackgroundColor).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event('orientationchange'));
+    window.dispatchEvent(new Event('resize'));
+    tick(ANDROID_BAR_REAPPLY_DEBOUNCE_MS - 1);
+    TestBed.tick();
+    expect(setWebViewBackgroundColor).toHaveBeenCalledTimes(1);
+
+    tick(1);
+    TestBed.tick();
+    expect(setSystemBarStyle).toHaveBeenCalledTimes(4);
+    expect(setNavigationBarColor).toHaveBeenCalledTimes(2);
+    expect(setWebViewBackgroundColor).toHaveBeenCalledTimes(2);
+  }));
+
+  it('does not listen for configuration changes in the legacy Android WebView', fakeAsync(() => {
+    initBars({ isAndroid: true, isLegacyAndroidWebView: true });
+    const before = setWebViewBackgroundColor.calls.count();
+
+    window.dispatchEvent(new Event('resize'));
+    tick(ANDROID_BAR_REAPPLY_DEBOUNCE_MS);
+    TestBed.tick();
+    expect(setWebViewBackgroundColor.calls.count()).toBe(before);
+  }));
+
+  it('leaves the Android bars alone on other platforms', fakeAsync(() => {
+    initBars({ isAndroid: false });
+
+    window.dispatchEvent(new Event('resize'));
+    tick(ANDROID_BAR_REAPPLY_DEBOUNCE_MS);
+    TestBed.tick();
+    expect(setSystemBarStyle).not.toHaveBeenCalled();
+    expect(setNavigationBarColor).not.toHaveBeenCalled();
+    expect(setWebViewBackgroundColor).not.toHaveBeenCalled();
+  }));
 });

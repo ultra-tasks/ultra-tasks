@@ -35,11 +35,13 @@ import { CaldavCfg } from 'src/app/features/issue/providers/caldav/caldav.model'
 import { OpenProjectCfg } from '../../../issue/providers/open-project/open-project.model';
 import { getRandomWorkContextColor } from '../../../../ui/work-context-color';
 import { removeDebounceFromFormItems } from '../../../../util/remove-debounce-from-form-items';
+import { adjustToDialogFormlyForm } from '../../../../util/adjust-to-dialog-formly-form';
 import { MatButton } from '@angular/material/button';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Log } from '../../../../core/log';
 import { PlainspaceShareService } from '../../../issue/providers/plainspace/plainspace-share.service';
 import { useDialogSize } from '../../../../ui/dialog-size.util';
+import { useDiscardGuard, useFormsDirty } from '../../../../ui/dialog-discard-guard.util';
 
 @Component({
   selector: 'dialog-create-project',
@@ -77,6 +79,10 @@ export class DialogCreateProjectComponent implements OnInit, OnDestroy {
 
   formBasic: UntypedFormGroup = new UntypedFormGroup({});
   formTheme: UntypedFormGroup = new UntypedFormGroup({});
+  // A stray tap on the backdrop or Escape asks before it throws typed text away.
+  private readonly _discardGuard = useDiscardGuard(
+    useFormsDirty(this.formBasic, this.formTheme),
+  );
   formOptionsBasic: FormlyFormOptions = {
     formState: {
       awesomeIsForced: false,
@@ -96,8 +102,11 @@ export class DialogCreateProjectComponent implements OnInit, OnDestroy {
 
   constructor() {
     // somehow they are only unproblematic if assigned here,
-    this.basicSettingsFormCfg = removeDebounceFromFormItems(
-      CREATE_PROJECT_BASIC_CONFIG_FORM_CONFIG.items as FormlyFieldConfig[],
+    // One boolean control: toggles, as in Project settings (not a checkbox here).
+    this.basicSettingsFormCfg = adjustToDialogFormlyForm(
+      removeDebounceFromFormItems(
+        CREATE_PROJECT_BASIC_CONFIG_FORM_CONFIG.items as FormlyFieldConfig[],
+      ),
     );
     this.themeFormCfg = removeDebounceFromFormItems(
       WORK_CONTEXT_THEME_CONFIG_FORM_CONFIG.items!.filter(

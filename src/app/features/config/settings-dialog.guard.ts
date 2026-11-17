@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { filter, take } from 'rxjs/operators';
 import { T } from '../../t.const';
-import { dialogSize } from '../../ui/dialog-size.util';
+import { dialogSize, dialogWindowHeight } from '../../ui/dialog-size.util';
 
 /** Keep the current workspace mounted underneath settings, including shortcut entry. */
 export const settingsDialogGuard: CanActivateFn = async (route) => {
@@ -27,14 +27,17 @@ export const settingsDialogGuard: CanActivateFn = async (route) => {
     dialogs.open<unknown>(isPlugins ? PluginsWindowComponent : ConfigPageComponent, {
       id,
       ...dialogSize('window', 'settings-window'),
-      height: '86dvh',
-      maxHeight: '96dvh',
+      ...dialogWindowHeight(),
+      // Settings and Account handle Back themselves: in the phone's drill-down it
+      // returns from a category to the list before it closes the window (see
+      // ConfigPageComponent). The Plugins window keeps closing on navigation.
+      closeOnNavigation: !!isPlugins,
       backdropClass: 'settings-backdrop',
       autoFocus: 'first-heading',
       restoreFocus: true,
       ariaLabel: translate.instant(
         isPlugins
-          ? T.PLUGINS.MARKETPLACE
+          ? T.PS.REDESIGN.PLUGINS
           : isAccount
             ? T.PS.REFINEMENT.ACCOUNT
             : T.PS.GLOBAL_SETTINGS,

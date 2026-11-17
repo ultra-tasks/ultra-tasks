@@ -137,11 +137,11 @@ test.describe('Phone menus (touch)', () => {
     await waitForMenuSettled(page);
 
     // The date shortcuts carry visible labels: tooltips never show on touch.
+    // Words, not weekday names: on a Sunday tomorrow and next week both read "Mon".
     await expect(menu.locator('.quick-access-label')).toHaveText([
       'Today',
-      // Short weekday names for tomorrow and the first day of next week.
-      /^\w{2,4}$/,
-      /^\w{2,4}$/,
+      'Tomorrow',
+      'Next week',
       'Date',
       // Added to Today, so it is scheduled and can be cleared.
       'Clear',

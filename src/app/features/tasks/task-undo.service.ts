@@ -305,6 +305,14 @@ export class TaskUndoService {
     return true;
   }
 
+  /** A snackbar must undo its own plan, never whichever edit became newest later. */
+  capturePlanUndo(id: string, day: string): (() => boolean) | undefined {
+    const entry = this._undo().at(-1);
+    if (!entry || entry.field !== 'dueDay' || entry.id !== id || entry.after !== day)
+      return undefined;
+    return () => this._undo().at(-1) === entry && this.undo();
+  }
+
   undo(): boolean {
     if (this._pendingTitle()) return false;
     const entry = this._undo().at(-1);

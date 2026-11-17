@@ -511,7 +511,10 @@ describe('MainHeaderComponent action placement', () => {
           },
         },
         { provide: MatDialog, useValue: { open: jasmine.createSpy('open') } },
-        { provide: Store, useValue: { dispatch: jasmine.createSpy('dispatch') } },
+        {
+          provide: Store,
+          useValue: { dispatch: jasmine.createSpy('dispatch'), select: () => EMPTY },
+        },
         {
           provide: TrackingPresenceService,
           useValue: { isRemoteSessionShown: signal(false) },

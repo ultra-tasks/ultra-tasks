@@ -77,21 +77,15 @@
   position: relative;
   transition: var(--transition-leave);
   transition-property: width, right, transform;
-  // Cap panel to at most half of the container width in side mode
+  // Cap panel to at most half of the container width in side mode. The column only
+  // exists from the `sm` breakpoint up: below it the panel is a bottom sheet (the
+  // compact shell), so it never has to share a narrow row with the nav (#9480).
   max-width: 50%;
   background: var(--right-panel-bg);
   background: transparent;
   border-left: 1px solid var(--separator-color);
   overflow: visible; // allow overlay controls to stick out on the left edge
   pointer-events: none; // Disable interactions when closed or closing
-
-  @include mq(sm, max) {
-    // NOTE: prevents overlapping with nav when open. Combined with the half-row
-    // cap above rather than replacing it: on its own, 500px is *looser* than
-    // 50% for every window under 1000px, so the cap quietly stopped applying in
-    // the band where the row can least afford it (#9480).
-    max-width: min(50%, 500px);
-  }
 
   @include mq(xs, max) {
     max-width: 100%;

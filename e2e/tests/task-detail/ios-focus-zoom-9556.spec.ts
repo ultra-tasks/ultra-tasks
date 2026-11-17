@@ -1,6 +1,7 @@
 import { Locator, Page } from 'playwright/test';
 
 import { expect, test } from '../../fixtures/test.fixture';
+import { expandTaskNotes } from '../../utils/task-notes';
 
 /**
  * Issues #9415, #9551, #9556: on iOS, tapping the tag field in a task's detail
@@ -119,6 +120,8 @@ test.describe('Task detail iOS focus zoom', () => {
   }) => {
     await openTaskDetailPanel(page, workViewPage, taskPage, 'touch zoom task');
 
+    // The Description row is folded for a task without notes: open it first.
+    await expandTaskNotes(page);
     // The live editor is lazily chunked (@defer), so wait for it to mount.
     await page.locator('inline-markdown .cm-content').first().waitFor();
     // isIOSWebKit as well as isTouchPrimary: the task title keeps the 14px base

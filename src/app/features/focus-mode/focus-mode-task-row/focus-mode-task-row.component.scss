@@ -8,12 +8,14 @@
 
 // Three-track grid so the title stays centered in the viewport regardless of
 // the flanking controls' widths: switch in the left 1fr track (hugging the
-// title), title in the auto center track, tracking + finish in the right 1fr
+// title), title in the center track, tracking + finish in the right 1fr
 // track (hugging the title). Equal 1fr side tracks => the center never shifts
-// when the time numbers change width.
+// when the time numbers change width. The side tracks never get narrower than
+// their controls (the finish check used to poke past the screen edge at 320px);
+// the title is what gives way when the row is tight.
 .task-title-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
   align-items: center;
   gap: var(--s2);
   width: 100%;
@@ -83,17 +85,12 @@
   text-align: center;
   margin-bottom: 0;
   opacity: 0.8;
-  font-size: 15px;
-  line-height: 1.2;
+  font: var(--type-body);
   max-width: 90%;
   overflow-wrap: break-word;
 
   @include mq(xs, max) {
-    font-size: 12px;
-  }
-
-  @include mq(xxxs, max) {
-    font-size: 10px;
+    font: var(--type-meta);
   }
 }
 

@@ -166,6 +166,16 @@ export class OnboardingHintComponent {
       if (step === null) {
         return;
       }
+      // A tip into a task list has no target on any other page: hide the chip
+      // there (it would stay where it was and cover unrelated rows), and let the
+      // return to a list start it again.
+      if (
+        HINT_STEP_CONFIGS.get(step)?.isWorkViewOnly &&
+        !this.onboardingHintService.isOnWorkView()
+      ) {
+        untracked(() => this.hintPosition.set(null));
+        return;
+      }
       this._activeStep = step;
       this._targetEl = null;
       untracked(() => this._startStep(step));

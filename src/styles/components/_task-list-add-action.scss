@@ -1,3 +1,5 @@
+@use '../mixins/_media-queries';
+
 // Shared creation row for task lists and nested subtask lists: a 40px row (48 on
 // touch) with its "+" in the 24px leading slot (the same column as the cards'
 // done toggles) and the label on the 56px text column. On touch the done toggle
@@ -37,5 +39,48 @@
   &:focus-visible {
     outline: var(--s-quarter) solid var(--c-accent);
     outline-offset: calc(-1 * var(--s-quarter));
+  }
+}
+
+// A list's add row that stays in reach on a phone (docs/styling-guide.md,
+// "Phone shell"). Below 600px a long list leaves its "Add task" row screens down;
+// `.pin-above-nav` on the <add-task-inline> host pins the row above the floating
+// nav while its natural place, the end of the list, is off-screen. On screen it
+// sits in the list as usual, so a short list is unchanged. Sticky is bounded by
+// the row's container: in a list with sections each section pins its own row
+// only while that section is at the bottom of the screen. The host is the sticky
+// element, so the open add-task bar stays in reach the same way.
+@include media-queries.mq(xs, max) {
+  add-task-inline.pin-above-nav {
+    display: block;
+    position: sticky;
+    // The scroller's own bottom padding already clears the nav, and a sticky
+    // offset is measured from inside that padding.
+    bottom: var(--s);
+    z-index: var(--z-pinned-add-row);
+    // Lets the row ask whether it is pinned (below); no layout effect.
+    container-type: scroll-state;
+  }
+
+  // Rows scroll under a pinned row, so it needs a surface of its own. Browsers
+  // without scroll-state queries keep the surface on; the others show it only
+  // while the row is pinned. :where() keeps the hover state of the row working.
+  :where(add-task-inline.pin-above-nav) > .task-list-add-action {
+    background: var(--card-bg);
+    box-shadow: var(--elev-1);
+  }
+
+  @supports (container-type: scroll-state) {
+    :where(add-task-inline.pin-above-nav) > .task-list-add-action {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    @container scroll-state(stuck: bottom) {
+      :where(add-task-inline.pin-above-nav) > .task-list-add-action {
+        background: var(--card-bg);
+        box-shadow: var(--elev-1);
+      }
+    }
   }
 }

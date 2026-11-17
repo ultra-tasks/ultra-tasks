@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { T } from '../../t.const';
+import { isTouchActive } from '../../util/input-intent';
 import { ReactiveFormsModule, UntypedFormControl } from '@angular/forms';
 import { BehaviorSubject, combineLatest, from, Observable } from 'rxjs';
 import { debounceTime, filter, map, startWith, switchMap, take } from 'rxjs/operators';
@@ -59,6 +60,13 @@ import {
   getRestoreTaskPayload,
   RecentlyDeletedEntry,
 } from '../../features/tasks/recently-deleted/recently-deleted.util';
+
+/** One heading and the commands under it ("Go to" or "Actions"). */
+export interface SearchCommandGroup {
+  id: 'go-to' | 'actions';
+  titleKey: string;
+  commands: SearchCommand[];
+}
 
 const MAX_RESULTS = 50;
 // Deleted matches are listed last but always get a few of the result slots,
@@ -127,11 +135,8 @@ export class SearchPageComponent implements OnInit {
   searchForm: UntypedFormControl = new UntypedFormControl('');
   includeCompletedForm: UntypedFormControl = new UntypedFormControl(false);
   filteredResults$: Observable<SearchItem[]> = new Observable();
-  /** The commands matching what is typed, grouped for display. */
-  commandGroups$: Observable<{
-    destinations: SearchCommand[];
-    actions: SearchCommand[];
-  }> = new Observable();
+  /** The commands matching what is typed, grouped for display, in display order. */
+  commandGroups$: Observable<SearchCommandGroup[]> = new Observable();
   // The (trimmed) term the results on screen were computed for. They trail what is
   // typed by the debounce, so Enter must not open a row that belongs to an older term.
   private _resultsTerm = '';
@@ -474,9 +479,12 @@ export class SearchPageComponent implements OnInit {
       }),
     );
 
-    // Focus the input after view init
+    // Focus the input after view init. Not on touch: the keyboard would open at
+    // once and cover the list; tapping the field is what starts typing there.
     setTimeout(() => {
-      this.inputEl().nativeElement.focus();
+      if (!isTouchActive()) {
+        this.inputEl().nativeElement.focus();
+      }
     }, 100);
   }
 
@@ -611,7 +619,13 @@ export class SearchPageComponent implements OnInit {
     if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') {
       return;
     }
-    const targets = [searchInput, ...this.resultBtns().map((btn) => btn.nativeElement)];
+    // A row hidden on this device (the shortcut cheat sheet on touch) has no focus.
+    const targets = [
+      searchInput,
+      ...this.resultBtns()
+        .map((btn) => btn.nativeElement)
+        .filter((btn) => btn.offsetParent !== null),
+    ];
     const index = targets.indexOf(ev.target as HTMLElement);
     if (index === -1 || targets.length < 2) {
       return;
@@ -628,24 +642,34 @@ export class SearchPageComponent implements OnInit {
     this.inputEl().nativeElement.focus();
   }
 
-  /** The commands matching a term, in display order: places first, then actions. */
-  private _groupedCommands(term: string): {
-    destinations: SearchCommand[];
-    actions: SearchCommand[];
-  } {
+  /**
+   * The commands matching a term, in display order. With something typed, places
+   * come first (Enter opens the first match). With nothing typed, the actions
+   * come first: "Add new task" is the one people came for, and it used to sit
+   * below the popup's fold.
+   */
+  private _groupedCommands(term: string): SearchCommandGroup[] {
     const matching = filterSearchCommands(this.commands(), term, (labelKey) =>
       this._translateService.instant(labelKey),
     );
-    return {
-      destinations: matching.filter((c) => c.kind === 'destination'),
-      actions: matching.filter((c) => c.kind === 'action'),
+    const destinations: SearchCommandGroup = {
+      id: 'go-to',
+      titleKey: T.F.SEARCH_BAR.GO_TO,
+      commands: matching.filter((c) => c.kind === 'destination'),
     };
+    const actions: SearchCommandGroup = {
+      id: 'actions',
+      titleKey: T.F.SEARCH_BAR.ACTIONS,
+      commands: matching.filter((c) => c.kind === 'action'),
+    };
+    return (term.trim() ? [destinations, actions] : [actions, destinations]).filter(
+      (group) => group.commands.length > 0,
+    );
   }
 
   /** The first command shown for a term: the one Enter opens. */
   private _firstCommand(term: string): SearchCommand | undefined {
-    const { destinations, actions } = this._groupedCommands(term);
-    return destinations[0] ?? actions[0];
+    return this._groupedCommands(term)[0]?.commands[0];
   }
 
   /** The user's shortcut for a command, when it has one. */

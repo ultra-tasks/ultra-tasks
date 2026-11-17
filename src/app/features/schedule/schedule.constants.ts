@@ -13,20 +13,6 @@ export const SCHEDULE_CONSTANTS = {
   HORIZONTAL_SCROLL_THRESHOLD: 1900,
 
   /**
-   * Responsive breakpoints for different device sizes.
-   */
-  BREAKPOINTS: {
-    /** Width threshold for tablet devices (768px) */
-    TABLET: 768,
-    /** Width threshold below which the schedule header switches to its compact form. Mirrors `$layout-xs` in `_media-queries.scss`. */
-    XS: 600,
-    /** Width threshold for mobile devices (480px) */
-    MOBILE: 480,
-    /** Width threshold below which the schedule header drops the date range and shows only the week number. */
-    XXS: 420,
-  },
-
-  /**
    * Column widths for different screen sizes.
    * These values determine the width of day columns in the schedule view.
    */

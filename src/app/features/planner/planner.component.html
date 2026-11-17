@@ -2,7 +2,9 @@
   <planner-calendar-nav
     [visibleDayDate]="planView.visibleDayDate()"
     [daysWithTasks]="daysWithTasks()"
+    [showUnscheduled]="!scope()"
     (dayTapped)="planView.scrollToDay($event)"
+    (unscheduledTapped)="unscheduledPanel.openSheet()"
   />
 }
 <div

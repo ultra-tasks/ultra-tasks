@@ -44,6 +44,7 @@ import {
   readPluginTranslationsFromZip,
 } from './util/read-plugin-translations-from-zip.util';
 import { BUNDLED_PLUGIN_IDS, BUNDLED_PLUGIN_PATHS } from './bundled-plugins.const';
+import { fetchBuiltInPluginAssets } from './util/fetch-built-in-plugin-assets.util';
 
 /**
  * Thrown by `_fireOnReady` when the user explicitly DENIES a nodeExecution consent
@@ -135,11 +136,20 @@ export class PluginService implements OnDestroy {
       'assets/bundled-plugins/ai-productivity-prompts', // discover-only
     ];
 
-    // Only load manifests for discovery
-    for (const path of pluginPaths) {
+    // Only load manifests for discovery. Every manifest and icon is a small static
+    // asset, so request them all at once: 21 plugins used to cost 42 round trips
+    // one after the other on the startup path.
+    const assets = pluginPaths.map((path) => fetchBuiltInPluginAssets(this._http, path));
+
+    // The results are still applied one plugin at a time, in list order, as each
+    // arrives, so the enable decisions, the state updates and the log lines are the
+    // ones the sequential loop produced.
+    for (const [index, path] of pluginPaths.entries()) {
       try {
-        const manifestUrl = `${path}/manifest.json`;
-        const manifest = await this._http.get<PluginManifest>(manifestUrl).toPromise();
+        const { manifest, icon, error } = await assets[index];
+        if (error) {
+          throw error;
+        }
 
         if (manifest) {
           let isEnabled = await this._pluginMetaPersistenceService.isPluginEnabled(
@@ -201,22 +211,11 @@ export class PluginService implements OnDestroy {
           this._setPluginState(manifest.id, state);
           this._pluginPaths.set(manifest.id, path);
 
-          // Load icon if available
-          try {
-            const iconUrl = `${path}/${manifest.icon || 'icon.svg'}`;
-            const icon = await this._http
-              .get(iconUrl, { responseType: 'text' })
-              .toPromise();
-            if (icon) {
-              state.icon = icon;
-              this._pluginIcons.set(manifest.id, icon);
-              this._updatePluginIcons();
-            }
-          } catch (e) {
-            // Icon is optional - silently ignore 404s and other errors
-            PluginLog.debug(
-              `Icon not found for plugin ${manifest.id}: ${path}/${manifest.icon || 'icon.svg'}`,
-            );
+          // Apply the icon if there is one
+          if (icon) {
+            state.icon = icon;
+            this._pluginIcons.set(manifest.id, icon);
+            this._updatePluginIcons();
           }
         }
       } catch (error) {

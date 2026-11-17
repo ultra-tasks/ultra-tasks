@@ -75,10 +75,12 @@ test.describe('Task hover controls cover the title', () => {
 
     await expectOpaqueUnderlay(page);
 
-    await page.evaluate(() => document.body.classList.add('isTouchOnly'));
+    // Hover controls are a pointer affordance: under touch input they are hidden.
+    // The rule keys on the input intent (`isTouchPrimary`), not `isTouchOnly`.
+    await page.evaluate(() => document.body.classList.add('isTouchPrimary'));
     const touch = await readUnderlay(page);
     expect(touch.display).toBe('none');
-    await page.evaluate(() => document.body.classList.remove('isTouchOnly'));
+    await page.evaluate(() => document.body.classList.remove('isTouchPrimary'));
     await task.hover();
     await expect(task.locator('task-hover-controls')).toBeVisible();
 

@@ -108,7 +108,8 @@ test.describe('App Features', () => {
     await expect(
       drawer.getByRole('menuitem', { name: /Issue Provider Panel/ }),
     ).not.toBeAttached();
-    await expect(drawer.getByRole('menuitem', { name: /Project Notes/ })).toBeVisible();
+    // "Notes" on Today and tags, "Project notes" on a project.
+    await expect(drawer.getByRole('menuitem', { name: /(^|\s)Notes$/ })).toBeVisible();
     // Nothing is connected, so Integrations has no sidebar row yet; the
     // workspace stays reachable by its route.
     await expect(

@@ -30,6 +30,7 @@ import { DEFAULT_GLOBAL_CONFIG } from '../../config/default-global-config.const'
 import { TranslatePipe } from '@ngx-translate/core';
 import { T } from '../../../t.const';
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
+import { isTouchActive } from '../../../util/input-intent';
 
 type Timeout = NodeJS.Timeout | number | undefined;
 
@@ -54,6 +55,9 @@ export class CreateTaskPlaceholderComponent implements OnDestroy {
   private readonly _snackService = inject(SnackService);
   private readonly _globalConfigService = inject(GlobalConfigService);
   private readonly _dateTimeFormatService = inject(DateTimeFormatService);
+
+  /** Touch intent: the cue says "tap", and the Ctrl+1 hint is not shown. */
+  readonly isTouch = isTouchActive;
 
   // Exposed so the template can pass the reactive locale to the now-pure
   // `localeDate` pipe, preserving re-render on a locale change.

@@ -58,4 +58,30 @@ describe('DialogPromptComponent', () => {
     component.close(false);
     expect(dialogRef.close).toHaveBeenCalledWith(undefined);
   });
+
+  describe('mobile keyboard hints', () => {
+    const input = (): HTMLInputElement =>
+      fixture.debugElement.query(By.css('input')).nativeElement;
+
+    it('ends a text prompt in Done and leaves capitals and correction on', async () => {
+      await create({ placeholder: 'Name' });
+      expect(input().getAttribute('enterkeyhint')).toBe('done');
+      expect(input().hasAttribute('autocapitalize')).toBeFalse();
+      expect(input().hasAttribute('spellcheck')).toBeFalse();
+    });
+
+    it('asks for the URL keyboard, without capitals or correction, for a URL', async () => {
+      await create({ placeholder: 'Address', type: 'url' });
+      expect(input().getAttribute('inputmode')).toBe('url');
+      expect(input().getAttribute('autocapitalize')).toBe('none');
+      expect(input().getAttribute('autocorrect')).toBe('off');
+      expect(input().getAttribute('spellcheck')).toBe('false');
+    });
+
+    it('does not capitalise or correct a password', async () => {
+      await create({ placeholder: 'Secret', type: 'password' });
+      expect(input().getAttribute('autocapitalize')).toBe('none');
+      expect(input().getAttribute('spellcheck')).toBe('false');
+    });
+  });
 });

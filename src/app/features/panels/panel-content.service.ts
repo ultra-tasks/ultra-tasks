@@ -8,7 +8,14 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TaskService } from '../tasks/task.service';
 import { TaskDetailTargetPanel } from '../tasks/task.model';
 
-export type PanelContentType = 'NOTES' | 'TASK' | 'TASK_VIEW_CUSTOMIZER_PANEL' | 'PLUGIN';
+export type PanelContentType =
+  | 'NOTES'
+  | 'TASK'
+  | 'TASK_VIEW_CUSTOMIZER_PANEL'
+  | 'PLUGIN'
+  // Upcoming's unscheduled tasks as a phone sheet. Asked for through the sheet's
+  // data (the Unscheduled chip), so `panelType` never derives it from state.
+  | 'UNSCHEDULED';
 
 @Injectable({ providedIn: 'root' })
 export class PanelContentService {

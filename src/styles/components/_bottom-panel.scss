@@ -1,7 +1,11 @@
 // Bottom panel sheet styles
 .bottom-panel-sheet {
   .mat-bottom-sheet-container {
-    padding: 0;
+    // The bottom inset only: on a native app the gesture or three-button bar is
+    // drawn over the sheet's lower edge, and without it the last row (the task's
+    // "Created on", a note's buttons) sat behind the bar. The sheet is
+    // border-box, so its height stays as set and the content gives the inset up.
+    padding: 0 0 var(--safe-area-bottom);
     height: 60vh; // Default to 3/5 of viewport height
     max-height: 98vh;
     min-height: 20vh;

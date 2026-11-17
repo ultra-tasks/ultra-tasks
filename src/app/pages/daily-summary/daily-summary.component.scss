@@ -139,7 +139,7 @@ $summary-point-inner-margin: var(--s);
 }
 
 .daily-summary-actions {
-  margin-top: 30px;
+  margin-top: var(--s4);
 
   button {
     margin: 0 var(--s-half);
@@ -203,4 +203,82 @@ $summary-point-inner-margin: var(--s);
 .week-section-title {
   font: var(--type-heading);
   margin-bottom: var(--s-half);
+}
+
+// Phone (the page was 2,783px tall at 412px: a stack of 160px tiles for the
+// figures, a stack of tiles for the habits, and the finish button at the very end).
+@include mq(xs, max) {
+  // One compact strip: three figures to a line, each a muted label over its value.
+  // The icons go; the labels name the figures. Break and focus time, when they
+  // exist, wrap onto a second line.
+  .daily-summary-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s2) var(--s);
+    margin-bottom: var(--s3);
+
+    .summary-point {
+      display: block;
+
+      mat-icon {
+        display: none;
+      }
+    }
+
+    // The value hugs the bottom, so figures line up when one label wraps.
+    .summary-text {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      color: var(--text-color-muted);
+      font: var(--type-meta);
+    }
+
+    .summary-val {
+      color: var(--text-color);
+    }
+  }
+
+  // The habits are a row of chips that wraps, not a stack of tiles.
+  .simple-counter-summary {
+    gap: var(--s);
+    margin-bottom: var(--s3);
+
+    simple-counter-summary-item {
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+
+  .day-end-note {
+    margin-bottom: var(--s3);
+  }
+
+  // Finish the day stays in reach: pinned just above the floating nav, full width,
+  // while the review scrolls. The page's scroller pads itself by the nav's height,
+  // and a sticky offset counts from inside that padding, so 0 is the nav's top edge.
+  .daily-summary-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-pinned-add-row);
+    margin-top: var(--s3);
+    padding: var(--s) 0;
+
+    .bottom-buttons {
+      display: flex;
+    }
+
+    button {
+      flex: 1;
+      margin: 0;
+      box-shadow: var(--elev-1);
+    }
+  }
+
+  // With the keyboard up (the plan tab's composer) it would sit on the field.
+  :host-context(body.isKeyboardVisible) .daily-summary-actions {
+    position: static;
+  }
 }

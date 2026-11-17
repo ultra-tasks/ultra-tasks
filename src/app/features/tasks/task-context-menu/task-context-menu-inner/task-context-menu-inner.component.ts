@@ -187,14 +187,6 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
 
   protected readonly isTouchActive = isTouchActive;
   protected readonly T = T;
-  // Weekday names instead of "Tomorrow"/"Next week" keep every label on one
-  // line in the narrow menu row; the tooltips keep the full wording. Matches
-  // the dates quickAccessBtnClick schedules: tomorrow and the week's first day.
-  private readonly _weekdayNames = this._dateAdapter.getDayOfWeekNames('short');
-  protected readonly tomorrowLabel =
-    this._weekdayNames[(this._dateAdapter.getDayOfWeek(new Date()) + 1) % 7];
-  protected readonly nextWeekLabel =
-    this._weekdayNames[this._dateAdapter.getFirstDayOfWeek()];
   protected readonly PRIORITY_LEVELS = TASK_PRIORITY_LEVELS;
   protected readonly PRIORITY_LABEL_KEY = TASK_PRIORITY_LABEL_KEY;
   readonly ESTIMATE_OPTIONS = ESTIMATE_OPTIONS;
@@ -441,7 +433,14 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
           menuPanel.style.width = '100%';
           menuPanel.style.borderRadius =
             'var(--card-border-radius) var(--card-border-radius) 0 0';
-          menuPanel.style.maxHeight = '80vh';
+          // As tall as the screen leaves room for (it was 80vh, which cut the
+          // last rows, Won't do and Delete, off a 740px phone). The vh line first
+          // is the fallback for a WebView without dvh. The panel is centered, so
+          // taking both insets off keeps it clear of the status and navigation bars.
+          menuPanel.style.maxHeight =
+            'calc(100vh - var(--safe-area-top) - var(--safe-area-bottom) - var(--s6))';
+          menuPanel.style.maxHeight =
+            'calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - var(--s6))';
           menuPanel.style.animation = 'none';
           menuPanel.style.transform = 'translateY(24px)';
           menuPanel.style.opacity = '0';
@@ -499,6 +498,72 @@ export class TaskContextMenuInnerComponent implements AfterViewInit, OnDestroy {
 
     this._taskFocusService.closeActiveTaskContextMenu.set(null);
     this._taskFocusService.isTaskContextMenuOpen.set(false);
+  }
+
+  // Which of the first group's actions apply to this task, one place for the
+  // rows and for the divider that closes the group. (Reading the template's own
+  // conditions twice is how a divider ends up under an empty group.)
+  protected get isMarkDoneShown(): boolean {
+    return !this.isTouchActive() && !this.isAdvancedControls();
+  }
+
+  /** Not on touch: the header has the Focus button already. */
+  protected get isFocusShown(): boolean {
+    return (
+      this.isFocusModeEnabled() &&
+      this.isAdvancedControls() &&
+      !this.isTouchActive() &&
+      !this.task.isDone &&
+      !this.task.subTaskIds.length
+    );
+  }
+
+  protected get isTrackShown(): boolean {
+    return (
+      this.isTimeTrackingEnabled() &&
+      ((this.isAdvancedControls() && this.isTouchActive()) ||
+        !this.isAdvancedControls()) &&
+      !this.task.isDone &&
+      !this.isCurrent &&
+      !this.task.subTaskIds.length
+    );
+  }
+
+  protected get isPauseShown(): boolean {
+    return (
+      this.isAdvancedControls() &&
+      this.isTouchActive() &&
+      !this.task.isDone &&
+      this.isCurrent &&
+      !this.task.subTaskIds.length
+    );
+  }
+
+  protected get isSubtaskShown(): boolean {
+    return this.isAdvancedControls() && !this.task.parentId && !this.task.isDone;
+  }
+
+  protected get isSelectShown(): boolean {
+    return this.isTouchActive() && this.isInTaskRow;
+  }
+
+  protected get hasQuickActions(): boolean {
+    return (
+      this.isMarkDoneShown ||
+      this.isFocusShown ||
+      this.isTrackShown ||
+      this.isPauseShown ||
+      this.isSubtaskShown ||
+      this.isSelectShown
+    );
+  }
+
+  protected get hasIntegrationActions(): boolean {
+    return (
+      (!!this.task.issueId && this.task.issueType !== ICAL_TYPE) ||
+      this.isPlainspaceHandoff ||
+      this.pluginTaskContextMenuEntries().length > 0
+    );
   }
 
   get kb(): KeyboardConfig {

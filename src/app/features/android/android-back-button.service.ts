@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { App as CapacitorApp } from '@capacitor/app';
 
 import { HISTORY_STATE } from '../../app.constants';
+import { getDialogBackHandler } from '../../ui/dialog-back-handler.util';
 import { GlobalConfigService } from '../config/global-config.service';
 import { getStartPageUrlPath } from '../config/default-start-page.util';
 import { selectIsOverlayShown } from '../focus-mode/store/focus-mode.selectors';
@@ -29,7 +30,10 @@ import { TaskMultiSelectService } from '../tasks/task-multi-select.service';
  * existing `window.history.back()` behavior so back still closes overlays and
  * navigates up. Focus mode and layout popups are store-backed and are closed
  * directly. A plain modal dialog (no history state) is dismissed directly so
- * back closes it rather than minimizing the app underneath it.
+ * back closes it rather than minimizing the app underneath it, unless it answers
+ * the press itself (a create/edit dialog asking before it discards typed text).
+ * Any other CDK overlay with a backdrop (menus, selects, pickers) is closed with
+ * Escape, so a menu never outlives the press that was meant to close it.
  */
 @Injectable({ providedIn: 'root' })
 export class AndroidBackButtonService {
@@ -43,6 +47,8 @@ export class AndroidBackButtonService {
 
   private readonly _isFocusOverlayShown = this._store.selectSignal(selectIsOverlayShown);
   private readonly _allProjects = this._store.selectSignal(selectAllProjects);
+  /** Backdrops that already got their Escape (see `_closeTopBackdropOverlay`). */
+  private readonly _escapeSentTo = new WeakSet<Element>();
 
   handleBackButton(canGoBack = true): void {
     // 1. Focus mode is store-based rather than history-backed.
@@ -53,6 +59,23 @@ export class AndroidBackButtonService {
 
     // 2. Task context menus are CDK overlays without a history entry.
     if (this._closeTaskContextMenu()) {
+      return;
+    }
+
+    // 2b. Any other CDK overlay with a backdrop that nothing above handles: the
+    //     header, drawer-row, view and picker menus, selects, the sheets that have
+    //     no history entry. Close the top-most one and stop there, or the press
+    //     would navigate away and leave its panel and backdrop over the new page.
+    if (this._closeTopBackdropOverlay()) {
+      return;
+    }
+
+    // 2c. The top dialog answers the press itself: a create/edit dialog that asks
+    //     before it discards typed text (useDiscardGuard), or that question. It goes
+    //     before the history step: with the phone's drawer open beneath it, the
+    //     history step would navigate back and dispose every dialog, unsaved one
+    //     included. A dialog with nothing to ask (or no handler) falls through.
+    if (this._isAnsweredByTopDialog()) {
       return;
     }
 
@@ -133,6 +156,67 @@ export class AndroidBackButtonService {
     }
 
     close();
+    return true;
+  }
+
+  /** True when the top dialog has a back handler and the handler dealt with the press. */
+  private _isAnsweredByTopDialog(): boolean {
+    const topDialog = this._matDialog.openDialogs.at(-1);
+    return !!topDialog && getDialogBackHandler(topDialog)?.() === true;
+  }
+
+  /**
+   * Menus, selects, pickers and sheets are CDK overlays with a backdrop and no history
+   * entry of their own; Escape on <body> is the one way every one of them closes (the CDK
+   * keyboard dispatcher hands it to the most recently opened overlay that listens).
+   *
+   * Left to the steps that own them: a dialog (step 4, which also covers
+   * `disableClose`), and, while a history overlay is open, any modal backdrop (its panel
+   * or dialog pops its own history entry in step 3). A menu on top of either still goes
+   * first: its backdrop is transparent.
+   */
+  private _closeTopBackdropOverlay(): boolean {
+    // A descendant of the container, not a child of it: with the Popover API (Chromium
+    // 114 and later, so nearly every Android WebView) the CDK puts the backdrop inside
+    // the overlay's host element, and the host is what sits in the container.
+    const showing = Array.from(
+      document.querySelectorAll(
+        '.cdk-overlay-container .cdk-overlay-backdrop.cdk-overlay-backdrop-showing',
+      ),
+    );
+    // Closing takes an animation, and a backdrop keeps "showing" until it ends. One that
+    // has had its Escape is closing, or ignores Escape; either way this press is for
+    // what is beneath it, so no overlay can trap the button.
+    const top = showing.reverse().find((backdrop) => !this._escapeSentTo.has(backdrop));
+    if (!top) {
+      return false;
+    }
+
+    // The overlay's host, which holds its pane: the backdrop's parent in popover mode,
+    // the element that follows the backdrop otherwise.
+    const parent = top.parentElement;
+    const host = parent?.classList.contains('cdk-overlay-container')
+      ? top.nextElementSibling
+      : parent;
+    if (host?.querySelector('.mat-mdc-dialog-panel')) {
+      return false;
+    }
+    const isTransparent = top.classList.contains('cdk-overlay-transparent-backdrop');
+    if (!isTransparent && this._isHistoryOverlayOpen()) {
+      return false;
+    }
+
+    this._escapeSentTo.add(top);
+    // `keyCode` as well as `key`: Material's menu and select read the former.
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        code: 'Escape',
+        keyCode: 27,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     return true;
   }
 

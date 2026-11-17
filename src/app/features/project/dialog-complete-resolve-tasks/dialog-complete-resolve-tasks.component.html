@@ -13,23 +13,32 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
+  <!-- The genuine alternative to the primary action: a stroked button at the start
+       edge. Cancel and the primary action stay together at the end edge and wrap
+       as a pair, instead of leaving one of three text buttons alone on a row. -->
   <button
-    mat-button
-    (click)="cancel()"
-  >
-    {{ T.G.CANCEL | translate }}
-  </button>
-  <button
-    mat-button
+    class="dialog-action-start"
+    mat-stroked-button
+    type="button"
     (click)="markDone()"
   >
     {{ T.F.PROJECT.COMPLETE.RESOLVE.MARK_DONE | translate }}
   </button>
-  <button
-    mat-flat-button
-    color="primary"
-    (click)="moveToInbox()"
-  >
-    {{ T.F.PROJECT.COMPLETE.RESOLVE.MOVE_TO_INBOX | translate }}
-  </button>
+  <div class="wrap-buttons">
+    <button
+      mat-button
+      type="button"
+      (click)="cancel()"
+    >
+      {{ T.G.CANCEL | translate }}
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="moveToInbox()"
+    >
+      {{ T.F.PROJECT.COMPLETE.RESOLVE.MOVE_TO_INBOX | translate }}
+    </button>
+  </div>
 </mat-dialog-actions>

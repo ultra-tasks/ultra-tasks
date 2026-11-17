@@ -17,8 +17,9 @@
         <mat-icon>close</mat-icon>
       </button>
     }
-    <!-- Touch devices have no right-click/hover menu at any width (#10835) -->
-    @if ((layoutService.isXs() || IS_TOUCH_PRIMARY) && !isDialogMode()) {
+    <!-- Touch devices have no right-click/hover menu at any width (#10835), and below
+         960px the panel is a bottom sheet with no row to right-click -->
+    @if ((layoutService.isCompactShell() || IS_TOUCH_PRIMARY) && !isDialogMode()) {
       <button
         mat-icon-button
         class="task-detail-more-btn"
@@ -231,18 +232,22 @@
     </ng-container>
 
     <ng-container panel-content>
-      <inline-markdown
-        (blur)="panelState.isFocusNotes.set(false)"
-        (blurred)="panelState.isFocusNotes.set(false)"
-        (changed)="changeTaskNotes($event); panelState.isFocusNotes.set(false)"
-        (keyboardUnToggle)="focusItem(noteWrapperElRef)"
-        [isFocus]="panelState.isFocusNotes()"
-        [isShowControls]="true"
-        [isScrollable]="true"
-        [ariaLabel]="T.F.TASK.D_DESCRIPTION.TITLE | translate"
-        [model]="task().notes || ''"
-        [taskId]="task().id"
-      ></inline-markdown>
+      <!-- The editor (CodeMirror) is created when the panel is open, not for
+           every task sheet that merely exists collapsed. -->
+      @if (isExpandedNotesPanel()) {
+        <inline-markdown
+          (blur)="panelState.isFocusNotes.set(false)"
+          (blurred)="panelState.isFocusNotes.set(false)"
+          (changed)="changeTaskNotes($event); panelState.isFocusNotes.set(false)"
+          (keyboardUnToggle)="focusItem(noteWrapperElRef)"
+          [isFocus]="panelState.isFocusNotes()"
+          [isShowControls]="true"
+          [isScrollable]="true"
+          [ariaLabel]="T.F.TASK.D_DESCRIPTION.TITLE | translate"
+          [model]="task().notes || ''"
+          [taskId]="task().id"
+        ></inline-markdown>
+      }
     </ng-container>
   </task-detail-item>
 

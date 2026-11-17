@@ -477,6 +477,11 @@ export interface ConfigFormSection<FormModel> {
   actions?: ConfigSectionAction[];
   isElectronOnly?: boolean;
   isHideForAndroidApp?: boolean;
+  /**
+   * Needs the desktop app or the browser extension: nothing to show on a phone or
+   * tablet, in the browser or in the app (idle handling).
+   */
+  isHideForMobile?: boolean;
 }
 
 export interface GenericConfigFormSection extends Omit<

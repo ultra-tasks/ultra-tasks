@@ -30,7 +30,7 @@
     margin-top: auto;
     margin-bottom: auto;
     height: 100% !important;
-    min-height: 40px;
+    min-height: var(--ctl-md);
     border-radius: var(--card-border-radius);
 
     ::ng-deep {
@@ -172,6 +172,9 @@ task-priority-indicator {
 }
 
 // TIME
+// Stays on every row at every width: it used to disappear in a main column of
+// 352px or less (a 320px phone, Android's large display size, a side panel),
+// where no row showed its estimate.
 .time-wrapper {
   position: relative;
   display: flex;
@@ -187,8 +190,10 @@ task-priority-indicator {
     min-width: 0;
   }
 
-  @include verySmallMainContainer {
-    display: none;
+  // The estimate opens its dialog on tap: a full-height 40px target, not the
+  // 25-31px the digits happen to measure.
+  @media (pointer: coarse) {
+    min-width: var(--ctl-md);
   }
 
   &.isEditable {
@@ -266,10 +271,6 @@ task-priority-indicator {
     @at-root .time-wrapper {
       margin-right: 0;
       @include timeWrapperMinimalStyles;
-
-      @include isDoneForFirstLine {
-        opacity: calc(var(--task-is-done-dim-opacity) + 0.1);
-      }
     }
   }
 
@@ -419,12 +420,15 @@ done-toggle {
   z-index: var(--z-toggle-sub-task-btn) !important;
   min-width: 0;
   min-height: 0;
-  width: 24px !important;
-  height: 24px !important;
+  // One icon slot: the width of the gutter it sits in on a phone.
+  width: var(--icon-slot) !important;
+  height: var(--icon-slot) !important;
   margin-top: -1px !important;
   transform-origin: left top;
   transition-property: opacity, transform, background, box-shadow;
-  box-shadow: none;
+  // A hairline ring, no shadow: on the card's own surface the 24px button was
+  // only a dash and a count, and did not read as something to tap.
+  box-shadow: 0 0 0 var(--st-line-width) var(--palette-border);
   background: var(--bg-lighter) !important;
   // The mini FAB's own foreground is the accent ink, which vanishes on this
   // card-colored background; the icon and the done/total badge inherit this.
@@ -527,9 +531,9 @@ done-toggle {
 .time-conflict-ico {
   align-self: center;
   color: var(--c-warn);
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
+  font-size: var(--icon-md);
+  width: var(--icon-md);
+  height: var(--icon-md);
   // tuck it close to the schedule button on its left, which it annotates
   margin-left: calc(-1 * var(--s-quarter));
 }
@@ -549,7 +553,7 @@ done-toggle {
 .repeat-date-badge,
 .time-badge {
   @include center;
-  margin-top: 10px;
+  margin-top: var(--task-badge-offset);
   // Meta size in the app font (buttons inherit it from the base reset).
   font-size: var(--font-size-sm);
   z-index: 10;
@@ -586,7 +590,7 @@ done-toggle {
 // done/total count overlaid on an icon button (checklist + collapsed sub tasks)
 .progress-badge {
   @include center;
-  margin-top: 10px;
+  margin-top: var(--task-badge-offset);
   font-size: var(--font-size-sm);
   z-index: 10;
   line-height: 1;
@@ -614,10 +618,10 @@ done-toggle {
 }
 
 .tag-ico {
-  font-size: 20px;
-  line-height: 20px;
-  height: 20px;
-  width: 20px;
+  font-size: var(--icon-md);
+  line-height: var(--icon-md);
+  height: var(--icon-md);
+  width: var(--icon-md);
   display: inline-block;
   vertical-align: middle;
   margin-right: var(--s-half);

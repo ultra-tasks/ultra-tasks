@@ -37,8 +37,10 @@ test('settings opens over the workspace, finds advanced options, and dismisses h
   await settingsLink.click();
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Plugins & integrations' }).click();
-  // The window itself is titled Marketplace.
-  await expect(page.getByRole('dialog', { name: 'Marketplace' })).toBeVisible();
+  // The window is titled the way it was entered.
+  await expect(
+    page.getByRole('dialog', { name: 'Plugins & integrations' }),
+  ).toBeVisible();
 });
 
 test('data settings separates import and export from account sync', async ({ page }) => {

@@ -67,6 +67,8 @@
 
 .schedule-nav-controls {
   display: flex;
+  // The page is a flex column: the scroll area under the toolbar must not squeeze it.
+  flex-shrink: 0;
   align-items: center;
   gap: var(--s);
   min-height: 48px;
@@ -108,12 +110,61 @@
   }
 
   .time-view-selector {
+    // The segments never give way (it used to shrink and clip the Month
+    // toggle); the title is what shortens when the row is tight.
+    flex: none;
     display: flex;
     margin-inline-start: var(--s);
     border-radius: var(--r-md);
     overflow: hidden;
     border: 1px solid var(--separator);
     background: transparent;
+  }
+
+  // Below the phone breakpoint the toolbar is two rows: the title on its own
+  // line (the calendar filter, when there is one, at its end) and the view
+  // switch and date navigation beneath it. Keyed to the page container, not the
+  // window, so a desktop window narrowed by the sidebar or a side panel gets the
+  // same rows instead of a clipped Month toggle.
+  @container main-content (max-width: #{$layout-xs - 1px}) {
+    flex-wrap: wrap;
+    gap: 0 var(--s);
+    min-height: 0;
+    padding-inline: var(--page-gutter);
+
+    .title {
+      // `auto`, not `0`: the line break below needs a non-zero item on this line.
+      flex: 1 1 auto;
+      margin-inline-end: 0;
+      padding: var(--s) 0;
+      font: var(--type-body-strong);
+    }
+
+    // Forced line break between the title row and the controls row.
+    &::after {
+      content: '';
+      order: 2;
+      flex: 0 0 100%;
+    }
+
+    // The empty mat-menu host would otherwise add a gap at the end of row two.
+    mat-menu {
+      order: 1;
+    }
+
+    .cal-filter-btn {
+      order: 1;
+    }
+
+    .time-view-selector {
+      order: 3;
+      margin-inline-start: 0;
+    }
+
+    .date-nav-group {
+      order: 4;
+      margin-inline-start: auto;
+    }
   }
 
   .time-view-btn {

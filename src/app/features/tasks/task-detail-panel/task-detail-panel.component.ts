@@ -9,10 +9,12 @@ import {
   HostListener,
   inject,
   input,
+  linkedSignal,
   OnDestroy,
   OnInit,
   output,
   signal,
+  untracked,
   viewChild,
   viewChildren,
 } from '@angular/core';
@@ -336,7 +338,17 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
     return !this.layoutService.isXs() && (!!this.issueData() || hasSyncNotice);
   });
 
-  isExpandedNotesPanel = signal(true);
+  // Open on the notes only when there are some: a task without any opens on its
+  // fields, not on an empty editor that pushes Links & Files, Tags and Created
+  // off a phone sheet. Keyed on the task id because the panel component is reused
+  // across tasks; the notes themselves are read untracked, so clearing the text
+  // while editing does not fold the panel away under the cursor. The Notes
+  // target, "Add description" and a tap on the header still open it (set below).
+  isExpandedNotesPanel = linkedSignal<string, boolean>({
+    source: () => this.task().id,
+    computation: (id, previous) =>
+      previous?.source === id ? previous.value : untracked(() => !!this.task().notes),
+  });
 
   isPlannedForTodayDay = computed(() => {
     const task = this.task();
@@ -470,7 +482,6 @@ export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestro
       // unlike per-row <task> components).
       this.isAddSubtaskInputVisible.set(false);
       this.isSubTasksExpanded.set(false);
-      this.isExpandedNotesPanel.set(true);
       this.panelState.isFocusNotes.set(false);
       // Only auto-focus panel content when focus is already inside the panel,
       // to avoid stealing focus from the main task list during navigation (#6578)

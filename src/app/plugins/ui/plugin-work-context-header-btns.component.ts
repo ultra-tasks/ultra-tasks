@@ -14,6 +14,7 @@ import { PluginWorkContextHeaderBtnCfg } from '../plugin-api.model';
         [class.isActive]="button.pluginId === activeEmbedPluginId()"
         [attr.aria-pressed]="button.pluginId === activeEmbedPluginId()"
         [matTooltip]="button.label"
+        [attr.aria-label]="button.label"
         (click)="onClick(button)"
       >
         <mat-icon>{{ button.icon }}</mat-icon>
@@ -36,8 +37,11 @@ import { PluginWorkContextHeaderBtnCfg } from '../plugin-api.model';
         transition: background var(--transition-standard);
       }
 
-      button.isActive:hover:not(:disabled) {
-        background: rgba(var(--ink-on-channel), 0.26);
+      /* A finger has no hover: after a tap this would stay on. */
+      @media (hover: hover) {
+        button.isActive:hover:not(:disabled) {
+          background: rgba(var(--ink-on-channel), 0.26);
+        }
       }
     `,
   ],

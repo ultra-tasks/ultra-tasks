@@ -241,8 +241,9 @@ export class TaskComponent implements OnDestroy, AfterViewInit {
   isMultiSelected = computed(() => this._multiSelect.selectedIds().has(this.task().id));
   isTouchSelectionMode = this._multiSelect.isTouchSelectionMode;
   isShowCloseButton = computed(() => {
-    // Only show close button when task is selected AND not on mobile (bottom panel)
-    return this.isSelected() && !this.layoutService.isXs();
+    // Only show close button when task is selected AND the panel is the side column,
+    // not the bottom sheet (phones, and the compact shell below 960px)
+    return this.isSelected() && !this.layoutService.isCompactShell();
   });
 
   // Determines if the toggle detail panel button should be visible

@@ -1,3 +1,5 @@
+@use '../../../../styles/_globals.scss' as *;
+
 :host ::ng-deep .wrap-add-planned {
   margin-top: var(--s2);
 }
@@ -42,4 +44,31 @@
 
 :host ::ng-deep add-task-inline {
   display: none !important;
+}
+
+// Phone: the composer's action row wraps instead of scrolling sideways, so Tags,
+// Estimate and Repeat are all in reach (at 360px only 12 of Repeat's 86px showed).
+@include mq(xs, max) {
+  :host ::ng-deep add-task-bar-actions {
+    // The edge cue is for a row that scrolls; this one no longer does.
+    &::after {
+      display: none;
+    }
+
+    .action-bar {
+      flex-wrap: wrap;
+      overflow: visible;
+      padding-inline-end: var(--s);
+
+      // The icon toggles come last and wrap to a row of their own, so the divider
+      // that leads them on a scrolling strip would hang at the start of that row.
+      // (The row's class twice: the composer's own rule is as specific as this one
+      // and comes later in the cascade.)
+      &.action-bar .inline-action-controls {
+        border-inline-start: 0;
+        margin-inline-start: 0;
+        padding-inline-start: 0;
+      }
+    }
+  }
 }

@@ -120,6 +120,17 @@ and smoke-tests the native packaged app on each runner. Only after every job
 passes does it create `ultra-tasks-v<package version>` and publish the GitHub
 release with SHA-256 checksums and `build/desktop-release-notes.md`.
 
+For a staged beta, set `publish_release=false` to validate and package all three
+desktop platforms without creating a tag or release. Once the release checks
+pass, publish those artifacts through `publish-desktop-artifacts.yml` using the
+build run ID. Versions containing a prerelease suffix are published as GitHub
+prereleases and never replace the latest stable release. Both desktop build
+variants receive the official public OAuth client registrations.
+
+Android beta downloads use a manual `build-android.yml` run with `play_track`
+empty. Attach the verified signed APKs to the beta release and retain the AAB
+as a testing artifact; do not dispatch Play promotion or push a stable tag.
+
 This workflow uses `electron-builder.desktop.yaml` for the independent Ultra
 Tasks desktop identity on Windows and Linux, and
 `electron-builder.desktop-signed.yaml` on macOS. Windows packages are unsigned.

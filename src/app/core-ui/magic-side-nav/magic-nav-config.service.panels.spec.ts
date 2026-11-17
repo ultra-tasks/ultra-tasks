@@ -13,6 +13,7 @@ import { GlobalConfigService } from '../../features/config/global-config.service
 import { DEFAULT_GLOBAL_CONFIG } from '../../features/config/default-global-config.const';
 import { AppFeaturesConfig } from '../../features/config/global-config.model';
 import { WorkContextService } from '../../features/work-context/work-context.service';
+import { WorkContextType } from '../../features/work-context/work-context.model';
 import { TagService } from '../../features/tag/tag.service';
 import { ShepherdService } from '../../features/shepherd/shepherd.service';
 import { QuickTourService } from '../../features/onboarding/quick-tour.service';
@@ -52,6 +53,7 @@ describe('MagicNavConfigService panel items', () => {
     sidePanelButtons: SidePanelBtn[] = [],
     contexts: { main: unknown; inbox: unknown } = { main: null, inbox: null },
     issueProviderCount = 0,
+    activeType: WorkContextType = WorkContextType.PROJECT,
   ): NavItem[] => {
     layout = {
       toggleNotes: jasmine.createSpy('toggleNotes'),
@@ -87,6 +89,7 @@ describe('MagicNavConfigService panel items', () => {
           useValue: {
             mainWorkContext$: of(contexts.main),
             inboxWorkContext$: of(contexts.inbox),
+            activeWorkContextTypeAndId$: of({ activeId: 'ctx', activeType }),
           },
         },
         { provide: TagService, useValue: { tagsNoMyDayAndNoList$: of([]) } },
@@ -140,6 +143,20 @@ describe('MagicNavConfigService panel items', () => {
     expect(notes.label).toBe(T.BN.SHOW_NOTES);
     notes.action();
     expect(layout.toggleNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the notes row "Notes" on Today and on tags, where "project" would be wrong', () => {
+    const [notes] = panelItems(
+      build(
+        { ...ALL_OFF, isProjectNotesEnabled: true },
+        [],
+        { main: null, inbox: null },
+        0,
+        WorkContextType.TAG,
+      ),
+    );
+
+    expect(notes.label).toBe(T.MH.NOTES);
   });
 
   it('ignores the retired issue-panel flag', () => {
@@ -208,6 +225,10 @@ describe('MagicNavConfigService phone drawer placement', () => {
           useValue: {
             mainWorkContext$: of({ id: 'TODAY', title: 'Today' }),
             inboxWorkContext$: of({ id: 'INBOX_PROJECT', title: 'Inbox' }),
+            activeWorkContextTypeAndId$: of({
+              activeId: 'TODAY',
+              activeType: WorkContextType.TAG,
+            }),
           },
         },
         { provide: TagService, useValue: { tagsNoMyDayAndNoList$: of([]) } },
@@ -267,6 +288,20 @@ describe('MagicNavConfigService phone drawer placement', () => {
   it('keeps Settings and Help in the drawer', () => {
     expect(find('settings')?.desktopOnly).toBeUndefined();
     expect(find('help')?.desktopOnly).toBeUndefined();
+  });
+
+  it('pins Help and Settings to the drawer footer, and leaves the keyboard tour to desktop', () => {
+    expect(find('help')?.pinBottom).toBe(true);
+    expect(find('settings')?.pinBottom).toBe(true);
+    expect(find('search')?.pinBottom).toBeUndefined();
+
+    const help = find('help');
+    const children = help?.type === 'menu' ? help.children : [];
+    expect(children.find((c) => c.id === 'tour-keyboard')?.desktopOnly).toBe(true);
+    // The other two tours work with a finger.
+    expect(
+      children.find((c) => c.id === 'tour-create-task')?.desktopOnly,
+    ).toBeUndefined();
   });
 
   it('keeps Support us under Help on every screen size', () => {

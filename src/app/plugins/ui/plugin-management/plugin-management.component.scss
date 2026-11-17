@@ -1,3 +1,5 @@
+@use '../../../../styles/_globals.scss' as *;
+
 :host {
   display: flex;
   flex-direction: column;
@@ -180,7 +182,7 @@ mat-error {
   padding: var(--s) var(--s3);
   border-top: 1px solid var(--separator);
 }
-@media (max-width: 600px) {
+@include mq(xs, max) {
   .plugin-browser-toolbar,
   .plugin-browser-results,
   .catalog-pagination {
@@ -204,6 +206,42 @@ mat-error {
   }
   .plugin-body {
     margin-left: 0;
+  }
+}
+
+// A short touch window (a phone in landscape, or with the keyboard up) cannot spare
+// a toolbar that stays put above the results (155px of 360): it is one row,
+// wrapping where the window is narrow, and scrolls away with them.
+@include mq-short-touch {
+  :host {
+    overflow-y: auto;
+  }
+  .plugin-browser-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s);
+    padding-block: var(--s);
+    border-bottom: 0;
+  }
+  .plugin-views {
+    margin-bottom: 0;
+  }
+  // A row of its own on a narrow window, the rest of the toolbar row from xs up.
+  .plugin-search-controls {
+    flex: 1 1 100%;
+    @include mq(xs) {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+  }
+  .result-count {
+    margin: 0;
+  }
+  .plugin-browser-results {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
   }
 }
 

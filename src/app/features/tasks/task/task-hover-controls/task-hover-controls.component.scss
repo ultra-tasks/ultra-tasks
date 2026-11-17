@@ -19,8 +19,11 @@
     right: unset;
   }
 
+  // Hover controls are for a pointer: none under touch input, whatever the screen
+  // (`.isTouchPrimary` follows the active input, `.isTouchOnly` is never set in a
+  // phone's browser).
   @include mq(xs, max) {
-    :host-context(.isTouchOnly) & {
+    :host-context(.isTouchPrimary) & {
       display: none !important;
     }
   }
@@ -38,7 +41,7 @@
     }
   }
 
-  :host-context(.isTouchOnly) :host-context(.first-line:hover) & {
+  :host-context(.isTouchPrimary) :host-context(.first-line:hover) & {
     display: none !important;
   }
 

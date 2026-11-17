@@ -78,6 +78,17 @@ export class MagicNavConfigService {
   private readonly _inboxContext = toSignal(this._workContextService.inboxWorkContext$, {
     initialValue: null,
   });
+  private readonly _activeContextType = toSignal(
+    this._workContextService.activeWorkContextTypeAndId$.pipe(
+      map(({ activeType }) => activeType),
+    ),
+    { initialValue: null },
+  );
+  // Its own computed, so switching between two projects (or two tags) leaves the nav
+  // config, which reads only the label, untouched.
+  private readonly _notesLabel = computed(() =>
+    this._activeContextType() === WorkContextType.PROJECT ? T.BN.SHOW_NOTES : T.MH.NOTES,
+  );
   private readonly _visibleProjects = toSignal(
     this._store.select(selectUnarchivedVisibleProjects),
     { initialValue: [] },
@@ -297,20 +308,10 @@ export class MagicNavConfigService {
             icon: 'feedback',
             href: 'https://github.com/ac9492/ultra-tasks/issues',
           },
-          // Donation links are disabled on native iOS and every macOS desktop
-          // build to keep App Store review behavior deterministic.
-          ...(!IS_DONATION_UI_RESTRICTED
-            ? [
-                {
-                  type: 'href' as const,
-                  id: 'help-contribute',
-                  label: T.MH.HM.CONTRIBUTE,
-                  icon: 'volunteer_activism',
-                  href: 'https://github.com/ac9492/ultra-tasks/blob/main/CONTRIBUTING.md',
-                },
-              ]
-            : []),
-          // Support us has no sidebar row of its own on any screen size.
+          // Support us has no sidebar row of its own on any screen size. It is the
+          // one way to the project's contributing page from here: the page says who
+          // maintains the app and links CONTRIBUTING.md, so a second "Contribute"
+          // row with the same link is gone.
           // Donation links are disabled on native iOS and every macOS desktop
           // build to keep App Store review behavior deterministic (Guideline 3.1.1).
           ...(this.isDonatePageEnabled() && !IS_DONATION_UI_RESTRICTED
@@ -319,7 +320,6 @@ export class MagicNavConfigService {
                   type: 'action' as const,
                   id: 'help-donate',
                   label: T.MH.DONATE,
-                  // Not the donate icon: "Contribute" above already uses it.
                   icon: 'favorite',
                   action: () => void this._router.navigateByUrl('/donate'),
                 },
@@ -345,8 +345,12 @@ export class MagicNavConfigService {
             label: T.MH.HM.KEYBOARD,
             icon: 'keyboard',
             action: () => this._startTour(TourId.KeyboardNav),
+            // A phone has no keyboard to navigate with.
+            desktopOnly: true,
           },
         ],
+        // The phone drawer keeps Help and Settings in a footer that stays on screen.
+        pinBottom: true,
       },
 
       {
@@ -356,6 +360,7 @@ export class MagicNavConfigService {
         icon: NAV_SECTION_ICON.SETTINGS,
         route: '/config',
         tourClass: 'tour-settingsMenuBtn',
+        pinBottom: true,
       },
       ...(IS_SYNC_AVAILABLE
         ? [
@@ -570,7 +575,8 @@ export class MagicNavConfigService {
       items.push({
         type: 'action',
         id: 'panel-notes',
-        label: T.BN.SHOW_NOTES,
+        // "Project notes" only reads right on a project: Today and tags hold notes too.
+        label: this._notesLabel(),
         icon: 'description',
         mobileOnly: true,
         action: () => this._layoutService.toggleNotes(),

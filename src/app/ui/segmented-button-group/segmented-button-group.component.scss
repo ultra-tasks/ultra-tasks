@@ -67,6 +67,11 @@
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: center;
+
+  // The smallest phones: "Countdown" no longer breaks into "Countdow/n".
+  @include mq(xxxs, max) {
+    font: var(--type-meta);
+  }
 }
 
 .segment.is-disabled {

@@ -25,10 +25,13 @@
         }
       }
       @case ('TASK_VIEW_CUSTOMIZER_PANEL') {
-        <task-view-customizer-panel></task-view-customizer-panel>
+        <task-view-customizer-sheet></task-view-customizer-sheet>
       }
       @case ('PLUGIN') {
         <plugin-panel-container></plugin-panel-container>
+      }
+      @case ('UNSCHEDULED') {
+        <planner-unscheduled-panel [isSheet]="true"></planner-unscheduled-panel>
       }
     }
   </div>

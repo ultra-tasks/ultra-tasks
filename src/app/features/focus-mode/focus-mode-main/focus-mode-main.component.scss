@@ -57,6 +57,11 @@
   // slot (z-index), which lifts the whole top row — see focus-mode-layout.scss.
   padding: 0 var(--s2);
   max-width: 600px;
+
+  // Short windows: stay clear of the (icon-only) close button at the right.
+  @media (max-height: 500px) {
+    max-width: min(600px, calc(100% - 2 * (var(--ctl-lg) + var(--s2))));
+  }
 }
 
 .mode-settings-btn {
@@ -237,6 +242,13 @@
     opacity 0.2s ease,
     transform 0.2s ease;
 
+  // Phone landscape: the standard 56px FAB, so the bottom row can be 56px tall
+  // (focus-mode-layout.component.scss).
+  @media (max-height: 420px) {
+    width: var(--s7);
+    height: var(--s7);
+  }
+
   mat-icon {
     font-size: 36px;
     width: 36px;
@@ -272,6 +284,11 @@
   height: var(--s8);
   overflow: visible;
   pointer-events: none;
+
+  @media (max-height: 420px) {
+    width: var(--s7);
+    height: var(--s7);
+  }
 }
 
 // ========== ROW 1 (In Progress): SIMPLE COUNTER BUTTONS ==========

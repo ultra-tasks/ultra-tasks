@@ -1,3 +1,5 @@
+@use '../mixins/media-queries';
+
 // EXPERIMENT: vertical action strip on the right edge of the viewport
 // (desktop only). Lives at the top level (not inside main-header.scss) so
 // it bypasses Angular view-encapsulation and any containing-block
@@ -10,7 +12,7 @@
 // off the same config flag — used here only for the tooltip override
 // (overlay panes live outside the teleported nav and need a body-level
 // anchor).
-@media screen and (min-width: 600px) {
+@include media-queries.mq(xs) {
   // The strip sits BELOW the window-controls overlay band on Win/Linux
   // Electron with custom title bar (the band holds the native window
   // controls); elsewhere it starts at viewport top.

@@ -18,7 +18,7 @@ import { DomSanitizer, SafeStyle } from '@angular/platform-browser';
 import { LanguageService } from '../../core/language/language.service';
 import { isTouchActive } from '../../util/input-intent';
 import { NavigationEnd, NavigationStart, Router } from '@angular/router';
-import { filter, map, startWith, switchMap } from 'rxjs/operators';
+import { filter, map, startWith, switchMap, take } from 'rxjs/operators';
 import { of, Subscription, timer } from 'rxjs';
 import { SwipeDirective } from '../../ui/swipe-gesture/swipe.directive';
 import { CssString, StyleObject, StyleObjectToString } from '../../util/styles';
@@ -41,6 +41,13 @@ import { BottomPanelStateService } from '../../core-ui/bottom-panel-state.servic
 import { slideRightPanelAni } from './slide-right-panel-out.ani';
 import { MatBottomSheet, MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { PanelContentService } from '../panels/panel-content.service';
+import { HISTORY_STATE } from '../../app.constants';
+
+// How long a sheet <-> side handover waits for the popstate that the closing task panel
+// causes (see `_nextPopState`). It normally arrives within a frame: this only bounds a
+// popstate that never comes.
+const HISTORY_SETTLE_TIMEOUT_MS = 250;
+
 // Right panel resize constants
 const RIGHT_PANEL_CONFIG = {
   DEFAULT_WIDTH: 320,
@@ -145,11 +152,21 @@ export class RightPanelComponent implements AfterViewInit, OnDestroy {
     this._panelContentService.getCanOpen(),
   );
 
-  // Get isOpen for the right side panel (desktop/non-xs only)
+  /**
+   * Holds the side column back while an open task panel moves over from the bottom
+   * sheet (the layout grew past the compact shell). The sheet's panel pops its history
+   * entry when it goes away, and a panel that exists by the time that popstate arrives
+   * closes itself on it: the side column waits for the popstate instead.
+   */
+  private readonly _isHandoverHold = signal(false);
+
+  // Get isOpen for the right side panel. Below 960px (the compact shell) the panel is a
+  // bottom sheet instead, so the list keeps a readable column.
   readonly isOpen = computed<boolean>(() => {
     // If bottom sheet is open, keep right panel closed for mutual exclusion
     if (this._bottomPanelState.isOpen()) return false;
-    return this._hasPanelContent() && !this._layoutService.isXs();
+    if (this._isHandoverHold()) return false;
+    return this._hasPanelContent() && !this._layoutService.isCompactShell();
   });
 
   // Resize functionality
@@ -229,71 +246,138 @@ export class RightPanelComponent implements AfterViewInit, OnDestroy {
   // Computed signal that determines if animations should be skipped
   private readonly _shouldSkipAnimation = computed(() => this._skipAnimationDuringNav());
 
-  // Effect to handle bottom sheet opening/closing on xs screens
+  // The panel is a bottom sheet in the compact shell (below 960px: phones, landscape
+  // phones, small tablets, unfolded foldables, narrow windows) and a side column above it.
   private _bottomSheetEffect = effect(() => {
-    const isXs = this._layoutService.isXs();
+    const isCompact = this._layoutService.isCompactShell();
     const hasContent = this._hasPanelContent();
 
-    untracked(() => {
-      // Close bottom sheet immediately when switching from xs to non-xs screens
-      if (!isXs && this._bottomSheetRef) {
-        this._bottomSheetRef.dismiss();
-        this._bottomSheetRef = null;
-        return;
-      }
-
-      // Only handle bottom sheet on xs screens
-      if (isXs) {
-        if (hasContent && !this._bottomSheetRef) {
-          // Open bottom sheet
-
-          import('../bottom-panel/bottom-panel-container.component').then((m) => {
-            // Re-check: conditions may have changed while chunk was loading
-            if (this._bottomSheetRef) {
-              return;
-            }
-            this._bottomSheetRef = this._bottomSheet.open(
-              m.BottomPanelContainerComponent,
-              {
-                hasBackdrop: true,
-                closeOnNavigation: false,
-                panelClass: 'bottom-panel-sheet',
-                // Default 'first-tabbable' otherwise focuses the tag-edit
-                // input, which on touch makes mat-autocomplete pop open
-                // immediately on every task open in portrait.
-                autoFocus: false,
-              },
-            );
-
-            // Force-blur on backdrop click so pending edits (e.g. task title)
-            // are saved before the bottom sheet dismisses and destroys the component.
-            this._bottomSheetRef
-              .backdropClick()
-              .pipe(takeUntilDestroyed(this._destroyRef))
-              .subscribe(() => {
-                const el = document.activeElement as HTMLElement;
-                if (el && isInputElement(el)) {
-                  el.blur();
-                }
-              });
-
-            // Handle bottom sheet dismissal
-            this._bottomSheetSubscription = this._bottomSheetRef
-              .afterDismissed()
-              .subscribe(() => {
-                this._bottomSheetRef = null;
-                this._bottomSheetSubscription = null;
-                this.close();
-              });
-          });
-        } else if (!hasContent && this._bottomSheetRef) {
-          // Close bottom sheet
-          this._bottomSheetRef.dismiss();
-          this._bottomSheetRef = null;
-        }
-      }
-    });
+    untracked(() => this._syncPanelMode(isCompact, hasContent));
   });
+
+  private _lastIsCompact: boolean | null = null;
+  // Bumped on every layout or content change, so an open that is still waiting for its
+  // chunk or for the history to settle can tell it has been overtaken.
+  private _modeToken = 0;
+
+  private _syncPanelMode(isCompact: boolean, hasContent: boolean): void {
+    const wasCompact = this._lastIsCompact;
+    this._lastIsCompact = isCompact;
+    const token = ++this._modeToken;
+    // The layout moved under an open panel (rotation, unfolding, a window resize).
+    const isHandover = wasCompact !== null && wasCompact !== isCompact && hasContent;
+
+    if (!isCompact) {
+      // Wide again: the sheet gives way to the side column.
+      this._dismissSheet(isHandover);
+      return;
+    }
+
+    if (hasContent && !this._bottomSheetRef) {
+      void this._openSheet(token, isHandover);
+    } else if (!hasContent) {
+      this._dismissSheet(false);
+    }
+  }
+
+  private async _openSheet(token: number, isHandover: boolean): Promise<void> {
+    // Coming over from the side column, the panel that goes away pops its history entry
+    // (see `_nextPopState`): wait for that before the sheet's own panel exists.
+    const historySettled =
+      isHandover && this._isTaskPanelHistoryEntryPending()
+        ? this._nextPopState()
+        : Promise.resolve();
+    const [{ BottomPanelContainerComponent }] = await Promise.all([
+      import('../bottom-panel/bottom-panel-container.component'),
+      historySettled,
+    ]);
+    // Re-check: conditions may have changed while the chunk was loading
+    if (token !== this._modeToken || this._bottomSheetRef) {
+      return;
+    }
+
+    const ref = this._bottomSheet.open(BottomPanelContainerComponent, {
+      hasBackdrop: true,
+      closeOnNavigation: false,
+      panelClass: 'bottom-panel-sheet',
+      // Default 'first-tabbable' otherwise focuses the tag-edit
+      // input, which on touch makes mat-autocomplete pop open
+      // immediately on every task open in portrait.
+      autoFocus: false,
+    });
+    this._bottomSheetRef = ref;
+
+    // Force-blur on backdrop click so pending edits (e.g. task title)
+    // are saved before the bottom sheet dismisses and destroys the component.
+    ref
+      .backdropClick()
+      .pipe(takeUntilDestroyed(this._destroyRef))
+      .subscribe(() => {
+        const el = document.activeElement as HTMLElement;
+        if (el && isInputElement(el)) {
+          el.blur();
+        }
+      });
+
+    // The user dismissed it (backdrop, swipe down, Escape): the panel is closed too.
+    this._bottomSheetSubscription = ref.afterDismissed().subscribe(() => {
+      this._bottomSheetRef = null;
+      this._bottomSheetSubscription = null;
+      this.close();
+    });
+  }
+
+  /**
+   * @param isHandover the panel stays open and moves to the side column: dismissing the
+   *   sheet must not close it, as a user's dismissal does.
+   */
+  private _dismissSheet(isHandover: boolean): void {
+    const ref = this._bottomSheetRef;
+    if (!ref) {
+      return;
+    }
+    this._bottomSheetRef = null;
+
+    if (isHandover) {
+      this._bottomSheetSubscription?.unsubscribe();
+      this._bottomSheetSubscription = null;
+      if (this._isTaskPanelHistoryEntryPending()) {
+        this._isHandoverHold.set(true);
+        ref
+          .afterDismissed()
+          .pipe(take(1))
+          .subscribe(() => {
+            void this._nextPopState().then(() => this._isHandoverHold.set(false));
+          });
+      }
+    }
+    ref.dismiss();
+  }
+
+  /**
+   * An open task panel owns one history entry (`task-detail-panel`): the instance that is
+   * destroyed pops it with `history.back()`, and a live instance closes the panel on any
+   * popstate. Moving the panel between the sheet and the side column replaces one
+   * instance with another, so the new one must not exist when that popstate arrives.
+   */
+  private _isTaskPanelHistoryEntryPending(): boolean {
+    return (
+      this._panelContentService.getCurrentPanelType() === 'TASK' &&
+      !!window.history.state?.[HISTORY_STATE.TASK_DETAIL_PANEL]
+    );
+  }
+
+  private _nextPopState(): Promise<void> {
+    return new Promise((resolve) => {
+      const settle = (): void => {
+        window.removeEventListener('popstate', settle);
+        window.clearTimeout(timeout);
+        resolve();
+      };
+      const timeout = window.setTimeout(settle, HISTORY_SETTLE_TIMEOUT_MS);
+      window.addEventListener('popstate', settle);
+    });
+  }
 
   ngAfterViewInit(): void {
     this._initializeWidth();
@@ -326,6 +410,9 @@ export class RightPanelComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // An open that is still waiting for its chunk must not create a sheet any more
+    this._modeToken++;
+
     // Clean up resize state if active (emergency cleanup)
     if (this.isResizing()) {
       this._handleDragEnd();

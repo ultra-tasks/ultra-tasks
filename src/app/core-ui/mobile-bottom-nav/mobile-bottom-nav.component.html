@@ -1,3 +1,10 @@
+<!-- The strip under the floating pill that the gesture bar covers: solid, so the end of
+     the list does not show through behind the bar. -->
+<div
+  class="inset-scrim"
+  aria-hidden="true"
+></div>
+
 <nav
   class="mobile-bottom-nav"
   [class.entrance]="isEntrance()"
@@ -7,8 +14,10 @@
     class="nav-button e2e-bottom-nav-today"
     [routerLink]="todayRoute"
     routerLinkActive="active"
+    #today="routerLinkActive"
     ariaCurrentWhenActive="page"
     [routerLinkActiveOptions]="{ exact: false }"
+    (click)="onTabTap(today.isActive)"
   >
     <mat-icon aria-hidden="true">today</mat-icon>
     <span class="nav-label">{{ T.G.TODAY_TAG_TITLE | translate }}</span>
@@ -20,8 +29,10 @@
       class="nav-button tour-planner e2e-bottom-nav-upcoming"
       routerLink="/planner"
       routerLinkActive="active"
+      #planner="routerLinkActive"
       ariaCurrentWhenActive="page"
       [routerLinkActiveOptions]="{ exact: false }"
+      (click)="onTabTap(planner.isActive)"
     >
       <mat-icon aria-hidden="true">{{ plannerIcon }}</mat-icon>
       <span class="nav-label">{{ T.MH.PLANNER | translate }}</span>
@@ -33,8 +44,10 @@
     class="nav-button e2e-bottom-nav-inbox"
     [routerLink]="inboxRoute"
     routerLinkActive="active"
+    #inbox="routerLinkActive"
     ariaCurrentWhenActive="page"
     [routerLinkActiveOptions]="{ exact: false }"
+    (click)="onTabTap(inbox.isActive)"
   >
     <mat-icon aria-hidden="true">inbox</mat-icon>
     <span class="nav-label">{{ T.G.INBOX_PROJECT_TITLE | translate }}</span>
@@ -42,15 +55,15 @@
 
   <!-- Opens the side nav as the phone drawer: projects, tags, Search, the
        right-panel toggles, Settings and everything else that is not a daily
-       destination. -->
+       destination. Marked on every page that is none of the three tabs. -->
   <button
     type="button"
     class="nav-button tour-navMenuBtn e2e-bottom-nav-browse"
-    [class.active]="layoutService.isMobileSideNavOpen()"
+    [class.active]="layoutService.isMobileSideNavOpen() || isOnBrowsePage()"
     [attr.aria-expanded]="layoutService.isMobileSideNavOpen()"
     (click)="toggleMobileNav()"
   >
-    <mat-icon aria-hidden="true">menu</mat-icon>
+    <mat-icon aria-hidden="true">folder_open</mat-icon>
     <span class="nav-label">{{ T.MH.BROWSE | translate }}</span>
   </button>
 </nav>

@@ -17,6 +17,11 @@
         matInput
         required
         [type]="data.type || 'text'"
+        [attr.inputmode]="hints['inputmode']"
+        [attr.autocapitalize]="hints['autocapitalize']"
+        [attr.autocorrect]="hints['autocorrect']"
+        [attr.spellcheck]="hints['spellcheck']"
+        [attr.enterkeyhint]="hints['enterkeyhint']"
       />
     </mat-form-field>
   </form>

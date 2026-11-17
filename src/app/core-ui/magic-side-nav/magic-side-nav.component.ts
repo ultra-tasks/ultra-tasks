@@ -44,6 +44,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { T } from '../../t.const';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { IS_MAC } from '../../util/is-mac';
+import { isTouchActive } from '../../util/input-intent';
 
 // 56px = 24px icon + 16px (var(--s2)) padding on each side, so the left-aligned
 // nav icons sit centered in the collapsed rail.
@@ -123,6 +124,26 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
     }
     return tidy;
   });
+  /**
+   * The phone drawer keeps Help and Settings in a footer that stays on screen, so they
+   * are not at the end of a scroll that runs to 1,100px and more.
+   */
+  readonly footerItems = computed(() =>
+    this.isMobile() ? this.navigationItems().filter((item) => item.pinBottom) : [],
+  );
+  /** What scrolls: every row on desktop, every row but the footer's on the phone. */
+  readonly listItems = computed(() => {
+    const items = this.navigationItems();
+    if (!this.isMobile()) {
+      return items;
+    }
+    const body = items.filter((item) => !item.pinBottom);
+    // The separator that sat above the footer rows has nothing left to separate.
+    while (body[body.length - 1]?.type === 'separator') {
+      body.pop();
+    }
+    return body;
+  });
 
   private readonly _destroyRef = inject(DestroyRef);
   private readonly _sideNavConfigService = inject(MagicNavConfigService);
@@ -146,7 +167,14 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
   );
   readonly WorkContextType = WorkContextType;
   readonly T = T;
+  /** The phone shell: the nav is the full-screen drawer behind Browse. */
   readonly isMobile = this._layoutService.isXs;
+  /**
+   * Below 960px (and from 600px up, where the nav is not the drawer) the nav is the 56px
+   * rail, whatever the saved choice says. An expanded 260px panel next to a page that
+   * is already under 700px wide leaves a list column too narrow to read.
+   */
+  readonly isCompactShell = this._layoutService.isCompactShell;
   private readonly _initialState = this._getInitialState();
 
   activeWorkContextId = input<string | null>(null);
@@ -168,8 +196,21 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
   // Externally controlled mobile overlay visibility
   mobileVisibleChange = output<boolean>();
 
+  /**
+   * The saved expanded/collapsed choice (`SUP_NAV_SIDEBAR_EXPANDED`). Only the user's own
+   * toggle or drag changes it: the rail that the compact shell forces never does, so
+   * the choice is back when the window grows again.
+   */
   isFullMode = signal(this._initialState.isFullMode);
+  /** The user opened the rail in the compact shell. Not saved; reset on entering it. */
+  private readonly _isExpandedInCompact = signal(false);
+  /** What is on screen in the desktop shell: the saved choice, or the compact rail. */
+  readonly isExpanded = computed(() =>
+    this.isCompactShell() ? this._isExpandedInCompact() : this.isFullMode(),
+  );
   showMobileMenuOverlay = signal(false);
+  /** One first-use line in the open phone drawer: the row menus open on a long press. */
+  readonly isRowMenuHintShown = signal(false);
   // Temporarily disable swipe during menu open animation to prevent
   // the touch event from the toggle button being captured as a swipe
   swipeEnabled = signal(true);
@@ -196,7 +237,7 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
   sidenavWidth = computed(() => {
     // The phone drawer is full screen: its width comes from the stylesheet.
     if (this.isMobile()) return null;
-    if (!this.isFullMode()) return COLLAPSED_WIDTH;
+    if (!this.isExpanded()) return COLLAPSED_WIDTH;
     return this.currentWidth();
   });
 
@@ -204,7 +245,7 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
   readonly hostWidthSignal = computed(() => (this.isMobile() ? 0 : this.sidenavWidth()));
 
   // Commonly used derived state for template readability
-  readonly showText = computed(() => this.isFullMode() || this.isMobile());
+  readonly showText = computed(() => this.isExpanded() || this.isMobile());
 
   // Keep stable references for event listeners to ensure proper cleanup
   private readonly _onDrag: (event: MouseEvent) => void = (event: MouseEvent) =>
@@ -212,13 +253,23 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
   private readonly _onDragEnd: () => void = () => this._handleDragEnd();
 
   constructor() {
+    // The drawer exists only in the phone shell: it starts closed when the layout enters
+    // it, and is closed (with its history entry) when the layout leaves it.
     let wasMobile = this.isMobile();
     effect(() => {
       const isMobile = this.isMobile();
-      if (!wasMobile && isMobile) {
-        untracked(() => this.showMobileMenuOverlay.set(false));
+      if (isMobile !== wasMobile) {
+        untracked(() => this._closeDrawerForLayoutChange(wasMobile && !isMobile));
       }
       wasMobile = isMobile;
+    });
+
+    // The rail the compact shell forces is the default there: an expansion the user asked
+    // for in one stretch of the compact range does not follow them back into it.
+    effect(() => {
+      if (this.isCompactShell()) {
+        untracked(() => this._isExpandedInCompact.set(false));
+      }
     });
 
     // Emit mobile visible changes to parent while in mobile mode
@@ -226,6 +277,13 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
       if (this.isMobile()) {
         this.mobileVisibleChange.emit(this.showMobileMenuOverlay());
       }
+    });
+
+    // Project and tag menus open on a long press, which nothing on screen says: the first
+    // time the drawer opens on touch, one line does. Remembered on this device only.
+    effect(() => {
+      const isOpen = this.isMobile() && this.showMobileMenuOverlay();
+      untracked(() => this._syncRowMenuHint(isOpen));
     });
 
     // Lets app-level overlays (onboarding tips) step aside while the menu is open.
@@ -375,15 +433,10 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
     isFullMode: boolean;
   } {
     const config = this.config();
-    const isMobile = this.isMobile();
 
-    if (isMobile) {
-      return {
-        currentWidth: config.defaultWidth,
-        isFullMode: config.fullModeByDefault,
-      };
-    }
-
+    // Read whatever the layout is at construction. A phone that starts in portrait used
+    // to take the defaults here and never look again, so rotating it to landscape showed
+    // the default width instead of the saved one (and, being saved, replaced it).
     return {
       currentWidth:
         readNumberLSBounded(LS.NAV_SIDEBAR_WIDTH, config.minWidth, config.maxWidth) ??
@@ -441,8 +494,45 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
 
   toggleSideNavMode(): void {
     this._enableWidthAnimation();
+    if (this.isCompactShell()) {
+      // Opens or closes the rail for now; the saved choice stays as it was.
+      this._isExpandedInCompact.update((isExpanded) => !isExpanded);
+      return;
+    }
     const newFullMode = !this.isFullMode();
     this.isFullMode.set(newFullMode);
+  }
+
+  /** Shows the hint on the first open of the drawer under touch, and never again. */
+  private _syncRowMenuHint(isDrawerOpen: boolean, isTouch = isTouchActive()): void {
+    if (!isDrawerOpen) {
+      this.isRowMenuHintShown.set(false);
+      return;
+    }
+    // Nothing to long-press without a project or a tag.
+    const hasRows =
+      this._sideNavConfigService.hasAnyProjects() ||
+      this._sideNavConfigService.hasAnyTags();
+    if (isTouch && hasRows && !readBoolLS(LS.NAV_ROW_MENU_HINT_SEEN, false)) {
+      this.isRowMenuHintShown.set(true);
+      lsSetItem(LS.NAV_ROW_MENU_HINT_SEEN, true);
+    }
+  }
+
+  /**
+   * Closes the drawer when the layout changes under it (rotation, resize, folding).
+   * Leaving the phone shell also pops the history entry the open drawer pushed:
+   * `syncMobileNavHistory` only runs for the phone shell, so nothing else would, and
+   * the next Back would be spent on a page that looks the same.
+   */
+  private _closeDrawerForLayoutChange(isLeavingMobile: boolean): void {
+    this.showMobileMenuOverlay.set(false);
+    if (
+      isLeavingMobile &&
+      window.history.state?.[HISTORY_STATE.MOBILE_NAVIGATION] !== undefined
+    ) {
+      window.history.back();
+    }
   }
 
   isGroupExpanded(item: NavItem): boolean {
@@ -475,7 +565,9 @@ export class MagicSideNavComponent implements OnDestroy, AfterViewInit {
 
   // Resize functionality
   onResizeStart(event: MouseEvent): void {
-    if (!this.config().resizable || this.isMobile()) return;
+    // The compact shell has a fixed rail: dragging it would change the saved width
+    // and choice from a layout that is not showing them.
+    if (!this.config().resizable || this.isMobile() || this.isCompactShell()) return;
 
     this.isResizing.set(true);
     this._layoutService.isPanelResizing.set(true);

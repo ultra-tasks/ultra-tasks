@@ -34,6 +34,7 @@ import { Log } from '../../../core/log';
 import { skipDuringSyncWindow } from '../../../util/skip-during-sync-window.operator';
 import { skipWhileApplyingRemoteOps } from '../../../util/skip-during-sync.operator';
 import { alertDialog, confirmDialog } from '../../../util/native-dialogs';
+import { TaskPlanUndoService } from '../../tasks/task-plan-undo.service';
 
 @Injectable()
 export class TagEffects {
@@ -45,6 +46,7 @@ export class TagEffects {
   private _router = inject(Router);
   private _translateService = inject(TranslateService);
   private _plannerService = inject(PlannerService);
+  private _taskPlanUndo = inject(TaskPlanUndoService);
 
   snackUpdateBaseSettings$ = createEffect(
     () =>
@@ -80,6 +82,11 @@ export class TagEffects {
               date: formattedDate,
               extra: await this._plannerService.getSnackExtraStr(getDbDateStr()),
             },
+            // Undo for a single task planned through the task history (the swipe
+            // menu's Today): the same Undo as Ctrl+Z.
+            ...(taskIds.length === 1
+              ? this._taskPlanUndo.getSnackAction(undefined, getDbDateStr(), taskIds[0])
+              : {}),
           });
         }),
       ),

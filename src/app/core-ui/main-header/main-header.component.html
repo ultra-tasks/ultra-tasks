@@ -73,6 +73,7 @@
           <play-button
             [isMobile]="isXs()"
             [currentTaskId]="currentTaskId()"
+            [currentTaskTitle]="currentTask()?.title"
             [hasTrackableTasks]="hasTrackableTasks()"
           ></play-button>
         }
@@ -138,7 +139,10 @@
         ></plugin-work-context-header-btns>
         <plugin-header-btns class="secondary-header-action"></plugin-header-btns>
 
-        @if (isXs() || isVerticalActionBar()) {
+        <!-- Icon-only in the 48px rail. Below 600px the layouts are in the page
+             options menu instead (see page-title): a bordered fourth button here
+             was what left the title no room. -->
+        @if (isVerticalActionBar()) {
           <project-view-menu [compact]="true"></project-view-menu>
         }
 

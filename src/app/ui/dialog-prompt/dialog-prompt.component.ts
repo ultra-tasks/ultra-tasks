@@ -12,6 +12,10 @@ import { MatInput } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { MatButton } from '@angular/material/button';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import {
+  getInputHintAttributes,
+  InputHintAttributes,
+} from '../formly-input-hints/input-hints.util';
 
 @Component({
   selector: 'dialog-prompt',
@@ -37,6 +41,8 @@ export class DialogPromptComponent {
 
   T: typeof T = T;
   txtVal: string = this.data.txtValue || '';
+  /** What the mobile keyboard is told about the field: layout, capitals, correction, Enter. */
+  readonly hints: InputHintAttributes = getInputHintAttributes(this.data.type);
 
   // A plain message names the dialog ("Add section"); rich text (links, lists)
   // stays in the body. Without a message the field's own label is the title.

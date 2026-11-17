@@ -53,7 +53,7 @@
 
   [mat-icon-button] {
     opacity: 0.6;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--transition-duration-s) var(--ani-standard-timing);
 
     &:hover {
       opacity: 1;
@@ -68,20 +68,17 @@
 }
 
 .range-label {
-  font-size: 14px;
-  font-weight: 500;
+  font: var(--type-body-strong);
   min-width: 120px;
   text-align: center;
   opacity: 0.8;
 }
 
 .today-btn {
-  font-size: 13px;
   opacity: 0.8;
 }
 
 .add-habit-btn {
-  font-size: 13px;
   margin-left: var(--s);
 
   mat-icon {
@@ -110,12 +107,20 @@
 
   @media screen and (max-width: 800px) {
     grid-template-columns: minmax(0, 1fr) repeat(7, 32px);
-    gap: 4px;
   }
 
+  // Phone: a habit is two lines. Its icon and name take the whole first line;
+  // the seven days (equal columns, the page's width) are the second, each with a
+  // 48px tap target. The weekday header above uses the same seven columns.
   @include mq(xs, max) {
-    grid-template-columns: 40px repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 0;
+  }
+}
+
+.header-spacer {
+  @include mq(xs, max) {
+    display: none;
   }
 }
 
@@ -126,38 +131,27 @@
 
 .day-header {
   text-align: center;
-  font-size: 11px;
+  font: var(--type-meta);
   opacity: 0.7;
-
-  @include mq(xs, max) {
-    font-size: 10px;
-  }
 
   .day-name {
     text-transform: uppercase;
-    font-weight: bold;
+    font: var(--type-label);
+    letter-spacing: var(--track-label);
     margin-bottom: var(--s-quarter);
   }
 
   .day-date {
-    font-size: 10px;
-
-    @include mq(xs, max) {
-      font-size: 9px;
-    }
+    font: var(--type-meta);
   }
 }
 
 .habit-row {
   padding: var(--s) 0;
-  border-bottom: 1px solid var(--c-dark-10);
+  border-bottom: 1px solid var(--separator);
 
-  @include darkTheme() {
-    border-bottom-color: rgba(255, 255, 255, 0.15);
-  }
-
-  @include lightTheme() {
-    border-bottom-color: rgba(0, 0, 0, 0.15);
+  @include mq(xs, max) {
+    padding: var(--s-half) 0;
   }
 
   &.cdk-drag-preview {
@@ -165,11 +159,9 @@
     align-items: center;
     gap: var(--s-half);
     box-sizing: border-box;
-    border-radius: var(--card-border-radius);
-    box-shadow:
-      0 5px 5px -3px var(--c-dark-20),
-      0 8px 10px 1px rgba(0, 0, 0, 0.14),
-      0 3px 14px 2px rgba(0, 0, 0, 0.12);
+    border-radius: var(--r-md);
+    background: var(--card-bg);
+    box-shadow: var(--elev-2);
 
     .habit-title {
       flex: 1 1 0px;
@@ -179,6 +171,20 @@
     .day-cell {
       flex: 0 0 48px;
     }
+
+    // The phone's two lines carry over to the preview.
+    @include mq(xs, max) {
+      display: grid;
+      gap: 0;
+
+      .habit-title {
+        min-width: 0;
+      }
+
+      .day-cell {
+        flex: none;
+      }
+    }
   }
 
   &.cdk-drag-placeholder {
@@ -187,7 +193,7 @@
 }
 
 .cdk-drag-animating {
-  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+  transition: transform var(--transition-duration-m) var(--ani-standard-timing);
 }
 
 // Habit title and day cells are buttons: reset to the plain look, keep a
@@ -213,7 +219,7 @@
   gap: var(--s);
   padding: 0 var(--s);
   border: 0;
-  border-radius: var(--card-border-radius);
+  border-radius: var(--r-md);
   text-align: start;
 
   &:hover {
@@ -221,66 +227,42 @@
   }
 
   @include mq(xs, max) {
-    flex: 0 0 40px;
-    width: 40px;
-    justify-content: center;
-    padding: 0;
+    grid-column: 1 / -1;
+    min-height: var(--ctl-md);
+    padding: 0 var(--s-half);
   }
 
   .habit-icon {
     flex-shrink: 0;
     opacity: 0.7;
-    font-size: 20px;
-    width: 24px;
-    height: 24px;
+    font-size: var(--icon-md);
+    width: var(--icon-slot);
+    height: var(--icon-slot);
     display: flex;
     align-items: center;
     justify-content: center;
-
-    @include mq(xs, max) {
-      font-size: 18px;
-      width: 22px;
-      height: 22px;
-    }
   }
 
   .habit-initial {
     flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    width: var(--icon-slot);
+    height: var(--icon-slot);
+    border-radius: var(--r-full);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
-    font-weight: 600;
+    font: var(--type-label);
+    letter-spacing: 0;
     opacity: 0.8;
-    background-color: var(--c-light-10);
-
-    @include darkTheme() {
-      background-color: rgba(255, 255, 255, 0.15);
-    }
-
-    @include lightTheme() {
-      background-color: var(--c-dark-10);
-    }
-
-    @include mq(xs, max) {
-      width: 22px;
-      height: 22px;
-      font-size: 10px;
-    }
+    background-color: var(--palette-hover);
   }
 
+  // The name is shown on every width: it is what tells the rows apart.
   .habit-name {
     display: block;
     font: var(--type-body-strong);
     @include truncateText();
     min-width: 0;
-
-    @include mq(xs, max) {
-      display: none;
-    }
   }
 }
 
@@ -304,7 +286,7 @@
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 13px;
+  font: var(--type-body);
   opacity: 0.6;
   padding: var(--s) 0;
 
@@ -329,7 +311,7 @@
   display: flex;
   align-items: center;
   gap: var(--s);
-  font-size: 13px;
+  font: var(--type-body);
   opacity: 0.7;
 }
 
@@ -341,7 +323,14 @@
 .day-cell {
   display: flex;
   justify-content: center;
+  align-items: center;
   cursor: pointer;
+
+  // The cell is the target (a tap anywhere in it counts, and a long press
+  // opens the value dialog), so on a phone it is 48px tall.
+  @include mq(xs, max) {
+    min-height: var(--ctl-lg);
+  }
 
   &.is-disabled {
     cursor: default;
@@ -351,64 +340,39 @@
 
 .check-circle {
   position: relative;
-  width: 32px;
-  height: 32px;
+  // 32px with a pointer, 40px on touch (--ctl-sm steps up with the coarse pointer).
+  min-width: var(--ctl-sm);
+  height: var(--ctl-sm);
   max-width: 90%;
-  aspect-ratio: 1/1;
   padding: 0;
   cursor: inherit;
 
-  border-radius: 50%;
-  border: 1.5px solid var(--c-dark-20);
+  border-radius: var(--r-full);
+  border: 1px solid var(--input-border-color);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition-standard);
 
-  @include mq(xs, max) {
-    width: 30px;
-    height: 30px;
-    min-width: 28px;
-    border-width: 1.2px;
-  }
-
-  @include darkTheme() {
-    border-color: rgba(255, 255, 255, 0.32);
-  }
-
-  @include lightTheme() {
-    border-color: rgba(0, 0, 0, 0.28);
-  }
-
   &.is-done {
-    background-color: var(--c-primary);
-    border-color: var(--c-primary);
-    color: var(--c-contrast);
+    background-color: var(--palette-accent);
+    border-color: var(--palette-accent);
+    color: var(--palette-accent-ink);
   }
 
   mat-icon {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-
-    @include mq(xs, max) {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    font-size: var(--icon-md);
+    width: var(--icon-md);
+    height: var(--icon-md);
   }
 
+  // A value (25m, 3, 1h30m): it grows the circle into a pill rather than
+  // spilling out of it.
   .value-text {
-    font-size: 9px;
-    font-weight: 600;
+    font: var(--type-label);
+    letter-spacing: 0;
     line-height: 1;
-
-    @include mq(xs, max) {
-      font-size: 9px;
-    }
+    padding-inline: var(--s-half);
   }
 
   .progress-ring {
@@ -422,7 +386,7 @@
   }
 
   .progress-ring-circle {
-    transition: stroke-dashoffset 0.3s;
-    color: var(--c-primary);
+    transition: stroke-dashoffset var(--transition-duration-l);
+    color: var(--palette-accent);
   }
 }

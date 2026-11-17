@@ -1,10 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Component, Input, signal } from '@angular/core';
+import { Component, Input, signal, WritableSignal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { registerLocaleData } from '@angular/common';
 import localeDe from '@angular/common/locales/de';
 import localeSv from '@angular/common/locales/sv';
-import { ScheduleMonthComponent } from './schedule-month.component';
+import { isProjectedEvent, ScheduleMonthComponent } from './schedule-month.component';
+import { LayoutService } from '../../../core-ui/layout/layout.service';
 import { ScheduleService } from '../schedule.service';
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
 import { parseDbDateStr } from '../../../util/parse-db-date-str';
@@ -23,6 +24,7 @@ describe('ScheduleMonthComponent', () => {
   let mockDateTimeFormatService: jasmine.SpyObj<DateTimeFormatService>;
   // Phone or short window by default: room for one event per cell
   let breakpointState$: BehaviorSubject<BreakpointState>;
+  let isXs: WritableSignal<boolean>;
   const setRoomForEvents = (nr: 1 | 2 | 3): void => {
     breakpointState$.next({
       matches: nr > 1,
@@ -38,6 +40,7 @@ describe('ScheduleMonthComponent', () => {
       matches: false,
       breakpoints: {},
     });
+    isXs = signal(false);
     mockScheduleService = jasmine.createSpyObj('ScheduleService', [
       'getDayClass',
       'getEventsForDay',
@@ -50,6 +53,7 @@ describe('ScheduleMonthComponent', () => {
     mockDateTimeFormatService = jasmine.createSpyObj('DateTimeFormatService', ['-'], {
       currentLocale: () => 'sv',
       isoTextLocale: () => 'de',
+      textLocale: () => 'en-US',
     });
 
     registerLocaleData(localeSv, 'sv');
@@ -59,6 +63,7 @@ describe('ScheduleMonthComponent', () => {
       providers: [
         { provide: ScheduleService, useValue: mockScheduleService },
         { provide: DateTimeFormatService, useValue: mockDateTimeFormatService },
+        { provide: LayoutService, useValue: { isXs } },
         {
           provide: BreakpointObserver,
           useValue: { observe: () => breakpointState$.asObservable() },
@@ -349,6 +354,113 @@ describe('ScheduleMonthComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('.month-more-events')).toBeNull();
+    });
+  });
+
+  describe('phone layout (dots that open the day)', () => {
+    const day = '2026-01-15';
+    const manyEvents = (n: number): ScheduleEvent[] =>
+      Array.from({ length: n }, (_, i) => createTaskScheduleEvent(`task-${i}`, day));
+
+    beforeEach(() => {
+      isXs.set(true);
+      fixture.componentRef.setInput('daysToShow', [day]);
+      TestBed.inject(TranslateService).setTranslation('en', {
+        F: {
+          SCHEDULE: {
+            MORE_EVENTS: { ONE: '{{count}} more event', OTHER: '{{count}} more events' },
+            DAY_EVENTS: {
+              ONE: '{{date}}, {{count}} event',
+              OTHER: '{{date}}, {{count}} events',
+            },
+          },
+        },
+      });
+    });
+
+    it('draws dots, not event chips', () => {
+      mockScheduleService.getEventsForDay.and.returnValue(manyEvents(2));
+      fixture.detectChanges();
+
+      expect(fixture.debugElement.queryAll(By.css('.month-day-dot')).length).toBe(2);
+      expect(fixture.debugElement.queryAll(By.css('.month-event')).length).toBe(0);
+      expect(
+        fixture.debugElement.queryAll(By.directive(ScheduleEventStubComponent)).length,
+      ).toBe(0);
+    });
+
+    it('draws at most three dots and counts the rest in the cell header', () => {
+      mockScheduleService.getEventsForDay.and.returnValue(manyEvents(7));
+      fixture.detectChanges();
+
+      expect(fixture.debugElement.queryAll(By.css('.month-day-dot')).length).toBe(3);
+      expect(
+        fixture.nativeElement
+          .querySelector('.month-more-events-count')
+          .textContent.trim(),
+      ).toBe('+4');
+    });
+
+    it('draws a hollow dot for a repeat that has no task yet', () => {
+      mockScheduleService.getEventsForDay.and.returnValue([
+        createTaskScheduleEvent('task-1', day),
+        { ...createTaskScheduleEvent('repeat-1', day), type: SVEType.RepeatProjection },
+      ]);
+      fixture.detectChanges();
+
+      const dots = fixture.debugElement.queryAll(By.css('.month-day-dot'));
+      expect(dots.map((d) => d.nativeElement.classList.contains('is-projected'))).toEqual(
+        [false, true],
+      );
+    });
+
+    it('makes the whole day one button that opens it, named with the date and its events', () => {
+      mockScheduleService.getEventsForDay.and.returnValue(manyEvents(2));
+      fixture.detectChanges();
+      const opened: string[] = [];
+      component.openDay.subscribe((d) => opened.push(d));
+
+      const button = fixture.nativeElement.querySelector(
+        '.month-day-open',
+      ) as HTMLButtonElement;
+      expect(button).not.toBeNull();
+      expect(button.getAttribute('aria-label')).toMatch(/January 15/);
+      expect(button.getAttribute('aria-label')).toMatch(/2 events$/);
+      button.click();
+
+      expect(opened).toEqual([day]);
+    });
+
+    it('names an empty day by its date alone', () => {
+      mockScheduleService.getEventsForDay.and.returnValue([]);
+      fixture.detectChanges();
+
+      const label = fixture.nativeElement
+        .querySelector('.month-day-open')
+        .getAttribute('aria-label');
+      expect(label).toMatch(/January 15/);
+      expect(label).not.toMatch(/event/);
+    });
+
+    it('keeps the chips and no tap target on a wide window', () => {
+      isXs.set(false);
+      mockScheduleService.getEventsForDay.and.returnValue(manyEvents(1));
+      fixture.detectChanges();
+
+      expect(fixture.debugElement.queryAll(By.css('.month-event')).length).toBe(1);
+      expect(fixture.debugElement.queryAll(By.css('.month-day-dot')).length).toBe(0);
+      expect(fixture.nativeElement.querySelector('.month-day-open')).toBeNull();
+    });
+  });
+
+  describe('isProjectedEvent', () => {
+    it('is true for the repeat projections only', () => {
+      expect(isProjectedEvent({ type: SVEType.RepeatProjection })).toBe(true);
+      expect(isProjectedEvent({ type: SVEType.RepeatProjectionSplit })).toBe(true);
+      expect(isProjectedEvent({ type: SVEType.ScheduledRepeatProjection })).toBe(true);
+      expect(isProjectedEvent({ type: SVEType.Task })).toBe(false);
+      expect(isProjectedEvent({ type: SVEType.ScheduledTask })).toBe(false);
+      expect(isProjectedEvent({ type: SVEType.CalendarEvent })).toBe(false);
     });
   });
 
@@ -665,6 +777,7 @@ describe('ScheduleMonthComponent dayNumberByDay (SPAP-26)', () => {
       imports: [ScheduleMonthComponent, TranslateModule.forRoot()],
       providers: [
         { provide: ScheduleService, useValue: scheduleServiceStub },
+        { provide: LayoutService, useValue: { isXs: signal(false) } },
         {
           provide: DateTimeFormatService,
           useValue: { currentLocale: localeSig, isoTextLocale: () => null },
@@ -782,6 +895,7 @@ describe('ScheduleMonthComponent deadline badges', () => {
       providers: [
         { provide: ScheduleService, useValue: mockScheduleService },
         { provide: DateTimeFormatService, useValue: mockDateTimeFormatService },
+        { provide: LayoutService, useValue: { isXs: signal(false) } },
       ],
     }).compileComponents();
 

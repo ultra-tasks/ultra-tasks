@@ -1,9 +1,7 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import type { Page } from '@playwright/test';
-import { cssSelectors } from '../../constants/selectors';
+import { expandTaskNotes } from '../../utils/task-notes';
 import type { SettingsPage } from '../../pages/settings.page';
-
-const { DETAIL_PANEL } = cssSelectors;
 
 /**
  * With "Enable Markdown formatting in task notes" OFF, notes are a plain
@@ -66,7 +64,7 @@ test.describe('Notes without markdown formatting', () => {
     await workViewPage.addTask('plain notes task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('plain notes task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const textarea = notes.locator('textarea');
     await textarea.waitFor({ state: 'visible' });
     await textarea.click();

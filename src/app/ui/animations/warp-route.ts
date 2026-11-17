@@ -19,6 +19,13 @@ import {
 // starts shortly after the headline so the page still reads top to bottom
 const CONTENT_FADE_TIMING = `${TRANSITION_DURATION_L} ${TRANSITION_DURATION_S} ${ANI_STANDARD_TIMING_}`;
 
+/**
+ * Carried in the state binding (`{ value, params: { skip } }`, see app.component.html):
+ * set for a switch that should have no animation at all. A parameter rather than
+ * `[@.disabled]` on the wrapper, so animations inside the page keep running.
+ */
+export const WARP_ROUTE_SKIP_PARAM = 'skip';
+
 export const warpRouteAnimation = trigger('warpRoute', [
   transition('* => daily-summary', [
     /* 1 */ query(
@@ -62,6 +69,11 @@ export const warpRouteAnimation = trigger('warpRoute', [
       ),
     ]),
   ]),
+
+  // Phones and big lists: no animation. The old page would stay in the DOM next to the
+  // new one for the 165ms out and 190ms in, and a full-screen layer would be scaled
+  // meanwhile; measured, that is 190-250ms of every switch and most of it on heavy pages.
+  transition((_from, _to, _element, params) => !!params?.[WARP_ROUTE_SKIP_PARAM], []),
 
   // Ordinary view switches: the old page eases out as the new one settles in
   // from just above its place. A small scale, not the daily-summary "warp".

@@ -12,6 +12,10 @@ describe('getInitialBottomPanelHeightRatio', () => {
     expect(getInitialBottomPanelHeightRatio('NOTES')).toBe(0.6);
   });
 
+  it('uses the compact height for the sort, group and filter sheet, so the list stays in view', () => {
+    expect(getInitialBottomPanelHeightRatio('TASK_VIEW_CUSTOMIZER_PANEL')).toBe(0.6);
+  });
+
   it('uses the expanded height for other panels', () => {
     expect(getInitialBottomPanelHeightRatio('PLUGIN')).toBe(0.9);
     expect(getInitialBottomPanelHeightRatio(null)).toBe(0.9);

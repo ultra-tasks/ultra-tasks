@@ -7,6 +7,7 @@ import {
   Injectable,
   runInInjectionContext,
   signal,
+  Signal,
   untracked,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -40,9 +41,12 @@ import { IS_ANDROID_WEB_VIEW } from '../../util/is-android-web-view';
 import { androidInterface } from '../../features/android/android-interface';
 import { HttpClient } from '@angular/common/http';
 import { CapacitorPlatformService } from '../platform/capacitor-platform.service';
-import { registerPlugin } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SafeArea } from 'capacitor-plugin-safe-area';
+import {
+  applyAndroidBarAppearance,
+  androidBarReapply$,
+} from './android-system-bars.util';
 import { patchCdkViewportForSafeArea } from './cdk-safe-area-viewport.util';
 import { lockViewportZoom } from './lock-viewport-zoom.util';
 import { LS } from '../persistence/storage-keys.const';
@@ -57,13 +61,6 @@ import { colorChannels } from './palette.util';
 import { BUILT_IN_SVG_ICONS } from './built-in-svg-icons.const';
 import { UltraTasksAppearanceService } from './ultra-tasks-appearance.service';
 import { pickGlassBackgroundImage } from './glass-backdrop/glass-backdrop.util';
-
-interface NavigationBarPlugin {
-  setColor(options: { color: string; style: 'LIGHT' | 'DARK' }): Promise<void>;
-  setWebViewBackgroundColor(options: { color: string }): Promise<void>;
-}
-
-const NavigationBar = registerPlugin<NavigationBarPlugin>('NavigationBar');
 
 export type DarkModeCfg = 'dark' | 'light' | 'system';
 
@@ -613,10 +610,6 @@ export class GlobalThemeService {
   }
 
   /**
-   * Initialize mobile status bar styling.
-   * Syncs status bar style with app dark/light mode on both iOS and Android.
-   */
-  /**
    * Read native safe area insets and set CSS variables.
    * Works around Android WebView's unreliable env(safe-area-inset-*) values.
    */
@@ -661,7 +654,19 @@ export class GlobalThemeService {
     );
   }
 
+  /**
+   * Initialize mobile status bar styling.
+   * Syncs status bar style with app dark/light mode on both iOS and Android.
+   */
   private _initMobileStatusBar(): void {
+    // Android with the Capacitor bridge: counts the native configuration changes
+    // (rotation, system dark-mode flip, hardware keyboard, display size, fold)
+    // that reset the bars' window background, so the effect below runs again
+    // after each one. See applyAndroidBarAppearance.
+    const androidBarReapplies: Signal<number> =
+      this._platformService.isAndroid() && !this._platformService.isLegacyAndroidWebView
+        ? toSignal(androidBarReapply$(), { initialValue: 0 })
+        : signal(0);
     effect(() => {
       const isDark = this.isDarkTheme();
       // Re-read computed tokens only after the loader has atomically swapped
@@ -675,6 +680,7 @@ export class GlobalThemeService {
         },
       );
       if (this._platformService.isAndroid()) {
+        androidBarReapplies();
         const bgColor = resolveSystemSurfaceColor(
           getComputedStyle(this.document.body).getPropertyValue(CSS_VAR_SYSTEM_SURFACE),
           isDark,
@@ -684,25 +690,15 @@ export class GlobalThemeService {
         // Capacitor's built-in SystemBars. SystemBars has NO bar-color API — the
         // edge-to-edge model is transparent bars with the web content drawn
         // behind them. The bar backgrounds are therefore painted by:
-        //   - setWebViewBackgroundColor below (window decor + WebView surface),
-        //     which shows through the transparent bars (the color backstop on
-        //     API 35+ where window.*BarColor is a no-op), and
+        //   - setWebViewBackgroundColor (window decor + WebView surface), which
+        //     shows through the transparent bars (the color backstop on API 35+
+        //     where window.*BarColor is a no-op), and
         //   - NavigationBar.setColor's window.navigationBarColor, still effective
         //     on API < 35, plus its setSystemBarsAppearance which drives the nav
         //     bar icon light/dark on all versions.
-        // Status-bar icon light/dark is set via StatusBar.setStyle above.
-        NavigationBar.setColor({
-          color: bgColor,
-          style: lightIcons ? 'DARK' : 'LIGHT',
-        }).catch((err) => {
-          Log.warn('Failed to set navigation bar appearance', err);
-        });
-        // Paint the WebView surface and window decor with the theme background so
-        // the transparent system bars show the theme color behind them and the
-        // keyboard animation can't flash white between frames.
-        NavigationBar.setWebViewBackgroundColor({ color: bgColor }).catch((err) => {
-          Log.warn('Failed to set web view background color', err);
-        });
+        // Both bars' icon style is also stored in SystemBars, which re-applies its
+        // own copy on every configuration change (see applyAndroidBarAppearance).
+        applyAndroidBarAppearance({ lightIcons, surfaceColor: bgColor });
       }
     });
   }

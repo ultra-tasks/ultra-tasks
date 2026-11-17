@@ -4,7 +4,7 @@ import { ofType } from '@ngrx/effects';
 import { NavigationEnd, Router } from '@angular/router';
 import { Action, Store } from '@ngrx/store';
 import { Observable, Subscription } from 'rxjs';
-import { concatMap, filter, first } from 'rxjs/operators';
+import { concatMap, filter, first, map, startWith } from 'rxjs/operators';
 import { LS } from '../../core/persistence/storage-keys.const';
 import { LayoutService } from '../../core-ui/layout/layout.service';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
@@ -37,6 +37,9 @@ type OnboardingPhase = 'idle' | 'await-first-task' | OnboardingStep;
 
 /** More projects than the default ones means this is not a new user. */
 const RETURNING_USER_MIN_PROJECTS = 3;
+
+/** The pages with a task list: Today, a project, a tag (`.../tasks`). */
+const WORK_VIEW_URL = /\/tasks(?:[?#]|$)/;
 
 /**
  * First-run guidance: value first, no upfront decision. New installs already
@@ -86,6 +89,21 @@ export class OnboardingHintService {
   private _activeWorkContextId = toSignal(this._workContextService.activeWorkContextId$, {
     initialValue: null,
   });
+
+  private _url = toSignal(
+    this._router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      map((event) => event.urlAfterRedirects),
+      startWith(this._router.url),
+    ),
+    { initialValue: this._router.url },
+  );
+
+  /**
+   * On a page with a task list. The tips that point into a list (add task, swipe
+   * a row) belong to these pages; the chip hides on every other one.
+   */
+  readonly isOnWorkView = computed(() => WORK_VIEW_URL.test(this._url() ?? ''));
 
   readonly firstTaskId = signal<string | null>(null);
 

@@ -44,13 +44,21 @@
                     (T.F.PLANNER.EDIT_REPEATED_TASK
                       | translate: { taskName: taskRepeatCfg.title }) +
                     ': ' +
-                    getRepeatInfoText(taskRepeatCfg)
+                    getRepeatInfoText(taskRepeatCfg) +
+                    (taskRepeatCfg.isPaused
+                      ? ', ' + (T.F.TASK_REPEAT.F.IS_PAUSED | translate)
+                      : '')
                   "
                   class="repeat-text-and-icon focus-ring"
                   [matTooltip]="getTooltipText(taskRepeatCfg)"
                   mat-ripple
                 >
                   <div class="repeat-text">{{ getRepeatInfoText(taskRepeatCfg) }}</div>
+                  @if (taskRepeatCfg.isPaused) {
+                    <div class="repeat-paused">
+                      {{ T.F.TASK_REPEAT.F.IS_PAUSED | translate }}
+                    </div>
+                  }
                   <mat-icon>repeat</mat-icon>
                 </div>
               </div>

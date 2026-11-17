@@ -165,3 +165,18 @@
   line-height: var(--planner-item-height);
   height: 0;
 }
+
+// Phone: the block is one disclosure line (count and action) over its rows. The
+// action keeps its label on one line and the title gives way to it, wrapping to
+// two lines at 320px. Open, the total sits under the title, on the title's own
+// left edge.
+.overdue-disclosure [actions] {
+  flex: none;
+  white-space: nowrap;
+}
+
+.overdue-estimate {
+  padding: 0 0 var(--s-half) calc(var(--icon-md) + var(--s));
+  color: var(--text-color-muted);
+  font: var(--type-meta);
+}

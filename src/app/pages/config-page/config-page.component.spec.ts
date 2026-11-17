@@ -15,7 +15,7 @@ import { EMPTY, of } from 'rxjs';
 import { signal } from '@angular/core';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { ShareService } from '../../core/share/share.service';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef, MatDialogState } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { LocalBackupService } from '../../imex/local-backup/local-backup.service';
 import { IS_ANDROID_WEB_VIEW_TOKEN } from '../../util/is-android-web-view';
@@ -40,6 +40,7 @@ describe('ConfigPageComponent', () => {
     lastBackupTime: number | null = null,
     isRenderSections: boolean = false,
     queryParams: Record<string, string> = {},
+    layout: { isXs?: boolean; dialogRef?: unknown } = {},
   ): Promise<void> => {
     const mockSyncConfigService = jasmine.createSpyObj(
       'SyncConfigService',
@@ -74,7 +75,10 @@ describe('ConfigPageComponent', () => {
     await TestBed.configureTestingModule({
       imports: [NoopAnimationsModule],
       providers: [
-        { provide: LayoutService, useValue: { isXs: signal(false) } },
+        { provide: LayoutService, useValue: { isXs: signal(layout.isXs ?? false) } },
+        ...(layout.dialogRef
+          ? [{ provide: MatDialogRef, useValue: layout.dialogRef }]
+          : []),
         {
           provide: DateTimeFormatService,
           useValue: {
@@ -389,7 +393,7 @@ describe('ConfigPageComponent', () => {
     });
 
     it('keeps plugin management out of the settings groups', () => {
-      expect(component.categories.map((category) => category.index)).toEqual([
+      expect(component.categories().map((category) => category.index)).toEqual([
         0, 6, 1, 2, 7, 8, 5,
       ]);
       expect(
@@ -403,6 +407,169 @@ describe('ConfigPageComponent', () => {
       component.expandedSection = 'appFeatures';
 
       expect(component.isSectionExpanded(APP_FEATURES)).toBe(true);
+    });
+  });
+
+  describe('categories on a phone', () => {
+    beforeEach(async () => {
+      TestBed.resetTestingModule();
+      await setup(false, null, false, {}, { isXs: true });
+    });
+
+    it('lists About last, where the window footer is gone', () => {
+      const indices = component.categories().map((category) => category.index);
+      expect(indices[indices.length - 1]).toBe(10);
+    });
+
+    it('keeps the keyboard category for a mouse-driven narrow window', () => {
+      // The test browser is mouse-driven; a touch-only phone is covered by
+      // getSettingsCategories (settings-categories.util.spec.ts).
+      expect(component.categories().map((category) => category.index)).toContain(7);
+    });
+  });
+
+  // Back in the phone's drill-down: a category is a history entry, so the system Back
+  // and the header arrow return to the list, and every other way out still closes the
+  // window (the guard opens it with closeOnNavigation: false, so this page does it).
+  describe('Back in the drill-down', () => {
+    const BENEATH = { navigationId: 2 };
+    let dialogRef: { getState: jasmine.Spy; close: jasmine.Spy };
+    let historyState: unknown;
+    let pushState: jasmine.Spy;
+    let historyBack: jasmine.Spy;
+
+    const popstate = (): void => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: historyState }));
+    };
+
+    beforeEach(async () => {
+      TestBed.resetTestingModule();
+      dialogRef = {
+        getState: jasmine.createSpy('getState').and.returnValue(MatDialogState.OPEN),
+        close: jasmine.createSpy('close'),
+      };
+      historyState = BENEATH;
+      spyOnProperty(window.history, 'state', 'get').and.callFake(() => historyState);
+      pushState = spyOn(window.history, 'pushState').and.callFake((state: unknown) => {
+        historyState = state;
+      });
+      historyBack = spyOn(window.history, 'back').and.callFake(() => {
+        historyState = BENEATH;
+        popstate();
+      });
+      await setup(false, null, false, {}, { isXs: true, dialogRef });
+      component.ngOnInit();
+    });
+
+    it('pushes a history entry when a category opens', () => {
+      component.selectCategory(1);
+
+      expect(component.mobileCategoryVisible).toBe(true);
+      expect(pushState).toHaveBeenCalledTimes(1);
+      expect(pushState.calls.mostRecent().args[0]).toEqual({
+        navigationId: 2,
+        settingsCategory: true,
+      });
+    });
+
+    it('opens another category on the same entry', () => {
+      component.selectCategory(1);
+      component.selectCategory(2);
+
+      expect(pushState).toHaveBeenCalledTimes(1);
+    });
+
+    it('goes back to the list, and keeps the window open, on the system Back', () => {
+      component.selectCategory(1);
+
+      historyState = BENEATH;
+      popstate();
+
+      expect(component.mobileCategoryVisible).toBe(false);
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('closes the window on the Back after that', () => {
+      component.selectCategory(1);
+      historyState = BENEATH;
+      popstate();
+
+      historyState = { navigationId: 1 };
+      popstate();
+
+      expect(dialogRef.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('goes back to the list through the history from the header arrow', () => {
+      component.selectCategory(1);
+
+      component.backToList();
+
+      expect(historyBack).toHaveBeenCalledTimes(1);
+      expect(component.mobileCategoryVisible).toBe(false);
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('closes the window when the route changes under an open category', () => {
+      component.selectCategory(1);
+
+      // Loading the URL again (a typed hash, a test harness) replaces the entry
+      // with a fresh state: it is not a Back and must not leave Settings open.
+      historyState = null;
+      popstate();
+
+      expect(dialogRef.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes the window on a Back from the list, as before', () => {
+      popstate();
+
+      expect(dialogRef.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not close a window that is already closing', () => {
+      dialogRef.getState.and.returnValue(MatDialogState.CLOSING);
+
+      popstate();
+
+      expect(dialogRef.close).not.toHaveBeenCalled();
+    });
+
+    it('drops its history entry when the window is closed with a category open', () => {
+      component.selectCategory(1);
+
+      fixture.destroy();
+
+      expect(historyBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the history alone when the window is closed from the list', () => {
+      fixture.destroy();
+
+      expect(historyBack).not.toHaveBeenCalled();
+    });
+
+    it('leaves the history alone when the entry was replaced by another navigation', () => {
+      component.selectCategory(1);
+      historyState = null;
+      popstate();
+
+      fixture.destroy();
+
+      expect(historyBack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Back in the two-pane window', () => {
+    it('pushes no history entry for a category', async () => {
+      TestBed.resetTestingModule();
+      const pushState = spyOn(window.history, 'pushState');
+      await setup(false, null, false, {}, { isXs: false });
+      component.ngOnInit();
+
+      component.selectCategory(1);
+
+      expect(pushState).not.toHaveBeenCalled();
     });
   });
 });

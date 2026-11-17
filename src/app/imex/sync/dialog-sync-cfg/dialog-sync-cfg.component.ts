@@ -78,6 +78,7 @@ import type { OneDrivePrivateCfg } from '../../../op-log/sync-providers/file-bas
 import type { LocalFileSyncPrivateCfg } from '@sp/sync-providers/local-file';
 import type { SuperSyncPrivateCfg } from '@sp/sync-providers/super-sync';
 import { useDialogSize } from '../../../ui/dialog-size.util';
+import { useDiscardGuard, useFormsDirty } from '../../../ui/dialog-discard-guard.util';
 import { BackupService } from '../../../op-log/backup/backup.service';
 import { OperationWriteFlushService } from '../../../op-log/sync/operation-write-flush.service';
 
@@ -179,6 +180,11 @@ export class DialogSyncCfgComponent implements AfterViewInit {
     ).map((item) => this._injectProviderHelpers(item));
   });
   form: FormGroup = new FormGroup({});
+  // A stray tap on the backdrop or Escape asks before it throws typed settings away.
+  private readonly _discardGuard = useDiscardGuard(
+    useFormsDirty(this.form),
+    this.isSaving,
+  );
 
   selectSetupProvider(provider: SyncSetupProvider): void {
     if (this.isInitialSettingsUnavailable() || this.isSaving()) return;

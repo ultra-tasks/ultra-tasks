@@ -489,13 +489,121 @@ describe('TaskContextMenuInnerComponent', () => {
           '.cdk-overlay-container .quick-access button',
         ),
       ).map((btn) => btn.querySelector('.quick-access-label')?.textContent?.trim());
+      // Words, not weekday names: on a Sunday "tomorrow" and "next week" both
+      // read "Mon", and the guide asks for visible Tomorrow and Next week labels.
       expect(labels).toEqual([
         T.G.TODAY,
-        // weekday names keep every label on one line in the narrow row
-        ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(new Date().getDay() + 1) % 7],
-        'Mon',
+        T.G.TOMORROW,
+        T.G.NEXT_WEEK,
         T.F.TASK.D_SCHEDULE_TASK.QA_LABEL_PICK_DATE,
       ]);
+      closeMenus();
+    }));
+
+    describe('on touch', () => {
+      // Karma's Chrome is a mouse-only device, so the touch predicate is swapped
+      // on the instance, which is what the template and the rows read.
+      const asTouch = (isInTaskRow = true): void => {
+        // The menu's rows are content of the mat-menu, which Angular creates
+        // with the component, so the app features have to be in place before
+        // the first check (a computed would keep what it read then).
+        Object.assign(TestBed.inject(GlobalConfigService), {
+          appFeatures: () => ({ isFocusModeEnabled: true, isTimeTrackingEnabled: true }),
+        });
+        fixture.componentRef.setInput('isAdvancedControls', true);
+        component.taskSet = {
+          ...DEFAULT_TASK,
+          id: 'task-1',
+          projectId: 'project-current',
+        } as Task;
+        Object.assign(component, { isTouchActive: () => true });
+        // ngAfterViewInit decides `isInTaskRow` from where the host sits.
+        fixture.detectChanges();
+        component.isInTaskRow = isInTaskRow;
+      };
+
+      it('has no focus session entry, which the header already has', fakeAsync(() => {
+        asTouch();
+        openMenu();
+
+        expect(itemKeys(overlayItems())).not.toContain(T.F.TASK.CMP.FOCUS_SESSION);
+        closeMenus();
+      }));
+
+      it('keeps the focus session entry on desktop', fakeAsync(() => {
+        openMenu();
+
+        expect(itemKeys(overlayItems())).toContain(T.F.TASK.CMP.FOCUS_SESSION);
+        closeMenus();
+      }));
+
+      it('puts "Select several tasks…" with the first actions, not under the plugins', fakeAsync(() => {
+        asTouch();
+        openMenu();
+
+        const keys = [
+          T.F.TASK.CMP.TRACK_TIME,
+          T.F.TASK.CMP.ADD_SUB_TASK,
+          T.F.TASK.MULTI_SELECT.SELECT_ENTRY,
+          T.F.TASK.CMP.ESTIMATE,
+          T.F.TASK.CMP.TOGGLE_TAGS,
+          T.F.TASK.CMP.DUPLICATE,
+          T.F.TASK.CMP.DELETE,
+        ];
+        const listed = overlayItems()
+          .map((el) => keys.find((key) => el.textContent?.includes(key)))
+          .filter((key): key is string => !!key);
+        expect(listed).toEqual(keys);
+        closeMenus();
+      }));
+
+      it('does not offer multi-select where there is no task row', fakeAsync(() => {
+        asTouch(false);
+        openMenu();
+
+        expect(
+          overlayItems().some((el) =>
+            el.textContent?.includes(T.F.TASK.MULTI_SELECT.SELECT_ENTRY),
+          ),
+        ).toBe(false);
+        closeMenus();
+      }));
+    });
+
+    it('hides the keyboard hints on a touch screen', fakeAsync(() => {
+      openMenu();
+
+      const hints = Array.from(
+        document.querySelectorAll<HTMLElement>('.cdk-overlay-container .key-i'),
+      );
+      expect(hints.length).toBeGreaterThan(0);
+      // the shared class that `.isTouchPrimary` hides
+      expect(hints.every((h) => h.classList.contains('show-only-on-mouse-primary'))).toBe(
+        true,
+      );
+      closeMenus();
+    }));
+
+    it('groups the actions with dividers and puts Delete last, in the warn role', fakeAsync(() => {
+      openMenu();
+
+      const content = document.querySelector(
+        '.cdk-overlay-container .mat-mdc-menu-content',
+      )!;
+      const dividers = content.querySelectorAll(':scope > .mat-divider');
+      // after the details, after won't do / duplicate, and after the first group
+      expect(dividers.length).toBeGreaterThanOrEqual(2);
+      const children = Array.from(content.children);
+      const last = children[children.length - 1] as HTMLElement;
+      expect(last.textContent).toContain(T.F.TASK.CMP.DELETE);
+      expect(last.classList).toContain('mat-menu-item-warn');
+      // never two dividers in a row, and none right before the end
+      children.forEach((el, i) => {
+        if (el.classList.contains('mat-divider')) {
+          expect(children[i + 1]?.classList.contains('mat-divider')).toBeFalsy();
+          expect(i).toBeLessThan(children.length - 1);
+        }
+      });
       closeMenus();
     }));
 

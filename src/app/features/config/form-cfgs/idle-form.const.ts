@@ -13,6 +13,7 @@ export const IDLE_FORM_CFG: ConfigFormSection<IdleConfig> = {
   key: 'idle',
   help: T.GCF.IDLE.HELP,
   isHideForAndroidApp: true,
+  isHideForMobile: true,
   items: [
     {
       type: 'tpl',

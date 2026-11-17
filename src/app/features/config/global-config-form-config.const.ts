@@ -14,18 +14,40 @@ import { SCHEDULE_FORM_CFG } from './form-cfgs/schedule-form.const';
 import { FOCUS_MODE_FORM_CFG } from './form-cfgs/focus-mode-form.const';
 import { FOCUS_MODE_LOCAL_FORM_CFG } from './form-cfgs/focus-mode-local-form.const';
 import { IS_NATIVE_PLATFORM } from '../../util/is-native-platform';
+import { IS_MOBILE } from '../../util/is-mobile';
+import { IS_IOS } from '../../util/is-ios';
 import { REMINDER_FORM_CFG } from './form-cfgs/reminder-form.const';
 import { SHORT_SYNTAX_FORM_CFG } from './form-cfgs/short-syntax-form.const';
 import { CLIPBOARD_IMAGES_FORM } from './form-cfgs/clipboard-images-form.const';
 import { TASKS_SETTINGS_FORM_CFG } from './form-cfgs/tasks-settings-form.const';
 import { TASK_WIDGET_FORM_CFG } from './form-cfgs/task-widget-form.const';
 
-const filterGlobalConfigForm = (cfg: ConfigFormSection<any>): boolean => {
-  return (
-    (IS_ELECTRON || !cfg.isElectronOnly) &&
-    !(IS_ANDROID_WEB_VIEW && cfg.isHideForAndroidApp)
-  );
-};
+/** What decides whether a settings section exists on this device. */
+export interface ConfigSectionPlatform {
+  isElectron: boolean;
+  isAndroidApp: boolean;
+  /** A phone or tablet: the browser on it, or the iOS or Android app. */
+  isMobile: boolean;
+}
+
+export const isConfigSectionAvailable = (
+  cfg: Pick<
+    ConfigFormSection<unknown>,
+    'isElectronOnly' | 'isHideForAndroidApp' | 'isHideForMobile'
+  >,
+  platform: ConfigSectionPlatform,
+): boolean =>
+  (platform.isElectron || !cfg.isElectronOnly) &&
+  !(platform.isAndroidApp && cfg.isHideForAndroidApp) &&
+  !(platform.isMobile && cfg.isHideForMobile);
+
+const filterGlobalConfigForm = (cfg: ConfigFormSection<any>): boolean =>
+  isConfigSectionAvailable(cfg, {
+    isElectron: IS_ELECTRON,
+    isAndroidApp: IS_ANDROID_WEB_VIEW,
+    // Never the desktop app: a Mac reports touch events and would pass as an iPad.
+    isMobile: !IS_ELECTRON && (IS_MOBILE || IS_IOS || IS_NATIVE_PLATFORM),
+  });
 
 // Presentation grouping preserves the stored section keys and platform availability.
 export const GLOBAL_GENERAL_FORM_CONFIG: ConfigFormConfig = [

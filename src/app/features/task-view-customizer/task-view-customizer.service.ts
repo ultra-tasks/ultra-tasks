@@ -96,13 +96,17 @@ export class TaskViewCustomizerService {
   public selectedFilter = signal<FilterOption>(DEFAULT_OPTIONS.filter);
   public collapsedGroupIds = signal<string[]>([]);
 
-  isCustomized = computed(() => {
-    return [
-      this.selectedSort().type,
-      this.selectedGroup().type,
-      this.selectedFilter().type,
-    ].some((x) => x !== null);
-  });
+  /** How many of sort, group and filter are set away from their defaults (0 to 3). */
+  customizationCount = computed(
+    () =>
+      [
+        this.selectedSort().type,
+        this.selectedGroup().type,
+        this.selectedFilter().type,
+      ].filter((x) => x !== null).length,
+  );
+
+  isCustomized = computed(() => this.customizationCount() > 0);
 
   private _isInProject = toSignal(this._workContextService.isActiveWorkContextProject$, {
     initialValue: false,
@@ -746,6 +750,18 @@ export class TaskViewCustomizerService {
 
   setFilter(val: FilterOption): void {
     this.selectedFilter.set(val);
+  }
+
+  /** The filter of kind `type` with the value `preset`; no value clears the filter. */
+  setFilterPreset(type: FILTER_OPTION_TYPE, preset: FilterOption['preset']): void {
+    if (!preset) {
+      this.setFilter(DEFAULT_OPTIONS.filter);
+      return;
+    }
+    const option = OPTIONS.filter.list.find((o) => o.type === type);
+    if (option) {
+      this.setFilter({ ...option, preset });
+    }
   }
 
   resetAll(): void {

@@ -93,8 +93,10 @@ swipe-block {
 done-toggle {
   --done-toggle-size: 30px;
 
-  // Same hit box as the task list on touch; the glyph keeps its size.
-  @include touchOnlyDevice {
+  // Same hit box as the task list on touch; the glyph keeps its size. `pointer:
+  // coarse` is the touch scale's own switch: `.isTouchOnly` is only ever set in the
+  // Capacitor build, so Android Chrome and a PWA kept the 30px box.
+  @media (pointer: coarse) {
     --done-toggle-size: var(--task-icon-size);
   }
 

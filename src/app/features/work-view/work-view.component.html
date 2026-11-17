@@ -35,10 +35,24 @@
                   ~<strong class="time-val">{{
                     (estimateRemainingToday() | msToString: false : true) || '0m'
                   }}</strong>
-                  <mat-icon>hourglass_empty</mat-icon>
+                  <!-- Phone only: the long label above is hidden there, and a bare
+                       "~3h" reads as an estimate, not as what is left. -->
+                  <span
+                    class="label-short show-xs-only"
+                    aria-hidden="true"
+                    >{{ T.WW.ESTIMATE_LEFT | translate }}</span
+                  >
+                  <mat-icon class="hide-xs">hourglass_empty</mat-icon>
                 </span>
               </div>
-              <div class="item">
+              @let workingTodayArchived =
+                workContextService.workingTodayArchived$ | async;
+              <!-- Nothing worked yet today: on a phone the row would only say "0m"
+                   next to a bare icon, so it waits for something to show. -->
+              <div
+                class="item"
+                [class.hide-xs]="!workingToday() && !workingTodayArchived"
+              >
                 <span class="label">{{ T.WW.WORKING_TODAY | translate }}</span>
                 <!-- Not on .item: the archived time below has its own tooltip. -->
                 <span class="no-wrap">
@@ -48,10 +62,7 @@
                     matTooltipPosition="above"
                     >{{ (workingToday() | msToString: false : true) || '0m' }}</strong
                   >
-                  @if (
-                    workContextService.workingTodayArchived$ | async;
-                    as workingTodayArchived
-                  ) {
+                  @if (workingTodayArchived) {
                     <span [matTooltip]="T.WW.WORKING_TODAY_ARCHIVED | translate"
                       >(+{{ workingTodayArchived | msToString }})</span
                     >
@@ -186,6 +197,7 @@
                     "
                   ></task-list>
                   <add-task-inline
+                    class="pin-above-nav"
                     [label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_ADD_TASK"
                     [isListAction]="true"
                   ></add-task-inline>
@@ -206,7 +218,7 @@
                     class="section-container"
                     cdkDrag
                     [cdkDragData]="section"
-                    [cdkDragStartDelay]="dragDelayForTouch()"
+                    [cdkDragStartDelay]="{ touch: DRAG_DELAY_FOR_TOUCH, mouse: 0 }"
                     [cdkDragLockAxis]="'y'"
                   >
                     <collapsible
@@ -254,6 +266,7 @@
                         [listModelId]="section.id"
                       ></task-list>
                       <add-task-inline
+                        class="pin-above-nav"
                         [label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_ADD_TASK"
                         [isListAction]="true"
                         (afterTaskAdd)="onTaskAddedToSection(section, $event)"
@@ -282,6 +295,7 @@
                   listModelId="UNDONE"
                 ></task-list>
                 <add-task-inline
+                  class="pin-above-nav"
                   [label]="T.F.TASK.ADD_TASK_BAR.TOOLTIP_ADD_TASK"
                   [isListAction]="true"
                 ></add-task-inline>

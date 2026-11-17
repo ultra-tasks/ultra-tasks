@@ -1,12 +1,31 @@
 @use '../../../styles/_globals.scss' as *;
 
+// A column that can shrink inside the dialog (the surface is a flex column with a
+// max-height): the header and the footer stay put, `main` scrolls between them.
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  // The pane is the whole viewport on a phone. Where its own limit does not carry
+  // the device insets, this keeps Skip and Continue clear of the status and
+  // navigation bars (the vh line is for a WebView without dvh).
+  max-height: calc(100vh - var(--safe-area-top) - var(--safe-area-bottom));
+  max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom));
+}
+
 .setup {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   color: var(--text-color);
   background: var(--card-bg);
 }
 
 header {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
   gap: var(--s2);
@@ -16,6 +35,10 @@ header {
 }
 
 main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--s4);
 }
 
@@ -96,7 +119,6 @@ select {
   margin-top: var(--s3);
   padding: var(--s2) 0;
   border-top: 1px solid var(--divider-color);
-  border-bottom: 1px solid var(--divider-color);
   font: var(--type-body);
 
   small {
@@ -112,10 +134,29 @@ select {
   }
 }
 
+// Always on screen: the choice it confirms scrolls above it.
 footer {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
   gap: var(--s2);
-  margin-top: var(--s3);
+  padding: var(--s2) var(--s4);
+  border-top: 1px solid var(--divider-color);
+}
+
+// A phone gets the room: the dialog fills the screen, so the gutters follow the
+// page gutters instead of the 32px of a centred window.
+@include mq(xs, max) {
+  header {
+    padding: var(--s) var(--s2);
+  }
+
+  main {
+    padding: var(--s2);
+  }
+
+  footer {
+    padding: var(--s) var(--s2);
+  }
 }

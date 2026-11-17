@@ -1,5 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { cssSelectors } from '../../constants/selectors';
+import { expandTaskNotes } from '../../utils/task-notes';
 
 const { DETAIL_PANEL, DETAIL_PANEL_BTN } = cssSelectors;
 
@@ -29,12 +30,13 @@ test.describe('Notes icon opens the notes section (#9850)', () => {
     await taskPage.openTaskDetail(task);
 
     const detailPanel = page.locator(DETAIL_PANEL);
-    const noteMarkdown = detailPanel.locator('inline-markdown').first();
-    // On desktop a fresh task already shows the notes section expanded, so the
-    // note can be typed through the inline editor; blur persists it. The editor
-    // is CodeMirror (#9910), so type into it rather than filling a textarea —
-    // and Tab still blurs, because the list-indent binding declines outside a
-    // list and lets the browser's default focus move through.
+    // A fresh task opens with the Description row folded (its editor is created
+    // once the row is open); open it, then the note can be typed through the
+    // inline editor and blur persists it. The editor is CodeMirror (#9910), so
+    // type into it rather than filling a textarea — and Tab still blurs, because
+    // the list-indent binding declines outside a list and lets the browser's
+    // default focus move through.
+    const noteMarkdown = await expandTaskNotes(page);
     const editor = noteMarkdown.locator('.cm-content');
     await editor.click();
     await page.keyboard.type(NOTE_TEXT);

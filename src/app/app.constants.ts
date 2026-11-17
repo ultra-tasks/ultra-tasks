@@ -187,4 +187,6 @@ export const HISTORY_STATE = {
   TASK_DETAIL_PANEL: 'taskDetailPanel',
   DIALOG_FULLSCREEN_MARKDOWN: 'dialogFullscreenMarkdown',
   NOTES: 'notes',
+  /** A category of the full-screen Settings drill-down is open: Back returns to the list. */
+  SETTINGS_CATEGORY: 'settingsCategory',
 };

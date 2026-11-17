@@ -7,9 +7,10 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatMenu, MatMenuContent, MatMenuTrigger } from '@angular/material/menu';
 import { WorkContextMenuComponent } from '../../work-context-menu/work-context-menu.component';
+import { LayoutService } from '../../layout/layout.service';
+import { PageOptionsMenuComponent } from '../page-options-menu/page-options-menu.component';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { T } from '../../../t.const';
-import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { of } from 'rxjs';
 import { filter, map, switchMap } from 'rxjs/operators';
@@ -49,6 +50,7 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
     MatMenuContent,
     MatMenuTrigger,
     WorkContextMenuComponent,
+    PageOptionsMenuComponent,
     TaskViewCustomizerPanelComponent,
     TranslatePipe,
     PluginIconComponent,
@@ -56,10 +58,10 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
   ],
   template: `
     @if (activeWorkContextTypeAndId()) {
-      @if (isSpecialSection()) {
-        <!-- A page of its own (Search, Upcoming, a plugin): the title names the
-             page. Linking it to the task list, which is somewhere else, is
-             misleading, so it is a plain heading. -->
+      @if (isStaticTitle()) {
+        <!-- A page of its own (Search, Upcoming, a plugin, History): the title
+             names the page. Linking it to the task list, which is somewhere
+             else, is misleading, so it is a plain heading. -->
         <h1 class="page-title page-title--static">
           <ng-container *ngTemplateOutlet="titleBody"></ng-container>
         </h1>
@@ -86,7 +88,7 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
           {{ T.F.PLANNER.UNSCHEDULED_TITLE | translate }}
         </button>
       }
-      @if (!isXxxs() && !isSpecialSection()) {
+      @if (!isSpecialSection()) {
         <div class="page-title-actions">
           @if (isSharedOnPlainspace()) {
             <button
@@ -98,43 +100,50 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
               <mat-icon svgIcon="plainspace"></mat-icon>
             </button>
           }
-          <button
-            [mat-menu-trigger-for]="activeWorkContextMenu"
-            [matTooltip]="T.G.MORE_ACTIONS | translate"
-            [attr.aria-label]="T.G.MORE_ACTIONS | translate"
-            class="project-settings-btn"
-            mat-icon-button
-          >
-            <mat-icon>more_vert</mat-icon>
-          </button>
-          @if (isWorkViewPage()) {
+          @if (isXs()) {
+            <!-- A phone has room for one button beside the title, so the menu,
+                 sort/filter and Project view are one: the same controls at every
+                 width, in one menu. -->
+            <page-options-menu
+              [contextId]="activeWorkContextTypeAndId()!.activeId"
+              [contextType]="activeWorkContextTypeAndId()!.activeType"
+              [isWorkViewPage]="isWorkViewPage()"
+            ></page-options-menu>
+          } @else {
             <button
-              class="task-filter-btn"
-              [class.isCustomized]="taskViewCustomizerService.isCustomized()"
-              [matMenuTriggerFor]="customizerPanel.menu"
-              [attr.aria-label]="
-                T.GCF.KEYBOARD.TOGGLE_TASK_VIEW_CUSTOMIZER_PANEL | translate
-              "
+              [mat-menu-trigger-for]="activeWorkContextMenu"
+              [matTooltip]="T.MH.PAGE_OPTIONS | translate"
+              [attr.aria-label]="T.MH.PAGE_OPTIONS | translate"
+              class="project-settings-btn"
               mat-icon-button
-              matTooltip="{{
-                T.GCF.KEYBOARD.TOGGLE_TASK_VIEW_CUSTOMIZER_PANEL | translate
-              }} {{
-                kb.toggleTaskViewCustomizerPanel
-                  ? '[' + kb.toggleTaskViewCustomizerPanel + ']'
-                  : ''
-              }}"
             >
-              <mat-icon>tune</mat-icon>
+              <mat-icon>more_vert</mat-icon>
             </button>
-            <!-- Inside the trigger's own block, which is a constraint rather
-                 than a preference: a template reference declared in a sibling
-                 @if is not in scope here, so moving it out silently breaks the
-                 trigger's customizerPanel.menu binding. It costs the row
-                 nothing anyway -- it renders only into the overlay and its host
-                 is display: contents, so it is not a flex item and charges no
-                 gap. Sharing the condition also keeps it uninstantiated on the
-                 views that have no trigger for it. -->
-            <task-view-customizer-panel #customizerPanel></task-view-customizer-panel>
+            @if (isWorkViewPage()) {
+              <button
+                class="task-filter-btn"
+                [class.isCustomized]="taskViewCustomizerService.isCustomized()"
+                [matMenuTriggerFor]="customizerPanel.menu"
+                [attr.aria-label]="T.MH.SORT_GROUP_FILTER | translate"
+                mat-icon-button
+                matTooltip="{{ T.MH.SORT_GROUP_FILTER | translate }} {{
+                  kb.toggleTaskViewCustomizerPanel
+                    ? '[' + kb.toggleTaskViewCustomizerPanel + ']'
+                    : ''
+                }}"
+              >
+                <mat-icon>tune</mat-icon>
+              </button>
+              <!-- Inside the trigger's own block, which is a constraint rather
+                   than a preference: a template reference declared in a sibling
+                   @if is not in scope here, so moving it out silently breaks the
+                   trigger's customizerPanel.menu binding. It costs the row
+                   nothing anyway -- it renders only into the overlay and its host
+                   is display: contents, so it is not a flex item and charges no
+                   gap. Sharing the condition also keeps it uninstantiated on the
+                   views that have no trigger for it. -->
+              <task-view-customizer-panel #customizerPanel></task-view-customizer-panel>
+            }
           }
         </div>
       }
@@ -168,7 +177,12 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
           >{{ contextIcon() }}</mat-icon
         >
       }
-      <span class="page-title-text">{{ displayTitle() }}</span>
+      <span class="page-title-text"
+        >{{ displayTitle() }}
+        @if (titleSuffix(); as suffix) {
+          <span class="page-title-suffix"> · {{ suffix }}</span>
+        }
+      </span>
     </ng-template>
   `,
   styles: [
@@ -281,6 +295,12 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
         min-width: 0;
       }
 
+      /* The context after a page's name: secondary to the name. */
+      .page-title-suffix {
+        font-weight: 400;
+        color: var(--text-color-muted);
+      }
+
       /* Mirrors the side-nav icon so the same project/tag or section reads
          identically in the nav and the header (icon value, emoji handling and
          theme/tag color). See nav-item.component. */
@@ -371,8 +391,11 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
           }
         }
 
-        &:hover:not(.isCustomized):not(:disabled) {
-          background-color: var(--state-hover);
+        /* A finger has no hover: after a tap this would stay on. */
+        @media (hover: hover) {
+          &:hover:not(.isCustomized):not(:disabled) {
+            background-color: var(--state-hover);
+          }
         }
 
         &:disabled {
@@ -382,13 +405,20 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
         }
       }
 
-      :host-context(.wrapper:hover) .project-settings-btn,
-      :host-context(.wrapper:hover) .task-filter-btn:not(.isCustomized),
-      :host-context(.wrapper:focus-within) .project-settings-btn,
-      :host-context(.wrapper:focus-within) .task-filter-btn:not(.isCustomized),
-      .page-title-actions:is(:hover, :focus-within) .project-settings-btn,
-      .page-title-actions:is(:hover, :focus-within) .task-filter-btn:not(.isCustomized) {
-        color: var(--text-color);
+      /* Ink the title's buttons while the pointer or the focus is in the header.
+         Only where there is a pointer to hover with: on a touch screen the focus
+         stays on a button after a menu closes (focus returns to its trigger), so
+         without this gate the buttons stayed black until a tap elsewhere. */
+      @media (hover: hover) {
+        :host-context(.wrapper:hover) .project-settings-btn,
+        :host-context(.wrapper:hover) .task-filter-btn:not(.isCustomized),
+        :host-context(.wrapper:focus-within) .project-settings-btn,
+        :host-context(.wrapper:focus-within) .task-filter-btn:not(.isCustomized),
+        .page-title-actions:is(:hover, :focus-within) .project-settings-btn,
+        .page-title-actions:is(:hover, :focus-within)
+          .task-filter-btn:not(.isCustomized) {
+          color: var(--text-color);
+        }
       }
 
       .project-settings-btn[aria-expanded='true'] {
@@ -400,7 +430,7 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PageTitleComponent {
-  private _breakpointObserver = inject(BreakpointObserver);
+  private _layoutService = inject(LayoutService);
   private _router = inject(Router);
   private _workContextService = inject(WorkContextService);
   readonly taskViewCustomizerService = inject(TaskViewCustomizerService);
@@ -465,11 +495,28 @@ export class PageTitleComponent {
     [/archived-projects$/, T.MH.ARCHIVED_PROJECTS, NAV_SECTION_ICON.ARCHIVED_PROJECTS],
   ];
 
+  // Pages OF a work context that have a name of their own: the history, the
+  // metrics and the daily summary. They used to fall through to the context's
+  // name ("Today"), which left a phone, with no sidebar to orient by, with a
+  // header that did not say where it was. Unlike _ROUTE_SECTIONS they keep the
+  // work-context menu (they still belong to a context), and the context follows
+  // the name as a suffix: "History · Work".
+  private static readonly _CONTEXT_SECTIONS: ReadonlyArray<
+    readonly [RegExp, string, string]
+  > = [
+    [/\/(history|worklog|quick-history)$/, T.MH.HISTORY, 'history'],
+    [/\/metrics$/, T.MH.METRICS, 'bar_chart'],
+    [/\/daily-summary(\/[^/]+)?$/, T.MH.DAILY_SUMMARY, 'done_all'],
+  ];
+
   private _routeSection = computed(() =>
     PageTitleComponent._ROUTE_SECTIONS.find(([re]) => re.test(this._url())),
   );
+  private _contextSection = computed(() =>
+    PageTitleComponent._CONTEXT_SECTIONS.find(([re]) => re.test(this._url())),
+  );
   private _routeTitleKey = computed(() => this._routeSection()?.[1]);
-  sectionIcon = computed(() => this._routeSection()?.[2]);
+  sectionIcon = computed(() => (this._routeSection() ?? this._contextSection())?.[2]);
 
   // Plugin pages are titled like the built-in sections, with the label and
   // icon of the plugin's nav entry.
@@ -487,17 +534,20 @@ export class PageTitleComponent {
   });
 
   isSpecialSection = computed(() => !!this._routeSection() || !!this.pluginId());
+  /** A plain heading rather than the link to the task list (see the template). */
+  isStaticTitle = computed(() => this.isSpecialSection() || !!this._contextSection());
   readonly plannerPanel = inject(PlannerUnscheduledPanelService);
-  // The phone layout (below 600px, as the layout's `isXs`): no panel there.
-  readonly isXs = toSignal(
-    this._breakpointObserver.observe('(max-width: 599px)').pipe(map((r) => r.matches)),
-    { initialValue: false },
-  );
+  // The phone layout (below 600px): one options button, no unscheduled panel.
+  readonly isXs = this._layoutService.isXs;
   /** Upcoming (not a project's Upcoming layout, which has no unscheduled panel). */
   readonly isPlannerPage = computed(() => this._routeSection()?.[1] === T.MH.PLANNER);
   isWorkViewPage = computed(() => /tasks$/.test(this._url()));
 
   displayTitle = computed(() => {
+    const contextSection = this._contextSection();
+    if (contextSection) {
+      return this._translateService.instant(contextSection[1]);
+    }
     const key = this._routeTitleKey();
     if (key) {
       return this._translateService.instant(key);
@@ -513,6 +563,15 @@ export class PageTitleComponent {
     }
     return this.activeWorkContextTitle();
   });
+
+  /**
+   * The work context a page of it belongs to, as a suffix to the page's name:
+   * "History · Work". Muted, and cut first when the row is tight, so the name of
+   * the page is what survives.
+   */
+  titleSuffix = computed(() =>
+    this._contextSection() ? (this.activeWorkContextTitle() ?? null) : null,
+  );
 
   // Icon shown next to the title, defaulting the same way the nav does
   // (`list_alt` for projects, `label` for tags) when none is set.
@@ -549,11 +608,6 @@ export class PageTitleComponent {
       }
     }
     return wc.theme?.primary || null;
-  });
-
-  private _isXxxs$ = this._breakpointObserver.observe('(max-width: 350px)');
-  isXxxs = toSignal(this._isXxxs$.pipe(map((result) => result.matches)), {
-    initialValue: false,
   });
 
   get kb(): KeyboardConfig {

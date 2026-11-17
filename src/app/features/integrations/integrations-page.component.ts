@@ -172,6 +172,8 @@ export class IntegrationsPageComponent {
     }
     return [...groups.values()];
   });
+  /** Filters, cards and the Connect button only make sense once something is connected. */
+  readonly hasProvider = computed(() => this.data.providers().length > 0);
   readonly hasCalendar = computed(() =>
     this.data.providers().some((p) => this.capabilities.isCalendar(p.issueProviderKey)),
   );

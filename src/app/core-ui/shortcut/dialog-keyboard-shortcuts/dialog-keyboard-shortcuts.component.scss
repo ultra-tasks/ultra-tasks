@@ -1,8 +1,7 @@
+// No `display` on the host: it stays Material's `display: contents`, so the
+// title, content and actions are flex items of the dialog surface and the
+// content scrolls between the pinned title and actions (_overwrite-material.scss).
 :host {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-
   .keyboard-shortcuts-dialog-content {
     width: 100%;
     box-sizing: border-box;
@@ -87,4 +86,12 @@
   :host .keyboard-shortcuts-dialog-content {
     padding: var(--s) var(--s) var(--s);
   }
+}
+
+// Undo and redo, after the table.
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s);
+  margin-top: var(--s2);
 }

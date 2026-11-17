@@ -81,18 +81,12 @@
     .month-day-number {
       background: var(--c-primary);
       color: var(--c-contrast);
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
+      border-radius: var(--r-full);
+      width: var(--icon-lg);
+      height: var(--icon-lg);
       display: flex;
       align-items: center;
       justify-content: center;
-
-      @include mq(xs, max) {
-        width: 20px;
-        height: 20px;
-        font-size: 12px;
-      }
     }
   }
 
@@ -121,11 +115,11 @@
   }
 
   .month-day-number {
-    font-weight: 600;
-    font-size: 14px;
+    font: var(--type-body-strong);
 
     @include mq(xs, max) {
-      font-size: 12px;
+      font: var(--type-label);
+      letter-spacing: 0;
     }
   }
 }
@@ -150,10 +144,6 @@
   overflow: hidden;
   width: 100%;
   box-sizing: border-box;
-
-  @include mq(xs, max) {
-    padding: var(--s-quarter);
-  }
 }
 
 .month-more-events {
@@ -177,11 +167,6 @@
     @include truncateText();
     box-sizing: border-box;
 
-    @include mq(xs, max) {
-      font-size: var(--font-size-xs);
-      padding: 1px var(--s-quarter);
-    }
-
     // Hover effect
     &:hover {
       opacity: 0.8;
@@ -191,17 +176,68 @@
   }
 }
 
+// The toolbar above is two rows below the phone breakpoint (schedule.component.scss),
+// 40px taller than the single row the heights above were set for.
+@container main-content (max-width: #{$layout-xs - 1px}) {
+  .month-grid-container {
+    height: calc(100vh - 160px);
+  }
+}
+
+// Phone: the grid fills what is left between the header and the bottom nav,
+// under the two-row toolbar (title row + 48px controls row).
 @include mq(xs, max) {
   .month-grid-container {
-    height: calc(100vh - 150px);
+    height: calc(
+      100vh - var(--shell-inset-top) - var(--shell-inset-bottom) - var(--ctl-md) - var(
+          --icon-btn-size
+        )
+    );
     gap: 0.5px;
   }
 
   .month-day-cell {
     min-height: 60px;
   }
+}
 
-  :host ::ng-deep schedule-event .ico-wrapper {
-    display: none;
+// Phone: a day's events are dots under its number; the whole cell opens the day.
+.month-day-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+}
+
+.month-day-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: var(--s-half);
+  padding: var(--s-half);
+  pointer-events: none;
+}
+
+.month-day-dot {
+  width: var(--s);
+  height: var(--s);
+  box-sizing: border-box;
+  border-radius: var(--r-full);
+  background: var(--palette-accent-text);
+
+  // A repeat's projected occurrence has no task yet: a hollow dot, like the
+  // dashed chip it replaces.
+  &.is-projected {
+    background: transparent;
+    border: 1px solid var(--palette-accent-text);
   }
 }

@@ -1,5 +1,6 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { cssSelectors } from '../../constants/selectors';
+import { expandTaskNotes } from '../../utils/task-notes';
 
 const { DETAIL_PANEL, DETAIL_PANEL_BTN } = cssSelectors;
 
@@ -25,7 +26,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('live markdown task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('live markdown task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     // Always mounted: there is no "edit" mode to enter any more.
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
@@ -102,7 +103,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('multiline image task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('multiline image task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -129,7 +130,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('link note task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('link note task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -166,7 +167,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('drag select task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('drag select task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -211,7 +212,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('keyboard exit task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('keyboard exit task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -250,7 +251,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('sized image task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('sized image task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -278,7 +279,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('checklist toolbar task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('checklist toolbar task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -331,7 +332,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('paren image task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('paren image task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -349,7 +350,7 @@ test.describe('Live markdown editor (#9910)', () => {
     await workViewPage.addTask('image note task');
     await taskPage.openTaskDetail(taskPage.getTaskByText('image note task'));
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     const editor = notes.locator('.cm-content');
     await editor.waitFor({ state: 'visible' });
 
@@ -379,7 +380,7 @@ test.describe('Live markdown editor (#9910)', () => {
       taskPage.getTaskByText('fullscreen live markdown task'),
     );
 
-    const notes = page.locator(DETAIL_PANEL).locator('inline-markdown').first();
+    const notes = await expandTaskNotes(page);
     await notes.locator('.cm-content').waitFor({ state: 'visible' });
 
     // The controls are opacity:0 until the notes area is hovered.

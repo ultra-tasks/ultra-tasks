@@ -4,8 +4,11 @@ import {
   computed,
   inject,
   input,
+  output,
 } from '@angular/core';
 import { ScheduleEvent } from '../schedule.model';
+import { SVEType } from '../schedule.const';
+import { LayoutService } from '../../../core-ui/layout/layout.service';
 import { ScheduleEventComponent } from '../schedule-event/schedule-event.component';
 import { safeFormatDate } from 'src/app/util/safe-format-date';
 import { ScheduleService } from '../schedule.service';
@@ -37,6 +40,23 @@ const HOST_BINDINGS = {
 const TWO_EVENTS_QUERY = '(min-width: 600px) and (min-height: 880px)';
 const THREE_EVENTS_QUERY = '(min-width: 600px) and (min-height: 1100px)';
 
+// On a phone a cell is about 50px wide: a chip would read "Re…". There a day is
+// one tap target that opens it, and its events are dots (a hollow one for a
+// repeat that has no task yet); the cell header counts the rest ("+N").
+const MAX_DOTS_PER_DAY = 3;
+
+const PROJECTED_EVENT_TYPES: ReadonlySet<SVEType> = new Set([
+  SVEType.RepeatProjection,
+  SVEType.RepeatProjectionSplit,
+  SVEType.RepeatProjectionSplitContinued,
+  SVEType.RepeatProjectionSplitContinuedLast,
+  SVEType.ScheduledRepeatProjection,
+]);
+
+/** A repeat's projected occurrence: not a task yet, drawn as a hollow dot. */
+export const isProjectedEvent = (ev: Pick<ScheduleEvent, 'type'>): boolean =>
+  PROJECTED_EVENT_TYPES.has(ev.type);
+
 @Component({
   selector: 'schedule-month',
   imports: [ScheduleEventComponent, TranslatePipe, MatIcon, MatTooltip],
@@ -51,6 +71,9 @@ export class ScheduleMonthComponent {
   private _dateTimeFormatService = inject(DateTimeFormatService);
   private _translateService = inject(TranslateService);
   private _translateStore = inject(TranslateStore);
+
+  /** The phone layout: days are dots that open the day instead of event chips. */
+  readonly isXs = inject(LayoutService).isXs;
 
   readonly maxVisibleEvents = toSignal(
     inject(BreakpointObserver)
@@ -68,6 +91,13 @@ export class ScheduleMonthComponent {
   readonly weeksToShow = input<number>(6);
   readonly firstDayOfWeek = input<number>(1);
   readonly deadlineTasksByDay = input<Record<string, TaskCopy[]> | null>(null);
+  /** A day was tapped (phone layout): show it in the day view. */
+  readonly openDay = output<string>();
+
+  /** How many events a cell draws: chips by window size, or the dots on a phone. */
+  readonly maxEventsShown = computed(() =>
+    this.isXs() ? MAX_DOTS_PER_DAY : this.maxVisibleEvents(),
+  );
 
   // Generate weekday headers based on firstDayOfWeek setting
   readonly weekdayHeaders = computed(() => {
@@ -104,6 +134,40 @@ export class ScheduleMonthComponent {
     const labels: Record<string, string> = {};
     for (const day of this.daysToShow()) {
       labels[day] = safeFormatDate(day, 'd', locale);
+    }
+    return labels;
+  });
+
+  /**
+   * The name of each day's tap target (phone layout): the date, and how many
+   * events it holds. Built once per change, not per cell during change detection.
+   */
+  readonly openDayLabelByDay = computed<Record<string, string>>(() => {
+    if (!this.isXs()) return {};
+    const textLocale = this._dateTimeFormatService.textLocale();
+    const isIso = this._dateTimeFormatService.isoTextLocale() !== null;
+    const formatter = new Intl.DateTimeFormat(textLocale, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      ...(isIso ? { calendar: 'gregory', numberingSystem: 'latn' } : {}),
+    });
+    const events = this.events() || [];
+    const labels: Record<string, string> = {};
+    for (const day of this.daysToShow()) {
+      const date = formatter.format(parseDbDateStr(day));
+      const count = this._scheduleService.getEventsForDay(day, events).length;
+      labels[day] = count
+        ? this._translateService.instant(
+            getPluralKey(
+              this._translateService,
+              this._translateStore,
+              count,
+              'F.SCHEDULE.DAY_EVENTS',
+            ),
+            { date, count },
+          )
+        : date;
     }
     return labels;
   });
@@ -161,6 +225,10 @@ export class ScheduleMonthComponent {
 
   getEventsForDay(day: string): ScheduleEvent[] {
     return this._scheduleService.getEventsForDay(day, this.events() || []);
+  }
+
+  isProjected(ev: ScheduleEvent): boolean {
+    return isProjectedEvent(ev);
   }
 
   getMoreEventsKey(count: number): string {

@@ -61,6 +61,11 @@ export class PanDirective implements OnDestroy {
   private readonly _el: HTMLElement = inject(ElementRef).nativeElement;
 
   // Not @HostListener: that would run change detection on every touchmove.
+  // Not passive, and `touchmove` must keep its preventDefault (below): measured
+  // 2026-11, a passive `touchmove` (with or without `touch-action: pan-y` on the
+  // row) leaves the browser's own scroll gesture running after a sideways pan, and
+  // the next tap then produces no click at all (e2e multi-select-touch, planner
+  // swipe menu). Blocking listeners per row stay until that is solved differently.
   constructor() {
     this._el.addEventListener('touchstart', this._onTouchStart);
     this._el.addEventListener('touchmove', this._onTouchMove);

@@ -17,6 +17,9 @@
       transform: translateX(0) !important;
       left: var(--s-half);
       right: var(--s-half);
+      // The bar opens at the top when a mouse or pen is the active input (the
+      // touch layout below is the bottom one): keep it under the status bar.
+      top: calc(var(--s) + var(--safe-area-top));
     }
 
     @include mq(xs) {
@@ -362,6 +365,28 @@
   // note field is expanded).
   .note-toggle-btn.has-value:not(.active) {
     --mat-icon-button-icon-color: var(--brand);
+  }
+}
+
+// Phone: the strip scrolls sideways, so what is first on it is what the thumb
+// sees. The labelled pickers (project, schedule, tags, estimate, repeat) lead and
+// the three icon toggles follow them; the divider moves to the toggles' start.
+// In search mode the toggles keep their place at the start of their own row.
+@include mq(xs, max) {
+  add-task-bar-actions .inline-action-controls {
+    order: 1;
+    border-inline-end: 0;
+    border-inline-start: 1px solid var(--divider-color);
+    padding-inline-end: 0;
+    padding-inline-start: var(--s-quarter);
+    margin-inline-end: 0;
+    margin-inline-start: var(--s-quarter);
+  }
+
+  // No issue provider: issue search has nothing to search. Searching stays one
+  // tap away while it is on, so it can still be turned off.
+  .inline-action-controls .search-toggle-btn.no-issue-provider {
+    display: none;
   }
 }
 

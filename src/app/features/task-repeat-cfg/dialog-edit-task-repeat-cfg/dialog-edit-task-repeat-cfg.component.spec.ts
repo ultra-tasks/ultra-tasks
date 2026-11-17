@@ -13,7 +13,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { TranslateModule } from '@ngx-translate/core';
 import { provideMockStore } from '@ngrx/store/testing';
-import { Observable, of, Subject } from 'rxjs';
+import { EMPTY, Observable, of, Subject } from 'rxjs';
 import { ReactiveFormsModule } from '@angular/forms';
 // FormlyConfigModule (not FormlyModule) is needed here to register custom
 // field types and validation within the TestBed injector.
@@ -91,7 +91,14 @@ describe('DialogEditTaskRepeatCfgComponent', () => {
     renderTemplate = false,
     { startOfNextDayDiffMs = 0 }: { startOfNextDayDiffMs?: number } = {},
   ): Promise<ComponentFixture<DialogEditTaskRepeatCfgComponent>> => {
-    mockDialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
+    mockDialogRef = jasmine.createSpyObj('MatDialogRef', [
+      'close',
+      'backdropClick',
+      'keydownEvents',
+    ]);
+    // the discard guard listens to both
+    mockDialogRef.backdropClick.and.returnValue(EMPTY);
+    mockDialogRef.keydownEvents.and.returnValue(EMPTY);
     mockMatDialog = jasmine.createSpyObj('MatDialog', ['open']);
     mockMatDialog.open.and.returnValue({
       afterClosed: () => of(null),

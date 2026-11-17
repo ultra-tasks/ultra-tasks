@@ -42,7 +42,8 @@ test('emits workflow outputs and rejects a mismatched release version', () => {
     env: { ...process.env, GITHUB_REF_NAME: `ultra-tasks-v${version}` },
     encoding: 'utf8',
   });
-  assert.equal(output, 'stable=true\nprerelease=false\n');
+  const info = getReleaseInfo(`ultra-tasks-v${version}`);
+  assert.equal(output, `stable=${info.stable}\nprerelease=${info.prerelease}\n`);
   const result = spawnSync(process.execPath, [require.resolve('./release-version')], {
     env: { ...process.env, GITHUB_REF_NAME: 'ultra-tasks-v999.0.0' },
     encoding: 'utf8',

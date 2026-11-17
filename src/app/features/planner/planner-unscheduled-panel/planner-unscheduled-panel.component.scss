@@ -113,3 +113,51 @@ header {
   color: var(--text-color-muted);
   font: var(--type-meta);
 }
+
+// On a phone the rows fill the bottom sheet, which is the surface: no card of
+// its own, hairline-separated 48px rows, and nothing to drag (the days are not
+// on screen), so no grab cursor or hover tint either.
+:host(.is-sheet) {
+  margin-inline-start: 0;
+  padding: 0 var(--s2) var(--s2);
+  border: 0;
+  border-radius: 0;
+  background: none;
+
+  header {
+    padding-inline-start: 0;
+
+    h2 {
+      font: var(--type-heading);
+    }
+  }
+
+  .row {
+    min-height: var(--ctl-lg);
+    padding-inline: 0;
+    border-radius: 0;
+    cursor: default;
+
+    & + .row {
+      border-top: 1px solid var(--divider-color);
+    }
+
+    &:hover,
+    &:focus-within {
+      background: none;
+    }
+
+    // Alone, the title is centred against the Schedule button, which spans both
+    // lines, instead of sitting at the top of the first one.
+    &:not(.has-meta) .title {
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+
+    // The only way to give a task its day here, so always visible, with a mouse too.
+    .schedule-btn {
+      margin-inline-end: 0;
+      opacity: 1;
+    }
+  }
+}

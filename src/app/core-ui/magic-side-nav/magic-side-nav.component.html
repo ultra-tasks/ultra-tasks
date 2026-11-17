@@ -33,8 +33,8 @@
   <nav
     class="nav-sidenav"
     [@mobileNavRight]="isMobile() ? 'visible' : 'desktop'"
-    [class.fullMode]="isFullMode() || isMobile()"
-    [class.compactMode]="!isFullMode() && !isMobile()"
+    [class.fullMode]="isExpanded() || isMobile()"
+    [class.compactMode]="!isExpanded() && !isMobile()"
     [class.mobile]="isMobile()"
     [class.position-right]="isMobile()"
     [class.animate]="animateWidth()"
@@ -48,43 +48,47 @@
     swipeGesture
     [swipeEnabled]="swipeEnabled()"
   >
-    <a
-      (click)="isMobile() ? toggleMobileNav() : undefined"
-      class="st-brand"
-      routerLink="/tag/TODAY/tasks"
-      aria-label="Ultra Tasks"
-    >
-      <img
-        src="assets/ultra-tasks/logo.svg"
-        width="40"
-        height="40"
-        alt=""
-      />
-      <span class="st-brand-name">Ultra Tasks</span>
-    </a>
-    @if (isMobile()) {
-      <button
-        class="mobile-menu-close"
-        type="button"
-        (click)="toggleMobileNav()"
-        [attr.aria-label]="T.G.CLOSE | translate"
-        cdkFocusInitial
+    <!-- One row on the phone, stuck to the top of the scroll so Close never scrolls
+         away; a plain wrapper (display: contents) on desktop. -->
+    <div class="nav-header">
+      <a
+        (click)="isMobile() ? toggleMobileNav() : undefined"
+        class="st-brand"
+        routerLink="/tag/TODAY/tasks"
+        aria-label="Ultra Tasks"
       >
-        <span>{{ T.G.CLOSE | translate }}</span>
-        <svg
-          aria-hidden="true"
-          focusable="false"
-          width="20"
-          height="20"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
+        <img
+          src="assets/ultra-tasks/logo.svg"
+          width="40"
+          height="40"
+          alt=""
+        />
+        <span class="st-brand-name">Ultra Tasks</span>
+      </a>
+      @if (isMobile()) {
+        <button
+          class="mobile-menu-close"
+          type="button"
+          (click)="toggleMobileNav()"
+          [attr.aria-label]="T.G.CLOSE | translate"
+          cdkFocusInitial
         >
-          <path d="M4 4l12 12M16 4L4 16" />
-        </svg>
-      </button>
-    }
+          <span>{{ T.G.CLOSE | translate }}</span>
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M4 4l12 12M16 4L4 16" />
+          </svg>
+        </button>
+      }
+    </div>
 
     <!-- Desktop Toggle Button (inside sidenav) -->
     @if (!isMobile()) {
@@ -93,10 +97,10 @@
         [class.visible]="!isMobile()"
         (click)="toggleSideNavMode()"
         [attr.aria-label]="
-          (isFullMode() ? T.MH.SWITCH_TO_COMPACT_MODE : T.MH.SWITCH_TO_FULL_MODE)
+          (isExpanded() ? T.MH.SWITCH_TO_COMPACT_MODE : T.MH.SWITCH_TO_FULL_MODE)
             | translate
         "
-        [attr.aria-expanded]="isFullMode()"
+        [attr.aria-expanded]="isExpanded()"
       >
         <svg
           width="20"
@@ -106,9 +110,18 @@
           stroke="currentColor"
           stroke-width="2"
         >
-          <path [attr.d]="isFullMode() ? 'M13 4l-6 6 6 6' : 'M7 4l6 6-6 6'" />
+          <path [attr.d]="isExpanded() ? 'M13 4l-6 6 6 6' : 'M7 4l6 6-6 6'" />
         </svg>
       </button>
+    }
+
+    @if (isMobile() && isRowMenuHintShown()) {
+      <p
+        class="drawer-hint"
+        role="note"
+      >
+        {{ T.MH.ROW_MENU_HINT | translate }}
+      </p>
     }
 
     @if (isDataLoaded()) {
@@ -117,7 +130,7 @@
         class="nav-list"
         role="list"
       >
-        @for (item of navigationItems(); track item.id) {
+        @for (item of listItems(); track item.id) {
           @switch (item.type) {
             @case ('separator') {
               <hr
@@ -228,6 +241,45 @@
           }
         }
       </ul>
+
+      <!-- Phone drawer: Help and Settings stay on screen as one row, whatever the
+           scroll. -->
+      @if (footerItems().length) {
+        <ul
+          class="drawer-footer"
+          role="list"
+        >
+          @for (item of footerItems(); track item.id) {
+            @switch (item.type) {
+              @case ('menu') {
+                <nav-mat-menu
+                  [item]="item"
+                  [showLabels]="showText()"
+                  (itemClick)="onItemClick($event)"
+                ></nav-mat-menu>
+              }
+              @case ('route') {
+                <li
+                  class="nav-item"
+                  role="listitem"
+                >
+                  <nav-item
+                    [container]="'route'"
+                    [navRoute]="item.route"
+                    [icon]="item.icon"
+                    [svgIcon]="item.svgIcon"
+                    [label]="item.label"
+                    [showLabels]="showText()"
+                    [tourClass]="item.tourClass"
+                    [featureConfigKey]="item.featureConfigKey"
+                    (clicked)="onItemClick(item)"
+                  ></nav-item>
+                </li>
+              }
+            }
+          }
+        </ul>
+      }
     }
   </nav>
 }
@@ -243,10 +295,10 @@
 }
 
 <!-- Resize Handle (moved outside scrolling container) -->
-@if (config().resizable && !isMobile()) {
+@if (config().resizable && !isMobile() && !isCompactShell()) {
   <div
     class="resize-handle position-left"
-    [class.compactMode-handle]="!isFullMode()"
+    [class.compactMode-handle]="!isExpanded()"
     (mousedown)="onResizeStart($event)"
     [attr.aria-label]="T.MH.RESIZE_SIDE_NAV | translate"
     role="separator"

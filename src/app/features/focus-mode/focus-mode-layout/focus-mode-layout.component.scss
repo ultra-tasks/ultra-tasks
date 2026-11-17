@@ -80,3 +80,41 @@
   height: var(--focus-mode-edge-row-height);
   padding-top: var(--s2);
 }
+
+// ========== SHORT WINDOWS (phone landscape, a small desktop window) ==========
+// 500px is the height of the overlay's own `main`. Below it the mode selector
+// (pinned to the top) and the centred task · clock · bottom group can no longer
+// be trusted to fit apart: the selector painted over the "Select task to focus"
+// button, whose centre then tapped Pomodoro. So the selector gets its own row
+// and the group starts below it. A phone in portrait is not short, and below
+// 600px wide the selector already has a row of its own under the close button
+// (above).
+@media (max-height: 500px) {
+  @include mq(xs) {
+    :host(.has-mode-selector) {
+      padding-top: var(--s7);
+    }
+
+    .top {
+      top: var(--s);
+    }
+  }
+}
+
+// Phone landscape (about 360px): the group no longer fits below that row with
+// 80px edge rows, so they shrink to 56px (the CTA and its margin, or a FAB or
+// control button), which still leaves the 180px clock its full size; the clock
+// ring's own inner space is the gap to both rows.
+@media (max-height: 420px) {
+  @include mq(xs) {
+    .task {
+      height: calc(var(--s) + var(--ctl-lg));
+      padding-bottom: 0;
+    }
+
+    .bottom {
+      height: var(--s7);
+      padding-top: 0;
+    }
+  }
+}

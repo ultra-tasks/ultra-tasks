@@ -10,6 +10,14 @@ import {
 } from '../../../op-log/sync-providers/sync-providers.factory';
 import { FormlyFieldConfig, FormlyFieldProps } from '@ngx-formly/core';
 import { basicSyncSetupOptions } from '../../../imex/sync/sync-setup-options';
+import {
+  getInputHintAttributes,
+  LITERAL_INPUT_HINTS,
+} from '../../../ui/formly-input-hints/input-hints.util';
+
+// Credentials and addresses: a mobile keyboard must not capitalise, correct or spell-check them.
+const URL_FIELD_ATTRIBUTES = getInputHintAttributes('url');
+const LITERAL_FIELD_ATTRIBUTES = LITERAL_INPUT_HINTS;
 
 /**
  * Stable structural marker on the "Advanced" collapsibles so the dialog
@@ -58,7 +66,7 @@ const createWebdavFormFields = (options: {
             templateOptions: {
               tag: 'div',
               text: options.infoText,
-              class: 'sync-warning',
+              class: 'info-panel info-panel--warning',
             },
           },
         ]
@@ -82,6 +90,7 @@ const createWebdavFormFields = (options: {
       templateOptions: {
         label: T.F.SYNC.FORM.WEB_DAV.L_BASE_URL,
         description: options.baseUrlDescription,
+        attributes: URL_FIELD_ATTRIBUTES,
       },
       expressions: {
         'props.required': (field: FormlyFieldConfig) =>
@@ -94,6 +103,7 @@ const createWebdavFormFields = (options: {
       className: 'e2e-userName',
       templateOptions: {
         label: T.F.SYNC.FORM.WEB_DAV.L_USER_NAME,
+        attributes: LITERAL_FIELD_ATTRIBUTES,
       },
       expressions: {
         'props.required': (field: FormlyFieldConfig) =>
@@ -119,6 +129,7 @@ const createWebdavFormFields = (options: {
       className: 'e2e-syncFolderPath',
       templateOptions: {
         label: T.F.SYNC.FORM.WEB_DAV.L_SYNC_FOLDER_PATH,
+        attributes: LITERAL_FIELD_ATTRIBUTES,
       },
       expressions: {
         'props.required': (field: FormlyFieldConfig) =>
@@ -216,7 +227,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           templateOptions: {
             tag: 'div',
             text: T.F.SYNC.FORM.LOCAL_FILE.INFO_TEXT,
-            class: 'sync-warning',
+            class: 'info-panel info-panel--warning',
           },
         },
         {
@@ -252,7 +263,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           templateOptions: {
             tag: 'div',
             text: T.F.SYNC.FORM.LOCAL_FILE.INFO_TEXT,
-            class: 'sync-warning',
+            class: 'info-panel info-panel--warning',
           },
         },
         {
@@ -307,6 +318,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           templateOptions: {
             label: T.F.SYNC.FORM.NEXTCLOUD.L_SERVER_URL,
             description: T.F.SYNC.FORM.NEXTCLOUD.SERVER_URL_DESCRIPTION,
+            attributes: URL_FIELD_ATTRIBUTES,
           },
           expressions: {
             'props.required': (field: FormlyFieldConfig) =>
@@ -319,6 +331,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           templateOptions: {
             label: T.F.SYNC.FORM.NEXTCLOUD.L_FILE_USER_NAME,
             description: T.F.SYNC.FORM.NEXTCLOUD.FILE_USER_NAME_DESCRIPTION,
+            attributes: LITERAL_FIELD_ATTRIBUTES,
           },
           expressions: {
             'props.required': (field: FormlyFieldConfig) =>
@@ -331,6 +344,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           templateOptions: {
             label: T.F.SYNC.FORM.NEXTCLOUD.L_LOGIN_NAME,
             description: T.F.SYNC.FORM.NEXTCLOUD.LOGIN_NAME_DESCRIPTION,
+            attributes: LITERAL_FIELD_ATTRIBUTES,
           },
         },
         {
@@ -351,6 +365,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           type: 'input',
           templateOptions: {
             label: T.F.SYNC.FORM.WEB_DAV.L_SYNC_FOLDER_PATH,
+            attributes: LITERAL_FIELD_ATTRIBUTES,
           },
           expressions: {
             'props.required': (field: FormlyFieldConfig) =>
@@ -444,6 +459,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           templateOptions: {
             label: T.F.SYNC.FORM.ONEDRIVE.L_TENANT_ID,
             description: T.F.SYNC.FORM.ONEDRIVE.TENANT_ID_DESCRIPTION,
+            attributes: LITERAL_FIELD_ATTRIBUTES,
           },
         },
         {
@@ -452,6 +468,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
           templateOptions: {
             label: T.F.SYNC.FORM.ONEDRIVE.L_SYNC_FOLDER_PATH,
             description: T.F.SYNC.FORM.ONEDRIVE.SYNC_FOLDER_PATH_DESCRIPTION,
+            attributes: LITERAL_FIELD_ATTRIBUTES,
           },
         },
       ],
@@ -760,6 +777,7 @@ export const SYNC_FORM: ConfigFormSection<SyncConfig> = {
                 label: T.F.SYNC.FORM.SUPER_SYNC.L_SERVER_URL,
                 description: T.F.SYNC.FORM.SUPER_SYNC.SERVER_URL_DESCRIPTION,
                 placeholder: SUPER_SYNC_DEFAULT_BASE_URL,
+                attributes: URL_FIELD_ATTRIBUTES,
               },
             },
             {

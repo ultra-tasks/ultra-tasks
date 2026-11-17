@@ -20,6 +20,21 @@ import {
 import { SelectOptionRowComponent } from '../../../ui/select-option-row/select-option-row.component';
 import { T } from '../../../t.const';
 
+/**
+ * The project layouts, in menu order. Shared by this control (the desktop
+ * header) and the phone's page-options menu, which lists the same four.
+ */
+export const PROJECT_VIEW_OPTIONS: ReadonlyArray<{
+  id: ProjectLayout;
+  labelKey: string;
+  icon: string;
+}> = [
+  { id: 'list', labelKey: T.F.PROJECT.LAYOUT.LIST, icon: 'view_list' },
+  { id: 'board', labelKey: T.F.PROJECT.LAYOUT.BOARD, icon: 'view_kanban' },
+  { id: 'calendar', labelKey: T.F.PROJECT.LAYOUT.CALENDAR, icon: 'calendar_view_week' },
+  { id: 'upcoming', labelKey: T.F.PROJECT.LAYOUT.UPCOMING, icon: 'edit_calendar' },
+];
+
 @Component({
   selector: 'project-view-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,8 +64,10 @@ import { T } from '../../../t.const';
       font: var(--type-label);
       cursor: pointer;
     }
-    .project-view-trigger:hover {
-      background: var(--state-hover);
+    @media (hover: hover) {
+      .project-view-trigger:hover {
+        background: var(--state-hover);
+      }
     }
     .project-view-trigger:focus-visible {
       outline: var(--focus-ring-width) solid var(--focus-ring-color);
@@ -64,12 +81,6 @@ import { T } from '../../../t.const';
     .project-view-trigger.is-compact .project-view-label,
     .project-view-trigger.is-compact .project-view-chevron {
       display: none;
-    }
-    @media (max-width: 599px) {
-      .project-view-label,
-      .project-view-chevron {
-        display: none;
-      }
     }
   `,
   template: `
@@ -151,16 +162,7 @@ export class ProjectViewMenuComponent {
   );
   readonly prefs = computed(() => this._layouts.prefsFor(this.projectId() ?? ''));
   readonly layout = computed(() => this.prefs().layout);
-  readonly options: ReadonlyArray<{
-    id: ProjectLayout;
-    labelKey: string;
-    icon: string;
-  }> = [
-    { id: 'list', labelKey: T.F.PROJECT.LAYOUT.LIST, icon: 'view_list' },
-    { id: 'board', labelKey: T.F.PROJECT.LAYOUT.BOARD, icon: 'view_kanban' },
-    { id: 'calendar', labelKey: T.F.PROJECT.LAYOUT.CALENDAR, icon: 'calendar_view_week' },
-    { id: 'upcoming', labelKey: T.F.PROJECT.LAYOUT.UPCOMING, icon: 'edit_calendar' },
-  ];
+  readonly options = PROJECT_VIEW_OPTIONS;
   readonly activeOption = computed(
     () => this.options.find((option) => option.id === this.layout()) ?? this.options[0],
   );

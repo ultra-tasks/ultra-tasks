@@ -14,7 +14,10 @@
 @if (!isEditMode()) {
   <div class="msg">
     <mat-icon>add</mat-icon>
-    {{ T.F.SCHEDULE.CLICK_TO_CREATE_TASK | translate }}
+    {{
+      (isTouch() ? T.F.SCHEDULE.TAP_TO_CREATE_TASK : T.F.SCHEDULE.CLICK_TO_CREATE_TASK)
+        | translate
+    }}
   </div>
 } @else {
   <div class="task-input-container">
@@ -37,8 +40,9 @@
       [isLimitToProject]="false"
     ></select-task-minimal>
 
-    <!-- Mode toggle hint -->
-    <div class="mode-hint">
+    <!-- Mode toggle hint: a keyboard shortcut, so not on touch (the time badge
+         above toggles the mode there). -->
+    <div class="mode-hint show-only-on-mouse-primary">
       <small>
         {{
           (isForDayMode()

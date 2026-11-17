@@ -64,8 +64,11 @@ import { GlobalConfigService } from '../../../features/config/global-config.serv
           }
         }
 
-        &:hover:not(.isActive) {
-          background-color: var(--state-hover);
+        /* A finger has no hover: after a tap this would stay on. */
+        @media (hover: hover) {
+          &:hover:not(.isActive) {
+            background-color: var(--state-hover);
+          }
         }
       }
     `,

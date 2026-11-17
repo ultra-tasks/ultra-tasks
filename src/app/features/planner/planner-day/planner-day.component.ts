@@ -34,7 +34,7 @@ import { ShortTimeHtmlPipe } from '../../../ui/pipes/short-time-html.pipe';
 import { TranslatePipe } from '@ngx-translate/core';
 import { ShortDate2Pipe } from '../../../ui/pipes/short-date2.pipe';
 import { ProgressBarComponent } from '../../../ui/progress-bar/progress-bar.component';
-import { dragDelayForTouch } from '../../../util/input-intent';
+import { DRAG_DELAY_FOR_TOUCH } from '../../../app.constants';
 import { LayoutService } from '../../../core-ui/layout/layout.service';
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
 import { parseDbDateStr } from '../../../util/parse-db-date-str';
@@ -115,7 +115,10 @@ export class PlannerDayComponent {
 
   protected readonly T = T;
   protected readonly SCHEDULE_ITEM_TYPE = ScheduleItemType;
-  protected readonly dragDelayForTouch = dragDelayForTouch;
+  // A constant for the template's {touch, mouse} form: CDK picks the delay from the
+  // event's own type, so it cannot go stale when the input intent flips (and the
+  // rows no longer read a signal each).
+  protected readonly DRAG_DELAY_FOR_TOUCH = DRAG_DELAY_FOR_TOUCH;
   // Lock Y-axis on small screens only — on wider screens the planner uses a
   // multi-column grid where cross-column dragging requires horizontal movement.
   protected readonly isXs = this._layoutService.isXs;

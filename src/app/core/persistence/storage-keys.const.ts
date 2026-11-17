@@ -122,6 +122,9 @@ export enum LS {
   // Magic side nav
   NAV_SIDEBAR_EXPANDED = 'SUP_NAV_SIDEBAR_EXPANDED',
   NAV_SIDEBAR_WIDTH = 'SUP_NAV_SIDEBAR_WIDTH',
+  // The one first-use line in the phone drawer (row menus open on a long press).
+  // Device-local, never synced.
+  NAV_ROW_MENU_HINT_SEEN = 'SUP_NAV_ROW_MENU_HINT_SEEN',
   RIGHT_PANEL_WIDTH = 'SUP_RIGHT_PANEL_WIDTH',
 
   // Task view customizer

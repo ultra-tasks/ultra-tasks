@@ -2,7 +2,7 @@ import { inject, Injectable, Injector } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { T } from '../../../t.const';
-import { dialogSize } from '../../../ui/dialog-size.util';
+import { dialogSize, viewportHeight } from '../../../ui/dialog-size.util';
 
 const SEARCH_DIALOG_ID = 'search-popup';
 
@@ -24,7 +24,7 @@ export class SearchDialogService {
     this._dialogs.open(DialogSearchComponent, {
       id: SEARCH_DIALOG_ID,
       ...dialogSize('l', 'search-popup'),
-      position: { top: '10dvh' },
+      position: { top: viewportHeight(10) },
       backdropClass: 'settings-backdrop',
       autoFocus: false,
       restoreFocus: true,

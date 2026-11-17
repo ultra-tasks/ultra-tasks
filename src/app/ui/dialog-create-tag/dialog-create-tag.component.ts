@@ -26,6 +26,7 @@ import { MaterialIconsLoaderService } from '../material-icons-loader.service';
 import { InputColorPickerComponent } from '../input-color-picker/input-color-picker.component';
 import { Log } from '../../core/log';
 import { useDialogSize } from '../dialog-size.util';
+import { useDiscardGuard } from '../dialog-discard-guard.util';
 
 export interface CreateTagData {
   title?: string;
@@ -66,6 +67,9 @@ export class DialogCreateTagComponent {
   icon: string | null = null;
   color: string = getRandomWorkContextColor();
   filteredIcons = signal<string[]>([]);
+  // Once something is typed or picked, a stray tap on the backdrop or Escape asks first.
+  private readonly _isEdited = signal(false);
+  private readonly _discardGuard = useDiscardGuard(this._isEdited);
 
   // Get reference to autocomplete trigger for explicit cleanup
   private _iconAutoTrigger = viewChild(MatAutocompleteTrigger);
@@ -82,7 +86,12 @@ export class DialogCreateTagComponent {
     }
   }
 
+  markEdited(): void {
+    this._isEdited.set(true);
+  }
+
   async onIconInput(val: string): Promise<void> {
+    this.markEdited();
     try {
       const icons = await this._iconLoader.loadIcons();
       const filtered = icons.filter((ico) =>

@@ -105,6 +105,11 @@ h2 {
     color: var(--text-color-muted);
   }
 
+  // The phone's short stand-in for the long label that is hidden there.
+  .label-short {
+    color: var(--text-color-muted);
+  }
+
   .no-wrap {
     white-space: nowrap;
     display: inline-flex;
@@ -312,8 +317,9 @@ finish-day-btn,
     }
   }
 
-  // Touch-only devices have no hover — keep controls always visible.
-  :host-context(.isTouchOnly) & {
+  // Nothing hovers under touch input — keep controls always visible. Keyed on the
+  // input intent, not `.isTouchOnly`, which a phone's browser never sets.
+  :host-context(.isTouchPrimary) & {
     ::ng-deep > collapsible > .collapsible-header > button[mat-icon-button] {
       opacity: 1;
     }

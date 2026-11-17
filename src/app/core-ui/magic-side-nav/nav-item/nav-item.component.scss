@@ -128,6 +128,14 @@
   }
 }
 
+// A long-press opens the row's menu at the finger, over the row itself: mark the row the
+// menu belongs to while it is open. The menu's trigger (inside `context-menu`) carries
+// `aria-expanded` for exactly as long.
+:host-context(.isTouchPrimary):has(context-menu [aria-expanded='true']) .nav-link {
+  background: var(--sidenav-hover-bg);
+  box-shadow: inset 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+}
+
 // Active state visuals - ensure they override Angular Material styles.
 // Work-context rows (buttons) and route rows (anchors) share this one look: the
 // tonal "selected" role, restated for the whole row in _ultra-tasks.scss.

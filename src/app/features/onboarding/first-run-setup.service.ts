@@ -64,8 +64,12 @@ export class FirstRunSetupService {
     this._dialog
       .open<FirstRunSetupComponent, void, FirstRunChoice>(FirstRunSetupComponent, {
         width: '760px',
-        maxWidth: 'calc(100vw - 32px)',
-        maxHeight: 'calc(100dvh - 32px)',
+        maxWidth: 'calc(100vw - var(--s4))',
+        // Clear of the status and navigation bars too (both insets are 0 off a
+        // device). On a phone the shared dialog rule makes the pane the whole
+        // viewport and this component's own cap keeps its controls inside it.
+        maxHeight:
+          'calc(100dvh - var(--s4) - var(--safe-area-top) - var(--safe-area-bottom))',
         ariaLabel: this._translate.instant(T.ONBOARDING.SETUP.TITLE),
         restoreFocus: true,
       })

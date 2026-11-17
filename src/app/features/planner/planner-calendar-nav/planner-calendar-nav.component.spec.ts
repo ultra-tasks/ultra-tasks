@@ -16,6 +16,7 @@ import { parseDbDateStr } from '../../../util/parse-db-date-str';
 import { getWeekRange } from '../../../util/get-week-range';
 import { DateTimeFormatService } from '../../../core/date-time-format/date-time-format.service';
 import { getWeekdaysMin } from '../../../util/get-weekdays-min';
+import { TranslateModule } from '@ngx-translate/core';
 
 // The app locale the component must follow. Deliberately NOT the browser's:
 // monthLabel used to pass no locale at all, so a German browser rendered
@@ -59,7 +60,7 @@ describe('PlannerCalendarNavComponent', () => {
     );
 
     TestBed.configureTestingModule({
-      imports: [PlannerCalendarNavComponent],
+      imports: [PlannerCalendarNavComponent, TranslateModule.forRoot()],
       providers: [
         { provide: GlobalConfigService, useValue: mockGlobalConfigService },
         {
@@ -249,20 +250,45 @@ describe('PlannerCalendarNavComponent', () => {
       expect(component.monthLabel()).toBe(expected);
     });
 
-    it('should reflect the middle week when expanded', () => {
+    // The window opens on today's week, so its middle week can sit in the next
+    // month: a month name over it ("December" above a row that starts 9 Nov) was
+    // wrong. The range it spans is right for every window.
+    it('should name the dates the window spans when expanded', () => {
       component.isExpanded.set(true);
       fixture.detectChanges();
 
       const weeks = component.weeks();
-      const midWeekIdx = Math.floor(weeks.length / 2);
-      const midDay = weeks[midWeekIdx][3];
-      const midDate = parseDbDateStr(midDay.dateStr);
-      const expected = midDate.toLocaleDateString(MOCK_TEXT_LOCALE, {
-        month: 'long',
+      const first = parseDbDateStr(weeks[0][0].dateStr);
+      const last = parseDbDateStr(weeks[weeks.length - 1][6].dateStr);
+      const expected = new Intl.DateTimeFormat(MOCK_TEXT_LOCALE, {
+        month: 'short',
+        day: 'numeric',
         year: 'numeric',
-      });
+      }).formatRange(first, last);
 
       expect(component.monthLabel()).toBe(expected);
+    });
+
+    it('should start the expanded label at the first day of the window, not its middle week', () => {
+      // Mon 16 Feb 2026 + 6 weeks ends Sun 29 Mar: the middle week is in March.
+      component.isExpanded.set(true);
+      fixture.detectChanges();
+
+      const label = component.monthLabel();
+      const startsInFebruary = new Intl.DateTimeFormat(MOCK_TEXT_LOCALE, {
+        month: 'short',
+      }).format(parseDbDateStr('2026-02-16'));
+
+      expect(label).toContain(startsInFebruary);
+    });
+
+    it('should go back to the month name when collapsed again', () => {
+      const collapsed = component.monthLabel();
+      component.isExpanded.set(true);
+      expect(component.monthLabel()).not.toBe(collapsed);
+
+      component.isExpanded.set(false);
+      expect(component.monthLabel()).toBe(collapsed);
     });
   });
 
@@ -292,7 +318,7 @@ describe('PlannerCalendarNavComponent', () => {
     // HANDLE_HEIGHT/MIN_PLAN_VIEW_HEIGHT would just restate the implementation
     // and hold for any value of them.
     it('should reserve the handle and a row of plan list below the grid', () => {
-      stubGeometry(110, 356);
+      stubGeometry(110, 376);
       component['_measureAvailableForRows']();
 
       expect(component['_availableForRows']()).toBe(178);
@@ -304,7 +330,7 @@ describe('PlannerCalendarNavComponent', () => {
       const wrapper = document.createElement('div');
       plannerEl.insertBefore(wrapper, fixture.nativeElement);
       wrapper.appendChild(fixture.nativeElement);
-      stubGeometry(110, 356);
+      stubGeometry(110, 376);
 
       component['_measureAvailableForRows']();
 
@@ -345,20 +371,20 @@ describe('PlannerCalendarNavComponent', () => {
       expect(component['_availableForRows']() - shorter).toBe(200);
     });
 
-    // HANDLE_HEIGHT restates `.handle`'s own CSS (padding 12px 0 + a 4px
-    // ::after). Nothing else notices if one side changes.
+    // HANDLE_HEIGHT restates `.handle`'s own CSS (a `--ctl-lg` touch row). Nothing
+    // else notices if one side changes.
     it('should keep HANDLE_HEIGHT in step with the rendered handle', () => {
       const handle = fixture.nativeElement.querySelector('.handle') as HTMLElement;
 
       expect(handle.getBoundingClientRect().height).toBe(HANDLE_HEIGHT);
     });
 
-    // The XS case from the #9463 review: 400px viewport, route content ending
-    // at 356 because the bottom nav owns the rest. 178px of room over six rows
-    // is 29px each, where dropping rows gave four full-size ones and hid the
-    // rest of the month.
+    // The XS case from the #9463 review: 178px of room over six rows, which is
+    // 29px each, where dropping rows gave four full-size ones and hid the rest of
+    // the month. (The route content ended at 356 until the toggle became a 48px
+    // row, 20px taller than the 28px handle it replaced: 376 keeps the room.)
     it('should shrink the rows to fit at the reported XS geometry', () => {
-      stubGeometry(110, 356);
+      stubGeometry(110, 376);
       component['_measureAvailableForRows']();
       component.isExpanded.set(true);
 
@@ -666,6 +692,190 @@ describe('PlannerCalendarNavComponent', () => {
 
       expect(pressedBtn).toBeTruthy();
       expect(pressedBtn!.getAttribute('aria-label')).toBe('2026-02-18');
+    });
+  });
+
+  describe('expand toggle', () => {
+    const handle = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('.handle') as HTMLButtonElement;
+
+    it('should be a button that says whether the calendar is expanded', () => {
+      expect(handle().tagName).toBe('BUTTON');
+      expect(handle().getAttribute('aria-expanded')).toBe('false');
+      expect(handle().getAttribute('aria-label')).toBe('F.PLANNER.EXPAND_CALENDAR');
+
+      component.isExpanded.set(true);
+      fixture.detectChanges();
+
+      expect(handle().getAttribute('aria-expanded')).toBe('true');
+      expect(handle().getAttribute('aria-label')).toBe('F.PLANNER.COLLAPSE_CALENDAR');
+    });
+
+    it('should expand and collapse on a click, keeping the active week', () => {
+      const snapTo = spyOn(component['_gesture'], 'snapTo');
+      fixture.componentRef.setInput('visibleDayDate', '2026-02-24');
+      fixture.detectChanges();
+      const activeWeek = component.activeWeekIndex();
+
+      handle().click();
+      expect(snapTo).toHaveBeenCalledWith(true, activeWeek);
+
+      component.isExpanded.set(true);
+      handle().click();
+      expect(snapTo).toHaveBeenCalledWith(false, activeWeek);
+    });
+
+    it('should expand on a touch tap, which never becomes a click', () => {
+      const snapTo = spyOn(component['_gesture'], 'snapTo');
+      const callbacks = (
+        component['_gesture'] as unknown as {
+          _cb: { onHandleTap(): void };
+        }
+      )._cb;
+
+      callbacks.onHandleTap();
+
+      expect(snapTo).toHaveBeenCalledWith(true, component.activeWeekIndex());
+    });
+
+    it('should not toggle twice when a click still follows a handled touch tap', () => {
+      const snapTo = spyOn(component['_gesture'], 'snapTo');
+      spyOn(component['_gesture'], 'wasHandleTapJustHandled').and.returnValue(true);
+
+      handle().click();
+
+      expect(snapTo).not.toHaveBeenCalled();
+    });
+
+    it('should be disabled where there is no room to expand, but never trap an open grid', () => {
+      component['_availableForRows'].set(0);
+      fixture.detectChanges();
+      expect(handle().disabled).toBe(true);
+
+      component.isExpanded.set(true);
+      fixture.detectChanges();
+      expect(handle().disabled).toBe(false);
+    });
+
+    it('should be a 48px touch row', () => {
+      expect(handle().getBoundingClientRect().height).toBeGreaterThanOrEqual(48);
+    });
+  });
+
+  describe('Unscheduled chip', () => {
+    const chip = (): HTMLButtonElement | null =>
+      fixture.nativeElement.querySelector('.unscheduled-chip');
+
+    it('should only show where the host offers it', () => {
+      expect(chip()).toBeNull();
+
+      fixture.componentRef.setInput('showUnscheduled', true);
+      fixture.detectChanges();
+
+      expect(chip()).not.toBeNull();
+      expect(chip()!.textContent).toContain('F.PLANNER.UNSCHEDULED_TITLE');
+    });
+
+    it('should tell the host when it is tapped', () => {
+      fixture.componentRef.setInput('showUnscheduled', true);
+      fixture.detectChanges();
+      const tapped = jasmine.createSpy('unscheduledTapped');
+      component.unscheduledTapped.subscribe(tapped);
+
+      chip()!.click();
+
+      expect(tapped).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not toggle the calendar', () => {
+      fixture.componentRef.setInput('showUnscheduled', true);
+      fixture.detectChanges();
+      const snapTo = spyOn(component['_gesture'], 'snapTo');
+
+      chip()!.click();
+
+      expect(snapTo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('day buttons', () => {
+    const dayButton = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('.week button') as HTMLButtonElement;
+
+    // The circle is 36px, but the control is the 40px row: a hit box under 40px
+    // is what the touch audit flagged on all 42 buttons.
+    it('should be a 40px hit box in a full-size row', () => {
+      const rect = dayButton().getBoundingClientRect();
+
+      expect(rect.width).toBe(ROW_HEIGHT);
+      expect(rect.height).toBe(ROW_HEIGHT);
+    });
+
+    it('should follow a row that had to shrink, so rows never overlap', () => {
+      // The XS geometry of the #9463 review: 178px of room over six rows.
+      const weeksEl = component['_weeksEl']()!.nativeElement;
+      Object.defineProperty(weeksEl, 'offsetTop', { value: 110, configurable: true });
+      Object.defineProperty(weeksEl, 'offsetParent', {
+        value: plannerEl,
+        configurable: true,
+      });
+      Object.defineProperty(plannerEl, 'offsetTop', { value: 0, configurable: true });
+      Object.defineProperty(plannerEl, 'offsetParent', {
+        value: null,
+        configurable: true,
+      });
+      Object.defineProperty(plannerEl, 'clientHeight', {
+        value: 376,
+        configurable: true,
+      });
+      component['_measureAvailableForRows']();
+      component.isExpanded.set(true);
+      fixture.detectChanges();
+
+      expect(component.rowHeight()).toBe(29);
+      expect(dayButton().getBoundingClientRect().height).toBe(29);
+    });
+  });
+
+  // PF5: reading `offsetTop` from `afterNextRender` forced a layout of the whole
+  // document while the page being left (291 rows on Today) was still in it.
+  describe('observing the room without forcing a layout', () => {
+    // The measurement is private; the spec watches whether it is taken.
+    const internals = (): { _measureAvailableForRows(): void } =>
+      component as unknown as { _measureAvailableForRows(): void };
+    const restartObserving = (): void => {
+      component['_resizeObserver']?.disconnect();
+      component['_resizeObserver'] = undefined;
+      component['_observeAvailableForRows']();
+    };
+
+    it('should not measure when it starts observing', () => {
+      const measure = spyOn(internals(), '_measureAvailableForRows');
+
+      restartObserving();
+
+      expect(measure).not.toHaveBeenCalled();
+    });
+
+    it('should watch the planner host and the strip itself', () => {
+      const observe = spyOn(ResizeObserver.prototype, 'observe').and.callThrough();
+
+      restartObserving();
+
+      const targets = observe.calls.allArgs().map(([target]) => target);
+      expect(targets).toContain(plannerEl);
+      expect(targets).toContain(fixture.nativeElement);
+    });
+
+    it('should take its first measurement from the observer, after layout', async () => {
+      const measure = spyOn(internals(), '_measureAvailableForRows').and.callThrough();
+
+      restartObserving();
+      for (let i = 0; i < 20 && !measure.calls.count(); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      expect(measure).toHaveBeenCalled();
     });
   });
 });

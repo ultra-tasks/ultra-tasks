@@ -51,6 +51,12 @@
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 
+    // At 320px the pill leaves 59px of label box for "Upcoming", which is 59.6px of
+    // text: the label gets the button's whole width.
+    @include mq(xxxs, max) {
+      padding-inline: 0;
+    }
+
     @include hoverWithPointer {
       background-color: var(--state-hover);
       color: var(--text-color);
@@ -93,6 +99,28 @@
         font-variation-settings: 'FILL' 1;
       }
     }
+  }
+}
+
+// Under the floating pill, where the gesture / navigation bar sits, the page would show
+// through: the end of the list peeked out behind the bar. A solid strip of exactly the
+// bar's height (nothing where there is no inset).
+.inset-scrim {
+  position: fixed;
+  inset: auto 0 0;
+  height: var(--safe-area-bottom);
+  background: var(--bg);
+  z-index: calc(var(--z-mobile-bottom-nav) - 1);
+  pointer-events: none;
+}
+
+// Keyboard up: the pill would ride above it and, with the header, take a third of what is
+// left (31% of a 440px-high window). The page reclaims its strip through
+// `--shell-inset-bottom` (_css-variables.scss).
+:host-context(body.isKeyboardVisible) {
+  .mobile-bottom-nav,
+  .inset-scrim {
+    display: none;
   }
 }
 

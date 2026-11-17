@@ -1377,6 +1377,59 @@ describe('TaskViewCustomizerService', () => {
     expect(service.selectedFilter()).toEqual(DEFAULT_OPTIONS.filter);
   });
 
+  describe('customizationCount', () => {
+    it('counts how many of sort, group and filter are set', () => {
+      expect(service.customizationCount()).toBe(0);
+      expect(service.isCustomized()).toBe(false);
+
+      service.selectedSort.set({ type: SORT_OPTION_TYPE.name } as SortOption);
+      expect(service.customizationCount()).toBe(1);
+      expect(service.isCustomized()).toBe(true);
+
+      service.selectedGroup.set({ type: GROUP_OPTION_TYPE.tag } as GroupOption);
+      service.selectedFilter.set({
+        type: FILTER_OPTION_TYPE.priority,
+        preset: FILTER_PRIORITY.high,
+      } as FilterOption);
+      expect(service.customizationCount()).toBe(3);
+
+      service.resetAll();
+      expect(service.customizationCount()).toBe(0);
+      expect(service.isCustomized()).toBe(false);
+    });
+  });
+
+  describe('setFilterPreset', () => {
+    it('sets the filter of that kind to the value', () => {
+      service.setFilterPreset(FILTER_OPTION_TYPE.priority, FILTER_PRIORITY.high);
+
+      expect(service.selectedFilter().type).toBe(FILTER_OPTION_TYPE.priority);
+      expect(service.selectedFilter().preset).toBe(FILTER_PRIORITY.high);
+      // the label comes from the option list, as the menu cascade gets it
+      expect(service.selectedFilter().label).toBe(
+        T.F.TASK_VIEW.CUSTOMIZER.FILTER_PRIORITY,
+      );
+    });
+
+    it('takes typed text for a tag filter', () => {
+      service.setFilterPreset(FILTER_OPTION_TYPE.tag, 'Tag A');
+
+      expect(service.selectedFilter().type).toBe(FILTER_OPTION_TYPE.tag);
+      expect(service.selectedFilter().preset).toBe('Tag A');
+    });
+
+    it('clears the filter when the value is empty', () => {
+      service.setFilterPreset(FILTER_OPTION_TYPE.project, 'Project A');
+      expect(service.isCustomized()).toBe(true);
+
+      service.setFilterPreset(FILTER_OPTION_TYPE.project, '');
+      expect(service.selectedFilter()).toEqual(DEFAULT_OPTIONS.filter);
+      service.setFilterPreset(FILTER_OPTION_TYPE.project, 'Project A');
+      service.setFilterPreset(FILTER_OPTION_TYPE.project, null);
+      expect(service.selectedFilter()).toEqual(DEFAULT_OPTIONS.filter);
+    });
+  });
+
   describe('saveSort', () => {
     const createTask = (
       id: string,

@@ -243,20 +243,24 @@ body.isDarkTheme {
 
 // The chip remove icon is the whole tap target and only 18px tall. On touch,
 // pad it to the chip's height without moving the layout (negative margin).
-.isTouchOnly .mat-mdc-chip-remove.mat-icon {
-  padding-block: var(--s);
-  margin-block: calc(var(--s) * -1);
+// `(pointer: coarse)`, like the rest of the touch scale: the old `.isTouchOnly`
+// class is only set inside the Capacitor build.
+@media (pointer: coarse) {
+  .mat-mdc-chip-remove.mat-icon {
+    padding-block: var(--s);
+    margin-block: calc(var(--s) * -1);
 
-  // Keep the focus ring and state layer on the glyph, not the padded box
-  // (Material insets them at 0 and -3px from the unpadded icon).
-  &::before {
-    top: var(--s);
-    bottom: var(--s);
-  }
+    // Keep the focus ring and state layer on the glyph, not the padded box
+    // (Material insets them at 0 and -3px from the unpadded icon).
+    &::before {
+      top: var(--s);
+      bottom: var(--s);
+    }
 
-  &::after {
-    top: calc(var(--s) - 3px);
-    bottom: calc(var(--s) - 3px);
+    &::after {
+      top: calc(var(--s) - 3px);
+      bottom: calc(var(--s) - 3px);
+    }
   }
 }
 
@@ -376,12 +380,37 @@ body.isNativeMobile .mat-mdc-menu-panel {
   }
 }
 
+// A dialog never runs past its window. Material caps the pane with
+// `max-height: 100%`, a percentage the container and the surface (which inherit
+// it) cannot resolve against the pane's auto height, so on a window shorter than
+// the dialog (a phone in landscape, the keyboard up) the dialog grew past the
+// bottom edge and took its actions with it. A length resolves. A dialog's own
+// inline `maxHeight` still wins; below 600px every dialog takes the window.
 .cdk-overlay-pane.mat-mdc-dialog-panel {
+  max-height: calc(100vh - var(--safe-area-top) - var(--safe-area-bottom));
+
   @include media-queries.mq(xs, max) {
     max-width: 96vw !important;
-    max-height: calc(
-      100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
-    ) !important;
+    max-height: calc(100vh - var(--safe-area-top) - var(--safe-area-bottom)) !important;
+  }
+}
+
+// Title, content and actions are flex items of the surface, so the content
+// shrinks and scrolls between the pinned title and actions. A <form> or
+// .dialog-help-wrapper around them is a plain block, which let the content push
+// the actions out of the window; it takes no box of its own (the form still
+// submits).
+.mat-mdc-dialog-surface form:has(> .mat-mdc-dialog-content),
+.mat-mdc-dialog-surface .dialog-help-wrapper {
+  display: contents;
+}
+
+// A short window (a phone in landscape, the keyboard up): the title and the
+// actions give back part of their padding, the content keeps the room.
+@media (max-height: 480px) {
+  :root {
+    --mat-dialog-headline-padding: var(--s2) var(--dialog-gutter) var(--s);
+    --mat-dialog-actions-padding: var(--s) var(--dialog-gutter) var(--s2);
   }
 }
 
@@ -414,9 +443,7 @@ body .mat-mdc-dialog-surface {
   height: auto;
   width: 100% !important;
   max-width: none !important;
-  max-height: calc(
-    95vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
-  ) !important;
+  max-height: calc(95vh - var(--safe-area-top) - var(--safe-area-bottom)) !important;
 
   // Desktop gets some breathing room
   @include media-queries.mq(xs) {
@@ -449,6 +476,8 @@ body .mat-mdc-dialog-surface {
 
 body.isNativeMobile .project-complete-fullscreen-dialog {
   width: calc(100vw - var(--safe-area-left) - var(--safe-area-right)) !important;
+  // `vh` first for WebViews older than Chrome 108, which do not know `dvh`.
+  height: calc(100vh - var(--safe-area-top) - var(--safe-area-bottom)) !important;
   height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom)) !important;
 }
 
@@ -675,6 +704,15 @@ body .mat-mdc-outlined-button.mat-mdc-outlined-button {
   }
 }
 
+// A mini FAB that follows the round icon-button size (40px, 48px on coarse
+// pointers) instead of Material's fixed 40px, so a FAB among icon buttons (the
+// header's Play) is not the smallest touch target in its row. Opt in with
+// `class="mat-mini-fab-touch"`.
+.mat-mdc-mini-fab.mat-mini-fab-touch {
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+}
+
 .mat-mdc-icon-button.mat-mdc-icon-button.mat-mdc-icon-button {
   width: var(--icon-btn-size);
   height: var(--icon-btn-size);
@@ -835,6 +873,17 @@ body .mat-mdc-button-base .mat-icon {
   max-width: none;
 }
 
+// Opt-in via `<mat-menu class="mat-menu-under-header">`: a long menu that hangs
+// from a header button (the phone's page options). It is held to the room under
+// the header band, so it neither covers the band it hangs from nor runs past the
+// screen, and it scrolls inside that room. The inline margin keeps a gutter from
+// the screen edge when the overlay pushes the panel back on screen to fit.
+.mat-mdc-menu-panel.mat-menu-under-header {
+  max-height: calc(100vh - var(--shell-inset-top) - var(--s2));
+  max-height: calc(100dvh - var(--shell-inset-top) - var(--s2));
+  margin-inline: var(--s);
+}
+
 // Menu panels keep a 4px inner padding so their --r-md rows sit
 // concentrically inside the --r-lg panel. Item rules are scoped to panels:
 // side-nav links also carry .mat-mdc-menu-item.
@@ -924,17 +973,28 @@ body.isVerticalActionBar .cdk-overlay-pane.mat-mdc-tooltip-panel {
     pointer-events: none;
   }
   body.hasMobileBottomNav mat-snack-bar-container {
+    // The pill sits above the bottom inset, so the snackbar clears the nav strip
+    // plus that inset: it floats 32px above the pill (the strip's 8px and --s3)
+    // whatever the inset.
+    --snack-pill-inset: var(--bottom-nav-safe-area);
     margin-bottom: calc(
-      var(--bottom-nav-height) + var(--bottom-nav-safe-area) +
-        var(--bottom-nav-extra-offset) + 24px
+      var(--bottom-nav-height) + var(--snack-pill-inset) +
+        var(--bottom-nav-extra-offset) + var(--s3)
     ) !important;
     pointer-events: auto;
     transition: 150ms margin;
   }
+  // A native shell already pads the overlay wrapper by the bottom inset (see
+  // `body.isNativeMobile .cdk-global-overlay-wrapper`): counting it again here
+  // floated the snackbar higher by the inset (56, 66, 80px above the pill for
+  // insets of 24, 34, 48px instead of 32).
+  body.isNativeMobile.hasMobileBottomNav mat-snack-bar-container {
+    --snack-pill-inset: 0px;
+  }
   body.hasMobileBottomNav.isAddTaskBarOpen mat-snack-bar-container {
     margin-bottom: calc(
-      var(--bottom-nav-height) + var(--bottom-nav-safe-area) +
-        var(--bottom-nav-extra-offset) + 48px
+      var(--bottom-nav-height) + var(--snack-pill-inset) +
+        var(--bottom-nav-extra-offset) + var(--s6)
     ) !important;
     pointer-events: auto;
   }
@@ -979,6 +1039,21 @@ body.isVerticalActionBar .cdk-overlay-pane.mat-mdc-tooltip-panel {
   .mat-calendar-body-cell:not(.mat-calendar-body-disabled):focus
     > .mat-calendar-body-cell-content:not(.mat-calendar-body-selected) {
     background-color: var(--calendar-hover-bg) !important;
+  }
+}
+
+// Touch: a day is a 40px target. A calendar is seven cells wide, so in a narrow
+// dialog (307px on a 320px phone: 37px cells) it gives up the 8px its content keeps
+// at each side and, where seven cells still do not fit, spreads into the dialog's
+// gutter. Wider than that nothing changes.
+@media (pointer: coarse) {
+  .mat-calendar {
+    margin-inline: min(0px, calc((100% - 7 * var(--ctl-md)) / 2));
+  }
+
+  // (Doubled, to outrank Material's own `.mat-calendar-content` padding.)
+  .mat-calendar .mat-calendar-content {
+    padding-inline: clamp(0px, calc((100% - 7 * var(--ctl-md)) / 2), var(--s));
   }
 }
 
@@ -1043,8 +1118,45 @@ body .mat-mdc-slide-toggle {
   --mat-slide-toggle-selected-pressed-handle-color: var(--palette-accent-ink);
 }
 
+// Toggle hit areas. The switch is a 32x20 pill; a label ends where its text does.
+// A toggle that is the row of a form field (every toggle in Settings and in the
+// project and tag dialogs) is flipped by a tap anywhere on the row, on the empty
+// part between its label and its icon too: the label's overlay covers the field
+// box (the infix stops being the containing block), and a tap on it is a tap on
+// the label. `.row-text` is the visible label of a row with a description.
+// The switch itself stays above the overlay (z-index), so a click or tap on it
+// still reaches its own button: the control a screen reader, a keyboard and a
+// test find by its role is never covered by another element.
+.mat-mdc-form-field:has(mat-slide-toggle) {
+  .mat-mdc-form-field-infix {
+    position: static;
+  }
+
+  .mat-mdc-slide-toggle .mdc-label::after,
+  .row-text::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    cursor: pointer;
+  }
+
+  .mat-mdc-slide-toggle .mdc-switch {
+    z-index: 1;
+  }
+}
+
+// A toggle on its own (a plugin's): Material's touch target is as tall as the
+// 48px control row but only as wide as the 32px pill; on touch it is square.
+@media (pointer: coarse) {
+  .mat-mdc-slide-toggle .mat-mdc-slide-toggle-touch-target {
+    width: var(--ctl-lg);
+  }
+}
+
 // Bounded pickers share the same scrolling surface and selected-row treatment.
 .mat-mdc-menu-panel.mat-menu-scrollable {
+  // `vh` first for WebViews older than Chrome 108, which do not know `dvh`.
+  max-height: min(60vh, 360px);
   max-height: min(60dvh, 360px);
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -1053,4 +1165,15 @@ body .mat-mdc-slide-toggle {
 
 .mat-mdc-menu-panel .mat-mdc-menu-item.is-selected {
   background: var(--state-selected);
+}
+
+// A destructive row (Delete): label and glyph in the warn role, so it never reads
+// as one more plain choice. Opt in with `class="mat-menu-item-warn"` next to
+// `mat-menu-item`; --c-warn is mode-aware and readable on every palette surface.
+.mat-mdc-menu-panel .mat-mdc-menu-item.mat-menu-item-warn {
+  color: var(--c-warn);
+
+  .mat-icon {
+    color: var(--c-warn);
+  }
 }

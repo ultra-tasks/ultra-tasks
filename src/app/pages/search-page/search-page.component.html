@@ -38,25 +38,28 @@
     class="search-results"
     [class.has-default]="!!searchForm.value?.trim()"
   >
-    @let commandGroups = commandGroups$ | async;
-    @let hasCommands =
-      !!commandGroups?.destinations?.length || !!commandGroups?.actions?.length;
+    @let commandGroups = (commandGroups$ | async) ?? [];
+    @let hasCommands = commandGroups.length > 0;
     <!-- Places and actions, filtered by what is typed (all of them while the field
-         is empty). Rows are buttons like the results: arrow keys and Tab reach
-         them, Enter runs one. -->
-    @if (commandGroups?.destinations?.length) {
+         is empty, actions first). Rows are buttons like the results: arrow keys and
+         Tab reach them, Enter runs one. The shortcut chips and the shortcut cheat
+         sheet are keyboard things, so they are not shown on touch. -->
+    @for (group of commandGroups; track group.id) {
       <h3
         class="search-group-title"
-        id="search-go-to"
+        [id]="'search-' + group.id"
       >
-        {{ T.F.SEARCH_BAR.GO_TO | translate }}
+        {{ group.titleKey | translate }}
       </h3>
       <ul
         class="search-results-list"
-        aria-labelledby="search-go-to"
+        [attr.aria-labelledby]="'search-' + group.id"
       >
-        @for (command of commandGroups?.destinations; track command.id) {
-          <li class="search-result">
+        @for (command of group.commands; track command.id) {
+          <li
+            class="search-result"
+            [class.show-only-on-mouse-primary]="command.id === 'shortcuts'"
+          >
             <button
               #resultBtn
               type="button"
@@ -66,36 +69,7 @@
               <mat-icon aria-hidden="true">{{ command.icon }}</mat-icon>
               <span>{{ command.labelKey | translate }}</span>
               @if (shortcutFor(command); as shortcut) {
-                <kbd>{{ shortcut }}</kbd>
-              }
-            </button>
-          </li>
-        }
-      </ul>
-    }
-    @if (commandGroups?.actions?.length) {
-      <h3
-        class="search-group-title"
-        id="search-actions"
-      >
-        {{ T.F.SEARCH_BAR.ACTIONS | translate }}
-      </h3>
-      <ul
-        class="search-results-list"
-        aria-labelledby="search-actions"
-      >
-        @for (command of commandGroups?.actions; track command.id) {
-          <li class="search-result">
-            <button
-              #resultBtn
-              type="button"
-              class="search-result-main search-command"
-              (click)="runCommand(command)"
-            >
-              <mat-icon aria-hidden="true">{{ command.icon }}</mat-icon>
-              <span>{{ command.labelKey | translate }}</span>
-              @if (shortcutFor(command); as shortcut) {
-                <kbd>{{ shortcut }}</kbd>
+                <kbd class="show-only-on-mouse-primary">{{ shortcut }}</kbd>
               }
             </button>
           </li>

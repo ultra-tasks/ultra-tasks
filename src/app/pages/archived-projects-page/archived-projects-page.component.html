@@ -1,24 +1,27 @@
 <div class="page-wrapper">
-  <div class="search-header">
-    <mat-form-field class="search-field">
-      <mat-label>{{ T.F.PROJECT.ARCHIVED_PROJECTS.SEARCH | translate }}</mat-label>
-      <input
-        matInput
-        [(ngModel)]="searchTerm"
-        [placeholder]="T.F.PROJECT.ARCHIVED_PROJECTS.SEARCH | translate"
-      />
-      @if (searchTerm()) {
-        <button
-          mat-icon-button
-          matSuffix
-          [attr.aria-label]="T.G.CLEAR | translate"
-          (click)="searchTerm.set('')"
-        >
-          <mat-icon>close</mat-icon>
-        </button>
-      }
-    </mat-form-field>
-  </div>
+  <!-- A field for a handful of projects is noise: it appears once the list is long. -->
+  @if (showSearch()) {
+    <div class="search-header">
+      <mat-form-field class="search-field">
+        <mat-label>{{ T.F.PROJECT.ARCHIVED_PROJECTS.SEARCH | translate }}</mat-label>
+        <input
+          matInput
+          [(ngModel)]="searchTerm"
+          [placeholder]="T.F.PROJECT.ARCHIVED_PROJECTS.SEARCH | translate"
+        />
+        @if (searchTerm()) {
+          <button
+            mat-icon-button
+            matSuffix
+            [attr.aria-label]="T.G.CLEAR | translate"
+            (click)="searchTerm.set('')"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+    </div>
+  }
 
   <section class="component-wrapper">
     @if (filteredProjects().length === 0) {
@@ -53,23 +56,42 @@
                 </span>
               }
             </a>
+            <!-- An icon with a tooltip where a pointer can read it; on a phone
+                 the action is a text button (a tooltip never shows on touch). -->
             @if (project.isDone) {
               <button
                 mat-icon-button
+                class="hide-xs"
                 [matTooltip]="T.F.PROJECT.COMPLETE.REOPEN | translate"
                 [attr.aria-label]="T.F.PROJECT.COMPLETE.REOPEN | translate"
                 (click)="reopen(project)"
               >
                 <mat-icon>restore</mat-icon>
               </button>
+              <button
+                mat-button
+                class="show-xs-only"
+                (click)="reopen(project)"
+              >
+                {{ T.F.PROJECT.COMPLETE.REOPEN | translate }}
+              </button>
             } @else {
               <button
                 mat-icon-button
+                class="hide-xs"
                 [matTooltip]="T.F.PROJECT.ARCHIVED_PROJECTS.UNARCHIVE | translate"
                 [attr.aria-label]="T.F.PROJECT.ARCHIVED_PROJECTS.UNARCHIVE | translate"
                 (click)="unarchive(project)"
               >
                 <mat-icon>unarchive</mat-icon>
+              </button>
+              <button
+                mat-button
+                class="show-xs-only"
+                [attr.aria-label]="T.F.PROJECT.ARCHIVED_PROJECTS.UNARCHIVE | translate"
+                (click)="unarchive(project)"
+              >
+                {{ T.F.PROJECT.ARCHIVED_PROJECTS.RESTORE | translate }}
               </button>
             }
           </li>

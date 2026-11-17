@@ -45,6 +45,10 @@ test.describe('Project', () => {
     // Navigate to Inbox project
     const inboxMenuItem = page.locator('magic-side-nav button:has-text("Inbox")');
     await inboxMenuItem.click();
+    // Let the (lazy) project route commit first. Settings is a dialog route whose guard
+    // cancels its own navigation, so a click that supersedes a still-pending project
+    // navigation leaves the URL on the previous page (a race on the unbundled dev server).
+    await expect(page).toHaveURL(/INBOX_PROJECT/);
 
     // Open settings via the Settings nav item
     const settingsMenuItem = page

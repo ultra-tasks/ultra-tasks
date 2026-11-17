@@ -239,6 +239,7 @@ describe('TaskComponent shortcut handling', () => {
           provide: LayoutService,
           useValue: jasmine.createSpyObj('LayoutService', [], {
             isXs: signal(false),
+            isCompactShell: signal(false),
           }),
         },
         {
@@ -1026,8 +1027,9 @@ describe('TaskComponent shortcut handling', () => {
     };
     const selectedTaskId = (): WritableSignal<string | null> =>
       taskServiceSpy.selectedTaskId as unknown as WritableSignal<string | null>;
-    const isXs = (): WritableSignal<boolean> =>
-      TestBed.inject(LayoutService).isXs as unknown as WritableSignal<boolean>;
+    // The panel is a bottom sheet (no close button on the row) below 960px
+    const isCompactShell = (): WritableSignal<boolean> =>
+      TestBed.inject(LayoutService).isCompactShell as unknown as WritableSignal<boolean>;
 
     it('opens the notes section directly when the task has notes', () => {
       setTask({ notes: 'some notes' });
@@ -1041,7 +1043,7 @@ describe('TaskComponent shortcut handling', () => {
     });
 
     it('opens the notes section on mobile, where the bug was reported', () => {
-      isXs().set(true);
+      isCompactShell().set(true);
       setTask({ notes: 'some notes' });
 
       component.onToggleDetailPanelBtnClick();
@@ -1096,7 +1098,7 @@ describe('TaskComponent shortcut handling', () => {
     });
 
     it('closes the panel on mobile where the notes icon stays visible while open', () => {
-      isXs().set(true);
+      isCompactShell().set(true);
       setTask({ notes: 'some notes' });
       selectedTaskId().set('top-1');
 

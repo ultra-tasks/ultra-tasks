@@ -33,6 +33,7 @@ import {
 import { SectionService } from '../../features/section/section.service';
 import { DialogPromptComponent } from '../../ui/dialog-prompt/dialog-prompt.component';
 import { MatMenuItem } from '@angular/material/menu';
+import { MatDivider } from '@angular/material/divider';
 import { TranslatePipe } from '@ngx-translate/core';
 import { MatIcon } from '@angular/material/icon';
 import { INBOX_PROJECT } from '../../features/project/project.const';
@@ -54,7 +55,15 @@ import { selectIsProjectSharedOnPlainspace } from '../../features/issue/store/is
   selector: 'work-context-menu',
   templateUrl: './work-context-menu.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterModule, MatMenuItem, TranslatePipe, MatIcon, AsyncPipe],
+  imports: [
+    RouterLink,
+    RouterModule,
+    MatMenuItem,
+    MatDivider,
+    TranslatePipe,
+    MatIcon,
+    AsyncPipe,
+  ],
   standalone: true,
 })
 export class WorkContextMenuComponent implements OnInit {

@@ -1,3 +1,5 @@
+@use '../mixins/media-queries';
+
 // Settings and plugin dialogs share these overlay styles outside component scope.
 .settings-backdrop {
   background: var(--c-dark-60);
@@ -12,19 +14,31 @@
 }
 
 // Header of the Settings and Plugins windows: 64px, the title role, a 40px
-// close button and a hairline below.
+// close button and a hairline below. In the Settings drill-down it also holds the
+// way back from a category (the back arrow before the title) and, in a short
+// window, the search field.
 .settings-window-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--s2);
   min-height: var(--s8);
   padding: 0 var(--s2) 0 var(--dialog-gutter);
   border-bottom: 1px solid var(--separator);
   h1 {
+    flex: 1 1 auto;
+    min-width: 0;
     margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font: var(--type-title);
     letter-spacing: var(--track-title);
+  }
+  // The arrow's glyph sits on the content's left edge, not its 40px box.
+  .settings-back {
+    flex: none;
+    margin-inline-start: calc(-1 * var(--s));
+    margin-inline-end: calc(-1 * var(--s));
   }
   // The dialog focuses its title on open (autoFocus: 'first-heading') so
   // screen readers start there. The title is not interactive (tabindex -1),
@@ -36,12 +50,30 @@
 
 .setting-row {
   display: flex;
+  // The help card (touch, see setting-help) wraps onto a line of its own under
+  // the row; the control keeps `flex: 1` with no basis, so it never wraps itself.
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--s);
   .setting-control {
     flex: 1;
     min-width: 0;
   }
+}
+
+// The help text of a setting on a touch screen, opened by its "?" button: the
+// hairline card of `help-section`, spanning the whole row (a flex row wraps it,
+// a grid row gives it every column).
+.setting-help-card {
+  flex: 0 0 100%;
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0 0 var(--s2);
+  padding: var(--s) var(--s2);
+  border: 1px solid var(--separator);
+  border-radius: var(--r-md);
+  font: var(--type-body);
+  overflow-wrap: anywhere;
 }
 
 .setting-help-button {
@@ -78,15 +110,72 @@
   font: var(--type-meta);
 }
 
-@media (max-width: 600px) {
+// A row that opens something (a link, a dialog): the field-height bordered row of
+// the form fields, the label first and a trailing glyph. The About page of the
+// phone's Settings is a list of them.
+.settings-link-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--s7);
+  margin: 0 0 var(--s2);
+  padding: 0 var(--s2);
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--input-border-radius);
+  background: var(--input-bg);
+  color: var(--text-color);
+  font: var(--type-body);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  &:hover {
+    background: var(--input-bg-hover);
+  }
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+  }
+  mat-icon {
+    flex: none;
+    color: var(--text-color-muted);
+  }
+  &__label {
+    flex: 1;
+    min-width: 0;
+  }
+  &__value {
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+  }
+}
+
+// Settings and Plugins take the whole screen where Settings is a drill-down: below
+// the xs breakpoint, where the shell is a phone, and in a short touch window (a
+// phone in landscape, or with the keyboard up), which the two-pane window left
+// 131px of content. `vh` first for WebViews older than Chrome 108, which do not
+// know `dvh`.
+@include media-queries.mq-drill-down {
   .settings-window.cdk-overlay-pane {
     max-width: 100vw !important;
     width: 100vw !important;
+    height: 100vh !important;
     height: 100dvh !important;
+    max-height: 100vh !important;
     max-height: 100dvh !important;
   }
   .settings-window .mat-mdc-dialog-surface {
     border-radius: 0;
+  }
+}
+
+// A short window has no room for a header and a search row: the header is 56px
+// and, on the category list, holds the search field (see ConfigPageComponent).
+@include media-queries.mq-short-touch {
+  .settings-window-header {
+    min-height: var(--s7);
+    gap: var(--s);
   }
 }
 @media (pointer: coarse) {

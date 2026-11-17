@@ -279,18 +279,8 @@ export class ScheduleComponent {
 
   weeksToShow = computed(() => Math.ceil(this.daysToShow().length / 7));
 
-  // Memoized so headerTitle only re-runs at the breakpoint boundary,
-  // not on every debounced resize tick.
-  private _isCompact = computed(
-    () => this._windowSize().width < SCHEDULE_CONSTANTS.BREAKPOINTS.XS,
-  );
-  private _isVeryCompact = computed(
-    () => this._windowSize().width < SCHEDULE_CONSTANTS.BREAKPOINTS.XXS,
-  );
-  private _isTablet = computed(
-    () => this._windowSize().width < SCHEDULE_CONSTANTS.BREAKPOINTS.TABLET,
-  );
-
+  // The title is always the full form: on a narrow page the toolbar gives it a
+  // row of its own (see schedule.component.scss), so it is never shortened here.
   headerTitle = computed(() => {
     const days = this.daysToShow();
     if (!days.length) return '';
@@ -298,11 +288,12 @@ export class ScheduleComponent {
     const isIsoLocale = this._dateTimeFormatService.isoTextLocale() !== null;
 
     if (this.isDayView()) {
-      // On tablet width and below the full date clips, so drop to month + day
-      // (the weekday still shows in the day-column header).
-      const dayOpts: Intl.DateTimeFormatOptions = this._isTablet()
-        ? { month: 'short', day: 'numeric' }
-        : { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+      const dayOpts: Intl.DateTimeFormatOptions = {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      };
       if (isIsoLocale) {
         dayOpts.calendar = 'gregory';
         dayOpts.numberingSystem = 'latn';
@@ -324,11 +315,7 @@ export class ScheduleComponent {
     const endStr = sameMonth
       ? safeFormatDate(end, 'd', locale)
       : safeFormatDate(end, 'MMM d', locale);
-    const labelKey = this._isCompact()
-      ? T.F.WORKLOG.CMP.WEEK_NR_SHORT
-      : T.F.WORKLOG.CMP.WEEK_NR;
-    const label = this._translate.instant(labelKey, { nr: weekNr });
-    if (this._isVeryCompact()) return label;
+    const label = this._translate.instant(T.F.WORKLOG.CMP.WEEK_NR, { nr: weekNr });
     return `${label} · ${startStr} – ${endStr}`;
   });
 
@@ -426,6 +413,11 @@ export class ScheduleComponent {
 
   /** Opens Upcoming with the unscheduled-tasks panel, where tasks get their day. */
   planUnscheduled(): void {
+    // A phone has no such panel: the same list opens as a sheet over this page.
+    if (this.layoutService.isXs()) {
+      void this._plannerPanel.openSheet();
+      return;
+    }
     this._plannerPanel.open();
     void this._router.navigateByUrl('/planner');
   }

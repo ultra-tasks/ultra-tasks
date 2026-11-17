@@ -55,29 +55,37 @@
       }
     </tbody>
   </table>
+
+  <!-- Task history lives with the reference, not in the actions: three buttons
+       with key hints wrapped the action row to 185px and pushed Close off a
+       short or narrow window. -->
+  <div class="history-actions">
+    <button
+      mat-button
+      type="button"
+      [disabled]="!taskUndo.canUndo()"
+      (click)="taskUndo.undo()"
+    >
+      {{ undoLabel() | translate }}
+      @if (undoKey()) {
+        <kbd>{{ undoKey() }}</kbd>
+      }
+    </button>
+    <button
+      mat-button
+      type="button"
+      [disabled]="!taskUndo.canRedo()"
+      (click)="taskUndo.redo()"
+    >
+      {{ redoLabel() | translate }}
+      @if (redoKey()) {
+        <kbd>{{ redoKey() }}</kbd>
+      }
+    </button>
+  </div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button
-    mat-button
-    [disabled]="!taskUndo.canUndo()"
-    (click)="taskUndo.undo()"
-  >
-    {{ undoLabel() | translate }}
-    @if (undoKey()) {
-      <kbd>{{ undoKey() }}</kbd>
-    }
-  </button>
-  <button
-    mat-button
-    [disabled]="!taskUndo.canRedo()"
-    (click)="taskUndo.redo()"
-  >
-    {{ redoLabel() | translate }}
-    @if (redoKey()) {
-      <kbd>{{ redoKey() }}</kbd>
-    }
-  </button>
   <button
     mat-button
     mat-dialog-close

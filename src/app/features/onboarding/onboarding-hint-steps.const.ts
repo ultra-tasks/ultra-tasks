@@ -51,6 +51,13 @@ export interface HintStepConfig {
    */
   isPolled?: boolean;
   /**
+   * The tip points into a task list, so it shows on the pages that have one (Today,
+   * a project, a tag) and is hidden on every other page: there is nothing there
+   * to point at, and a chip left at its last position would cover unrelated rows.
+   * It comes back when the user returns to a list.
+   */
+  isWorkViewOnly?: boolean;
+  /**
    * End guidance (part 1) or skip the step (tour) when no target shows up.
    * Part 1's first steps wait instead, but an invisible later tip would keep
    * onboarding "in progress", which holds back the install prompt, sync
@@ -109,6 +116,7 @@ export const HINT_STEP_CONFIGS = new Map<HintStep, HintStepConfig>([
         isTouch ? T.ONBOARDING.HINTS.CREATE_TASK_TOUCH : T.ONBOARDING.HINTS.CREATE_TASK,
       shortcut: 'addNewTask',
       isPulse: true,
+      isWorkViewOnly: true,
     },
   ],
   // Phones only. Anchored to the task row; task.component itself is untouched.
@@ -119,6 +127,7 @@ export const HINT_STEP_CONFIGS = new Map<HintStep, HintStepConfig>([
       message: () => T.ONBOARDING.HINTS.TASK_SWIPE_LEFT_TOUCH,
       icon: 'swipe_left',
       isPulse: false,
+      isWorkViewOnly: true,
     },
   ],
   [

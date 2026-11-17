@@ -22,7 +22,6 @@
   // `var()` at computed-value time but does NOT evaluate `calc()`, so a
   // `calc(-1 * ...)` here reads back as an unparseable string.
   --header-title-actions-inset: var(--s);
-  --header-title-actions-gutter: var(--s2);
   // How wide the "there is more that way" fade is. Wider than it looks like it
   // needs to be, and that is the point: an icon button is 40px around a 20px
   // glyph, so the transparent gutter between two glyphs is ~24px. A band that
@@ -57,14 +56,22 @@
   // seventh icon.
   //
   // `ch` rather than px: it means "about this many characters" at whatever font
-  // the title renders in, which is the guarantee actually wanted. Zero below
-  // 600px, where add-task and the panel buttons have moved to the bottom nav
-  // and the title is competing with far less.
-  --header-title-text-min: 0px;
+  // the title renders in, which is the guarantee actually wanted. Eight below
+  // 600px: it used to be zero there, on the reasoning that add-task and the panel
+  // buttons have moved to the bottom nav and the title competes with far less --
+  // but the row still held up to eight controls, and at 360px a project name was
+  // squeezed to its icon (0px) and at 412px to "Pers". The phone's menu, sort and
+  // Project view are now one button (page-options-menu), and what the row still
+  // cannot seat scrolls (#9480) instead of costing the name.
+  --header-title-text-min: 8ch;
+  // The gap after the title's buttons. Nothing follows them on a phone but the
+  // slack and the actions, so it would only come out of the name.
+  --header-title-actions-gutter: 0px;
 
   @include mq(xs) {
     --header-action-group-gap: var(--s2);
     --header-title-padding-inline-end: var(--s);
+    --header-title-actions-gutter: var(--s2);
     --header-title-text-min: 6ch;
   }
 
@@ -174,8 +181,16 @@ button {
   ::ng-deep button:not(.mat-accent):not(.isActive):not(.active) {
     color: var(--text-color-muted);
 
-    &:is(:hover, :focus-visible):not(:disabled) {
+    &:focus-visible:not(:disabled) {
       color: var(--text-color);
+    }
+
+    // Hover only where there is a pointer: a finger leaves the button in its
+    // hover state until the next tap elsewhere.
+    @media (hover: hover) {
+      &:hover:not(:disabled) {
+        color: var(--text-color);
+      }
     }
   }
 }
@@ -207,6 +222,19 @@ button {
   position: relative;
   container-type: inline-size;
   container-name: header-pill-slot;
+
+  // Below 600px the row's leftover is a few pixels, so there is nowhere in it
+  // for the tracked task. The slot leaves the row and spans it, under the band,
+  // and the pill (a chip there, see tracked-task-pill) hangs in it at the row's
+  // end: the glass keeps its 56px. The slot takes no pointer events, so the page
+  // under it still scrolls and takes taps; the chip takes its own.
+  @include mq(xs, max) {
+    position: absolute;
+    inset-block-start: calc(100% + var(--s-half));
+    inset-inline: var(--page-gutter) var(--s);
+    align-self: auto;
+    pointer-events: none;
+  }
 }
 
 .action-nav-right {
@@ -414,6 +442,7 @@ button {
   z-index: 2;
   pointer-events: none;
   // Many counters must stay reachable, #5999.
+  max-height: calc(100vh - 120px);
   max-height: calc(100dvh - 120px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -477,8 +506,14 @@ button {
 .sync-btn {
   color: var(--text-color-muted);
 
-  &:is(:hover, :focus-visible) {
+  &:focus-visible {
     color: var(--text-color);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      color: var(--text-color);
+    }
   }
 
   // While syncing we intentionally keep the muted color: the spin animation

@@ -95,6 +95,7 @@ import {
   toFallBehindChoice,
 } from './fall-behind-choice';
 import { useDialogSize } from '../../../ui/dialog-size.util';
+import { useDiscardGuard } from '../../../ui/dialog-discard-guard.util';
 
 type StoredRepeatCfg = Omit<TaskRepeatCfgCopy, 'id'> | TaskRepeatCfg;
 // The dialog's model may carry the dialog-only "After I complete it…" preset
@@ -294,6 +295,7 @@ export class DialogEditTaskRepeatCfgComponent {
       .afterClosed()
       .subscribe((result) => {
         if (result) {
+          this._hasUserEdits.set(true);
           const newDateStr = getDbDateStr(result.date);
           const hasTime = !!result.time && isValidSplitTime(result.time);
           this.repeatCfg.update((cfg) => ({
@@ -340,6 +342,10 @@ export class DialogEditTaskRepeatCfgComponent {
     () => this.repeatCfg().quickSetting === AFTER_COMPLETION_PRESET,
   );
   isLoading = signal<boolean>(false);
+  // The user changed something (a form field, the start date, a tag): until then Escape
+  // and a tap on the backdrop close the dialog, after it they ask first.
+  private readonly _hasUserEdits = signal(false);
+  private readonly _discardGuard = useDiscardGuard(this._hasUserEdits);
   isEdit = computed(() => {
     if (this._data.repeatCfg) return true;
     if (this._data.task?.repeatCfgId) return true;
@@ -577,6 +583,10 @@ export class DialogEditTaskRepeatCfgComponent {
    * @param isBehaviourForm the emitting form holds "If you fall behind".
    */
   onModelChange(emitted: RepeatCfgModel, isBehaviourForm = false): void {
+    // A control is only dirty from the user's own input, never from the dialog's defaults.
+    if (!this._hasUserEdits() && this._getFormGroups().some((group) => group.dirty)) {
+      this._hasUserEdits.set(true);
+    }
     // waitForCompletion and skipOverdue are no form control, and fallBehind is
     // one only in the behaviour form. Formly can emit a copy of its model that
     // predates the dialog's last adjustment (e.g. a second emission when a field
@@ -1049,6 +1059,7 @@ export class DialogEditTaskRepeatCfgComponent {
   }
 
   addTag(id: string): void {
+    this._hasUserEdits.set(true);
     this.repeatCfg.update((cfg) => ({
       ...cfg,
       tagIds: unique([...cfg.tagIds, id]),
@@ -1057,6 +1068,7 @@ export class DialogEditTaskRepeatCfgComponent {
 
   addNewTag(title: string): void {
     const id = this._tagService.addTag({ title });
+    this._hasUserEdits.set(true);
     this.repeatCfg.update((cfg) => ({
       ...cfg,
       tagIds: unique([...cfg.tagIds, id]),
@@ -1064,6 +1076,7 @@ export class DialogEditTaskRepeatCfgComponent {
   }
 
   removeTag(id: string): void {
+    this._hasUserEdits.set(true);
     this.repeatCfg.update((cfg) => ({
       ...cfg,
       tagIds: cfg.tagIds.filter((tagId) => tagId !== id),

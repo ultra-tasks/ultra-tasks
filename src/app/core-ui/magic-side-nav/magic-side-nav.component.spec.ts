@@ -9,6 +9,7 @@ import { By } from '@angular/platform-browser';
 import { TranslateModule } from '@ngx-translate/core';
 import { EMPTY, of, Subject } from 'rxjs';
 import { HISTORY_STATE } from '../../app.constants';
+import { LS } from '../../core/persistence/storage-keys.const';
 
 import { MagicSideNavComponent } from './magic-side-nav.component';
 import { MagicNavConfigService } from './magic-nav-config.service';
@@ -22,11 +23,14 @@ import { NavActionItem, NavConfig, NavItem, NavPluginItem } from './magic-side-n
 describe('MagicSideNavComponent', () => {
   let fixture: ComponentFixture<MagicSideNavComponent>;
   let isXs: ReturnType<typeof signal<boolean>>;
+  let isCompactShell: ReturnType<typeof signal<boolean>>;
   let isMobileSideNavOpen: ReturnType<typeof signal<boolean>>;
   let browserMatches: boolean;
   let navConfigServiceMock: {
     navConfig: ReturnType<typeof signal<NavConfig>>;
     areInitialTreesReady: ReturnType<typeof signal<boolean>>;
+    hasAnyProjects: ReturnType<typeof signal<boolean>>;
+    hasAnyTags: ReturnType<typeof signal<boolean>>;
     isProjectsExpanded: ReturnType<typeof signal<boolean>>;
     isTagsExpanded: ReturnType<typeof signal<boolean>>;
     onNavItemClick: jasmine.Spy;
@@ -69,11 +73,14 @@ describe('MagicSideNavComponent', () => {
 
   beforeEach(async () => {
     isXs = signal(false);
+    isCompactShell = signal(false);
     isMobileSideNavOpen = signal(false);
     browserMatches = false;
     navConfigServiceMock = {
       navConfig: signal(navConfig),
       areInitialTreesReady: signal(false),
+      hasAnyProjects: signal(true),
+      hasAnyTags: signal(false),
       isProjectsExpanded: signal(false),
       isTagsExpanded: signal(false),
       onNavItemClick: jasmine.createSpy('onNavItemClick'),
@@ -113,6 +120,7 @@ describe('MagicSideNavComponent', () => {
           provide: LayoutService,
           useValue: {
             isXs,
+            isCompactShell,
             focusSideNavTrigger: signal(0),
             toggleSideNavModeTrigger: signal(0),
             isMobileSideNavOpen,
@@ -350,6 +358,7 @@ describe('MagicSideNavComponent', () => {
 
     try {
       const drawer = fixture.nativeElement.querySelector('.nav-sidenav') as HTMLElement;
+      const header = fixture.nativeElement.querySelector('.nav-header') as HTMLElement;
       const closeButton = fixture.nativeElement.querySelector(
         '.mobile-menu-close',
       ) as HTMLButtonElement;
@@ -357,15 +366,159 @@ describe('MagicSideNavComponent', () => {
       for (const isNative of [false, true]) {
         document.body.classList.toggle('isNativeMobile', isNative);
 
-        // The drawer is full screen and owns the inset: its brand row, Close
-        // and list all sit below it, and nothing adds the inset a second time.
+        // The drawer is full screen and its sticky header row owns the inset: the
+        // brand and Close sit below it, the list scrolls under it, and nothing
+        // adds the inset a second time.
         expect(getComputedStyle(drawer).top).toBe('0px');
-        expect(getComputedStyle(drawer).paddingTop).toBe('24px');
+        expect(getComputedStyle(drawer).paddingTop).toBe('0px');
+        expect(getComputedStyle(header).paddingTop).toBe('24px');
         expect(getComputedStyle(closeButton).marginTop).toBe('0px');
       }
     } finally {
       document.body.classList.toggle('isNativeMobile', wasNativeMobile);
     }
+  });
+
+  describe('phone drawer chrome', () => {
+    const open = (): HTMLElement => {
+      isXs.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.componentInstance.showMobileMenuOverlay.set(true);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
+
+    afterEach(() => {
+      localStorage.removeItem(LS.NAV_ROW_MENU_HINT_SEEN);
+    });
+
+    it('keeps the brand and Close in one row that sticks to the top of the scroll', () => {
+      const host = open();
+      const header = host.querySelector('.nav-header') as HTMLElement;
+
+      expect(header.querySelector('.st-brand')).not.toBeNull();
+      expect(header.querySelector('.mobile-menu-close')).not.toBeNull();
+      expect(getComputedStyle(header).position).toBe('sticky');
+      expect(getComputedStyle(header).top).toBe('0px');
+      expect(getComputedStyle(host.querySelector('.nav-sidenav')!).overflowY).toBe(
+        'auto',
+      );
+    });
+
+    it('is only a plain wrapper around the brand on desktop', () => {
+      isXs.set(false);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+      const header = fixture.nativeElement.querySelector('.nav-header') as HTMLElement;
+
+      expect(getComputedStyle(header).display).toBe('contents');
+      expect(header.querySelector('.mobile-menu-close')).toBeNull();
+    });
+
+    describe('footer', () => {
+      const route = (id: string, over: Partial<NavItem> = {}): NavItem =>
+        ({ type: 'route', id, label: id, icon: id, route: `/${id}`, ...over }) as NavItem;
+      const separator = (id: string): NavItem => ({ type: 'separator', id });
+      const menu: NavItem = {
+        type: 'menu',
+        id: 'help',
+        label: 'Help',
+        icon: 'help',
+        pinBottom: true,
+        children: [route('help-a')],
+      };
+      const ids = (items: NavItem[]): string[] => items.map((item) => item.id);
+
+      beforeEach(() => {
+        navConfigServiceMock.navConfig.set({
+          ...navConfig,
+          items: [
+            route('schedule'),
+            separator('sep-3'),
+            menu,
+            route('settings', { pinBottom: true }),
+          ],
+        });
+      });
+
+      it('keeps Help and Settings out of the scroll on a phone, and drops the separator above them', () => {
+        isXs.set(true);
+        fixture = TestBed.createComponent(MagicSideNavComponent);
+
+        expect(ids(fixture.componentInstance.footerItems())).toEqual([
+          'help',
+          'settings',
+        ]);
+        expect(ids(fixture.componentInstance.listItems())).toEqual(['schedule']);
+      });
+
+      it('lists every row in one scroll on desktop, with no footer', () => {
+        isXs.set(false);
+        fixture = TestBed.createComponent(MagicSideNavComponent);
+
+        expect(fixture.componentInstance.footerItems()).toEqual([]);
+        expect(ids(fixture.componentInstance.listItems())).toEqual([
+          'schedule',
+          'sep-3',
+          'help',
+          'settings',
+        ]);
+      });
+    });
+
+    describe('first-use hint for the row menus', () => {
+      const sync = (isOpen: boolean, isTouch?: boolean): void =>
+        (
+          fixture.componentInstance as unknown as {
+            _syncRowMenuHint: (isOpen: boolean, isTouch?: boolean) => void;
+          }
+        )._syncRowMenuHint(isOpen, isTouch);
+
+      beforeEach(() => {
+        localStorage.removeItem(LS.NAV_ROW_MENU_HINT_SEEN);
+        isXs.set(true);
+        fixture = TestBed.createComponent(MagicSideNavComponent);
+      });
+
+      it('shows once, the first time the drawer opens under touch, and is remembered', () => {
+        sync(true, true);
+        expect(fixture.componentInstance.isRowMenuHintShown()).toBe(true);
+        expect(localStorage.getItem(LS.NAV_ROW_MENU_HINT_SEEN)).toBe('true');
+
+        sync(false);
+        expect(fixture.componentInstance.isRowMenuHintShown()).toBe(false);
+
+        sync(true, true);
+        expect(fixture.componentInstance.isRowMenuHintShown()).toBe(false);
+      });
+
+      it('stays away for a mouse or keyboard session and keeps the first use for touch', () => {
+        sync(true, false);
+
+        expect(fixture.componentInstance.isRowMenuHintShown()).toBe(false);
+        expect(localStorage.getItem(LS.NAV_ROW_MENU_HINT_SEEN)).toBeNull();
+      });
+
+      it('stays away when there is no project or tag to long-press', () => {
+        navConfigServiceMock.hasAnyProjects.set(false);
+        navConfigServiceMock.hasAnyTags.set(false);
+
+        sync(true, true);
+
+        expect(fixture.componentInstance.isRowMenuHintShown()).toBe(false);
+        expect(localStorage.getItem(LS.NAV_ROW_MENU_HINT_SEEN)).toBeNull();
+      });
+
+      it('renders as a note under the header while it is shown', () => {
+        fixture.componentInstance.showMobileMenuOverlay.set(true);
+        sync(true, true);
+        fixture.detectChanges();
+
+        const note = fixture.nativeElement.querySelector('.drawer-hint');
+        expect(note?.getAttribute('role')).toBe('note');
+        expect(note?.previousElementSibling?.classList).toContain('nav-header');
+      });
+    });
   });
 
   it('removes the mobile drawer and its focus trap while closed', () => {
@@ -395,6 +548,160 @@ describe('MagicSideNavComponent', () => {
     );
 
     expect(fixture.componentInstance.showMobileMenuOverlay()).toBe(false);
+  });
+
+  describe('compact shell (below 960px)', () => {
+    const savedChoice = (): string | null =>
+      localStorage.getItem(LS.NAV_SIDEBAR_EXPANDED);
+
+    beforeEach(() => {
+      localStorage.removeItem(LS.NAV_SIDEBAR_EXPANDED);
+      localStorage.removeItem(LS.NAV_SIDEBAR_WIDTH);
+    });
+
+    afterEach(() => {
+      localStorage.removeItem(LS.NAV_SIDEBAR_EXPANDED);
+      localStorage.removeItem(LS.NAV_SIDEBAR_WIDTH);
+    });
+
+    it('is the 56px rail whatever the saved choice says, and leaves the choice alone', () => {
+      localStorage.setItem(LS.NAV_SIDEBAR_EXPANDED, 'true');
+      isCompactShell.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+      const nav = fixture.componentInstance;
+
+      expect(nav.isExpanded()).toBe(false);
+      expect(nav.sidenavWidth()).toBe(56);
+      expect(nav.showText()).toBe(false);
+      expect(nav.isFullMode()).toBe(true);
+      expect(savedChoice()).toBe('true');
+      expect(
+        fixture.nativeElement
+          .querySelector('.nav-sidenav')
+          ?.classList.contains('compactMode'),
+      ).toBe(true);
+    });
+
+    it('follows the saved choice again from 960px, collapsed or expanded', () => {
+      localStorage.setItem(LS.NAV_SIDEBAR_EXPANDED, 'false');
+      isCompactShell.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+      expect(fixture.componentInstance.sidenavWidth()).toBe(56);
+
+      isCompactShell.set(false);
+      fixture.detectChanges();
+      // The user had collapsed it themselves: still collapsed.
+      expect(fixture.componentInstance.sidenavWidth()).toBe(56);
+      expect(savedChoice()).toBe('false');
+
+      fixture.componentInstance.toggleSideNavMode();
+      fixture.detectChanges();
+      expect(fixture.componentInstance.sidenavWidth()).toBe(260);
+      expect(savedChoice()).toBe('true');
+    });
+
+    it('expands for now on the toggle without saving it, and starts as a rail again', () => {
+      localStorage.setItem(LS.NAV_SIDEBAR_EXPANDED, 'false');
+      isCompactShell.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+      const nav = fixture.componentInstance;
+
+      nav.toggleSideNavMode();
+      fixture.detectChanges();
+      expect(nav.isExpanded()).toBe(true);
+      expect(nav.showText()).toBe(true);
+      expect(nav.isFullMode()).toBe(false);
+      expect(savedChoice()).toBe('false');
+
+      isCompactShell.set(false);
+      fixture.detectChanges();
+      isCompactShell.set(true);
+      fixture.detectChanges();
+      expect(nav.isExpanded()).toBe(false);
+    });
+
+    it('reads the saved choice when it starts as a phone, then shows it in landscape', () => {
+      localStorage.setItem(LS.NAV_SIDEBAR_EXPANDED, 'false');
+      isXs.set(true);
+      isCompactShell.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+
+      // Rotated to a desktop-width landscape window (960px up): the saved choice, not
+      // the default, and the phone session never replaced it.
+      isXs.set(false);
+      isCompactShell.set(false);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.isFullMode()).toBe(false);
+      expect(fixture.componentInstance.sidenavWidth()).toBe(56);
+      expect(savedChoice()).toBe('false');
+    });
+
+    it('keeps the rail from being dragged open or shut', () => {
+      navConfigServiceMock.navConfig.set({ ...navConfig, resizable: true });
+      isCompactShell.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.resize-handle')).toBeNull();
+      fixture.componentInstance.onResizeStart(new MouseEvent('mousedown'));
+      expect(fixture.componentInstance.isResizing()).toBe(false);
+    });
+  });
+
+  describe('the layout changes under the open drawer', () => {
+    let state: Record<string, unknown> | null;
+
+    const open = (): void => {
+      state = null;
+      spyOnProperty(window.history, 'state', 'get').and.callFake(() => state);
+      (window.history.pushState as jasmine.Spy).and.callFake((next) => (state = next));
+      isXs.set(true);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+    };
+
+    it('closes it and pops its history entry when the layout leaves the phone shell', () => {
+      open();
+      fixture.componentInstance.toggleMobileNav();
+      fixture.detectChanges();
+      expect(state?.[HISTORY_STATE.MOBILE_NAVIGATION]).toBe(true);
+
+      // Rotated to landscape: the drawer is gone, and so must be what it left behind,
+      // or the next Back is spent on a page that looks the same.
+      isXs.set(false);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.showMobileMenuOverlay()).toBe(false);
+      expect(window.history.back).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the history alone when it was closed', () => {
+      open();
+
+      isXs.set(false);
+      fixture.detectChanges();
+
+      expect(window.history.back).not.toHaveBeenCalled();
+    });
+
+    it('starts closed when the layout enters the phone shell, with nothing to pop', () => {
+      state = null;
+      spyOnProperty(window.history, 'state', 'get').and.callFake(() => state);
+      isXs.set(false);
+      fixture = TestBed.createComponent(MagicSideNavComponent);
+      fixture.detectChanges();
+
+      isXs.set(true);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.showMobileMenuOverlay()).toBe(false);
+      expect(window.history.back).not.toHaveBeenCalled();
+    });
   });
 
   describe('onItemClick', () => {

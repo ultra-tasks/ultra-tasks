@@ -229,6 +229,25 @@ body .preview-action {
   background-color: var(--palette-accent);
 }
 
+// A touch screen cannot hover, so an attachment's edit/copy/delete controls are a
+// permanent strip of flat buttons under the card (task-attachment-list). On the
+// card's surface they take the surface ink, not the accent fill the rule above
+// gives every enabled filled button.
+@media (hover: none) {
+  body
+    task-attachment-list
+    .controls
+    :is(a, button).mat-mdc-unelevated-button:not(:disabled) {
+    @include ink(
+      var(--palette-surface-ink),
+      var(--palette-surface-ink-channel),
+      var(--palette-ink-muted)
+    );
+    color: var(--palette-surface-ink) !important;
+    background-color: transparent;
+  }
+}
+
 // Work-context rows take the surface ink on hover. The active nav row is the
 // tonal selected role (_ultra-tasks.scss), never the accent fill.
 body nav-item button:not(.active):hover {

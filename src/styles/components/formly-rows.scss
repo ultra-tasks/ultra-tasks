@@ -15,28 +15,8 @@
   }
 }
 
-// Warning box for sync provider info (local file, WebDAV)
-.sync-warning {
-  position: relative;
-  padding: 16px 16px 16px 48px;
-  margin: 8px 0 16px;
-  background: rgba(255, 152, 0, 0.1);
-  border: 1px solid rgba(255, 152, 0, 0.3);
-  border-radius: var(--card-border-radius);
-  line-height: 1.5;
-
-  &::before {
-    @include materialIcon('warning');
-    color: var(--color-warning);
-    position: absolute;
-    left: 16px;
-    top: 16px;
-  }
-
-  @include darkTheme {
-    background: rgba(255, 152, 0, 0.15);
-  }
-}
+// (The warning box of the sync provider forms is `.info-panel--warning`, see
+// _info-panel.scss.)
 
 // Encryption status box - groups password info and encryption action buttons
 // NOTE: formly puts `className` on the <formly-field> host, which has no default

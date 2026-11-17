@@ -2,8 +2,8 @@ import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { Store } from '@ngrx/store';
 import { LayoutService } from './layout.service';
 import { hideAddTaskBar, showAddTaskBar } from './store/layout.actions';
-import { of } from 'rxjs';
-import { BreakpointObserver } from '@angular/cdk/layout';
+import { BehaviorSubject, of } from 'rxjs';
+import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 import { NavigationEnd, Router } from '@angular/router';
 import { WorkContextService } from '../../features/work-context/work-context.service';
 
@@ -66,8 +66,138 @@ describe('LayoutService', () => {
       BreakpointObserver,
     ) as jasmine.SpyObj<BreakpointObserver>;
 
+    // mq(xs, max): the phone shell
     expect(breakpointObserver.observe).toHaveBeenCalledWith('(max-width: 599px)');
-    expect(breakpointObserver.observe).toHaveBeenCalledWith('(max-width: 397px)');
+    // mq(sm, max): the compact shell (rail nav, bottom-sheet panels)
+    expect(breakpointObserver.observe).toHaveBeenCalledWith('(max-width: 959px)');
+  });
+
+  describe('breakpoint signals', () => {
+    let queries: Map<string, BehaviorSubject<BreakpointState>>;
+
+    const matches = (isMatching: boolean): BreakpointState => ({
+      matches: isMatching,
+      breakpoints: {},
+    });
+
+    beforeEach(() => {
+      queries = new Map();
+      const observer = TestBed.inject(
+        BreakpointObserver,
+      ) as jasmine.SpyObj<BreakpointObserver>;
+      observer.observe.and.callFake((query) => {
+        const key = typeof query === 'string' ? query : query.join(',');
+        if (!queries.has(key)) {
+          queries.set(key, new BehaviorSubject(matches(false)));
+        }
+        return queries.get(key)!;
+      });
+      // The signals subscribe when the service is created, so build a fresh one.
+      TestBed.runInInjectionContext(() => {
+        service = new LayoutService();
+      });
+    });
+
+    it('keeps the phone shell and the compact shell on their own queries', () => {
+      expect(service.isXs()).toBe(false);
+      expect(service.isCompactShell()).toBe(false);
+
+      // 600 to 959px: the desktop shell in its compact step (landscape phone, small
+      // tablet, unfolded foldable). Not the phone shell: it keeps its bottom nav,
+      // drawer and full-screen pages to below 600px.
+      queries.get('(max-width: 959px)')!.next(matches(true));
+      expect(service.isCompactShell()).toBe(true);
+      expect(service.isXs()).toBe(false);
+      expect(service.isShowMobileBottomNav()).toBe(false);
+
+      queries.get('(max-width: 599px)')!.next(matches(true));
+      expect(service.isXs()).toBe(true);
+      expect(service.isShowMobileBottomNav()).toBe(true);
+    });
+
+    it('is no longer compact at 960px and up', () => {
+      queries.get('(max-width: 959px)')!.next(matches(true));
+      expect(service.isCompactShell()).toBe(true);
+
+      queries.get('(max-width: 959px)')!.next(matches(false));
+      expect(service.isCompactShell()).toBe(false);
+    });
+  });
+
+  describe('scrollPageToTop', () => {
+    let wrapper: HTMLElement;
+    let page: HTMLElement;
+
+    // A box that reports a scrollTop, with the scrollTo that answers it recorded.
+    const scrollable = (
+      parent: Element,
+      scrollTop: number,
+    ): { el: HTMLElement; scrollTo: jasmine.Spy } => {
+      const el = parent.appendChild(document.createElement('div'));
+      Object.defineProperty(el, 'scrollTop', { value: scrollTop, configurable: true });
+      return { el, scrollTo: spyOn(el, 'scrollTo') };
+    };
+
+    beforeEach(() => {
+      // The shape of app.component.html: the routed page follows the outlet.
+      wrapper = document.createElement('div');
+      wrapper.classList.add('route-wrapper');
+      wrapper.appendChild(document.createElement('router-outlet'));
+      page = wrapper.appendChild(document.createElement('tag-task-page'));
+      document.body.appendChild(wrapper);
+    });
+
+    afterEach(() => wrapper.remove());
+
+    it('scrolls the scrolled box inside the routed page back to its top', () => {
+      const pageScrollTo: jasmine.Spy = spyOn(page, 'scrollTo');
+      const { el: inner } = scrollable(page, 0);
+      const list = scrollable(inner, 340);
+
+      service.scrollPageToTop();
+
+      expect(list.scrollTo).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ top: 0 }),
+      );
+      expect(pageScrollTo).not.toHaveBeenCalled();
+    });
+
+    it('scrolls the routed page itself when that is the scroller', () => {
+      Object.defineProperty(page, 'scrollTop', { value: 80, configurable: true });
+      const pageScrollTo: jasmine.Spy = spyOn(page, 'scrollTo');
+
+      service.scrollPageToTop();
+
+      expect(pageScrollTo).toHaveBeenCalledOnceWith(jasmine.objectContaining({ top: 0 }));
+    });
+
+    it('leaves a box that is already at the top alone', () => {
+      const list = scrollable(page, 0);
+
+      service.scrollPageToTop();
+
+      expect(list.scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('looks five levels into the page, no deeper', () => {
+      let parent: Element = page;
+      for (let level = 1; level <= 4; level++) {
+        parent = parent.appendChild(document.createElement('div'));
+      }
+      const fifth = scrollable(parent, 10);
+      const sixth = scrollable(fifth.el, 10);
+
+      service.scrollPageToTop();
+
+      expect(fifth.scrollTo).toHaveBeenCalled();
+      expect(sixth.scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when no page is routed', () => {
+      page.remove();
+
+      expect(() => service.scrollPageToTop()).not.toThrow();
+    });
   });
 
   describe('Focus restoration', () => {

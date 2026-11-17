@@ -109,6 +109,8 @@
 // A 40px row: room for the help button column; the first field is 8px below.
 .settings-section-heading {
   display: flex;
+  // The section's help card (touch) wraps onto a line of its own.
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--s);

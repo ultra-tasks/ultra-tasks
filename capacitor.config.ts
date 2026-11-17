@@ -41,8 +41,10 @@ const config: CapacitorConfig = {
       // then jumping (it reads the meta tag back only at onPageCommitVisible).
       // Must change together with that meta tag.
       initialViewportFitValueHint: 'cover',
-      // Initial bar icon style before the theme service boots; runtime updates
-      // go through StatusBar.setStyle / NavigationBar (global-theme.service.ts).
+      // Initial bar icon style before the theme service boots. SystemBars keeps
+      // its own copy of the style and re-applies it on every configuration change,
+      // so runtime updates also go through SystemBars.setStyle, next to
+      // StatusBar.setStyle / NavigationBar (android-system-bars.util.ts).
       style: 'DARK',
     },
   },

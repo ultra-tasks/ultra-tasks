@@ -1,52 +1,87 @@
-<header>
-  <div class="day-title">{{ T.G.OVERDUE | translate }}</div>
-  <div class="day-counts">
-    <span>{{ totalEstimate() | roundDuration | msToString }}</span>
-
-    @if ((overdueTasks() || []).length > 5) {
-      <mat-icon inline="true">checklist</mat-icon>
-      <span>{{ (overdueTasks() || []).length }}</span>
-    }
-  </div>
-</header>
-
-<div
-  class="normal-tasks"
-  data-planner-selection-scope="overdue"
->
-  <div
-    class="normal-tasks-items"
-    cdkDropList
-    [cdkDropListSortingDisabled]="true"
-    [cdkDropListEnterPredicate]="enterPredicate"
-    [cdkDropListData]="OVERDUE_LIST_ID"
-    [cdkDropListAutoScrollStep]="8"
+@if (isXs()) {
+  <!-- Phone: one disclosure line, as Today shows it ("From previous days (3)"),
+       with the action at its end. The rows and their total open on a tap, so the
+       first screen is not all overdue. -->
+  <collapsible
+    class="overdue-disclosure"
+    [title]="(T.G.OVERDUE | translate) + ' (' + overdueCount() + ')'"
+    [isIconBefore]="true"
+    [isExpanded]="isExpanded()"
+    (isExpandedChange)="isExpanded.set($event)"
   >
-    @for (task of overdueTasks(); track task.id) {
-      <planner-task
-        cdkDrag
-        [cdkDragData]="task"
-        [cdkDragStartDelay]="dragDelayForTouch()"
-        [cdkDragDisabled]="multiSelect.isTouchSelectionMode()"
-        [cdkDragLockAxis]="isXs() ? 'y' : ''"
-        [task]="task"
-        [day]=""
-        [focusable]="true"
-      ></planner-task>
+    @if (overdueTasks()?.length) {
+      <button
+        actions
+        mat-button
+        type="button"
+        class="mat-button-compact"
+        (click)="addAllToToday($event)"
+      >
+        {{ T.F.TASK.CMP.ADD_TO_MY_DAY | translate }}
+      </button>
     }
-  </div>
-</div>
+    @if (isExpanded()) {
+      <div class="overdue-estimate">
+        {{ totalEstimate() | roundDuration | msToString }}
+      </div>
+      <ng-container *ngTemplateOutlet="overdueItems"></ng-container>
+    }
+  </collapsible>
+} @else {
+  <header>
+    <div class="day-title">{{ T.G.OVERDUE | translate }}</div>
+    <div class="day-counts">
+      <span>{{ totalEstimate() | roundDuration | msToString }}</span>
 
-@if (overdueDeadlineTasks()?.length) {
-  <div class="deadlines">
-    <div class="section-title">
-      <mat-icon>flag</mat-icon>
+      @if ((overdueTasks() || []).length > 5) {
+        <mat-icon inline="true">checklist</mat-icon>
+        <span>{{ (overdueTasks() || []).length }}</span>
+      }
     </div>
+  </header>
 
-    <div class="deadline-items">
-      @for (task of overdueDeadlineTasks(); track task.id) {
-        <planner-deadline-task [task]="task"></planner-deadline-task>
+  <ng-container *ngTemplateOutlet="overdueItems"></ng-container>
+}
+
+<ng-template #overdueItems>
+  <div
+    class="normal-tasks"
+    data-planner-selection-scope="overdue"
+  >
+    <div
+      class="normal-tasks-items"
+      cdkDropList
+      [cdkDropListSortingDisabled]="true"
+      [cdkDropListEnterPredicate]="enterPredicate"
+      [cdkDropListData]="OVERDUE_LIST_ID"
+      [cdkDropListAutoScrollStep]="8"
+    >
+      @for (task of overdueTasks(); track task.id) {
+        <planner-task
+          cdkDrag
+          [cdkDragData]="task"
+          [cdkDragStartDelay]="{ touch: DRAG_DELAY_FOR_TOUCH, mouse: 0 }"
+          [cdkDragDisabled]="multiSelect.isTouchSelectionMode()"
+          [cdkDragLockAxis]="isXs() ? 'y' : ''"
+          [task]="task"
+          [day]=""
+          [focusable]="true"
+        ></planner-task>
       }
     </div>
   </div>
-}
+
+  @if (overdueDeadlineTasks()?.length) {
+    <div class="deadlines">
+      <div class="section-title">
+        <mat-icon>flag</mat-icon>
+      </div>
+
+      <div class="deadline-items">
+        @for (task of overdueDeadlineTasks(); track task.id) {
+          <planner-deadline-task [task]="task"></planner-deadline-task>
+        }
+      </div>
+    </div>
+  }
+</ng-template>

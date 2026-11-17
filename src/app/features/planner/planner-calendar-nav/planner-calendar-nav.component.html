@@ -55,4 +55,33 @@
     }
   </div>
 </div>
-<div class="handle"></div>
+<div class="strip-footer">
+  <!-- The expand toggle. A tap toggles it, a drag from it still resizes the grid
+       by hand (the gesture handler owns both on touch). It spans the row, so the
+       chip below lies over its end. -->
+  <button
+    type="button"
+    class="handle"
+    [class.is-expanded]="isExpanded()"
+    [attr.aria-expanded]="isExpanded()"
+    [attr.aria-label]="
+      (isExpanded() ? T.F.PLANNER.COLLAPSE_CALENDAR : T.F.PLANNER.EXPAND_CALENDAR)
+        | translate
+    "
+    [disabled]="!isExpanded() && !canExpand()"
+    (click)="onHandleClick()"
+  >
+    <mat-icon aria-hidden="true">expand_more</mat-icon>
+  </button>
+  @if (showUnscheduled()) {
+    <button
+      type="button"
+      class="unscheduled-chip"
+      aria-haspopup="dialog"
+      (click)="unscheduledTapped.emit()"
+    >
+      <mat-icon aria-hidden="true">checklist</mat-icon>
+      <span class="label">{{ T.F.PLANNER.UNSCHEDULED_TITLE | translate }}</span>
+    </button>
+  }
+</div>

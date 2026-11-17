@@ -1,8 +1,18 @@
-import { signal } from '@angular/core';
+import {
+  Component,
+  createEnvironmentInjector,
+  EnvironmentInjector,
+  runInInjectionContext,
+  signal,
+} from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Overlay, OverlayRef } from '@angular/cdk/overlay';
+import { ComponentPortal } from '@angular/cdk/portal';
 import { Router } from '@angular/router';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef, MatDialogState } from '@angular/material/dialog';
 import { provideMockStore, MockStore } from '@ngrx/store/testing';
+import { EMPTY, Subject } from 'rxjs';
+import { filter } from 'rxjs/operators';
 
 import { AndroidBackButtonService } from './android-back-button.service';
 import { GlobalConfigService } from '../config/global-config.service';
@@ -18,8 +28,13 @@ import { hideFocusOverlay } from '../focus-mode/store/focus-mode.actions';
 import { LayoutService } from '../../core-ui/layout/layout.service';
 import { TaskFocusService } from '../tasks/task-focus.service';
 import { TaskMultiSelectService } from '../tasks/task-multi-select.service';
+import { setDialogBackHandler } from '../../ui/dialog-back-handler.util';
+import { useDiscardGuard } from '../../ui/dialog-discard-guard.util';
 
 const TODAY_URL = `/tag/${TODAY_TAG.id}/tasks`;
+
+@Component({ template: '<p>overlay content</p>' })
+class OverlayContentComponent {}
 
 const project = (over: Partial<Project>): Project =>
   ({ id: 'p1', isArchived: false, isHiddenFromMenu: false, ...over }) as Project;
@@ -217,6 +232,324 @@ describe('AndroidBackButtonService (#7972)', () => {
     });
   });
 
+  // The CDK lays an overlay out two ways. With the Popover API (Chromium 114+, so nearly
+  // every Android WebView) its host holds both the backdrop and the pane, and the host is
+  // what sits in the container. Without it the backdrop is a child of the container and
+  // the host follows it. Both are covered; a real overlay follows below.
+  (['popover', 'legacy'] as const).forEach((layout) =>
+    describe(`CDK overlays with a backdrop (menus, selects, pickers, sheets), ${layout} DOM`, () => {
+      let overlayContainer: HTMLElement;
+      let escapes: KeyboardEvent[];
+      const recordEscape = (ev: KeyboardEvent): void => {
+        escapes.push(ev);
+      };
+      const setHistoryOverlayOpen = (isOpen: boolean): void => {
+        (
+          service as unknown as { _isHistoryOverlayOpen: jasmine.Spy }
+        )._isHistoryOverlayOpen.and.returnValue(isOpen);
+      };
+
+      const addOverlay = (
+        kind: 'menu' | 'sheet' | 'dialog',
+        { isShowing = true }: { isShowing?: boolean } = {},
+      ): void => {
+        const backdrop = document.createElement('div');
+        backdrop.classList.add(
+          'cdk-overlay-backdrop',
+          kind === 'menu'
+            ? 'cdk-overlay-transparent-backdrop'
+            : 'cdk-overlay-dark-backdrop',
+        );
+        if (isShowing) {
+          backdrop.classList.add('cdk-overlay-backdrop-showing');
+        }
+        const host = document.createElement('div');
+        const pane = document.createElement('div');
+        pane.classList.add('cdk-overlay-pane');
+        if (kind === 'dialog') {
+          pane.classList.add('mat-mdc-dialog-panel');
+        }
+        if (layout === 'popover') {
+          host.classList.add('cdk-overlay-popover');
+          host.append(backdrop, pane);
+          overlayContainer.append(host);
+        } else {
+          host.appendChild(pane);
+          overlayContainer.append(backdrop, host);
+        }
+      };
+
+      beforeEach(() => {
+        overlayContainer = document.createElement('div');
+        overlayContainer.classList.add('cdk-overlay-container');
+        document.body.appendChild(overlayContainer);
+        escapes = [];
+        document.body.addEventListener('keydown', recordEscape);
+      });
+
+      afterEach(() => {
+        document.body.removeEventListener('keydown', recordEscape);
+        overlayContainer.remove();
+      });
+
+      it('closes an open menu with Escape on <body> instead of leaving the start page', () => {
+        addOverlay('menu');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(1);
+        // Material reads `keyCode`, not `key`.
+        expect(escapes[0].key).toBe('Escape');
+        expect(escapes[0].keyCode).toBe(27);
+        expect(escapes[0].target).toBe(document.body);
+        expect(minimizeApp).not.toHaveBeenCalled();
+        expect(navigateByUrl).not.toHaveBeenCalled();
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      it('closes the menu before navigating up from a non-top-level page', () => {
+        routerUrl = '/config';
+        addOverlay('menu');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(1);
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      it('sends one Escape per press, for the top-most of several overlays', () => {
+        addOverlay('menu');
+        addOverlay('menu');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(1);
+      });
+
+      it('closes a sheet that has no history entry (customizer and plugin panels)', () => {
+        addOverlay('sheet');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(1);
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      it('ignores a backdrop that is already on its way out', () => {
+        addOverlay('menu', { isShowing: false });
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(0);
+        expect(minimizeApp).toHaveBeenCalled();
+      });
+
+      it('does nothing when no overlay is open', () => {
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(0);
+        expect(minimizeApp).toHaveBeenCalled();
+      });
+
+      it('leaves a dialog to the dialog step', () => {
+        const dialog = fakeDialog();
+        openDialogs = [dialog];
+        addOverlay('dialog');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(0);
+        expect(dialog.close).toHaveBeenCalled();
+      });
+
+      it('closes a menu that is open above a dialog before the dialog', () => {
+        const dialog = fakeDialog();
+        openDialogs = [dialog];
+        addOverlay('dialog');
+        addOverlay('menu');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(1);
+        expect(dialog.close).not.toHaveBeenCalled();
+      });
+
+      it('leaves a history-backed sheet to its popstate listener', () => {
+        setHistoryOverlayOpen(true);
+        addOverlay('sheet');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(0);
+        expect(historyBack).toHaveBeenCalled();
+      });
+
+      it('closes a menu above a history-backed overlay first, then the overlay', () => {
+        setHistoryOverlayOpen(true);
+        addOverlay('sheet');
+        addOverlay('menu');
+
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(1);
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      it('keeps the task context menu step ahead of it', () => {
+        const closeTaskContextMenu = jasmine.createSpy('closeTaskContextMenu');
+        closeActiveTaskContextMenu.set(closeTaskContextMenu);
+        addOverlay('menu');
+
+        service.handleBackButton();
+
+        expect(closeTaskContextMenu).toHaveBeenCalled();
+        expect(escapes.length).toBe(0);
+      });
+
+      it('sends the next press to the overlay beneath one that is still closing', () => {
+        addOverlay('sheet');
+        addOverlay('menu');
+
+        service.handleBackButton();
+        // The menu's backdrop keeps "showing" while it animates out.
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(2);
+        expect(minimizeApp).not.toHaveBeenCalled();
+      });
+
+      it('does not let an overlay that ignores Escape trap the button', () => {
+        addOverlay('menu');
+
+        service.handleBackButton();
+        expect(escapes.length).toBe(1);
+        expect(minimizeApp).not.toHaveBeenCalled();
+
+        // Still there after the first press: that press was lost, the next one is not.
+        service.handleBackButton();
+        expect(escapes.length).toBe(1);
+        expect(minimizeApp).toHaveBeenCalled();
+      });
+
+      it('tries a different overlay that opens afterwards', () => {
+        addOverlay('menu');
+        service.handleBackButton();
+
+        addOverlay('menu');
+        service.handleBackButton();
+
+        expect(escapes.length).toBe(2);
+      });
+    }),
+  );
+
+  describe('a real CDK overlay (whatever DOM this browser gives it)', () => {
+    let overlayRef: OverlayRef | undefined;
+    let escapes: KeyboardEvent[];
+    const recordEscape = (ev: KeyboardEvent): void => {
+      escapes.push(ev);
+    };
+
+    // The CDK marks a backdrop "showing" on the next animation frame.
+    const nextFrame = (): Promise<void> =>
+      new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+    const open = async ({
+      isEscapeClosing = true,
+      isTransparent = true,
+    }: {
+      isEscapeClosing?: boolean;
+      isTransparent?: boolean;
+    } = {}): Promise<OverlayRef> => {
+      const overlay = TestBed.inject(Overlay);
+      const ref = overlay.create({
+        hasBackdrop: true,
+        backdropClass: isTransparent
+          ? 'cdk-overlay-transparent-backdrop'
+          : 'cdk-overlay-dark-backdrop',
+        positionStrategy: overlay.position().global(),
+      });
+      ref.attach(new ComponentPortal(OverlayContentComponent));
+      if (isEscapeClosing) {
+        // What a menu, a select and a sheet do with the key.
+        ref
+          .keydownEvents()
+          .pipe(filter((ev) => ev.key === 'Escape'))
+          .subscribe(() => ref.dispose());
+      }
+      overlayRef = ref;
+      await nextFrame();
+      return ref;
+    };
+
+    beforeEach(() => {
+      escapes = [];
+      document.body.addEventListener('keydown', recordEscape);
+    });
+
+    afterEach(() => {
+      document.body.removeEventListener('keydown', recordEscape);
+      overlayRef?.dispose();
+      overlayRef = undefined;
+    });
+
+    it('shows its backdrop where the service looks for it', async () => {
+      await open();
+
+      expect(
+        document.querySelectorAll(
+          '.cdk-overlay-container .cdk-overlay-backdrop.cdk-overlay-backdrop-showing',
+        ).length,
+      ).toBe(1);
+    });
+
+    it('is closed by the press, and the app stays where it is', async () => {
+      const ref = await open();
+
+      service.handleBackButton();
+
+      expect(ref.hasAttached()).toBeFalse();
+      expect(escapes.length).toBe(1);
+      expect(minimizeApp).not.toHaveBeenCalled();
+      expect(navigateByUrl).not.toHaveBeenCalled();
+      expect(historyBack).not.toHaveBeenCalled();
+    });
+
+    it('is closed by the press on a page that navigates up as well', async () => {
+      routerUrl = '/config';
+      const ref = await open({ isTransparent: false });
+
+      service.handleBackButton();
+
+      expect(ref.hasAttached()).toBeFalse();
+      expect(historyBack).not.toHaveBeenCalled();
+    });
+
+    it('lets the next press through when it ignores Escape', async () => {
+      const ref = await open({ isEscapeClosing: false });
+
+      service.handleBackButton();
+      expect(ref.hasAttached()).toBeTrue();
+      expect(minimizeApp).not.toHaveBeenCalled();
+
+      service.handleBackButton();
+      expect(minimizeApp).toHaveBeenCalled();
+    });
+
+    it('closes one overlay per press when two are open', async () => {
+      const first = await open();
+      const second = await open();
+
+      service.handleBackButton();
+      expect(second.hasAttached()).toBeFalse();
+      expect(first.hasAttached()).toBeTrue();
+
+      service.handleBackButton();
+      expect(first.hasAttached()).toBeFalse();
+      expect(minimizeApp).not.toHaveBeenCalled();
+    });
+  });
+
   describe('modal dialogs', () => {
     it('closes the topmost open dialog instead of minimizing on the start page', () => {
       const dialog = fakeDialog();
@@ -275,6 +608,195 @@ describe('AndroidBackButtonService (#7972)', () => {
 
       expect(historyBack).toHaveBeenCalled();
       expect(dialog.close).not.toHaveBeenCalled();
+    });
+
+    describe('a dialog that answers the press itself (discard guard)', () => {
+      const withHandler = (
+        handler: () => boolean,
+        over: Partial<Pick<MatDialogRef<unknown>, 'disableClose'>> = {},
+      ): MatDialogRef<unknown> & { close: jasmine.Spy } => {
+        const dialog = fakeDialog(over);
+        setDialogBackHandler(dialog, handler);
+        return dialog;
+      };
+      const setHistoryOverlayOpen = (isOpen: boolean): void => {
+        (
+          service as unknown as { _isHistoryOverlayOpen: jasmine.Spy }
+        )._isHistoryOverlayOpen.and.returnValue(isOpen);
+      };
+
+      it('hands the press to the handler, and the dialog stays open until it is told to close', () => {
+        const handler = jasmine.createSpy('handler').and.returnValue(true);
+        // what a guarded dialog with typed text looks like: it opted out of closing
+        const dialog = withHandler(handler, { disableClose: true });
+        openDialogs = [dialog];
+
+        service.handleBackButton();
+
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(dialog.close).not.toHaveBeenCalled();
+        expect(minimizeApp).not.toHaveBeenCalled();
+        expect(navigateByUrl).not.toHaveBeenCalled();
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      it('asks before the history step: over the phone drawer a back press would dispose the dialog', () => {
+        setHistoryOverlayOpen(true);
+        const handler = jasmine.createSpy('handler').and.returnValue(true);
+        const dialog = withHandler(handler, { disableClose: true });
+        openDialogs = [dialog];
+
+        service.handleBackButton();
+
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(historyBack).not.toHaveBeenCalled();
+        expect(dialog.close).not.toHaveBeenCalled();
+      });
+
+      it('closes a clean guarded dialog like any other: its handler declines', () => {
+        const handler = jasmine.createSpy('handler').and.returnValue(false);
+        const dialog = withHandler(handler);
+        openDialogs = [dialog];
+
+        service.handleBackButton();
+
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(dialog.close).toHaveBeenCalledTimes(1);
+        expect(minimizeApp).not.toHaveBeenCalled();
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      it('leaves a declining handler over a drawer to the history step, as before', () => {
+        setHistoryOverlayOpen(true);
+        const handler = jasmine.createSpy('handler').and.returnValue(false);
+        const dialog = withHandler(handler);
+        openDialogs = [dialog];
+
+        service.handleBackButton();
+
+        expect(historyBack).toHaveBeenCalledTimes(1);
+        expect(dialog.close).not.toHaveBeenCalled();
+      });
+
+      it('keeps swallowing the press for a disableClose dialog whose handler declines', () => {
+        const dialog = withHandler(() => false, { disableClose: true });
+        openDialogs = [dialog];
+
+        service.handleBackButton();
+
+        expect(dialog.close).not.toHaveBeenCalled();
+        expect(minimizeApp).not.toHaveBeenCalled();
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      it('asks only the topmost dialog', () => {
+        const lowerHandler = jasmine.createSpy('lowerHandler').and.returnValue(true);
+        const lower = withHandler(lowerHandler, { disableClose: true });
+        const top = fakeDialog();
+        openDialogs = [lower, top];
+
+        service.handleBackButton();
+
+        expect(lowerHandler).not.toHaveBeenCalled();
+        expect(top.close).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not change a disableClose dialog that has no handler', () => {
+        setHistoryOverlayOpen(false);
+        const dialog = fakeDialog({ disableClose: true });
+        openDialogs = [dialog];
+
+        service.handleBackButton();
+
+        expect(dialog.close).not.toHaveBeenCalled();
+        expect(minimizeApp).not.toHaveBeenCalled();
+        expect(historyBack).not.toHaveBeenCalled();
+      });
+
+      describe('with the real discard guard on a dialog with typed text, over the phone drawer', () => {
+        let guarded: ReturnType<typeof fakeDialog>;
+        let guardDialogs: { open: jasmine.Spy };
+        let isDirty: ReturnType<typeof signal<boolean>>;
+
+        beforeEach(() => {
+          setHistoryOverlayOpen(true);
+          guarded = Object.assign(fakeDialog(), {
+            backdropClick: () => EMPTY,
+            keydownEvents: () => EMPTY,
+            getState: () => MatDialogState.OPEN,
+          });
+          // The dialog stack the service reads: opening the question pushes it, closing pops it.
+          guardDialogs = {
+            open: jasmine.createSpy('open').and.callFake(() => {
+              const closed$ = new Subject<unknown>();
+              const question: Record<string, unknown> = {
+                disableClose: false,
+                afterClosed: () => closed$,
+              };
+              question['close'] = jasmine
+                .createSpy('closeQuestion')
+                .and.callFake((result?: unknown) => {
+                  openDialogs = openDialogs.filter((d) => d !== (question as never));
+                  closed$.next(result);
+                });
+              openDialogs = [...openDialogs, question as never];
+              return question;
+            }),
+          };
+          isDirty = signal(true);
+          const injector = createEnvironmentInjector(
+            [
+              { provide: MatDialogRef, useValue: guarded },
+              { provide: MatDialog, useValue: guardDialogs },
+            ],
+            TestBed.inject(EnvironmentInjector),
+          );
+          runInInjectionContext(injector, () => useDiscardGuard(isDirty));
+          TestBed.flushEffects();
+          openDialogs = [guarded];
+        });
+
+        it('asks instead of navigating back, and keeps the dialog when the user keeps editing', () => {
+          service.handleBackButton();
+
+          expect(guardDialogs.open).toHaveBeenCalledTimes(1);
+          expect(openDialogs.length).toBe(2);
+          expect(historyBack).not.toHaveBeenCalled();
+
+          // Back on the question answers "Keep editing", still without navigating
+          service.handleBackButton();
+
+          expect(openDialogs).toEqual([guarded]);
+          expect(guarded.close).not.toHaveBeenCalled();
+          expect(historyBack).not.toHaveBeenCalled();
+        });
+
+        it('closes the dialog when the user discards, and asks again after a Keep editing', () => {
+          service.handleBackButton();
+          service.handleBackButton();
+          service.handleBackButton();
+          expect(guardDialogs.open).toHaveBeenCalledTimes(2);
+
+          const question = openDialogs[1] as unknown as {
+            close: (result?: unknown) => void;
+          };
+          question.close(true);
+
+          expect(guarded.close).toHaveBeenCalledTimes(1);
+          expect(historyBack).not.toHaveBeenCalled();
+        });
+
+        it('lets the usual rules close the dialog once nothing is left to lose', () => {
+          isDirty.set(false);
+          TestBed.flushEffects();
+
+          service.handleBackButton();
+
+          expect(guardDialogs.open).not.toHaveBeenCalled();
+          // over the drawer the history step closes it, as for every other dialog
+          expect(historyBack).toHaveBeenCalledTimes(1);
+        });
+      });
     });
   });
 

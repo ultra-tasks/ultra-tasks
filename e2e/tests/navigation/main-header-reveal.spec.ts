@@ -15,8 +15,11 @@ import { createHeaderCounters } from '../../utils/header-counters';
  *   scrolled behind the start edge, a running timer's pause control is
  *   invisible, and the start fade can land on the group gap and say nothing.
  *
- * The tracking test adds two counters so the row genuinely overflows at 720px
+ * The tracking test adds two counters so the row genuinely overflows at 960px
  * with the default side nav, which is what makes the reveal observable.
+ *
+ * 960px is the narrowest window with a side panel: below it the panel is a bottom
+ * sheet (the compact shell), which takes nothing from the header's row.
  */
 
 const scroller = (page: Page): ReturnType<Page['locator']> =>
@@ -34,7 +37,7 @@ test.describe('main header action-row reveal', () => {
     workViewPage,
   }) => {
     await workViewPage.waitForTaskList();
-    await page.setViewportSize({ width: 720, height: 860 });
+    await page.setViewportSize({ width: 960, height: 860 });
 
     // Playwright's actionability scroll parks the row wherever it needs to be
     // to click; the panel's width animation then shrinks the row under it.
@@ -63,7 +66,7 @@ test.describe('main header action-row reveal', () => {
   }) => {
     await workViewPage.waitForTaskList();
     await createHeaderCounters(page, ['Counter one', 'Counter two']);
-    await page.setViewportSize({ width: 720, height: 860 });
+    await page.setViewportSize({ width: 960, height: 860 });
     await workViewPage.addTask('track me');
 
     // The header fits at this width until a panel takes part of its space.

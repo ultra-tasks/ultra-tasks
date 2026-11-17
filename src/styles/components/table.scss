@@ -125,4 +125,26 @@ div.material-table {
       padding-right: var(--s3);
     }
   }
+
+  // Phone: the labels may wrap (the figures stay on one line) and the cells give
+  // up some of their 18/24px side padding. A Metrics table is 349px wide on one
+  // line, in a card 302px wide at 320px; wrapping alone left it 5px too wide.
+  @include media-queries.mq(xs, max) {
+    th {
+      white-space: normal;
+    }
+
+    th,
+    td {
+      padding-inline: var(--s2);
+
+      &:first-of-type {
+        padding-left: var(--s2);
+      }
+
+      &:last-of-type {
+        padding-right: var(--s2);
+      }
+    }
+  }
 }

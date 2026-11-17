@@ -9,6 +9,7 @@
       <mat-label>{{ T.F.TAG.FORM_BASIC.L_TITLE | translate }}</mat-label>
       <input
         [(ngModel)]="title"
+        (ngModelChange)="markEdited()"
         name="title"
         matInput
         required
@@ -45,7 +46,7 @@
     <input-color-picker
       [label]="T.F.TAG.FORM_BASIC.L_COLOR | translate"
       [value]="color"
-      (valueChange)="color = $event"
+      (valueChange)="color = $event; markEdited()"
     />
   </form>
 </mat-dialog-content>

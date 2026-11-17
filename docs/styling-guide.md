@@ -46,7 +46,7 @@ The accent is scarce on purpose.
 1. **Reuse before you create.** Look in `src/app/ui/` and `src/styles/components/` first. A near-fit is a reason to add a variant there, not a local copy.
 2. **A new page** uses the page wrappers and gutter ([Page layout](#page-layout)); **a new list** uses the task-row or flat-row pattern; **a new setting** uses the settings row; **a new empty state** uses `.empty-state`.
 3. **A new token or pattern is added once**, in `_css-variables.scss` or the shared layer, and documented in this file in the same change. Do not add a one-off value "for now".
-4. **Check the matrix** before calling a UI change done: light and dark, glass on and off (and reduced transparency), a window under 600px, a touch pointer (`(pointer: coarse)`), reduced motion, and a long title or a large list.
+4. **Check the matrix** before calling a UI change done: light and dark, glass on and off (and reduced transparency), a window under 600px and one between 600 and 960px (the compact shell), a short window (phone landscape, 740×360), a touch pointer (`(pointer: coarse)`), reduced motion, and a long title or a large list.
 5. **Task rows are a hot path.** Row heights are exactly 48px (title only) and 56px (with a meta line), and 56 and 60 on touch ([Touch scale](#touch-scale)); no template function calls in `task.component.*`.
 6. **Copy matters as much as spacing.** Labels are sentence case, buttons name their action ("Save", "Discard"), and every user-facing string goes through `en.json`.
 
@@ -56,7 +56,7 @@ The accent is scarce on purpose.
 | --------------------------------------------------- | --------------------------------------------------------------- |
 | `npm run lint:css-vars` (`tools/check-css-vars.js`) | A `var(--x)` whose `--x` can't reach the rule                   |
 | `npm run lint:scss` (stylelint, recommended-scss)   | SCSS syntax and basic errors; **not** hardcoded values          |
-| Review and the self-check below                     | Literal colours, spacing, radii, font sizes, durations, z-index |
+| Review and the self-checks below                    | Literal colours, spacing, radii, font sizes, durations, z-index |
 
 Nothing automated stops a hardcoded `16px` or `#fff`, so check your own diff:
 
@@ -67,6 +67,18 @@ git diff -U0 -- '*.scss' '*.html' | rg '^\+.*(#[0-9a-fA-F]{3,8}\b|\b[0-9.]+(px|r
 Every hit needs a token, or a comment saying why it is a deliberate layout
 dimension (a 1px hairline, a fixed illustration size). Positioning and layout
 (flexbox, grid, `position`, widths) may stay plain CSS.
+
+A breakpoint has one source ([Responsive Breakpoints](#responsive-breakpoints)),
+so a literal width in a media query, or a `var()` in its condition (which never
+matches), is a bug. List them with:
+
+```bash
+rg -n "@media[^{]*(max|min)-width:\s*(var\(|[0-9]+px)" src --glob '*.scss'
+```
+
+What it finds today is not a phone breakpoint: the iPad rules in `styles.scss`
+(1024 and 500px) and two content-width steps (the integrations grid and the habit
+grid, at 1000 and 800px).
 
 ## Rules
 
@@ -233,7 +245,11 @@ Rules that follow from this:
 - Write row heights, icon sizes and text through the tokens above. A literal `40px` or `20px` in component SCSS does not scale; it silently keeps the pointer size on a phone.
 - Rows that sit in the task column (the add-task row, repeat rows) derive their indent from `--task-icon-size`, so the "+" and the label stay on the cards' columns when the slot grows.
 - Text-entry fields were already 16/24 on touch; the rest of the UI now matches them, so a focused field no longer looks larger than the text around it.
-- The planner's week strip keeps its 40px row (`ROW_HEIGHT` is shared with the drag-to-expand math), but its month, weekday and day labels use the touch type sizes.
+- The planner's week strip keeps its 40px row (`ROW_HEIGHT` is shared with the drag-to-expand math), but its month, weekday and day labels use the touch type sizes. A day is a 40px hit box (`--ctl-md`, never taller than the row) with the 36px circle drawn inside it, and the strip's expand toggle is a 48px row.
+- The header's Play button is a mini FAB, which Material fixes at 40px. A FAB among icon buttons takes `class="mat-mini-fab-touch"` (`_overwrite-material.scss`) and follows `--icon-btn-size` (40px, 48px on touch).
+- The estimate on a task row is a full-height zone, 40px (`--ctl-md`) wide on touch (the digits alone measure 25–31px), and it stays on every row at every width.
+- A toggle in a form row switches from a tap anywhere on the row: its label's overlay covers the field box and the switch stays above the overlay, so the control a screen reader or a test finds by role is never covered. A toggle on its own (a plugin's) has a 48px touch target on touch. A boolean in Settings and in dialogs is one control, `mat-slide-toggle` (Glass appearance and Create project use it like Project settings), not a checkbox here and a toggle there.
+- Targets inside dialogs follow the scale too: calendar days and colour swatches 40px, the estimate dials' value inputs 40px, mention rows 48px.
 
 ### Layout
 
@@ -279,6 +295,9 @@ each commented in place.
 - **Buttons:** text, filled, outlined, raised and tonal buttons are 40px (`--ctl-md`). Add `class="mat-button-compact"` to a button, or to the row that holds them, for 32px buttons (40px on touch). Icon buttons are 40px round.
 - **Button toggles** (segmented controls) are 40px with `--r-md`.
 - **Menus:** the panel has 4px inner padding; items are 40px (48px under `(pointer: coarse)`), `--r-md`, with 12px insets and 20px icons. Dividers use `--palette-separator` with 4px above and below. Item rules are scoped to `.mat-mdc-menu-panel` because side-nav links also carry `.mat-mdc-menu-item`. Opt into a 320px panel with `class="mat-menu-wide"`.
+- **Which menu:** a popover for about seven rows or fewer on one level. On a phone, anything longer or nested is a bottom sheet with 48px rows and the drill-down inside the sheet (see [Bottom sheets](#bottom-sheets)); a cascade of panels over one another does not fit a phone. Sort, group and filter is that sheet (`task-view-customizer-sheet`), not three menus. The task menu (a swipe left on a touch screen) is not a sheet yet: its submenus and positioning would make that a rewrite of its navigation, so it is grouped and capped to the screen instead.
+- **Inside a menu:** rows are grouped by `<mat-divider>`, and a divider renders only where the group after it does. The destructive item is last, after a divider, in the warn role: `class="mat-menu-item-warn"` next to `mat-menu-item` (label and glyph in `--c-warn`). Key hints in a row (`.key-i`) carry `show-only-on-mouse-primary`, because a touch screen has no keyboard.
+- **A menu from a header button** that can be long takes `class="mat-menu-under-header"` on its `<mat-menu>`: the panel is held to the room under the header band (`--shell-inset-top`), scrolls inside it and keeps an 8px gutter from the screen edge.
 - **Select and autocomplete panels:** 4px inner padding, 40px options (48px on touch).
 - **Tooltips:** 12/16 type, `--r-sm`, and the inverse colour pair `--palette-tooltip-bg` / `--palette-tooltip-ink` (mapped in `_palette-theme.scss`), so a tooltip reads on any surface.
 
@@ -296,6 +315,9 @@ One field look for both appearances:
 
 - **Anatomy:** one `--dialog-gutter` (24px, 16px below 600px) insets title, content and actions. The title box is `24 24 12` around one 24px line (Material's 40px baseline strut is hidden); content is `24 24 16`; actions are `8 24 24`, with buttons 8px apart through the row's gap (also when they wrap). Title, `mat-dialog-content` and `mat-dialog-actions` are siblings: no dialog nests its actions in its content.
 - **Height:** the content scrolls between the pinned title and actions, so the actions never leave the screen. Material caps the content at 65vh, which is enough for most dialogs. One that needs the whole viewport (schedule, deadline) lifts that cap with `max-height: none` on `mat-dialog-content` and makes its host a flex column no taller than the viewport; the pane's own max-height does not reach the content.
+- **Height chain:** the pane's max-height is a length, `100vh` minus both safe-area insets (Material's `100%` is a percentage that the container and surface inheriting it cannot resolve, so a dialog ran past a short window and took its actions along). Title, content and actions are then flex items of the dialog surface, and the content is what shrinks. A `<form>` or `.dialog-help-wrapper` around them is `display: contents` (the form still submits), and a dialog component keeps Material's `display: contents` host: never set `:host { display }` on one (the schedule and deadline dialogs, which cap their own host as above, are the exception). Under 480px of window height the title and actions give back part of their padding, and the windowed notes editor under 400px of height drops its formatting toolbar and shows its title to assistive technology only.
+- **Unsaved changes:** create and edit dialogs (Create project, Create tag, Repeat, Sync config) call `useDiscardGuard(isDirty)` (`src/app/ui/dialog-discard-guard.util.ts`, with `useFormsDirty(...forms)`). While something is dirty, a tap on the backdrop, Escape and the Android Back button ask "You have unsaved changes. Discard them?" (**Keep editing** or **Discard**) instead of closing. Cancel and Save close as always, and a dialog nothing was typed in closes without asking. Back is answered through `setDialogBackHandler` (`src/app/ui/dialog-back-handler.util.ts`), which `AndroidBackButtonService` asks before it navigates.
+- **Text fields on a phone** tell the soft keyboard what they take. `getInputHintAttributes(type)` (`src/app/ui/formly-input-hints/input-hints.util.ts`) returns `inputmode`, `autocapitalize`, `autocorrect`, `spellcheck` and `enterkeyhint` for an input type. A formly extension applies it to every plain `input` field and `dialog-prompt` uses it; an address is `type: 'url'`, and a user name or folder path adds `LITERAL_INPUT_HINTS` (no capital, no correction, no spell check). `enterkeyhint` is `done`; a field followed by another in its form sets `next` itself, and a field's own `props.attributes` win.
 - **Markdown editors:** use `live-markdown-editor` with `[fillHeight]="true"` inside a bounded flex pane. CodeMirror then owns the text scrollbar; keep the formatting toolbar and dialog actions outside that scrolling area.
 - **Title:** every dialog has a visible `h2 mat-dialog-title` in the title role. It is also the dialog's accessible name. (`h1` belongs to the page.) A leading 20px icon is allowed only when it names the object type (repeat, sync). `dialog-confirm` shows `data.title`, or "Confirm"; `dialog-prompt` shows its plain `message` or the field's label.
 - **Help:** a dialog that needs help puts `<help-section>` in its content. Its button is a plain 40px icon button at the end of the title row, never a floating button over the corner.
@@ -316,7 +338,11 @@ bubbles. Use `delete` for recoverable deletion and `delete_forever` only for
 permanent deletion. Imports/uploads, downloads/exports and clipboard copies
 must follow the actual action direction.
 
-Every icon-only action needs a translated accessible name on its button. Keep
+Every icon-only action needs a translated accessible name on its button, and one
+whose action depends on state is named for what it does now: the header's Play
+reads "Start tracking time", "Resume tracking: {task}" or "Pause tracking:
+{task}", and a plugin's header, work-context and side-panel buttons carry the
+plugin's label (a side-panel toggle also `aria-pressed`). Keep
 visible labels when the icon alone cannot distinguish the meaning, such as
 Tomorrow, next week, energy levels, and timer controls with different scopes.
 Match repeated navigation icons through `NAV_SECTION_ICON`; use pure display
@@ -353,19 +379,42 @@ Rules:
 
 ## Phone shell
 
+The shell has three modes, each switched by one breakpoint
+([Responsive Breakpoints](#responsive-breakpoints)):
+
+- **Phone, below 600px** (`LayoutService.isXs`, `mq(xs, max)`): the floating bottom nav and the Browse drawer, described below.
+- **Compact, 600–959px** (`LayoutService.isCompactShell`, `mq(sm, max)`; landscape phones, small tablets, unfolded foldables, split-screen windows): the desktop header with a 56px rail for the side nav, and every right panel (task, notes, plugin panels) as a bottom sheet. An expanded 260px nav beside a side panel left a list column too narrow to read.
+- **Desktop, 960px and up:** the side nav, expanded or collapsed, and side panels.
+
+In the compact shell the rail is forced, whatever the saved choice says. The saved expanded state and width (`SUP_NAV_SIDEBAR_EXPANDED`, `SUP_NAV_SIDEBAR_WIDTH`) are never overwritten by it and are back when the window grows; expanding the rail there lasts for the session, and its resize handle is hidden. A panel that is open when the window crosses 960px moves to the other form (sheet or side column) and stays open.
+
 Below 600px the shell is two floating glass surfaces over a full-height page, as
 on iOS: the header and the bottom nav hover over the content, and what scrolls
 behind them is blurred.
 
 - **Header:** an overlay (`position: absolute` in `app.component.scss`), the same frosted frame as on desktop (`--glass-panel-bg`, `--glass-blur`). Its 56px band sits below the top safe area, and the glass itself runs to the screen edge behind the status bar, notch or Dynamic Island: the wrapper is `--shell-inset-top` tall (band + `--safe-area-top`) with that inset as top padding.
 - **Top safe area:** below 600px the page starts at the screen edge, so the native `body` reserves no top padding. `--body-inset-top` is that padding: `--safe-area-top` from 600px up, `0px` on a phone. Anything sized against the body's top padding (the app container, the iOS keyboard shell height) reads `--body-inset-top`; anything that must clear the cutout on a phone pads itself by `--safe-area-top` (the header, the Browse drawer, the full-width right panel). Never subtract the raw `--safe-area-top` for the body.
-- **Bottom nav:** a floating pill, `--r-full`, `--elev-2`, `--s` above the safe area and `--s2` from each side (at most 576px wide, centred). Exactly four labelled destinations: **Today, Upcoming, Inbox, Browse**. Each is a 24px icon over a one-line meta label in a 56px pill-shaped hit area; the open destination is the tonal "selected" role with a filled glyph. It has no add button and no per-user slot: **Browse** opens the side nav as the drawer, which also lists the right-panel toggles (Project Notes, Issue Provider Panel, plugin panels) that the header carries from 600px up. Upcoming is hidden when the Planner is switched off. Glass off gives the same pill with an opaque `--bottom-nav-bg`.
+- **Bottom nav:** a floating pill, `--r-full`, `--elev-2`, `--s` above the safe area and `--s2` from each side (at most 576px wide, centred). Exactly four labelled destinations: **Today, Upcoming, Inbox, Browse**. Each is a 24px icon over a one-line meta label in a 56px pill-shaped hit area; the open destination is the tonal "selected" role with a filled glyph. It has no add button and no per-user slot: **Browse** opens the side nav as the drawer, which also lists the right-panel toggles (Project Notes, Issue Provider Panel, plugin panels) that the header carries from 600px up. Upcoming is hidden when the Planner is switched off. Glass off gives the same pill with an opaque `--bottom-nav-bg`. **Browse** is the "you are here" mark on every page that is none of the three tabs (a project, a tag, Calendar, Boards, Habits, Search, History…) as well as while the drawer is open; its glyph is the drawer's `folder_open`. Tapping the tab of the page that is open scrolls that page back to the top (`LayoutService.scrollPageToTop()`, smooth unless reduced motion is on). With the soft keyboard up the pill and its scrim hide and `--shell-inset-bottom` is 0, so the page reclaims the strip (`body.isKeyboardVisible`, which the iOS and Android apps set; Android Chrome reports a hybrid device and never does). `.inset-scrim` is a solid `--bg` strip over `--safe-area-bottom` under the pill, so the end of a list does not show behind the gesture bar. Below 398px the labels lose their side padding and take the button's whole width, so "Upcoming" is not cut at 320px.
 - **Content:** a page's scroller pads itself by `--shell-inset-top` (band + top safe area) and `--shell-inset-bottom` so its first and last rows rest clear of both surfaces while the rest scrolls behind them. A page that is the scroller (secondary pages) gets this from `.route-wrapper > router-outlet + *` in `app.component.scss`; a page that scrolls an inner element pads that element and is excluded there (the work-view `.today`, the planner's `planner-plan-view`, the search page's results). A new page either is its own scroller or pads its inner one; it never adds its own bottom space for the nav.
-- **Browse drawer:** full screen (`width: 100%`, from the screen edge, padded by `--safe-area-top` so the brand row and Close clear the cutout, sliding in from the right, closed with its Close button or a swipe right), solid by design. The destinations the bar and Settings already reach are not repeated in it. It leaves out Today, Inbox and Upcoming (bar), Plugins & integrations and Account (rows at the end of Settings' category list) and Support us (an entry in Help); it adds the right-panel toggles. A nav item flagged `desktopOnly` is skipped on a phone, one flagged `mobileOnly` is skipped above it; `MagicSideNavComponent.navigationItems` applies both, also to a menu's children, and drops any separator the hiding leaves first, last or doubled. The Projects and Tags headers keep only their "+" on a phone and put the other tools (show/hide, new folder) behind a ⋯ menu.
+- **Snackbar:** it floats 32px above the pill whatever the bottom inset (`--snack-pill-inset` is the nav's safe-area share in the web shell and 0 in the native one, whose overlay wrapper already pads by the inset; counting it twice floated the snackbar 56, 66 and 80px high at insets of 24, 34 and 48px).
+- **Browse drawer:** full screen (`width: 100%`, from the screen edge, sliding in from the right, closed with its Close button or a swipe right), solid by design. It is one scroll between two sticky bars, each carrying its own safe-area inset: the header (`.nav-header`, brand and Close) sticks to the top with `--safe-area-top`, so Close never scrolls away and clears the cutout, and the footer (`.drawer-footer`, Help and Settings) sticks to the bottom with `--safe-area-bottom`. The list between them is as tall as its rows: no strip is kept for the pill that the drawer covers. The first time it opens under touch with a project or tag in it, one line says "Press and hold a project or tag for its menu" (`.drawer-hint`, shown once: `SUP_NAV_ROW_MENU_HINT_SEEN`, device-local), and a row is marked while its menu is open. The destinations the bar and Settings already reach are not repeated in it. It leaves out Today, Inbox and Upcoming (bar), Plugins & integrations and Account (rows at the end of Settings' category list) and Support us (an entry in Help); it adds the right-panel toggles ("Notes" on Today and tags, "Project Notes" on a project). A nav item flagged `desktopOnly` (Help › keyboard navigation) is skipped on a phone, one flagged `mobileOnly` is skipped above it, and one flagged `pinBottom` (Help, Settings) moves to the footer on a phone and stays in the list elsewhere; `MagicSideNavComponent.navigationItems` applies the first two, also to a menu's children, and drops any separator the hiding leaves first, last or doubled. A keyboard hint (the Ctrl+F chip on Search) is hidden on touch with `show-only-on-mouse-primary`. The Projects and Tags headers keep only their "+" on a phone and put the other tools (show/hide, new folder) behind a ⋯ menu.
 - **Header:** the sync icon shows on every screen size once sync is on and a provider is chosen, even if that provider needs attention (so an error stays visible and the icon is the way to fix it); before that there is no icon. Setting it up lives under Account (a row at the end of Settings on a phone) and in Search as **Set up sync**.
-- **Today:** the time summary row appears only when time has been worked or tasks are planned for today, never for overdue tasks' estimates alone.
+- **Page options:** below 600px the header's ⋮, its sort/filter button and its Project view button are one ⋮ (`page-options-menu`), because three controls beside the title left a project name 0px wide at 360px. The menu lists the project's layouts (a project's task page; the current one is marked), then **Sort, group and filter** (a task list page: a row with a count of what is on and a chevron, which opens the [bottom sheet](#bottom-sheets)), a divider, then the work-context items (grouped by dividers, Delete last). A dot on the button, and the name "Page options (sort, group or filter is on)", say that a sort, group or filter is on. From 600px up the three separate buttons stay. The title keeps a floor of 8ch below 600px (`--header-title-text-min`; 6ch from 600px up) and never collapses to its icon: what the row cannot seat scrolls under the fade (#9480) instead. History, Metrics and Daily summary name themselves in the header, with the icon of their page and the context as a muted suffix ("History · Work").
+- **Tracked task:** below 600px the tracked-task pill is a one-line chip (`.is-phone-chip`, at most 60% wide, a 40px tap target that opens the task). It hangs under the header band at the end of the row, so the glass stays 56px, and it can cover the first row at the right edge.
+- **Today:** the time summary row appears only when time has been worked or tasks are planned for today, never for overdue tasks' estimates alone. On a phone the remaining estimate ends in "left" (the long label is hidden there) and the worked-today figure is left out while it is 0.
+- **Add task row:** below 600px each list's inline "Add task" row (`add-task-inline.pin-above-nav`) is `position: sticky` above the nav (`bottom: var(--s)`, `z-index: var(--z-pinned-add-row)`) while its natural place at the end of a long list is off screen; on screen it sits in the list as usual, so a short list is unchanged. It gets a card surface (`--card-bg`, `--elev-1`) only while pinned (`@container scroll-state(stuck: bottom)`; a browser without scroll-state queries keeps the surface on). With sections, each section pins its own row only while that section is at the bottom of the screen. It is the existing row made reachable, not a second capture control.
+- **Route changes:** the page transition is skipped on a phone and whenever the list being left or entered has more than 40 rows (`ROUTE_ANIMATION_MAX_ROWS`). It is a `skip` parameter of the `warpRoute` state binding, not `[@.disabled]`, so animations inside the page and the daily-summary warp keep running; a small list on desktop still animates.
 - Both insets are 0 from 600px up, so the same rules are inert on desktop.
 - The header's banner row stays inside the header, so a banner covers the first rows while it is shown.
+
+### Bottom sheets
+
+The right panel's content (task details, notes, plugin panels, Sort, group and filter) opens as a bottom sheet (`.bottom-panel-sheet`, `BottomPanelContainerComponent`) below 960px, and so does Upcoming's Unscheduled list on a phone.
+
+- The sheet pads its bottom by `--safe-area-bottom` (`_bottom-panel.scss`), so the last row is not behind the gesture or three-button bar. It is border-box: its height stays as set and the content gives the inset up.
+- It opens at a share of the viewport height by content: task 0.6, notes 0.6, Sort, group and filter 0.6 (the list above it stays in view to show the choice applied), anything else 0.9 (`getInitialBottomPanelHeightRatio`). The height is set in pixels when it opens, so it is set again when the width changes (a rotation).
+- **Sort, group and filter** (`task-view-customizer-sheet`) is a root of three 48px rows that show what each is set to, with **Reset all**. Sort and Group are radio lists, Filter goes in two steps (the kind, then its values), and a tag or project is typed in a field at the top of the list and applies live. A choice goes back to the root and the header's arrow goes up one level; the system Back closes the whole sheet.
+- **Unscheduled** (`UNSCHEDULED`; phone only, asked for through the sheet's data and never derived from state) is the planner panel's rows without card chrome: 48px hairline rows, the Schedule button always shown, no drag. It opens from the Unscheduled chip in Upcoming's calendar strip and from Calendar's empty-week "Plan unscheduled tasks"; dragging a task onto a day stays a desktop gesture.
 
 ## Page layout
 
@@ -374,9 +423,20 @@ Secondary pages (Habits, Recurring tasks, Archived projects, Metrics, Worklog an
 - **Secondary-page column:** `.page-wrapper` puts the content at the page gutter (`--page-gutter`, the header title's left edge), 16px from the top and 72px from the bottom (16px on a phone, where the scroller already pads clear of the floating nav). `.component-wrapper` caps it at `--component-max-width` and stays aligned to the page gutter.
 - **Task lists:** `.task-list-wrapper` centres the bounded task column within its available pane, with equal inline margins. The summary, sections, task cards, add row and Finish Day align inside that column. Opening a side panel recentres the column within the remaining workspace; narrow screens keep the normal page gutters. Subtasks retain their indentation.
 - **Canvas pages** (Planner, Schedule, Boards) span the width and use the same gutter: day columns, the schedule toolbar and the board tabs and panels start at `--page-gutter`.
-- **Planner empty days** are a dashed drop zone (`--divider-color`, `--r-md`), not a repeated "No tasks" line (a visually hidden one remains). A day's Add button shows on hover or focus where a pointer can reveal it, and stays visible on touch; on a phone an empty day is a one-line header over a slim zone. The unscheduled-tasks panel beside the days is a card (`--card-bg`, `--palette-border`) of flat 40px rows with one hover/focus-revealed Schedule button each; its open state and project filter are device-local (`LS.PLANNER_UNSCHEDULED_*`).
+- **Planner empty days** are a dashed drop zone (`--divider-color`, `--r-md`), not a repeated "No tasks" line (a visually hidden one remains). A day's Add button shows on hover or focus where a pointer can reveal it, and stays visible on touch; on a phone an empty day is a one-line header over a slim zone. The unscheduled-tasks panel beside the days is a card (`--card-bg`, `--palette-border`) of flat 40px rows with one hover/focus-revealed Schedule button each; its open state and project filter are device-local (`LS.PLANNER_UNSCHEDULED_*`). On a phone the same list is a [bottom sheet](#bottom-sheets).
 - **No second page title.** The shell header names the page. Sections inside a report use the title role (`--type-title`), then the heading role (`--type-heading`); no centred headings. Report tables are `--r-md` hairline cards (`.material-table`), never shadowed.
-- **Empty states** are one layout, `.empty-state` (`src/styles/components/_empty-state.scss`): on the column's start edge, an optional 24px muted icon, one line of muted body text (a heading line may lead it) and at most one action. `<p class="empty-state">text</p>` is the text-only form.
+- **Empty states** are one layout, `.empty-state` (`src/styles/components/_empty-state.scss`): on the column's start edge, an optional 24px muted icon, one line of muted body text (a heading line may lead it) and at most one action. `<p class="empty-state">text</p>` is the text-only form. A page that has nothing yet shows only that: Integrations without a connection is one `.empty-state` with a **Connect** button, and its filters, toolbar, selection bar and side cards come with the first provider; a provider with no matching task shows plain `.empty-state` text.
+
+### Screens on a narrow page
+
+- **Schedule:** the toolbar is two rows when the page container (`@container main-content`) is under 600px, whatever the window (a desktop window narrowed by the sidebar or a side panel gets it too): the title on its own line in `--type-body-strong`, always in its full form ("Week 46 · Nov 15 – 21"), with the calendar filter at its end, then the view switch (which never shrinks) and the date arrows. On a phone (`isXs`) a month cell is one tap target that opens that day in the day view: up to three dots (hollow for a repeat that has no task yet) and the "+N" count in the cell header, named by its date and event count. Under touch intent the create row says "Tap to add a task" and the Ctrl+1 hint is not shown.
+- **Habits:** below 600px a habit is two lines: the icon and the name in `--type-body-strong`, then seven equal day cells with 48px targets under a weekday header on the same columns. The drag preview is a card (`--card-bg`, `--elev-2`) with the same two lines.
+- **Boards:** the column count follows the page container, not the window (`auto-fill` columns of at least 18rem), so beside the sidebar or a side panel a two-column board drops to one column instead of cutting the second off. Below 600px the panels stack and the board is the only scroller: a panel is as tall as its tasks, so a swipe on a task never scrolls an inner list first.
+- **Focus mode on a short window:** under 500px of height the close label becomes an icon and, from 600px wide, the mode selector gets its own row (below 600px it already has one), so it no longer paints over the task button. Under 420px of height the play button and the rocket are 56px and, from 600px wide, so are the top and bottom rows. Segment labels drop to `--type-meta` at 397px and narrower, so "Countdown" stays on one line.
+- **Review tables** (`.material-table`: Daily summary, Metrics, History) are hairline cards, never shadowed. On a phone their headers wrap and their cells pad `--s2`. The Daily summary's task table is a card of two-line rows instead of a sideways scroller: each cell carries `data-label` and shows it through `::before`, the header row stays for assistive technology only, and the total-spent column is dropped. The same page shows its figures as one three-column strip and its habit counters as a row of chips, and **Finish the day** is `position: sticky` above the nav (`--z-pinned-add-row`; static while the keyboard is up).
+- **First-run welcome:** a flex column capped to the viewport minus both safe-area insets (a `vh` line, then `dvh`). The header and the footer stay put and the choices scroll between them, so Continue and Skip are never below the fold. A tip that points into a task list (`isWorkViewOnly` on its step) shows only on a page that has one: Today, a project or a tag.
+- **Upcoming's calendar strip:** its foot is a 48px toggle row (a chevron button with `aria-expanded` and "Collapse calendar" / "Expand calendar"; a tap toggles it and a drag from it still resizes the grid) with the labelled Unscheduled chip at its end. Expanded, the strip is named by the dates it spans ("Nov 9 – Dec 20, 2026"). On a phone the overdue block ("From previous days") is one disclosure line with the count and an **Add to Today** action; its rows open on a tap. The strip measures from a `ResizeObserver` callback: a synchronous read forced a layout of the page being left.
+- **No tooltip on touch:** an icon-only action that has no other route is a text button on a phone (Archived projects: **Restore** or **Reopen**).
 
 ## Callouts (info / warning / danger / success)
 
@@ -412,7 +472,9 @@ on the wrap.
 
 Sibling: `.info-panel` (`_info-panel.scss`) is the same idea for
 formly-generated markup, where no icon element can be added and the glyph has to
-come from a `::before`.
+come from a `::before`. Its warning tone is `info-panel--warning` (the generic
+WebDAV and local-folder notes of the sync forms use it; the old local
+`.sync-warning` box is gone).
 
 ## Key Files
 
@@ -434,8 +496,40 @@ come from a `::before`.
 
 Settings opens in a centered dialog over a dimmed, blurred workspace on desktop.
 Use labeled category navigation on the left: 40px rows, the open category in the
-tonal "selected" role like the side nav's active row. On small screens, show the
-category list first and provide a Back action within the selected category.
+tonal "selected" role like the side nav's active row. On small screens it is a
+full-screen drill-down, described next.
+
+Settings and Plugins & integrations are that drill-down (the category list, then
+one category at a time) below the `xs` breakpoint, where the shell is a phone, and
+in a short touch window (`mq-short-touch`: `(max-height: 500px) and (pointer:
+coarse)`, a phone in landscape or with the keyboard up, where the two-pane window
+left 131px of content). `mq-drill-down` is both; `ConfigPageComponent` asks the
+same question in TypeScript (`isDrillDown`, `SHORT_TOUCH_MEDIA_QUERY`), so keep
+the two in step. Exactly 600px is the two-pane window, like 601px. In the
+drill-down:
+
+- The window header names the open category, so the page does not repeat its title,
+  and it is the way back: an arrow before the title, one step (the close button
+  still closes the whole window). The open category and the divider are drawn in
+  the two-pane window only.
+- Opening a category pushes a history entry (`HISTORY_STATE.SETTINGS_CATEGORY`),
+  so the system Back returns to the list first and only then closes the window.
+  Any other navigation under an open Settings closes it.
+- The footer is gone (About holds its links). A short window also has a 56px header
+  and carries the search field in the header, on the list.
+
+The categories come from content (`getSettingsCategories`), not from one fixed
+list. Keyboard shortcuts is listed only where there is a keyboard form section
+(not in the Android app) and not on a touch-only phone, where a soft keyboard
+cannot fill the key-capture fields. **About** (the version, tap to copy; the
+changelog; the update check; the logs; the privacy policy) is listed only in the
+drill-down, where the footer that holds them is gone, and reuses the footer's
+handlers. A section that needs the desktop app or the browser extension (Idle
+handling) is hidden whole on a phone or tablet (`isHideForMobile`) instead of
+showing a paragraph about an extension. A row that opens something (the About
+page's changelog, logs and privacy policy) is `.settings-link-row`
+(`_settings.scss`): the field-height bordered row with the label first, an
+optional muted value and a trailing glyph.
 
 The window header is 64px: the title role, a 40px close button, a hairline below.
 Everything in the content starts at one left edge: the category title (title
@@ -450,8 +544,11 @@ Group controls with headings and whitespace. Reserve bordered surfaces for
 self-contained information such as sync status.
 
 Each option has a separate question-mark button at the trailing edge of its row.
-Use the shared `setting-help` component for generated and custom controls. Help
-opens on hover, keyboard focus, or click and fades away when the pointer leaves.
+Use the shared `setting-help` component for generated and custom controls. With a
+mouse or the keyboard, help opens on hover, focus or click as a tooltip and fades
+away when the pointer leaves. On touch nothing holds a tooltip open, so a tap
+toggles the same text as a card under the row (`.setting-help-card`, spanning the
+row, with `aria-expanded` and no timer) and a second tap closes it.
 The button must have its own hit area and an accessible name identifying the
 option. Tooltips explain the effect of a choice. Required formats, validation
 errors, and destructive consequences stay visible alongside the control.
@@ -464,7 +561,11 @@ The Plugins & integrations window separates Installed from Discover. Keep search
 type filters, and page navigation outside the scrolling results. Use compact rows
 for installed items, with secondary metadata in Details, and a responsive grid for
 discovery. Render at most 24 results per page; reset to page one after a search or
-filter changes. Empty results must offer a way to clear filters.
+filter changes. Empty results must offer a way to clear filters. The window is
+titled "Plugins & integrations" wherever it is entered, "Choose plugin file" is a
+flat button, and in a short touch window (which cannot spare a pinned 155px
+toolbar) the toolbar is one row, wrapping where it is narrow, that scrolls away
+with the results.
 
 ## Glass surfaces
 
@@ -472,17 +573,18 @@ With Glass appearance on (Settings → General → Appearance) the window reads 
 pane of glass in three tiers. All values come from `_glass.scss` and the palette
 normaliser, never from component SCSS.
 
-| Tier    | Surfaces                                                  | Tint alpha (design) | Blur                      |
-| ------- | --------------------------------------------------------- | ------------------- | ------------------------- |
-| Frame   | Side nav, header, right panels, the phone's floating nav  | 75%                 | `--glass-blur` (20px)     |
-| Canvas  | The content sheet behind the task list (`.route-wrapper`) | 84%                 | same, on the wrapper only |
-| Overlay | Full-width phone right panel (the phone drawer is solid)  | 95%                 | none                      |
+| Tier    | Surfaces                                                  | Tint alpha (design) | Blur                  |
+| ------- | --------------------------------------------------------- | ------------------- | --------------------- |
+| Frame   | Side nav, header, right panels, the phone's floating nav  | 75%                 | `--glass-blur` (20px) |
+| Canvas  | The content sheet behind the task list (`.route-wrapper`) | 84%                 | none, tint only       |
+| Overlay | Full-width phone right panel (the phone drawer is solid)  | 95%                 | none                  |
 
 - The canvas sits one step denser than the frame around it, so the focus area stands out while the frame stays see-through.
+- **Only the frame blurs:** the side nav, the header, the right panel and the phone's pill. Behind the canvas is the drawn backdrop, already blurred into a small canvas, so a live blur there changed at most 3/255 per channel and was about half of the GPU work of the phone's three blur layers. The sheet is `contain: layout` instead (glass on only), which keeps what the blur used to give it: it is the containing block of `position: fixed` descendants, so the multi-select bar centres on the content column and not on the window, and a stacking context, so their z-index stays scoped. `container-type` (the sheet is the `main-content` container) does neither in current Chromium. Keep `backdrop-filter` off the sheet and off the routed page inside it.
 - **Opaque on purpose:** task cards, dialogs, menus, popovers and the add-task bar. Content the user reads and edits never sits on a translucent fill.
 - **Alpha is `max(design value, contrast floor)`.** The floor keeps body and muted text readable over a worst-case backdrop (the ink colour pulled 35% toward the background; see [theming-contract.md](theming-contract.md#glass-roles)). Do not lower an alpha in a component; change the design value and re-run `palette-normalize.util.spec.ts`.
-- **Blur never animates.** Put `backdrop-filter` on the static wrapper, not on a routed page, a drawer or anything inside a route transition, and never on the `magic-side-nav` host (see the `magic-side-nav` rule near the end of this guide).
-- **Fallbacks:** reduced transparency, forced colours and `st-solid` make every tier opaque; a browser without `backdrop-filter` gets the overlay alpha.
+- **Blur never animates.** Put `backdrop-filter` on a static frame surface, not on the content sheet, a routed page, a drawer or anything inside a route transition, and never on the `magic-side-nav` host (see the `magic-side-nav` rule near the end of this guide).
+- **Fallbacks:** reduced transparency, forced colours and `st-solid` make every tier opaque; a browser without `backdrop-filter` gets the overlay alpha. Without `color-mix()` (an Android WebView below Chromium 111) the three glass tokens would be invalid and every surface would compute transparent under its blur, so they become `var(--bg)` and the frame drops its blur.
 - **Windows window controls** are drawn by the OS over the top-right corner and can't show CSS. The renderer sends the frame tint and alpha to the main process (`updateTitleBarDarkMode(isDark, overlayColor)`), and the control band is `WCO_HEIGHT` (56px, the header height) so the glyphs share the header's centre line. Keep both in step with the header if either changes.
 
 ## Colour
@@ -526,9 +628,9 @@ Mixins are in `src/styles/mixins/_theming.scss`.
 
 ## Popups, search and descriptions
 
-- **Popups over the page** (global search, the description editor) are Material dialogs: opaque surface, `--r-lg`, `--elev-2`, one of the dialog sizes. The search popup uses the Settings window's surface (`.search-popup`, `settings-backdrop`), `dialogSize('l')` and sits near the top; Escape closes it and so does picking a result. The search page is shared with the phone route, so it takes an `isPopup` input rather than a second copy.
+- **Popups over the page** (global search, the description editor) are Material dialogs: opaque surface, `--r-lg`, `--elev-2`, one of the dialog sizes. The search popup uses the Settings window's surface (`.search-popup`, `settings-backdrop`), `dialogSize('l')` and sits near the top; Escape closes it and so does picking a result. The search page is shared with the phone route, so it takes an `isPopup` input rather than a second copy. With nothing typed it lists **Actions** before **Go to** (a typed query keeps Go to first, as Enter opens the first match); under touch it does not focus its field on opening, so the keyboard does not cover the list, and its shortcut chips and cheat-sheet row are not shown.
 - **Save / Discard dialogs** write nothing until Save. Discard, Escape and the backdrop leave the data as it was; Save is the single filled button, disabled until something changed.
-- **Task description** is the task's `notes` field. On the row it is one muted `--type-meta` line after the last tag, cut with an ellipsis where the row runs out; the full text is in a multi-line tooltip (`matTooltipClass="task-description-tooltip"`, defined once in `_overwrite-material.scss`). It adds no height: the row stays 56px.
+- **Task description** is the task's `notes` field. On the row it is one muted `--type-meta` line after the last tag, cut with an ellipsis where the row runs out; the full text is in a multi-line tooltip (`matTooltipClass="task-description-tooltip"`, defined once in `_overwrite-material.scss`). It adds no height: the row stays 56px. In the task panel (the phone sheet and the side panel alike) the Description opens folded when the task has no notes, so the fields below it stay in view and its editor is only created when it opens; a task with notes opens it expanded. The Notes target, **Add description** and a tap on its header open it.
 - **Add actions** live where the thing is added: the inline "Add task" row in each list or section. The header has no global "+" and neither has the phone's bottom nav; quick capture is Shift+A.
 - **One list, many destinations:** a picker that can target a project or a section lists projects in tree order with their sections indented beneath, led by a dash. The current location is shown and disabled.
 
@@ -571,9 +673,34 @@ Row states each have one channel:
 | Tracked (the current task) | an accent edge: the card border becomes `--palette-accent-text`; no tint, no shadow. A subtask shows only its play indicator          |
 | Multi-selected             | `--task-c-multi-selected-bg` tint plus a 1px accent outline                                                                           |
 | Keyboard focus             | a `--focus-ring-width` (2px) `--focus-ring` outline, no tint                                                                          |
+| Done                       | the title struck through and the line in `--text-color-muted`: muted ink, never opacity                                               |
 
 A tracked task is deliberately not tinted, so it never looks like the one open in
 the panel. The planner marks its tracked row the same way.
+
+A done row is quieter, not faint: the strike-through and the muted ink replace
+the old 30% opacity, which left the title at 2.1:1 and the tags at 1.6:1 in light.
+Planner rows and the priority icon still dim with `--task-is-done-dim-opacity`.
+
+The estimate stays on every row at every width, with a 40px tap zone on touch (it
+used to vanish in a main column of 352px or less). The date, deadline and count
+chips sit `--task-badge-offset` below the centre of their icon button, 10px and
+14px below 600px, so a deadline flag still reads as a flag.
+
+**Long lists skip the rows that are off screen.** `_ultra-tasks.scss` gives a
+list's own rows (`.task-list-wrapper task`, not subtasks) `content-visibility:
+auto` with `contain-intrinsic-size: auto <estimate>`, in an `@supports` for both
+properties: an engine that knows the first but not `auto` in the second would
+collapse a skipped row to nothing. The estimate (`--task-row-estimate`) is a
+typical one-line row less its two borders, which the intrinsic size does not
+include: 54px, and 58px on touch, for rows of 56 and 60px, so the scroll height
+moves little when the real heights replace it. A row that is animating
+(`.ng-animating`) is excluded: the list's enter animation starts every new row at
+`height: 0`, and a row skipped in that state remembers a 2px box for good.
+Containment clips what paints outside a row, so nothing may: draw focus and
+highlight outlines inset (a negative `outline-offset`, as the search highlight
+does). A search or jump to a row far down keeps it centred while the rows above
+it, still estimates, are rendered (`keepCentered`).
 
 Section headings in task lists (`collapsible.task-section`, including user-made
 sections) are a 32px (`--ctl-sm`) type-only row in `--type-label` with
@@ -625,7 +752,7 @@ both together.
 
 - When migrating hardcoded durations, pick the nearest bucket; up to ~15% drift is acceptable.
 - Under touch intent (`body.isTouchPrimary`) the `-s` and `-m` durations are shorter.
-- **Ordinary view switches** fade and scale slightly (the new page settles in from 1.04, the old one leaves toward 1.02). The large "warp" is for the daily summary only.
+- **Ordinary view switches** fade and scale slightly (the new page settles in from 1.04, the old one leaves toward 1.02). The large "warp" is for the daily summary only. A phone, and a switch to or from a list of more than 40 rows, skip the transition ([Phone shell](#phone-shell)).
 - **Reduced motion:** animations are off when the in-app "Disable all animations" setting is on or the OS asks for reduced motion (`isAnimationDisabled`). The app follows the OS setting; it does not override it. New CSS animations need no extra work (`body.isDisableAnimations` zeroes them); JS timers that wait for an animation must use the same flag.
 - Code that waits on a duration (the side nav's width collapse, the header's reveal pin) must be at least as long as the token it waits for; check those constants when you change a duration.
 
@@ -662,6 +789,7 @@ utility class from `util.scss`, which applies an `outline` on `:focus-visible` o
 | `--z-check-done`        | 11    | Task done checkbox        |
 | `--z-main-header`       | 12    | Main header               |
 | `--z-task-title-focus`  | 32    | Focused task title        |
+| `--z-pinned-add-row`    | 40    | Pinned Add task row       |
 | `--z-multi-select-bar`  | 45    | Multi-select action bar   |
 | `--z-mobile-bottom-nav` | 50    | Phone floating navigation |
 | `--z-side-nav`          | 60    | Side navigation           |
@@ -676,7 +804,7 @@ the add-task bar.
 
 ## Responsive Breakpoints
 
-Available as CSS vars (`--layout-xxxs` through `--layout-xl`) and as SCSS variables and mixins in `src/styles/mixins/_media-queries.scss`:
+Available as CSS vars (`--layout-xxxs` through `--layout-xl`) and as SCSS variables and mixins in `src/styles/mixins/_media-queries.scss`. A media condition cannot read a CSS var, so `@media` always goes through `mq()`:
 
 | Breakpoint | Value  |
 | ---------- | ------ |
@@ -688,9 +816,39 @@ Available as CSS vars (`--layout-xxxs` through `--layout-xl`) and as SCSS variab
 | `lg`       | 1920px |
 | `xl`       | 2000px |
 
-Device input is a separate axis: use `(pointer: coarse)` for touch hit areas and
-field sizes (the scale does), and the `isTouchPrimary` / `isMousePrimary` body
-classes for behaviour that follows the current input intent.
+**One source for the shell.** `xs` (600px) splits the phone from everything wider
+and `sm` (960px) splits the compact shell from desktop ([Phone shell](#phone-shell)).
+In SCSS they are `mq(xs, max)` and `mq(sm, max)`; in TypeScript
+`LayoutService.isXs` and `LayoutService.isCompactShell`, which are exactly those
+two queries (`(max-width: 599px)` and `(max-width: 959px)`). Write
+`@include mq(xs, max) { … }`, never `@media (max-width: 599px)` or `600px`: with a
+600px rule beside a 599px shell, Settings was a full-screen drill-down at exactly
+600px and a two-pane dialog at 601px. A `var()` in a media condition
+(`@media (min-width: var(--layout-xs))`) never matches. A short touch window
+(`mq-short-touch` in SCSS, `SHORT_TOUCH_MEDIA_QUERY` in TypeScript) is the one
+other question asked in both languages: keep the two in step by hand.
+
+Device input is a separate axis:
+
+- Use `(pointer: coarse)` for touch hit areas and field sizes (the scale does) and
+  `(hover: none)` for what only a pointer can reveal. The `isTouchPrimary` /
+  `isMousePrimary` body classes follow the current input intent, so they also hold
+  on a phone's browser and on a hybrid device.
+- Do not use `.isTouchOnly` or `.isNoTouchOnly` (nor the `touchOnlyDevice` and
+  `noTouchOnly` mixins) in new code. They are reliable only in the Capacitor build:
+  a phone's browser or an installed PWA, which the detection library calls
+  "hybrid", never gets `.isTouchOnly`. A few older rules still use them.
+- A hover affordance goes under `@media (hover: hover)` (the `hoverWithPointer`
+  and `interactiveHighlight` mixins do it), with `:focus-visible` as its own rule:
+  a finger leaves `:hover` on the last element it touched, so an ungated rule
+  stays on until the next tap elsewhere.
+- A hint that is only for a keyboard (a shortcut chip, "Ctrl+Enter" in a
+  placeholder) takes `show-only-on-mouse-primary`, or an `isTouchActive()` check
+  where the text itself changes. `show-only-on-touch-primary` is its opposite.
+- A `100dvh` has a `100vh` line before it: a WebView older than Chrome 108 drops
+  a declaration it does not understand. `viewportHeight()` and
+  `dialogWindowHeight()` (`src/app/ui/dialog-size.util.ts`) do the same for a
+  height that TypeScript sets.
 
 ## Utility Classes
 

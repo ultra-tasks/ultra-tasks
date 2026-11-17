@@ -88,6 +88,8 @@ import { BodyClass } from '../../../app.constants';
 import { DEFAULT_GLOBAL_CONFIG } from '../../config/default-global-config.const';
 import { Store } from '@ngrx/store';
 import { PlannerActions } from '../../planner/store/planner.actions';
+import { selectEnabledIssueProviders } from '../../issue/store/issue-provider.selectors';
+import { isTouchActive } from '../../../util/input-intent';
 import { DateService } from '../../../core/date/date.service';
 import { MenuTreeService } from '../../menu-tree/menu-tree.service';
 import { SelectOptionRowComponent } from '../../../ui/select-option-row/select-option-row.component';
@@ -185,6 +187,17 @@ export class AddTaskBarComponent implements AfterViewInit, OnInit, OnDestroy {
   );
   isAddToBacklog = signal(false);
   isSearchMode = signal(false);
+  // The search toggle looks for issues (and tasks from the archive and other
+  // lists): without an issue provider a phone has no use for one more unlabeled
+  // icon at the start of the strip (see the template).
+  readonly hasIssueProvider = toSignal(
+    this._store
+      .select(selectEnabledIssueProviders)
+      .pipe(map((providers) => providers.length > 0)),
+    { initialValue: false },
+  );
+  // Hints that name a keyboard shortcut stay off a touch screen.
+  protected readonly isTouchActive = isTouchActive;
   isSearchLoading = signal(false);
   activatedSuggestion$ = new BehaviorSubject<AddTaskSuggestion | null>(null);
   isMentionListShown = signal(false);

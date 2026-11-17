@@ -238,7 +238,7 @@ body {
 
   // Phone: the routed page's scroller already pads itself clear of the floating
   // header and nav (--shell-inset-*), so the wrapper only needs normal air.
-  @media (max-width: 599px) {
+  @include media-queries.mq(xs, max) {
     padding-bottom: var(--s2);
   }
 }

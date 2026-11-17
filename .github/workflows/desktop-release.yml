@@ -6,8 +6,17 @@ on:
         description: Build, sign, notarize and verify only the macOS packages. No validation, tag or release.
         type: boolean
         default: false
+      publish_release:
+        description: Publish after validation and packaging. Disable to review all platform artifacts first.
+        type: boolean
+        default: true
 permissions:
   contents: read
+env:
+  GITHUB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITHUB_CLIENT_ID }}
+  GITLAB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITLAB_CLIENT_ID }}
+  LINEAR_OAUTH_CLIENT_ID: ${{ vars.OAUTH_LINEAR_CLIENT_ID }}
+  TRELLO_OAUTH_CLIENT_ID: ${{ vars.OAUTH_TRELLO_CLIENT_ID }}
 concurrency:
   group: desktop-github-release
   cancel-in-progress: false
@@ -217,7 +226,7 @@ jobs:
             .tmp/app-builds/*.rpm
           if-no-files-found: error
   publish:
-    if: ${{ !inputs.dry_run }}
+    if: ${{ !inputs.dry_run && inputs.publish_release }}
     needs: [validate, package]
     runs-on: ubuntu-latest
     permissions:
@@ -238,6 +247,7 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           TAG="ultra-tasks-v${VERSION}"
+          PRERELEASE=$(node -p "require('./tools/release-version').getReleaseInfo('ultra-tasks-v'+require('./package.json').version).prerelease")
           test "$(find downloads -name '*.exe' | wc -l)" -eq 2
           test "$(find downloads -name '*.dmg' | wc -l)" -eq 3
           test "$(find downloads -name '*.zip' | wc -l)" -eq 2
@@ -247,5 +257,9 @@ jobs:
           (cd downloads && sha256sum * > SHA256SUMS.txt)
           # GITHUB_TOKEN deliberately prevents inherited tag/release workflows
           # from submitting this GitHub-only release to upstream stores.
-          gh release create "$TAG" downloads/* --target "$GITHUB_SHA" --title "Ultra Tasks ${VERSION}" --notes-file build/desktop-release-notes.md --draft
-          gh release edit "$TAG" --draft=false --latest
+          gh release create "$TAG" downloads/* --target "$GITHUB_SHA" --title "Ultra Tasks ${VERSION}" --notes-file build/desktop-release-notes.md --draft --prerelease="$PRERELEASE"
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$TAG" --draft=false --latest=false
+          else
+            gh release edit "$TAG" --draft=false --latest
+          fi

@@ -206,9 +206,11 @@
           <mat-icon>table_chart</mat-icon>
         </button>
 
-        <span class="toolbar-divider"></span>
+        <!-- Keyboard shortcuts are a keyboard thing: not shown on touch. -->
+        <span class="toolbar-divider show-only-on-mouse-primary"></span>
 
         <button
+          class="show-only-on-mouse-primary"
           mat-icon-button
           matTooltipTouchGestures="off"
           (mousedown)="$event.preventDefault()"

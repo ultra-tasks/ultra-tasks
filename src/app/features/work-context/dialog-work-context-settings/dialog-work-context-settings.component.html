@@ -1,5 +1,8 @@
 <h2 mat-dialog-title>
-  {{ T.MH.SETTINGS | translate }}
+  {{
+    (isProject ? T.MH.CONTEXT_MENU.PROJECT_SETTINGS : T.MH.CONTEXT_MENU.TAG_SETTINGS)
+      | translate
+  }}
 </h2>
 
 <mat-dialog-content>

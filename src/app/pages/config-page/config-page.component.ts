@@ -14,6 +14,8 @@ import {
   OnInit,
   viewChild,
 } from '@angular/core';
+import { Location, NgTemplateOutlet } from '@angular/common';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LayoutService } from '../../core-ui/layout/layout.service';
 import { GlobalConfigService } from '../../features/config/global-config.service';
@@ -41,13 +43,14 @@ import {
   GlobalSectionConfig,
 } from '../../features/config/global-config.model';
 import { from, of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ProjectCfgFormKey } from '../../features/project/project.model';
 import { T } from '../../t.const';
 import { versions } from '../../../environments/versions';
-import { IS_ELECTRON, IS_SYNC_AVAILABLE } from '../../app.constants';
+import { HISTORY_STATE, IS_ELECTRON, IS_SYNC_AVAILABLE } from '../../app.constants';
 import { IS_ANDROID_WEB_VIEW_TOKEN } from '../../util/is-android-web-view';
+import { IS_TOUCH_PRIMARY } from '../../util/is-mouse-primary';
 import { getAutomaticBackUpFormCfg } from '../../features/config/form-cfgs/automatic-backups-form.const';
 import { getAppVersionStr } from '../../util/get-app-version-str';
 import { UpdateCheckService } from '../../core/update-check/update-check.service';
@@ -66,7 +69,13 @@ import { DialogLogsComponent } from '../../ui/dialog-logs/dialog-logs.component'
 import { SnackService } from '../../core/snack/snack.service';
 import { ShareService } from '../../core/share/share.service';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogClose } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialog,
+  MatDialogClose,
+  MatDialogRef,
+  MatDialogState,
+} from '@angular/material/dialog';
 import { SyncProviderId } from '../../op-log/sync-providers/provider.const';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -82,6 +91,12 @@ import {
   searchSettings,
   SettingsSearchTarget,
 } from '../../features/config/settings-search.util';
+import {
+  ABOUT_CATEGORY_INDEX,
+  getSettingsCategories,
+  KEYBOARD_CATEGORY_INDEX,
+  SettingsCategory,
+} from './settings-categories.util';
 
 /**
  * Starts expanded so the feature toggles are visible on opening Settings —
@@ -89,6 +104,21 @@ import {
  * the page is left.
  */
 const OPEN_BY_DEFAULT_SECTION_KEY = 'appFeatures';
+
+/**
+ * A short window on a touch screen (a phone in landscape, or any phone with the
+ * keyboard up). Mirrors `mq-short-touch` in styles/mixins/_media-queries.scss.
+ */
+const SHORT_TOUCH_MEDIA_QUERY = '(max-height: 500px) and (pointer: coarse)';
+
+/** The Account window shows the sync summary as a tab of its own, outside the category list. */
+const ACCOUNT_TAB_INDEX = 9;
+
+const CHANGELOG_URL = 'https://github.com/ac9492/ultra-tasks/releases/latest';
+const PRIVACY_POLICY_URL =
+  'https://github.com/ac9492/ultra-tasks/blob/main/docs/privacy.md';
+const FEEDBACK_URL =
+  'https://github.com/ac9492/ultra-tasks/issues/new?template=question.yml';
 
 @Component({
   selector: 'config-page',
@@ -114,6 +144,7 @@ const OPEN_BY_DEFAULT_SECTION_KEY = 'appFeatures';
     MatAutocomplete,
     MatAutocompleteTrigger,
     MatOption,
+    NgTemplateOutlet,
   ],
 })
 export class ConfigPageComponent implements OnInit {
@@ -203,18 +234,48 @@ export class ConfigPageComponent implements OnInit {
   private readonly _dialogData = inject<Record<string, string> | null>(MAT_DIALOG_DATA, {
     optional: true,
   });
-  readonly categories = [
-    { index: 0, label: T.PS.TABS.GENERAL, icon: 'tune' },
-    { index: 6, label: T.PS.REFINEMENT.APPEARANCE, icon: 'palette' },
-    { index: 1, label: T.PS.REDESIGN.TASKS, icon: 'task_alt' },
-    { index: 2, label: T.PS.REDESIGN.TIME, icon: 'timer' },
-    { index: 7, label: T.PS.REFINEMENT.KEYBOARD, icon: 'keyboard' },
-    { index: 8, label: T.PS.REFINEMENT.SOUND, icon: 'volume_up' },
-    { index: 5, label: T.PS.REFINEMENT.DATA, icon: 'import_export' },
-  ];
   readonly isAccount = this._dialogData?.['account'] === 'true';
   readonly isPhone = inject(LayoutService).isXs;
+  /** A short window on a touch screen: a phone in landscape, or with the keyboard up. */
+  readonly isShortTouch = toSignal(
+    inject(BreakpointObserver)
+      .observe(SHORT_TOUCH_MEDIA_QUERY)
+      .pipe(map((result) => result.matches)),
+    { initialValue: window.matchMedia(SHORT_TOUCH_MEDIA_QUERY).matches },
+  );
+  /**
+   * Settings is a full-screen drill-down (the category list, then one category at
+   * a time) exactly where the shell is a phone or the window is short on a touch
+   * screen; everywhere else it is the two-pane window. The styles ask the same
+   * question with `mq-drill-down`.
+   */
+  readonly isDrillDown = computed(() => this.isPhone() || this.isShortTouch());
+  /** The primary input is a finger: key-capture fields cannot be filled from a soft keyboard. */
+  readonly isTouchPrimary = IS_TOUCH_PRIMARY;
+  /** What the window lists, derived from the device: see getSettingsCategories(). */
+  readonly categories = computed<SettingsCategory[]>(() =>
+    getSettingsCategories({
+      hasKeyboardSections: this.keyboardSections.length > 0,
+      isDrillDown: this.isDrillDown(),
+      isTouchPrimary: this.isTouchPrimary,
+    }),
+  );
+  readonly aboutCategoryIndex = ABOUT_CATEGORY_INDEX;
+  readonly changelogUrl = CHANGELOG_URL;
+  readonly privacyPolicyUrl = PRIVACY_POLICY_URL;
+  readonly feedbackUrl = FEEDBACK_URL;
   private readonly _router = inject(Router);
+  private readonly _location = inject(Location);
+  // Set when Settings is a dialog: the guard leaves closing on Back to this page,
+  // see _onLocationChange().
+  private readonly _dialogRef = inject<MatDialogRef<ConfigPageComponent>>(MatDialogRef, {
+    optional: true,
+  });
+  private readonly _title = viewChild<ElementRef<HTMLElement>>('settingsTitle');
+  /** This page pushed a history entry for the open category (drill-down only). */
+  private _hasCategoryHistoryState = false;
+  /** The `history.state` of the entry that category entry sits on: Back returns to exactly it. */
+  private _stateBeneathCategory: unknown = null;
   /**
    * Windows of their own that Settings points to. Plugins & integrations has no
    * sidebar row on any screen size; Account has one on desktop, so it is a
@@ -260,6 +321,24 @@ export class ConfigPageComponent implements OnInit {
     return this.generalFormCfg.filter((section) => section.key === 'keyboard');
   }
   mobileCategoryVisible = false;
+
+  /** The drill-down shows one category, with its own header, instead of the list. */
+  get isCategoryOpen(): boolean {
+    return this.isDrillDown() && this.mobileCategoryVisible && !this.isAccount;
+  }
+  /** In the short drill-down the search sits in the window header, on the list only. */
+  get isSearchInHeader(): boolean {
+    return this.isShortTouch() && !this.isAccount && !this.isCategoryOpen;
+  }
+  /** The title of the window: the open category inside the drill-down. */
+  get headerTitle(): string {
+    if (this.isAccount) {
+      return T.PS.REFINEMENT.ACCOUNT;
+    }
+    return (
+      (this.isCategoryOpen && this._selectedCategory()?.label) || T.PS.GLOBAL_SETTINGS
+    );
+  }
 
   constructor() {
     // Initialize tab-specific form configurations
@@ -336,6 +415,19 @@ export class ConfigPageComponent implements OnInit {
       Log.log('Plugin shortcuts changed:', { shortcuts });
       this._updateKeyboardFormWithPluginShortcuts(shortcuts);
     });
+
+    // The window grows or shrinks across the drill-down breakpoint with a category
+    // open that the other layout does not list (About): fall back to the first.
+    effect(() => {
+      const categories = this.categories();
+      if (
+        this.selectedTabIndex !== ACCOUNT_TAB_INDEX &&
+        !categories.some((category) => category.index === this.selectedTabIndex)
+      ) {
+        this.selectedTabIndex = categories[0].index;
+        this._cd.markForCheck();
+      }
+    });
   }
 
   /**
@@ -368,14 +460,22 @@ export class ConfigPageComponent implements OnInit {
       .subscribe((params) => {
         if (params['tab'] !== undefined) {
           const tabIndex = parseInt(params['tab'], 10);
-          if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 9) {
+          if (
+            !isNaN(tabIndex) &&
+            tabIndex >= 0 &&
+            tabIndex <= 9 &&
+            (tabIndex !== KEYBOARD_CATEGORY_INDEX || this._isCategoryListed(tabIndex))
+          ) {
             this.selectedTabIndex = tabIndex === 3 ? 2 : tabIndex;
             this._cd.detectChanges();
           }
         }
         if (params['section'] !== undefined) {
           this.expandedSection = params['section'];
-          if (this.expandedSection === 'keyboard') this.selectedTabIndex = 7;
+          // A phone has no keyboard category (and the Android app no shortcuts at all).
+          if (this.expandedSection === 'keyboard' && this._isCategoryListed(7)) {
+            this.selectedTabIndex = 7;
+          }
           if (this.expandedSection === 'sound') this.selectedTabIndex = 8;
           if (this.expandedSection === 'appearance') this.selectedTabIndex = 6;
           // Backups, import and export: the first-run Restore and Import land here.
@@ -398,6 +498,22 @@ export class ConfigPageComponent implements OnInit {
         this.mobileCategoryVisible =
           params['tab'] !== undefined || params['section'] !== undefined;
       });
+
+    // Settings does not close itself on a location change (see the guard): in the
+    // drill-down Back first returns from a category to the list.
+    const locationSub = this._location.subscribe(() => this._onLocationChange());
+    this._destroyRef.onDestroy(() => {
+      locationSub.unsubscribe();
+      if (
+        this._hasCategoryHistoryState &&
+        window.history.state?.[HISTORY_STATE.SETTINGS_CATEGORY]
+      ) {
+        // Closed with a category open (the header's close button): drop the entry
+        // this page pushed, or the next Back would have nothing to close.
+        this._hasCategoryHistoryState = false;
+        window.history.back();
+      }
+    });
   }
 
   private _updateKeyboardFormWithPluginShortcuts(shortcuts: PluginShortcutCfg[]): void {
@@ -407,8 +523,8 @@ export class ConfigPageComponent implements OnInit {
       (section) => section.key === 'keyboard',
     );
 
+    // The Android app has no keyboard section (isHideForAndroidApp): nothing to update.
     if (keyboardFormIndex === -1) {
-      Log.err('Keyboard form section not found');
       return;
     }
 
@@ -531,7 +647,13 @@ export class ConfigPageComponent implements OnInit {
         { labelKey: T.PS.TABS.PLUGINS, sections: [] },
         { labelKey: T.PS.REFINEMENT.DATA, sections: this.globalImexFormCfg },
         { labelKey: T.PS.REFINEMENT.APPEARANCE, sections: [] },
-        { labelKey: T.PS.REFINEMENT.KEYBOARD, sections: this.keyboardSections },
+        {
+          labelKey: T.PS.REFINEMENT.KEYBOARD,
+          // No hits in a category the window does not list.
+          sections: this._isCategoryListed(KEYBOARD_CATEGORY_INDEX)
+            ? this.keyboardSections
+            : [],
+        },
         { labelKey: T.PS.REFINEMENT.SOUND, sections: [] },
       ],
       this.searchQuery,
@@ -541,9 +663,93 @@ export class ConfigPageComponent implements OnInit {
 
   selectCategory(index: number): void {
     this.selectedTabIndex = index;
-    this.mobileCategoryVisible = true;
+    this._showCategory();
     this._content()?.nativeElement.scrollTo({ top: 0 });
     this._layout()?.nativeElement.scrollTo({ top: 0 });
+  }
+
+  /**
+   * The header's back arrow in the drill-down. It goes through the history entry
+   * pushed with the category, so it and the system Back are one path.
+   */
+  backToList(): void {
+    if (this._hasCategoryHistoryState) {
+      window.history.back();
+      return;
+    }
+    this.mobileCategoryVisible = false;
+    this._focusTitle();
+  }
+
+  /** Opens the selected category; in the drill-down it is a step Back undoes. */
+  private _showCategory(): void {
+    this.mobileCategoryVisible = true;
+    if (this.isDrillDown() && !this.isAccount && !this._hasCategoryHistoryState) {
+      this._stateBeneathCategory = window.history.state ?? null;
+      window.history.pushState(
+        { ...window.history.state, [HISTORY_STATE.SETTINGS_CATEGORY]: true },
+        '',
+      );
+      this._hasCategoryHistoryState = true;
+    }
+    this._focusTitle();
+  }
+
+  /**
+   * A location change: Back, Forward, or a hash that is typed or loaded. The window
+   * does not close itself on them (the guard opens it with `closeOnNavigation:
+   * false`). Back from a category of the drill-down goes to the list, and that is
+   * the only one it keeps the window open for: anything else leaves Settings as it
+   * always did, a route that changes under an open category included.
+   */
+  private _onLocationChange(): void {
+    if (this._isCategoryEntryPopped()) {
+      this._hasCategoryHistoryState = false;
+      this.mobileCategoryVisible = false;
+      this._cd.markForCheck();
+      this._focusTitle();
+      return;
+    }
+    // The entry pushed with the category is no longer ours to pop.
+    this._hasCategoryHistoryState = false;
+    if (this._dialogRef?.getState() === MatDialogState.OPEN) {
+      this._dialogRef.close();
+    }
+  }
+
+  /**
+   * Back from the category's own history entry lands on exactly the state it was
+   * pushed on top of. Loading the same URL again (a hash that is typed, a link, a
+   * test harness) replaces the entry with a fresh state: not a Back.
+   */
+  private _isCategoryEntryPopped(): boolean {
+    const state = window.history.state;
+    return (
+      this._hasCategoryHistoryState &&
+      !state?.[HISTORY_STATE.SETTINGS_CATEGORY] &&
+      JSON.stringify(state ?? null) === JSON.stringify(this._stateBeneathCategory)
+    );
+  }
+
+  private _isCategoryListed(index: number): boolean {
+    return this.categories().some((category) => category.index === index);
+  }
+
+  private _selectedCategory(): SettingsCategory | undefined {
+    return this.categories().find((category) => category.index === this.selectedTabIndex);
+  }
+
+  /**
+   * In the drill-down the header changes under the user's finger or a screen
+   * reader: continue at the new title, as the category list and its buttons are gone.
+   */
+  private _focusTitle(): void {
+    if (!this.isDrillDown()) {
+      return;
+    }
+    afterNextRender(() => this._title()?.nativeElement.focus({ preventScroll: true }), {
+      injector: this._injector,
+    });
   }
 
   openWindow(path: string): void {
@@ -562,7 +768,7 @@ export class ConfigPageComponent implements OnInit {
     this._cd.detectChanges();
     this.selectedTabIndex = target.tabIndex;
     this.expandedSection = target.sectionKey ?? null;
-    this.mobileCategoryVisible = true;
+    this._showCategory();
     this.expandedField = target.fieldKey ?? '';
     this.colorEditorExpanded = target.scrollSelector === '.theme-select';
     this.soundExpanded = target.scrollSelector === '.sound-section';
