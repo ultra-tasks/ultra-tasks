@@ -5,6 +5,11 @@ on:
     tags:
       - ultra-tasks-v*
   workflow_dispatch:
+    inputs:
+      store_version:
+        description: 'Optional numeric Store version (major.minor.patch). Required for beta source; increment for each Store update.'
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -23,6 +28,11 @@ jobs:
       WINDOWS_STORE_PUBLISHER: ${{ vars.WINDOWS_STORE_PUBLISHER }}
       WINDOWS_STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.WINDOWS_STORE_PUBLISHER_DISPLAY_NAME }}
       WINDOWS_STORE_PACKAGE_FAMILY_NAME: ${{ vars.WINDOWS_STORE_PACKAGE_FAMILY_NAME }}
+      WINDOWS_STORE_VERSION: ${{ inputs.store_version }}
+      GITHUB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITHUB_CLIENT_ID }}
+      GITLAB_OAUTH_CLIENT_ID: ${{ vars.OAUTH_GITLAB_CLIENT_ID }}
+      LINEAR_OAUTH_CLIENT_ID: ${{ vars.OAUTH_LINEAR_CLIENT_ID }}
+      TRELLO_OAUTH_CLIENT_ID: ${{ vars.OAUTH_TRELLO_CLIENT_ID }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6

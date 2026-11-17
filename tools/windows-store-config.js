@@ -1,6 +1,9 @@
 'use strict';
 
 const getWindowsStoreConfig = (env, version, base = {}) => {
+  // Store package versions are numeric; a beta needs an explicit, separately
+  // incremented Store version instead of silently dropping its prerelease suffix.
+  const storeVersion = env.WINDOWS_STORE_VERSION?.trim() || version;
   const keys = [
     'WINDOWS_STORE_IDENTITY_NAME',
     'WINDOWS_STORE_PUBLISHER',
@@ -31,17 +34,20 @@ const getWindowsStoreConfig = (env, version, base = {}) => {
     );
   }
   if (
-    !/^\d+\.\d+\.\d+$/.test(version) ||
-    version.split('.').some((part) => Number(part) > 65535)
+    !/^\d+\.\d+\.\d+$/.test(storeVersion) ||
+    storeVersion.split('.').some((part) => Number(part) > 65535)
   ) {
     throw new Error(
-      'Store packages require a numeric major.minor.patch version (each at most 65535).',
+      'Store packages require a numeric major.minor.patch version (each at most 65535). For a prerelease, explicitly set WINDOWS_STORE_VERSION and increment it for each Store submission.',
     );
   }
   return {
     ...base,
     directories: { ...base.directories, output: '.tmp/store-builds' },
-    artifactName: 'Ultra-Tasks-Store-${version}-${arch}.${ext}',
+    artifactName:
+      storeVersion === version
+        ? 'Ultra-Tasks-Store-${version}-${arch}.${ext}'
+        : `Ultra-Tasks-Store-${version}-package-${storeVersion}-\${arch}.\${ext}`,
     publish: null,
     win: {
       ...base.win,
@@ -63,7 +69,12 @@ const getWindowsStoreConfig = (env, version, base = {}) => {
       capabilities: ['runFullTrust'],
     },
     extraMetadata: {
-      ultraTasksWindowsStore: { packageFamilyName, applicationId: 'UltraTasks' },
+      version: storeVersion,
+      ultraTasksWindowsStore: {
+        packageFamilyName,
+        applicationId: 'UltraTasks',
+        sourceVersion: version,
+      },
     },
   };
 };

@@ -19,6 +19,9 @@ try {
   }
   if ($identity.ProcessorArchitecture -cne $Architecture) { throw 'Wrong package architecture' }
   $version = (Get-Content -LiteralPath "$PSScriptRoot/../package.json" -Raw | ConvertFrom-Json).version
+  if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_STORE_VERSION)) {
+    $version = $env:WINDOWS_STORE_VERSION.Trim()
+  }
   if ($identity.Version -cne "$version.0") { throw 'Wrong Store package version' }
   if ($manifest.Package.Applications.Application.Id -cne 'UltraTasks') { throw 'Wrong application ID' }
   if (-not $manifest.SelectSingleNode('//*[local-name()="Protocol" and @Name="ultratasks"]')) {

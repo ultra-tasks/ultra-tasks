@@ -12,6 +12,7 @@ const {
   validateConfiguration,
 } = require('app-builder-lib/out/util/config/config');
 const AppxTarget = require('app-builder-lib/out/targets/AppxTarget').default;
+const { AppInfo } = require('app-builder-lib/out/appInfo');
 const { getWindowsStoreConfig } = require('./windows-store-config');
 
 const root = join(__dirname, '..');
@@ -20,6 +21,26 @@ const env = {
   WINDOWS_STORE_PUBLISHER: 'CN=12345678-1234-1234-1234-123456789abc',
   WINDOWS_STORE_PUBLISHER_DISPLAY_NAME: 'Example & Developer',
   WINDOWS_STORE_PACKAGE_FAMILY_NAME: '12345.UltraTasks_abcde12345678',
+  WINDOWS_STORE_VERSION: '',
+};
+
+const readStoreBuilderConfig = async (version, storeVersion = '') => {
+  const previousEnv = { ...process.env };
+  const packageMetadata = require('../package.json');
+  const previousVersion = packageMetadata.version;
+  packageMetadata.version = version;
+  Object.assign(process.env, env, { WINDOWS_STORE_VERSION: storeVersion });
+  try {
+    // The CJS entry point reads environment and package metadata at load time.
+    delete require.cache[require.resolve('../build/electron-builder.appx.cjs')];
+    return await getConfig(root, 'build/electron-builder.appx.cjs');
+  } finally {
+    packageMetadata.version = previousVersion;
+    for (const key of Object.keys(env)) {
+      if (previousEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = previousEnv[key];
+    }
+  }
 };
 
 test('missing Store configuration fails with actionable Partner Center fields', () => {
@@ -40,27 +61,21 @@ test('missing Store configuration fails with actionable Partner Center fields', 
     /numeric major.minor.patch/,
   );
   assert.throws(() => getWindowsStoreConfig(env, '0.3.65536'), /at most 65535/);
+  for (const storeVersion of ['0.4.0-beta.1', '0.4.0.1', '0.4.65536']) {
+    assert.throws(
+      () =>
+        getWindowsStoreConfig(
+          { ...env, WINDOWS_STORE_VERSION: storeVersion },
+          '0.4.0-beta.1',
+        ),
+      /numeric major.minor.patch/,
+    );
+  }
 });
 
 test('Store configuration passes the installed builder schema without changing direct targets', async () => {
   const before = readFileSync(join(root, 'electron-builder.yaml'), 'utf8');
-  const previousEnv = { ...process.env };
-  // Store packaging deliberately rejects prereleases. Exercise the actual
-  // builder config with a stable fixture even while preparing a beta app.
-  const packageMetadata = require('../package.json');
-  const previousVersion = packageMetadata.version;
-  packageMetadata.version = '0.3.0';
-  Object.assign(process.env, env);
-  let config;
-  try {
-    config = await getConfig(root, 'build/electron-builder.appx.cjs');
-  } finally {
-    packageMetadata.version = previousVersion;
-    for (const key of Object.keys(env)) {
-      if (previousEnv[key] === undefined) delete process.env[key];
-      else process.env[key] = previousEnv[key];
-    }
-  }
+  const config = await readStoreBuilderConfig('0.3.0');
   await validateConfiguration(config, { isEnabled: false });
   assert.deepEqual(config.win.target, [{ target: 'appx', arch: ['x64', 'arm64'] }]);
   assert.equal(config.directories.output, '.tmp/store-builds');
@@ -78,6 +93,43 @@ test('Store configuration passes the installed builder schema without changing d
   );
   assert.equal(direct.extraMetadata?.ultraTasksWindowsStore, undefined);
   assert.equal(readFileSync(join(root, 'electron-builder.yaml'), 'utf8'), before);
+});
+
+test('an explicit numeric Store version packages beta source with traceable metadata and real builder manifests', async (t) => {
+  const sourceVersion = '0.4.0-beta.1';
+  const sourceMetadata = readFileSync(join(root, 'package.json'), 'utf8');
+  const config = await readStoreBuilderConfig(sourceVersion, ' 0.4.0 ');
+  await validateConfiguration(config, { isEnabled: false });
+  assert.equal(config.extraMetadata.version, '0.4.0');
+  assert.equal(config.extraMetadata.ultraTasksWindowsStore.sourceVersion, sourceVersion);
+  assert.equal(
+    config.artifactName,
+    'Ultra-Tasks-Store-0.4.0-beta.1-package-0.4.0-${arch}.${ext}',
+  );
+  assert.equal(readFileSync(join(root, 'package.json'), 'utf8'), sourceMetadata);
+
+  const dir = mkdtempSync(join(tmpdir(), 'ultra-beta-store-manifest-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const target = Object.create(AppxTarget.prototype);
+  target.options = config.appx;
+  target.packager = {
+    config,
+    platformSpecificBuildOptions: config.win,
+    appInfo: new AppInfo({
+      config,
+      metadata: { ...require('../package.json'), ...config.extraMetadata },
+    }),
+    getResource: async () => null,
+    info: { metadata: { dependencies: {} } },
+  };
+  for (const arch of [Arch.x64, Arch.arm64]) {
+    const output = join(dir, `${arch}.xml`);
+    await target.writeManifest(output, arch, config.appx.publisher, []);
+    const xml = readFileSync(output, 'utf8');
+    assert.match(xml, /Version="0.4.0.0"/);
+    assert.match(xml, /EntryPoint="Windows.FullTrustApplication"/);
+    assert.match(xml, /Protocol Name="ultratasks"/);
+  }
 });
 
 test('real AppX manifest generation includes our identity, protocol and desktop capability for both architectures', async (t) => {

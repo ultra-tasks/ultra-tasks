@@ -84,7 +84,19 @@ rebuilding an identical package will not resolve an account verification failure
 
 ## Build
 
-Run **Windows Store AppX** in GitHub Actions on the desired stable numeric version.
+Run **Windows Store AppX** in GitHub Actions on the desired source version.
+For prerelease source, explicitly enter a numeric **store_version** such as
+`0.4.0` in the manual workflow form. It becomes Store package version `0.4.0.0`;
+the source remains `0.4.0-beta.1` and is recorded in the artifact filename and
+embedded `ultraTasksWindowsStore.sourceVersion` metadata. The production frontend
+is built from the original source version before packaging, retaining its beta
+version label. Electron's packaged version uses the numeric Store version.
+
+Store versions must increase independently of source versions once an override
+has been used: after `0.4.0.0`, use `0.4.1.0` or higher for the next Store update,
+including a later beta or the stable `0.4.0` app. This is an explicit packaging
+choice, not a promotion of the source app to a stable release.
+
 The workflow also runs on `ultra-tasks-v*` tags. It validates the tag against
 `package.json`, builds x64 and ARM64 AppX packages, verifies each package's identity,
 version, architecture, protocol, desktop capability, absence of a local signature,
@@ -100,6 +112,8 @@ $env:WINDOWS_STORE_IDENTITY_NAME = '<Package/Identity/Name>'
 $env:WINDOWS_STORE_PUBLISHER = '<Package/Identity/Publisher>'
 $env:WINDOWS_STORE_PUBLISHER_DISPLAY_NAME = '<PublisherDisplayName>'
 $env:WINDOWS_STORE_PACKAGE_FAMILY_NAME = '<Package Family Name>'
+# Required for beta source; omit for a numeric source version when no override is needed.
+$env:WINDOWS_STORE_VERSION = '0.4.0'
 npm run dist:win:appx
 ```
 
@@ -112,8 +126,9 @@ It extends the shared packaging configuration without rewriting it.
 AppX is supported by the installed electron-builder 26 and accepted by the Store;
 switching to a newer MSIX target is unnecessary. Store versions use
 `major.minor.patch.0`, with numeric components at most 65535. Prerelease versions
-are rejected rather than silently mapped to the same Store version. Increment the
-app version for a subsequent Store update; keep the fourth component zero.
+without an explicit numeric override are rejected rather than silently mapped
+to the same Store version. Increment the Store version for a subsequent Store
+update; keep the fourth component zero.
 Both architectures share the same version and identity. The application ID inside
 the package is `UltraTasks`; the Windows notification ID is `<PFN>!UltraTasks`.
 The manifest registers `ultratasks://`, and declares `runFullTrust` for the
