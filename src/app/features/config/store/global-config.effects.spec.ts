@@ -25,6 +25,7 @@ import { TaskSharedActions } from '../../../root-store/meta/task-shared.actions'
 import { selectAllTasks } from '../../tasks/store/task.selectors';
 import { IS_ELECTRON_TOKEN } from '../../../app.constants';
 import { IS_MAC_TOKEN } from '../../../util/is-mac';
+import { selectConfigFeatureState } from './global-config.reducer';
 
 describe('GlobalConfigEffects', () => {
   let effects: GlobalConfigEffects;
@@ -400,7 +401,120 @@ describe('GlobalConfigEffects', () => {
       delete (window as any).ea;
     });
 
+    // The initial registration resolves asynchronously (macOS waits for the layout).
+    const loadAllDataWithKeyboard = async (keyboard: KeyboardConfig): Promise<void> => {
+      actions$.next(
+        loadAllData({
+          appDataComplete: {
+            globalConfig: { ...DEFAULT_GLOBAL_CONFIG, keyboard },
+          } as any,
+        }),
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve));
+    };
+
+    // Effects run after the reducer, so the store already holds the updated keyboard
+    // config when `updateGlobalShortcut$` reads it. The mock store has no reducer.
+    const setEffectiveKeyboard = (keyboard: KeyboardConfig): void => {
+      store.overrideSelector(selectConfigFeatureState, {
+        ...DEFAULT_GLOBAL_CONFIG,
+        keyboard,
+      });
+      store.refreshState();
+    };
+
+    const updateKeyboard = (sectionCfg: Partial<KeyboardConfig>): void => {
+      actions$.next(updateGlobalConfigSection({ sectionKey: 'keyboard', sectionCfg }));
+    };
+
     describe('updateGlobalShortcut$', () => {
+      it('should not send again when the update leaves the global bindings unchanged', () => {
+        setup(true, false);
+        effects.updateGlobalShortcut$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+        };
+        setEffectiveKeyboard(keyboardCfg);
+        updateKeyboard(keyboardCfg);
+
+        // Only an in-app shortcut changes (e.g. accepting a suggested replacement).
+        setEffectiveKeyboard({ ...keyboardCfg, undo: 'Ctrl+Alt+Z' });
+        updateKeyboard({ undo: 'Ctrl+Alt+Z' });
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should send again after a real change of a global binding', () => {
+        setup(true, false);
+        effects.updateGlobalShortcut$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+        };
+        setEffectiveKeyboard(keyboardCfg);
+        updateKeyboard(keyboardCfg);
+
+        const changedCfg = { ...keyboardCfg, globalAddTask: 'Ctrl+Alt+A' };
+        setEffectiveKeyboard(changedCfg);
+        updateKeyboard({ globalAddTask: 'Ctrl+Alt+A' });
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(2);
+        expect(registerGlobalShortcutsSpy.calls.mostRecent().args[0]).toEqual(changedCfg);
+      });
+
+      it('should send the complete effective keyboard config when the update carries only the changed keys', () => {
+        setup(true, false);
+        effects.updateGlobalShortcut$.subscribe();
+        // The main process treats what it receives as the complete set of global bindings.
+        const effectiveCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+          globalAddTask: 'Ctrl+Alt+A',
+        };
+        setEffectiveKeyboard(effectiveCfg);
+
+        updateKeyboard({ globalAddTask: 'Ctrl+Alt+A' });
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledOnceWith(effectiveCfg);
+      });
+
+      it('should keep the global bindings registered when a partial update changes only an in-app shortcut', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        effects.updateGlobalShortcut$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+        };
+        await loadAllDataWithKeyboard(keyboardCfg);
+
+        // `{ undo }` alone would otherwise be read as "no global bindings any more".
+        setEffectiveKeyboard({ ...keyboardCfg, undo: 'Ctrl+Alt+Z' });
+        updateKeyboard({ undo: 'Ctrl+Alt+Z' });
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(1);
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledWith(keyboardCfg);
+      });
+
+      it('should send a global change that follows the initial registration', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        effects.updateGlobalShortcut$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+        };
+        await loadAllDataWithKeyboard(keyboardCfg);
+
+        const changedCfg = { ...keyboardCfg, globalShowHide: 'Ctrl+Alt+X' };
+        setEffectiveKeyboard(changedCfg);
+        updateKeyboard({ globalShowHide: 'Ctrl+Alt+X' });
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(2);
+        expect(registerGlobalShortcutsSpy.calls.mostRecent().args[0]).toEqual(changedCfg);
+      });
+
       it('should register shortcuts in Electron', () => {
         setup(true, false);
         effects.updateGlobalShortcut$.subscribe();
@@ -463,6 +577,131 @@ describe('GlobalConfigEffects', () => {
     });
 
     describe('registerGlobalShortcutInitially$', () => {
+      it('should not send unchanged global bindings again when a later loadAllData (e.g. an applied account snapshot) carries them', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+        };
+
+        await loadAllDataWithKeyboard(keyboardCfg);
+        await loadAllDataWithKeyboard({ ...keyboardCfg });
+        await loadAllDataWithKeyboard({ ...keyboardCfg });
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledOnceWith(keyboardCfg);
+      });
+
+      it('should ignore changes to in-app shortcuts in a later loadAllData', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+          undo: 'Ctrl+Z',
+        };
+
+        await loadAllDataWithKeyboard(keyboardCfg);
+        await loadAllDataWithKeyboard({ ...keyboardCfg, undo: 'Ctrl+Alt+Z' });
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should send again when a later loadAllData changes a global binding', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+        };
+        const changedCfg = { ...keyboardCfg, globalAddTask: 'Ctrl+Alt+A' };
+
+        await loadAllDataWithKeyboard(keyboardCfg);
+        await loadAllDataWithKeyboard(changedCfg);
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(2);
+        expect(registerGlobalShortcutsSpy.calls.mostRecent().args[0]).toEqual(changedCfg);
+      });
+
+      it('should send again when a later loadAllData clears a global binding', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        const keyboardCfg = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+X',
+        };
+        const clearedCfg = { ...keyboardCfg, globalShowHide: null };
+
+        await loadAllDataWithKeyboard(keyboardCfg);
+        await loadAllDataWithKeyboard(clearedCfg);
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(2);
+        expect(registerGlobalShortcutsSpy.calls.mostRecent().args[0]).toEqual(clearedCfg);
+      });
+
+      it('should treat a missing binding and a null binding alike', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        const withNull = { ...DEFAULT_GLOBAL_CONFIG.keyboard, globalAddNote: null };
+        const withoutKey = Object.fromEntries(
+          Object.entries(withNull).filter(([key]) => key !== 'globalAddNote'),
+        ) as KeyboardConfig;
+
+        await loadAllDataWithKeyboard(withNull);
+        await loadAllDataWithKeyboard(withoutKey);
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should still send the first load even when it carries no global binding', async () => {
+        setup(true, false);
+        effects.registerGlobalShortcutInitially$.subscribe();
+        const noGlobalBindings = {
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: null,
+        };
+
+        await loadAllDataWithKeyboard(noGlobalBindings);
+
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledOnceWith(noGlobalBindings);
+      });
+
+      it('should compare the QWERTY-mapped bindings on macOS', async () => {
+        const keyboardLayoutService = new KeyboardLayoutService();
+        setup(true, true, keyboardLayoutService);
+        keyboardLayoutService.setLayout(
+          new Map([
+            ['KeyY', 'z'],
+            ['KeyZ', 'y'],
+          ]),
+        );
+        effects.registerGlobalShortcutInitially$.subscribe();
+
+        // Both spellings are the same key on this layout, so they map to the same binding.
+        await loadAllDataWithKeyboard({
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+Z',
+        });
+        await loadAllDataWithKeyboard({
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+z',
+        });
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(1);
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledWith(
+          jasmine.objectContaining({ globalShowHide: 'Ctrl+Y' }),
+        );
+
+        // A different key maps to a different binding and is sent.
+        await loadAllDataWithKeyboard({
+          ...DEFAULT_GLOBAL_CONFIG.keyboard,
+          globalShowHide: 'Ctrl+Y',
+        });
+        expect(registerGlobalShortcutsSpy).toHaveBeenCalledTimes(2);
+        expect(registerGlobalShortcutsSpy.calls.mostRecent().args[0]).toEqual(
+          jasmine.objectContaining({ globalShowHide: 'Ctrl+Z' }),
+        );
+      });
+
       it('should register shortcuts initially in Electron', (done) => {
         setup(true, false);
 

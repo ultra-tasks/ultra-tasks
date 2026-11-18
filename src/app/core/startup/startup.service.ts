@@ -1,4 +1,5 @@
 import { effect, inject, Injectable, Injector } from '@angular/core';
+import { Router } from '@angular/router';
 import { ImexViewService } from '../../imex/imex-meta/imex-view.service';
 import { TranslateService } from '@ngx-translate/core';
 import { LocalBackupService } from '../../imex/local-backup/local-backup.service';
@@ -115,8 +116,46 @@ export class StartupService {
           // eslint-disable-next-line local-rules/no-user-content-in-logs -- grandfathered log baseline (2026-09), not yet triaged
           Log.err(data);
         });
+        this._listenForGlobalShortcutConflicts();
       });
     }
+  }
+
+  /**
+   * A system-wide shortcut that cannot be registered is a settings problem, not an app
+   * error, so it gets its own calm notice instead of the generic error snack.
+   */
+  private _listenForGlobalShortcutConflicts(): void {
+    window.ea.on(IPC.GLOBAL_SHORTCUT_CONFLICT, (...args: unknown[]) => {
+      const { shortcut, action } = (args[0] ?? {}) as {
+        shortcut?: unknown;
+        action?: unknown;
+      };
+      if (typeof shortcut !== 'string' || !shortcut) {
+        return;
+      }
+      // On macOS the registered shortcut is the QWERTY-mapped form; name what the user set.
+      const configured =
+        typeof action === 'string'
+          ? (
+              this._globalConfigService.cfg()?.keyboard as
+                | Record<string, unknown>
+                | undefined
+            )?.[action]
+          : undefined;
+      this._snackService.open({
+        type: 'WARNING',
+        msg: T.GLOBAL_SNACK.GLOBAL_SHORTCUT_CONFLICT,
+        translateParams: {
+          shortcut: typeof configured === 'string' && configured ? configured : shortcut,
+        },
+        actionStr: T.GLOBAL_SNACK.GLOBAL_SHORTCUT_CONFLICT_BTN,
+        actionFn: () =>
+          this._injector
+            .get(Router)
+            .navigate(['/config'], { queryParams: { section: 'keyboard' } }),
+      });
+    });
   }
 
   async init(): Promise<void> {

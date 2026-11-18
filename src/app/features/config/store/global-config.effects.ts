@@ -23,7 +23,7 @@ import { DateService } from '../../../core/date/date.service';
 import { SnackService } from '../../../core/snack/snack.service';
 import { loadAllData } from '../../../root-store/meta/load-all-data.action';
 import { DEFAULT_GLOBAL_CONFIG } from '../default-global-config.const';
-import { KeyboardConfig } from '@sp/keyboard-config';
+import { GLOBAL_KEY_CFG_KEYS, KeyboardConfig } from '@sp/keyboard-config';
 import { updateGlobalConfigSection } from './global-config.actions';
 import {
   selectConfigFeatureState,
@@ -42,6 +42,18 @@ import { FULL_STATE_OP_TYPES } from '../../../op-log/core/operation.types';
 
 const LAYOUT_DETECTION_TIMEOUT_MS = 1000;
 
+/**
+ * Identifies the part of the keyboard config that becomes system-wide shortcuts, in a
+ * fixed order. Bindings that are cleared (null, empty or missing) look alike.
+ */
+const getGlobalBindingsKey = (keyboardCfg: KeyboardConfig | undefined): string =>
+  JSON.stringify(
+    GLOBAL_KEY_CFG_KEYS.map((key) => {
+      const binding = keyboardCfg?.[key];
+      return typeof binding === 'string' && binding.length > 0 ? binding : null;
+    }),
+  );
+
 @Injectable()
 export class GlobalConfigEffects {
   private _actions$ = inject(LOCAL_ACTIONS);
@@ -52,6 +64,10 @@ export class GlobalConfigEffects {
   private _keyboardLayoutService = inject(KeyboardLayoutService);
   private _isElectron = inject(IS_ELECTRON_TOKEN);
   private _isMac = inject(IS_MAC_TOKEN);
+
+  // The global bindings this renderer last handed to the main process. A reload starts
+  // over, which is right: it then registers again.
+  private _lastSentGlobalBindings?: string;
 
   snackUpdate$ = createEffect(
     () =>
@@ -78,18 +94,20 @@ export class GlobalConfigEffects {
     () =>
       this._actions$.pipe(
         ofType(updateGlobalConfigSection),
-        filter(
-          ({ sectionKey, sectionCfg }) => this._isElectron && sectionKey === 'keyboard',
-        ),
-        tap(({ sectionKey, sectionCfg }) => {
-          let keyboardCfg: KeyboardConfig = sectionCfg as KeyboardConfig;
+        filter(({ sectionKey }) => this._isElectron && sectionKey === 'keyboard'),
+        // Effects run after the reducer: this is the keyboard config including the update.
+        withLatestFrom(this._store.select(selectConfigFeatureState)),
+        tap(([{ sectionCfg }, globalCfg]) => {
+          // An update can carry only the changed keys (e.g. one suggested shortcut), but the
+          // main process takes what it receives as the complete set of global bindings.
+          let keyboardCfg = { ...globalCfg?.keyboard, ...sectionCfg } as KeyboardConfig;
           if (this._isMac) {
             keyboardCfg = mapKeyboardConfigToQwerty(
               keyboardCfg,
               this._keyboardLayoutService.layout,
             );
           }
-          window.ea.registerGlobalShortcuts(keyboardCfg);
+          this._registerGlobalShortcuts(keyboardCfg);
         }),
       ),
     { dispatch: false },
@@ -129,7 +147,7 @@ export class GlobalConfigEffects {
           if (this._isMac) {
             cfg = mapKeyboardConfigToQwerty(keyboardCfg, layout);
           }
-          window.ea.registerGlobalShortcuts(cfg);
+          this._registerGlobalShortcuts(cfg);
         }),
       ),
     { dispatch: false },
@@ -276,4 +294,19 @@ export class GlobalConfigEffects {
       ),
     { dispatch: false },
   );
+
+  /**
+   * Hands the config to the main process unless it already has exactly these global
+   * bindings. Every `loadAllData` (an applied account snapshot, an import, a repair)
+   * arrives here, nearly always with the bindings it already holds.
+   * Expects the config after macOS layout mapping.
+   */
+  private _registerGlobalShortcuts(keyboardCfg: KeyboardConfig): void {
+    const bindingsKey = getGlobalBindingsKey(keyboardCfg);
+    if (bindingsKey === this._lastSentGlobalBindings) {
+      return;
+    }
+    this._lastSentGlobalBindings = bindingsKey;
+    window.ea.registerGlobalShortcuts(keyboardCfg);
+  }
 }

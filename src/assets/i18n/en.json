@@ -3451,6 +3451,8 @@
     "DUPLICATE_PROJECT_SUCCESS": "Project duplicated successfully",
     "FILE_DOWNLOADED": "{{fileName}} downloaded",
     "FILE_DOWNLOADED_BTN": "Open folder",
+    "GLOBAL_SHORTCUT_CONFLICT": "{{shortcut}} is not available as a system-wide shortcut. Another app may already be using it. Pick a different one in Settings → Keyboard shortcuts.",
+    "GLOBAL_SHORTCUT_CONFLICT_BTN": "Change shortcut",
     "NAVIGATE_TO_TASK_ERR": "Could not focus the task. Did you delete it?",
     "NO_TASKS_TO_COPY": "No tasks to copy",
     "NO_TASKS_TO_UNPLAN": "No tasks to unschedule",

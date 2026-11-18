@@ -1,84 +1,74 @@
 import { globalShortcut, ipcMain } from 'electron';
+import { error, info } from 'electron-log/main';
 import { IPC } from '../shared-with-frontend/ipc-events.const';
-import {
-  KeyboardConfig,
-  GLOBAL_KEY_CFG_KEYS,
-} from '../shared-with-frontend/keyboard-config.model';
-import { getWin } from '../main-window';
+import { KeyboardConfig } from '../shared-with-frontend/keyboard-config.model';
+import { getIsAppReady, getWin } from '../main-window';
 import { toggleTaskWidgetVisibility } from '../task-widget/task-widget';
 import { showOrFocus, toggleWindowVisibility } from '../various-shared';
-import { errorHandlerWithFrontendInform } from '../error-handler-with-frontend-inform';
+import {
+  createGlobalShortcutRegistry,
+  GlobalShortcutConflict,
+} from '../global-shortcuts-registry';
 
-export const initGlobalShortcutsIpc = (): void => {
-  ipcMain.on(IPC.REGISTER_GLOBAL_SHORTCUTS_EVENT, (_ev, cfg) => {
-    registerShowAppShortCuts(cfg);
-  });
+// The window is looked up when a shortcut is pressed: registrations are kept across
+// config re-applies, and the window can be re-created in between (macOS).
+const GLOBAL_SHORTCUT_ACTIONS: Record<string, () => void> = {
+  globalShowHide: () => {
+    toggleWindowVisibility(getWin());
+  },
+
+  globalToggleTaskStart: () => {
+    getWin().webContents.send(IPC.TASK_TOGGLE_START);
+  },
+
+  globalAddNote: () => {
+    const mainWin = getWin();
+    showOrFocus(mainWin);
+    mainWin.webContents.send(IPC.ADD_NOTE);
+  },
+
+  globalAddTask: () => {
+    const mainWin = getWin();
+    showOrFocus(mainWin);
+    mainWin.webContents.send(IPC.SHOW_ADD_TASK_BAR);
+  },
+
+  globalToggleTaskWidget: () => {
+    toggleTaskWidgetVisibility();
+  },
 };
 
-const registerShowAppShortCuts = (cfg: KeyboardConfig): void => {
-  // unregister all previous
-  globalShortcut.unregisterAll();
+// Same grace period errorHandlerWithFrontendInform gives a renderer that is still booting.
+const WAIT_FOR_RENDERER_DURATION = 4000;
 
-  if (cfg) {
-    const mainWin = getWin();
-    Object.keys(cfg)
-      .filter((key: string) => GLOBAL_KEY_CFG_KEYS.includes(key as keyof KeyboardConfig))
-      .forEach((key: string) => {
-        let actionFn: () => void;
-        const shortcut = cfg[key as keyof KeyboardConfig];
-
-        switch (key) {
-          case 'globalShowHide':
-            actionFn = () => {
-              toggleWindowVisibility(mainWin);
-            };
-            break;
-
-          case 'globalToggleTaskStart':
-            actionFn = () => {
-              mainWin.webContents.send(IPC.TASK_TOGGLE_START);
-            };
-            break;
-
-          case 'globalAddNote':
-            actionFn = () => {
-              showOrFocus(mainWin);
-              mainWin.webContents.send(IPC.ADD_NOTE);
-            };
-            break;
-
-          case 'globalAddTask':
-            actionFn = () => {
-              showOrFocus(mainWin);
-              // NOTE: delay slightly to make sure app is ready
-              mainWin.webContents.send(IPC.SHOW_ADD_TASK_BAR);
-            };
-            break;
-
-          case 'globalToggleTaskWidget':
-            actionFn = toggleTaskWidgetVisibility;
-            break;
-
-          default:
-            actionFn = () => undefined;
-        }
-
-        if (shortcut && shortcut.length > 0) {
-          try {
-            const ret = globalShortcut.register(shortcut, actionFn) as unknown;
-            if (!ret) {
-              errorHandlerWithFrontendInform(
-                'Global Shortcut registration failed: ' + shortcut,
-                shortcut,
-              );
-            }
-          } catch (e) {
-            errorHandlerWithFrontendInform(
-              'Global Shortcut registration failed: ' + shortcut,
-              { e, shortcut },
-            );
-          }
-        }
-      });
+// A conflict is a settings problem, not an app error: it goes out on its own channel and
+// is never handed to errorHandlerWithFrontendInform.
+const sendConflictToRenderer = (
+  conflict: GlobalShortcutConflict,
+  isRetry = false,
+): void => {
+  try {
+    if (getIsAppReady()) {
+      getWin().webContents.send(IPC.GLOBAL_SHORTCUT_CONFLICT, conflict);
+      return;
+    }
+  } catch {
+    // window already gone
   }
+  if (!isRetry) {
+    setTimeout(() => sendConflictToRenderer(conflict, true), WAIT_FOR_RENDERER_DURATION);
+  }
+};
+
+export const initGlobalShortcutsIpc = (): void => {
+  const registry = createGlobalShortcutRegistry({
+    backend: globalShortcut,
+    getAction: (action) => GLOBAL_SHORTCUT_ACTIONS[action] ?? ((): void => undefined),
+    onConflict: sendConflictToRenderer,
+    logger: { error, info },
+  });
+
+  ipcMain.on(IPC.REGISTER_GLOBAL_SHORTCUTS_EVENT, (_ev, cfg: KeyboardConfig) => {
+    registry.apply(cfg);
+  });
 };

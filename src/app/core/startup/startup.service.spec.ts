@@ -5,6 +5,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { LocalBackupService } from '../../imex/local-backup/local-backup.service';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { SnackService } from '../snack/snack.service';
+import { SnackParams } from '../snack/snack.model';
 import { PluginService } from '../../plugins/plugin.service';
 import { PluginConnectionRuntimeService } from '../../plugins/issue-provider/plugin-connection-runtime.service';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
@@ -19,9 +20,11 @@ import { LegacySupDbService } from '../persistence/legacy-sup-db.service';
 import { DataInitStateService } from '../data-init/data-init-state.service';
 import { PaletteThemeService } from '../theme/palette-theme.service';
 import { of } from 'rxjs';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
+import { Router } from '@angular/router';
 import { LS } from '../persistence/storage-keys.const';
 import { T } from '../../t.const';
+import { IPC } from '../../../../electron/shared-with-frontend/ipc-events.const';
 import { provideMockStore } from '@ngrx/store/testing';
 import { selectSyncConfig } from '../../features/config/store/global-config.reducer';
 import { selectEnabledIssueProviders } from '../../features/issue/store/issue-provider.selectors';
@@ -248,6 +251,100 @@ describe('StartupService', () => {
           delete (window as Partial<Window>).ea;
         }
       }
+    });
+  });
+
+  // A system-wide shortcut another app holds is a settings problem, not an app error.
+  describe('global shortcut conflict notice', () => {
+    let snackService: jasmine.SpyObj<SnackService>;
+    let router: jasmine.SpyObj<Router>;
+    let onConflict: (...args: unknown[]) => void;
+    let ea: { on: jasmine.Spy };
+    let originalEaDescriptor: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+      snackService = TestBed.inject(SnackService) as jasmine.SpyObj<SnackService>;
+      router = jasmine.createSpyObj('Router', ['navigate']);
+      Object.assign(service as object, { _injector: { get: () => router } });
+
+      originalEaDescriptor = Object.getOwnPropertyDescriptor(window, 'ea');
+      ea = { on: jasmine.createSpy('on') };
+      Object.defineProperty(window, 'ea', {
+        value: ea,
+        configurable: true,
+        writable: true,
+      });
+
+      (
+        service as unknown as { _listenForGlobalShortcutConflicts: () => void }
+      )._listenForGlobalShortcutConflicts();
+      onConflict = ea.on.calls.mostRecent().args[1];
+    });
+
+    afterEach(() => {
+      if (originalEaDescriptor) {
+        Object.defineProperty(window, 'ea', originalEaDescriptor);
+      } else {
+        delete (window as Partial<Window>).ea;
+      }
+    });
+
+    it('should listen on a channel of its own, not the generic error channel', () => {
+      expect(ea.on).toHaveBeenCalledOnceWith(
+        IPC.GLOBAL_SHORTCUT_CONFLICT,
+        jasmine.any(Function),
+      );
+      expect(IPC.GLOBAL_SHORTCUT_CONFLICT).not.toBe(IPC.ERROR);
+    });
+
+    it('should show a calm translatable warning that names the shortcut', () => {
+      onConflict({ shortcut: 'Ctrl+Shift+X', action: 'globalShowHide' });
+
+      expect(snackService.open).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({
+          type: 'WARNING',
+          msg: T.GLOBAL_SNACK.GLOBAL_SHORTCUT_CONFLICT,
+          translateParams: { shortcut: 'Ctrl+Shift+X' },
+          actionStr: T.GLOBAL_SNACK.GLOBAL_SHORTCUT_CONFLICT_BTN,
+        }),
+      );
+      const params = snackService.open.calls.mostRecent().args[0] as SnackParams;
+      expect(params.isSkipTranslate).toBeUndefined();
+    });
+
+    it('should name the shortcut the user configured, not the macOS-mapped one', () => {
+      (TestBed.inject(GlobalConfigService).cfg as unknown as WritableSignal<unknown>).set(
+        {
+          keyboard: { globalShowHide: 'Ctrl+Y' },
+        },
+      );
+
+      // macOS registers the QWERTY position of the configured key.
+      onConflict({ shortcut: 'Ctrl+Z', action: 'globalShowHide' });
+
+      expect(snackService.open).toHaveBeenCalledWith(
+        jasmine.objectContaining({ translateParams: { shortcut: 'Ctrl+Y' } }),
+      );
+    });
+
+    it('should offer to open the keyboard shortcut settings', () => {
+      onConflict({ shortcut: 'Ctrl+Shift+X', action: 'globalShowHide' });
+
+      const params = snackService.open.calls.mostRecent().args[0] as SnackParams;
+      params.actionFn?.();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(['/config'], {
+        queryParams: { section: 'keyboard' },
+      });
+    });
+
+    it('should ignore a payload without a shortcut', () => {
+      onConflict(undefined);
+      onConflict({});
+      onConflict({ shortcut: '' });
+      onConflict({ shortcut: 42, action: 'globalShowHide' });
+
+      expect(snackService.open).not.toHaveBeenCalled();
     });
   });
 
