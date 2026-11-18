@@ -1,0 +1,50 @@
+/**
+ * The one vocabulary every account surface (header, mobile navigation, Account dialog,
+ * Settings, search commands, account page) uses for "where is my account sync?".
+ * `NativeSyncService.phase` derives it from engine events and confirmed local commits;
+ * it is not persisted and not synced.
+ */
+export type AccountPhase =
+  /** No Ultra Tasks account is configured on this device. */
+  | 'signed-out'
+  /** Password, browser return or two-factor step in progress. */
+  | 'signing-in'
+  /** Waiting for the new-device email code. */
+  | 'verify-device'
+  /** The vault is open but the data source is undecided (or the choice was deferred). */
+  | 'choose-data'
+  /** Fetching the encrypted account data. */
+  | 'downloading'
+  /** Writing downloaded data into this device. */
+  | 'applying'
+  /** Incremental upload and download. */
+  | 'syncing'
+  /** Initial apply finished, nothing pending, no error. */
+  | 'synced'
+  /** A configured account whose vault is not open (for example protected storage unavailable). */
+  | 'locked'
+  /** The session was revoked or expired: sign in again. The configured identity is kept. */
+  | 'reauth';
+
+/** Bounded counts of what a dataset holds, safe to show in a dialog. Never carries content. */
+export interface AccountDataSummary {
+  tasks: number;
+  projects: number;
+  notes: number;
+  archived: number;
+  /** True when there is anything beyond first-run defaults and the example task. */
+  hasUserData: boolean;
+}
+
+/**
+ * Both sides hold real data (or the user deferred the choice). Cleared once the user
+ * downloads the account copy or replaces it with this device.
+ */
+export interface AccountDataChoice {
+  local: AccountDataSummary;
+  account: AccountDataSummary;
+  /** When the choice became necessary, in ms since epoch. */
+  since: number;
+  /** The user closed the dialog without deciding: show "Data connection not finished". */
+  deferred: boolean;
+}

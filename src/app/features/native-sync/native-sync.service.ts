@@ -31,6 +31,7 @@ import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { GlobalConfigService } from '../config/global-config.service';
 import { BackupService } from '../../op-log/backup/backup.service';
 import { updateGlobalConfigSection } from '../config/store/global-config.actions';
+import type { AccountDataChoice, AccountPhase } from './account-sync.types';
 
 interface CachedAccount {
   capabilities: Capabilities;
@@ -77,6 +78,30 @@ export class NativeSyncService {
       this.unlocked() &&
       this.account?.capabilities?.features['personalRealtime'] === true,
   );
+  /** Email and support ID of the configured account; known even while the vault is closed. */
+  readonly accountIdentity = signal<{ email: string; id: string } | null>(
+    NativeSyncService.cachedIdentity(),
+  );
+  /** The last attempt failed because the device or the server was unreachable. */
+  readonly offline = signal(false);
+  /** Last fully successful sync, in ms since epoch. */
+  readonly lastSyncedAt = signal<number | null>(null);
+  /** Number of local change intents not yet uploaded (bounded count, never content). */
+  readonly pendingChanges = signal(0);
+  /** The last complete fetch found no tasks in the account. */
+  readonly emptyAccount = signal(false);
+  /** Both sides hold real data (or the choice was deferred). */
+  readonly dataChoice = signal<AccountDataChoice | null>(null);
+  /** Derived presentation state; see {@link AccountPhase}. Not persisted. */
+  readonly phase = computed<AccountPhase>(() => {
+    if (this.dataChoice()) return 'choose-data';
+    if (!this.unlocked()) {
+      if (this.status() === 'NATIVE_SYNC.MFA') return 'signing-in';
+      return this.configured() ? 'locked' : 'signed-out';
+    }
+    if (!this.linked()) return 'choose-data';
+    return this.busy() ? 'syncing' : 'synced';
+  });
   client?: SyncClient;
   account?: AccountClient;
   serverUrl = '';
@@ -89,6 +114,19 @@ export class NativeSyncService {
   private localChanges?: Subscription;
   private resyncRequested = false;
 
+  private static cachedIdentity(): { email: string; id: string } | null {
+    try {
+      const raw = localStorage.getItem(
+        'ultra-native-account:' + (localStorage.getItem('ultra-native-server') ?? ''),
+      );
+      const account = raw ? (JSON.parse(raw) as CachedAccount).account : undefined;
+      return account?.email && account.id
+        ? { email: account.email, id: account.id }
+        : null;
+    } catch {
+      return null;
+    }
+  }
   private cacheKey(): string {
     return 'ultra-native-account:' + this.serverUrl;
   }
@@ -113,6 +151,7 @@ export class NativeSyncService {
     );
     localStorage.setItem('ultra-native-server', this.serverUrl);
     this.configured.set(true);
+    this.accountIdentity.set({ email: account.account!.email, id: account.account!.id });
   }
   private normalizeServerUrl(serverUrl: string): string {
     const url = new URL(serverUrl);
@@ -613,6 +652,7 @@ export class NativeSyncService {
         if (deleted) {
           localStorage.removeItem(cacheKey);
           this.configured.set(false);
+          this.accountIdentity.set(null);
         }
         this.closing = false;
       }
@@ -634,6 +674,7 @@ export class NativeSyncService {
       await this.bridge.unlink();
       localStorage.removeItem(key);
       this.configured.set(false);
+      this.accountIdentity.set(null);
     }
   }
   async disconnect(): Promise<void> {
@@ -644,6 +685,7 @@ export class NativeSyncService {
     await this.bridge.unlink();
     localStorage.removeItem(key);
     this.configured.set(false);
+    this.accountIdentity.set(null);
   }
   async lock(): Promise<void> {
     this.closing = true;
