@@ -1,5 +1,5 @@
 import { test, expect } from '../../fixtures/webdav.fixture';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { SyncPage } from '../../pages/sync.page';
 import { WorkViewPage } from '../../pages/work-view.page';
 import { waitForStatePersistence } from '../../utils/waits';
@@ -12,16 +12,80 @@ import {
 
 const ultraUrl = process.env.E2E_ULTRA_URL;
 if (!ultraUrl && process.env.E2E_REQUIRE_ULTRA === 'true')
-  throw new Error('The UltraSync migration acceptance server is required.');
-const signIn = async (page: Page, username: string): Promise<void> => {
-  const custom = page.getByRole('radio', { name: 'Custom server', exact: true });
+  throw new Error('The Ultra Tasks account migration acceptance server is required.');
+/** The one place that knows how the account page signs in (Email, Password, Sign in). */
+const signIn = async (page: Page, email: string): Promise<void> => {
+  const account = page.locator('native-sync');
+  await expect(
+    account.getByRole('button', { name: 'Sign in', exact: true }),
+  ).toBeVisible();
+  // The address field exists only for a custom server (or when no official server is built in).
+  const custom = account.getByRole('radio', { name: 'Custom server', exact: true });
   if (await custom.isVisible()) await custom.check();
-  await page.getByLabel('Ultra Tasks server URL').fill(ultraUrl!);
-  await page.getByLabel('Email or username').fill(username);
-  await page
+  await account.getByLabel('Ultra Tasks server URL').fill(ultraUrl!);
+  await account.getByLabel('Email', { exact: true }).fill(email);
+  await account
     .getByLabel('Password', { exact: true })
     .fill('test password for encrypted accounts');
-  await page.getByRole('button', { name: 'Sign in and unlock' }).click();
+  await account.getByRole('button', { name: 'Sign in', exact: true }).click();
+};
+
+/**
+ * The first connection is finished when the app lands on the task list, or the account page
+ * says the account is up to date. A pending data choice or a failure is neither.
+ */
+const expectConnected = async (page: Page): Promise<void> => {
+  const upToDate = page.locator(
+    'native-sync [data-status="up-to-date"], native-sync [data-status="up-to-date-empty"]',
+  );
+  await expect
+    .poll(
+      async () =>
+        !page.url().includes('native-sync') || (await upToDate.first().isVisible()),
+      { timeout: 60000 },
+    )
+    .toBe(true);
+};
+
+/** The focused dialog that asks which data to keep, when both sides hold real data. */
+const dataChoice = (page: Page): Locator =>
+  page.getByRole('dialog').filter({ hasText: 'Download account data' });
+
+/** Chooses the account's data when asked. An empty device downloads it without asking. */
+const downloadAccountData = async (page: Page): Promise<void> => {
+  const choice = dataChoice(page).getByRole('button', { name: 'Download account data' });
+  await choice
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => choice.click())
+    .catch(() => undefined);
+};
+
+/**
+ * Replaces the account's data with this device's. The choice reopens from "Data connection not
+ * finished" when an earlier attempt failed; replacement asks for one more confirmation.
+ */
+const replaceAccountData = async (page: Page): Promise<void> => {
+  const dialog = dataChoice(page);
+  const finish = page.getByRole('button', { name: 'Finish connecting' });
+  await expect(dialog.or(finish)).toBeVisible({ timeout: 30000 });
+  if (!(await dialog.isVisible())) await finish.click();
+  await dialog
+    .getByRole('button', { name: 'Replace account data with this device' })
+    .click();
+  const confirm = page.locator('dialog-confirm button[e2e="confirmBtn"]');
+  await confirm
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => confirm.click())
+    .catch(() => undefined);
+};
+
+/** Switches this device's sync provider to the Ultra Tasks account from the provider dialog. */
+const switchToUltraTasksAccount = async (page: Page, syncBtn: Locator): Promise<void> => {
+  await syncBtn.click({ button: 'right' });
+  const dialog = page.locator('dialog-sync-cfg');
+  await dialog.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Ultra Tasks account', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Continue with Ultra Tasks account' }).click();
 };
 
 for (const phase of ['preflight', 'download', 'foreign'] as const) {
@@ -31,7 +95,10 @@ for (const phase of ['preflight', 'download', 'foreign'] as const) {
     request,
     webdavServerUp,
   }) => {
-    test.skip(!ultraUrl, 'The isolated UltraSync acceptance server is required');
+    test.skip(
+      !ultraUrl,
+      'The isolated Ultra Tasks account acceptance server is required',
+    );
     expect(webdavServerUp).toBe(true);
     test.setTimeout(180000);
     const username =
@@ -52,11 +119,7 @@ for (const phase of ['preflight', 'download', 'foreign'] as const) {
       await waitForStatePersistence(owner.page);
       await owner.page.goto('/#/native-sync');
       await signIn(owner.page, username);
-      await expect(
-        owner.page.getByRole('button', { name: 'Sync now', exact: true }),
-      ).toBeEnabled({
-        timeout: 60000,
-      });
+      await expectConnected(owner.page);
 
       const folder = generateSyncFolderName('ultra-late-edit');
       await createSyncFolder(request, folder);
@@ -65,21 +128,10 @@ for (const phase of ['preflight', 'download', 'foreign'] as const) {
         ...WEBDAV_CONFIG_TEMPLATE,
         syncFolderPath: `/${folder}`,
       });
-      await sync.syncBtn.click({ button: 'right' });
-      const dialog = source.page.locator('dialog-sync-cfg');
-      await dialog.getByRole('combobox').click();
-      await source.page
-        .getByRole('option', { name: 'UltraTasks Account', exact: true })
-        .click();
-      await dialog
-        .getByRole('button', { name: 'Continue with UltraTasks Account' })
-        .click();
-      await signIn(source.page, username);
-      const useAccount = source.page.getByRole('button', {
-        name: 'Use the account’s existing data',
-      });
-      await expect(useAccount).toBeVisible();
+      await switchToUltraTasksAccount(source.page, sync.syncBtn);
 
+      // The download is held at the server before the first sign-in step finishes, so the edit
+      // below always lands while it is under way (this device holds no tasks: it downloads).
       let seen!: () => void;
       const reachedDownload = new Promise<void>((resolve) => (seen = resolve));
       const endpoint = phase === 'preflight' ? 'snapshot' : 'changes';
@@ -91,7 +143,8 @@ for (const phase of ['preflight', 'download', 'foreign'] as const) {
           await route.continue();
         },
       );
-      await useAccount.click();
+      await signIn(source.page, username);
+      await downloadAccountData(source.page);
       await reachedDownload;
       const editingPage =
         phase === 'foreign' ? await source.context.newPage() : source.page;
@@ -143,7 +196,10 @@ for (const writer of ['local', 'foreign'] as const) {
     request,
     webdavServerUp,
   }) => {
-    test.skip(!ultraUrl, 'The isolated UltraSync acceptance server is required');
+    test.skip(
+      !ultraUrl,
+      'The isolated Ultra Tasks account acceptance server is required',
+    );
     expect(webdavServerUp).toBe(true);
     test.setTimeout(180000);
     const username = writer === 'local' ? 'latemigrate' : 'latemigratetab';
@@ -159,9 +215,7 @@ for (const writer of ['local', 'foreign'] as const) {
       await waitForStatePersistence(owner.page);
       await owner.page.goto('/#/native-sync');
       await signIn(owner.page, username);
-      await expect(
-        owner.page.getByRole('button', { name: 'Sync now', exact: true }),
-      ).toBeEnabled({ timeout: 60000 });
+      await expectConnected(owner.page);
 
       const folder = generateSyncFolderName('ultra-late-upload');
       await createSyncFolder(request, folder);
@@ -172,20 +226,9 @@ for (const writer of ['local', 'foreign'] as const) {
       });
       await new WorkViewPage(source.page).addTask(originalTitle);
       await waitForStatePersistence(source.page);
-      await sync.syncBtn.click({ button: 'right' });
-      const dialog = source.page.locator('dialog-sync-cfg');
-      await dialog.getByRole('combobox').click();
-      await source.page
-        .getByRole('option', { name: 'UltraTasks Account', exact: true })
-        .click();
-      await dialog
-        .getByRole('button', { name: 'Continue with UltraTasks Account' })
-        .click();
+      await switchToUltraTasksAccount(source.page, sync.syncBtn);
       await signIn(source.page, username);
-      const useLocal = source.page.getByRole('button', {
-        name: 'Import this device’s data',
-      });
-      await expect(useLocal).toBeVisible();
+      await expect(dataChoice(source.page)).toBeVisible();
       let seen!: () => void;
       const reachedUpload = new Promise<void>((resolve) => (seen = resolve));
       await source.page.route(
@@ -196,7 +239,7 @@ for (const writer of ['local', 'foreign'] as const) {
           await route.continue();
         },
       );
-      await useLocal.click();
+      await replaceAccountData(source.page);
       await reachedUpload;
       const editingPage =
         writer === 'foreign' ? await source.context.newPage() : source.page;
@@ -250,7 +293,7 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
   request,
   webdavServerUp,
 }) => {
-  test.skip(!ultraUrl, 'The isolated UltraSync acceptance server is required');
+  test.skip(!ultraUrl, 'The isolated Ultra Tasks account acceptance server is required');
   expect(webdavServerUp).toBe(true);
   test.setTimeout(180000);
   const owner = await setupSyncClient(browser, baseURL);
@@ -262,11 +305,7 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
     await waitForStatePersistence(owner.page);
     await owner.page.goto('/#/native-sync');
     await signIn(owner.page, 'latefailure');
-    await expect(
-      owner.page.getByRole('button', { name: 'Sync now', exact: true }),
-    ).toBeEnabled({
-      timeout: 60000,
-    });
+    await expectConnected(owner.page);
 
     const folder = generateSyncFolderName('ultra-interrupted-upload');
     await createSyncFolder(request, folder);
@@ -277,23 +316,15 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
     });
     await new WorkViewPage(source.page).addTask(localTitle);
     await waitForStatePersistence(source.page);
-    await sync.syncBtn.click({ button: 'right' });
-    const dialog = source.page.locator('dialog-sync-cfg');
-    await dialog.getByRole('combobox').click();
-    await source.page
-      .getByRole('option', { name: 'UltraTasks Account', exact: true })
-      .click();
-    await dialog
-      .getByRole('button', { name: 'Continue with UltraTasks Account' })
-      .click();
+    await switchToUltraTasksAccount(source.page, sync.syncBtn);
     await signIn(source.page, 'latefailure');
+    await expect(dataChoice(source.page)).toBeVisible();
     const stage = /\/sync\/scopes\/[^/]+\/replacement\/stage$/;
     await source.page.route(stage, (route) => route.abort());
-    await source.page.getByRole('button', { name: 'Import this device’s data' }).click();
-    await expect(source.page.locator('native-sync [role=alert]')).toContainText(
-      'Sync is off on this device',
-      { timeout: 60000 },
-    );
+    await replaceAccountData(source.page);
+    await expect(
+      source.page.getByRole('alert').filter({ hasText: 'Sync is off on this device' }),
+    ).toBeVisible({ timeout: 60000 });
     await source.page.unroute(stage);
     await source.page.goto('/#/tag/TODAY/tasks');
     await source.page.reload();
@@ -327,16 +358,15 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
       )
       .toBe(false);
 
+    await owner.page.goto('/#/native-sync');
     await owner.page.getByRole('button', { name: 'Sync now', exact: true }).click();
     await owner.page.goto('/#/tag/TODAY/tasks');
     await expect(owner.page.locator('task').filter({ hasText: oldTitle })).toBeVisible();
 
     await source.page.goto('/#/native-sync');
     await signIn(source.page, 'latefailure');
-    await source.page.getByRole('button', { name: 'Import this device’s data' }).click();
-    await expect(
-      source.page.getByRole('button', { name: 'Sync now', exact: true }),
-    ).toBeEnabled({ timeout: 60000 });
+    await replaceAccountData(source.page);
+    await expectConnected(source.page);
     await source.page.goto('/#/tag/TODAY/tasks');
     await tasks.waitForTaskList();
     await expect(

@@ -1,40 +1,74 @@
 import { expect, test } from '../../fixtures/test.fixture';
+import type { Locator, Page } from '@playwright/test';
 import { waitForStatePersistence } from '../../utils/waits';
 import { openSyncSetup } from '../../utils/open-sync-setup';
 
 const ultraUrl = process.env.E2E_ULTRA_URL;
 if (!ultraUrl && process.env.E2E_REQUIRE_ULTRA === 'true') {
-  throw new Error('The isolated UltraSync acceptance server is required.');
+  throw new Error('The isolated Ultra Tasks account acceptance server is required.');
 }
+
+/** The one place that knows how the account page signs in (Email, Password, Sign in). */
+const signIn = async (page: Page, email: string): Promise<void> => {
+  const account = page.locator('native-sync');
+  await expect(
+    account.getByRole('button', { name: 'Sign in', exact: true }),
+  ).toBeVisible();
+  // The address field exists only for a custom server (or when no official server is built in).
+  const custom = account.getByRole('radio', { name: 'Custom server', exact: true });
+  if (await custom.isVisible()) await custom.check();
+  await account.getByLabel('Ultra Tasks server URL').fill(ultraUrl!);
+  await account.getByLabel('Email', { exact: true }).fill(email);
+  await account
+    .getByLabel('Password', { exact: true })
+    .fill('test password for encrypted accounts');
+  await account.getByRole('button', { name: 'Sign in', exact: true }).click();
+};
+
+/** The focused dialog that asks which data to keep, when both sides hold real data. */
+const dataChoice = (page: Page): Locator =>
+  page.getByRole('dialog').filter({ hasText: 'Download account data' });
+
+/** Chooses the account's data when asked. An empty device downloads it without asking. */
+const downloadAccountData = async (page: Page): Promise<void> => {
+  const choice = dataChoice(page).getByRole('button', { name: 'Download account data' });
+  await choice
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => choice.click())
+    .catch(() => undefined);
+};
+
+/**
+ * The first connection is finished when the app lands on the task list, or the account page
+ * says the account is up to date. A pending data choice or a failure is neither.
+ */
+const expectConnected = async (page: Page): Promise<void> => {
+  const upToDate = page.locator(
+    'native-sync [data-status="up-to-date"], native-sync [data-status="up-to-date-empty"]',
+  );
+  await expect
+    .poll(
+      async () =>
+        !page.url().includes('native-sync') || (await upToDate.first().isVisible()),
+      { timeout: 60000 },
+    )
+    .toBe(true);
+};
 
 test('keeps the provider choice and dialog fixed while a switch is saving', async ({
   page,
   workViewPage,
 }) => {
-  test.skip(!ultraUrl, 'The isolated UltraSync acceptance server is required');
+  test.skip(!ultraUrl, 'The isolated Ultra Tasks account acceptance server is required');
   test.setTimeout(180000);
 
   await page.goto('/#/native-sync');
-  const customServer = page.getByRole('radio', { name: 'Custom server', exact: true });
-  if (await customServer.isVisible()) await customServer.check();
-  await page.getByLabel('Ultra Tasks server URL').fill(ultraUrl!);
-  await page.getByLabel('Email or username').fill('empty');
-  await page
-    .getByLabel('Password', { exact: true })
-    .fill('test password for encrypted accounts');
-  await page.getByRole('button', { name: 'Sign in and unlock' }).click();
+  await signIn(page, 'empty');
+  // A device with no tasks of its own downloads the account's data without asking.
+  await downloadAccountData(page);
+  await expectConnected(page);
 
   const syncNow = page.getByRole('button', { name: 'Sync now', exact: true });
-  await expect(syncNow).toBeVisible({ timeout: 60000 });
-  const useAccount = page.getByRole('button', {
-    name: 'Use the account’s existing data',
-  });
-  await expect(useAccount.or(syncNow.and(page.locator('button:enabled')))).toBeVisible({
-    timeout: 60000,
-  });
-  if (await useAccount.isVisible()) await useAccount.click();
-  await expect(syncNow).toBeEnabled({ timeout: 60000 });
-
   await page.goto('/#/tag/TODAY/tasks');
   await workViewPage.waitForTaskList();
   const title = `Switch in flight ${Date.now()}`;

@@ -1,0 +1,74 @@
+:host {
+  display: block;
+}
+
+// A secondary section under the account card: one quiet row until it is opened.
+.calendar-publications {
+  padding-inline: var(--s3);
+  border: 1px solid var(--palette-border);
+  border-radius: var(--r-md);
+  background: var(--card-bg);
+}
+
+.calendar-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-block: var(--s) var(--s3);
+
+  p {
+    margin: 0;
+  }
+}
+
+.quiet {
+  color: var(--text-color-muted);
+}
+
+.field {
+  width: 100%;
+}
+
+// A field already carries its own bottom margin (shared form look), so the form adds no gap.
+.publish-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  button {
+    margin-block-start: var(--s);
+  }
+}
+
+.url-block .field {
+  margin-block-end: 0;
+}
+
+.feeds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s);
+    padding-block-start: var(--s2);
+    border-block-start: 1px solid var(--palette-separator);
+  }
+
+  h3 {
+    margin: 0;
+    font: var(--type-body-strong);
+    overflow-wrap: anywhere;
+  }
+}
+
+.feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s);
+}

@@ -19,6 +19,7 @@ import {
 } from '@sp/sync-providers/ultra-tasks';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
+import { normalizeServerUrl } from './native-server-url.util';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { IS_ELECTRON } from '../../app.constants';
@@ -154,23 +155,12 @@ export class NativeSyncService {
     this.accountIdentity.set({ email: account.account!.email, id: account.account!.id });
   }
   private normalizeServerUrl(serverUrl: string): string {
-    const url = new URL(serverUrl);
-    if (
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      (url.protocol !== 'https:' &&
-        !(
-          url.protocol === 'http:' &&
-          ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-        ))
-    )
-      throw new Error('NATIVE_SYNC.ERROR_URL');
-    return url.href.replace(/\/$/, '');
+    return normalizeServerUrl(serverUrl);
   }
-  async openAccount(serverUrl: string): Promise<void> {
-    const url = this.normalizeServerUrl(serverUrl) + '/account';
+  /** Opens the account website; `signup` lands on its create-account view. */
+  async openAccount(serverUrl: string, view?: 'signup'): Promise<void> {
+    const url =
+      this.normalizeServerUrl(serverUrl) + '/account' + (view ? '?view=' + view : '');
     if (Capacitor.isNativePlatform()) await Browser.open({ url });
     else if (IS_ELECTRON) window.ea.openExternalUrl(url);
     else window.open(url, '_blank', 'noopener,noreferrer');
@@ -724,5 +714,12 @@ export class NativeSyncService {
     this.status.set('NATIVE_SYNC.LOCKED');
     await this.certTrust.setPendingConfig(this, null);
     this.closing = false;
+  }
+  // PLACEHOLDER for the account page ("Finish connecting"): the data-connection owner replaces
+  // this with the real implementation, which reopens the data choice.
+  async resumeDataConnection(): Promise<void> {
+    this.dataChoice.update((choice) =>
+      choice ? { ...choice, deferred: false } : choice,
+    );
   }
 }

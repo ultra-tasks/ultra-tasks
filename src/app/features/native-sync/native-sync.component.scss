@@ -1,93 +1,301 @@
+@use '../../../styles/_globals.scss' as *;
+
 :host {
   display: block;
 }
-.component-wrapper {
-  max-width: 760px;
+
+// One centred column (docs/styling-guide.md § Page layout): the account has one thing to say
+// at a time, so nothing sits beside it.
+.account-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  max-width: 30rem;
+  margin-inline: auto;
 }
+
 .account-card {
-  margin-block-end: var(--s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
   padding: var(--s3);
   border: 1px solid var(--palette-border);
   border-radius: var(--r-md);
   background: var(--card-bg);
+
+  @include mq(xs, max) {
+    padding: var(--s2);
+  }
+
+  h2 {
+    margin: 0;
+    font: var(--type-title);
+    letter-spacing: var(--track-title);
+    overflow-wrap: anywhere;
+  }
+
+  p {
+    margin: 0;
+  }
 }
-.sign-in-card {
-  max-width: 448px;
+
+// Signed in, but the tasks are not syncing yet: the one thing to do is finish connecting.
+.data-card {
+  border-color: var(--color-warning);
 }
-.account-context {
-  display: flex;
-  align-items: center;
-  gap: var(--s);
+
+.intro,
+.quiet {
   color: var(--text-color-muted);
-  font: var(--type-label);
-  margin-block-end: var(--s2);
 }
-.account-card h2 {
-  font: var(--type-title);
-  margin: 0;
-}
-.intro {
-  margin-block: var(--s1-5) var(--s3);
-  color: var(--text-color-muted);
-}
-.sign-in-card form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s);
-}
-mat-radio-group {
-  display: flex;
-  flex-direction: column;
-  margin-block-end: var(--s2);
-}
-.sign-in-card > button {
-  margin-block-start: var(--s);
-}
-.account-help,
-.server-address {
-  color: var(--text-color-muted);
-  margin-block: var(--s2) var(--s);
-}
-.server-address,
-.account-email {
-  overflow-wrap: anywhere;
-}
-.privacy-note {
-  border-block-start: 1px solid var(--palette-separator);
-  padding-block-start: var(--s2);
-  margin-block: var(--s3) 0;
+
+.hint {
   color: var(--text-color-muted);
   font: var(--type-meta);
+  text-align: center;
 }
+
+.wide {
+  width: 100%;
+}
+
+.field {
+  width: 100%;
+}
+
+.server-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s3);
+}
+
+// A field already carries its own bottom margin (shared form look), so the form adds no gap.
+.sign-in-form {
+  display: flex;
+  flex-direction: column;
+
+  .server-note,
+  .callout {
+    margin-block-end: var(--s2);
+  }
+}
+
+.server-address {
+  overflow-wrap: anywhere;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--text-color-muted);
+  font: var(--type-meta);
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-block-start: 1px solid var(--palette-separator);
+  }
+}
+
+.text-links,
+.step-actions,
 .account-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s);
-  margin-block-start: var(--s2);
 }
-.sync-status {
+
+.text-links {
+  justify-content: center;
+}
+
+.privacy-note {
+  border-block-start: 1px solid var(--palette-separator);
+  padding-block-start: var(--s2);
+  color: var(--text-color-muted);
+  font: var(--type-meta);
+}
+
+.request-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s);
+}
+
+.code {
+  font: var(--type-heading);
+  font-family: var(--font-mono-stack);
+  letter-spacing: 0.08em;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-half);
+}
+
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s1-5);
+}
+
+.status-icon {
+  flex: none;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  font-size: var(--icon-md);
+  color: var(--text-color-muted);
+}
+
+.status[data-severity='ok'] .status-icon {
+  color: var(--color-success);
+}
+
+.status[data-severity='warning'] .status-icon {
+  color: var(--color-warning);
+}
+
+.status[data-severity='error'] .status-icon {
+  color: var(--color-danger);
+}
+
+.status-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-half);
+  min-width: 0;
+}
+
+.status-label {
   font: var(--type-body-strong);
 }
-.account-options {
+
+.spin {
+  animation: spin calc(var(--transition-duration-l) * 4) linear infinite;
+  transform-origin: center center;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+// Clockwise, the way the arrows of the `sync_ring` icon point.
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Two quiet disclosures at the foot of the card, each a hairline row (shared `<details>` look).
+details {
   border-block-start: 1px solid var(--palette-separator);
-  margin-block-start: var(--s3);
-  padding-block-start: var(--s2);
 }
-summary {
-  cursor: pointer;
-  min-height: var(--ctl-md);
-  align-content: center;
+
+.details-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-block: var(--s) var(--s2);
 }
-// Future shared-project fields retain their layout without touching Material internals.
-input:not([matInput], [type='checkbox']),
-textarea,
-select {
-  display: block;
-  width: min(100%, 35em);
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin: 0;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-half);
+  }
+
+  dt {
+    color: var(--text-color-muted);
+    font: var(--type-meta);
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
 }
-li {
-  margin-block: var(--s);
+
+.problem {
+  color: var(--color-danger);
+  font: var(--type-meta);
 }
-.tasks {
-  padding-inline-start: var(--s2);
+
+.copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s);
+
+  .value {
+    flex: 1 1 18rem;
+    min-width: 0;
+    padding: var(--s);
+    font-family: var(--font-mono-stack);
+    font-size: var(--font-size-sm);
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: inherit;
+
+    @include noIosFocusZoomOnTouch();
+  }
+}
+
+.options-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-block: var(--s) var(--s2);
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s);
+}
+
+.danger-area {
+  margin-block-start: var(--s);
+
+  button {
+    margin-block-start: var(--s);
+  }
+}
+
+// Shared projects need a non-private server and are not extended here: they only sit in the same
+// card as the rest of the page, with native controls that follow the dark theme.
+.shared-projects {
+  @include darkTheme() {
+    color-scheme: dark;
+  }
+
+  input:not([matInput], [type='checkbox']),
+  textarea,
+  select {
+    display: block;
+    width: min(100%, 35em);
+  }
+
+  li {
+    margin-block: var(--s);
+  }
+
+  .tasks {
+    padding-inline-start: var(--s2);
+  }
 }

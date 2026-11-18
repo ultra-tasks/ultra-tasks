@@ -2,6 +2,12 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { ErrorStateMatcher } from '@angular/material/core';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { ProjectService } from '../project/project.service';
 import { TagService } from '../tag/tag.service';
 import { T } from '../../t.const';
@@ -12,135 +18,24 @@ import {
 
 @Component({
   selector: 'calendar-publications',
-  imports: [FormsModule, TranslatePipe, MatButtonModule],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    MatButtonModule,
+    MatCheckboxModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatSelectModule,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (publication.available()) {
-      <section>
-        <h2>{{ T.CALENDAR_PUBLICATION.TITLE | translate }}</h2>
-        <button
-          mat-button
-          type="button"
-          [disabled]="publication.busy()"
-          (click)="publication.refresh()"
-        >
-          {{ T.PS.RELOAD | translate }}
-        </button>
-        <p>{{ T.CALENDAR_PUBLICATION.DISCLOSURE | translate }}</p>
-        <p>{{ T.CALENDAR_PUBLICATION.REFRESH_HELP | translate }}</p>
-        @if (failed() || publication.error()) {
-          <p role="alert">{{ T.CALENDAR_PUBLICATION.ERROR | translate }}</p>
-        }
-        <form (ngSubmit)="publish()">
-          <p>
-            <label
-              >{{ T.CALENDAR_PUBLICATION.LABEL | translate }}
-              <input
-                name="calendarLabel"
-                [(ngModel)]="label"
-                required
-                maxlength="100"
-              />
-            </label>
-          </p>
-          <p>
-            <label
-              >{{ T.CALENDAR_PUBLICATION.SELECTION | translate }}
-              <select
-                name="calendarSelection"
-                [(ngModel)]="selection"
-              >
-                <option value="all">{{ T.CALENDAR_PUBLICATION.ALL | translate }}</option>
-                @for (project of projects.list(); track project.id) {
-                  <option [value]="'project:' + project.id">{{ project.title }}</option>
-                }
-                @for (tag of tags.tagsNoMyDayAndNoList(); track tag.id) {
-                  <option [value]="'tag:' + tag.id">#{{ tag.title }}</option>
-                }
-              </select>
-            </label>
-          </p>
-          <p>
-            <label
-              >{{ T.CALENDAR_PUBLICATION.PRIVACY | translate }}
-              <select
-                name="calendarPrivacy"
-                [(ngModel)]="privacy"
-              >
-                <option value="busy">
-                  {{ T.CALENDAR_PUBLICATION.BUSY | translate }}
-                </option>
-                <option value="titles">
-                  {{ T.CALENDAR_PUBLICATION.TITLES | translate }}
-                </option>
-              </select>
-            </label>
-          </p>
-          <p>
-            <label
-              ><input
-                type="checkbox"
-                name="calendarConsent"
-                [(ngModel)]="consent"
-              />
-              {{ T.CALENDAR_PUBLICATION.CONSENT | translate }}
-            </label>
-          </p>
-          <button
-            mat-flat-button
-            type="submit"
-            [disabled]="!consent || !label.trim() || publication.busy()"
-          >
-            {{ T.CALENDAR_PUBLICATION.PUBLISH | translate }}
-          </button>
-        </form>
-        @if (url()) {
-          <p>{{ T.CALENDAR_PUBLICATION.URL_HELP | translate }}</p>
-          <p>
-            <label
-              >{{ T.CALENDAR_PUBLICATION.URL | translate }}
-              <input
-                readonly
-                [value]="url()"
-              />
-            </label>
-          </p>
-        }
-        @for (feed of publication.feeds(); track feed.id) {
-          <article>
-            <h3>{{ feed.label }}</h3>
-            <p>
-              {{
-                (publication.ownedIds().has(feed.id)
-                  ? T.CALENDAR_PUBLICATION.OWNER
-                  : T.CALENDAR_PUBLICATION.OTHER_DEVICE
-                ) | translate
-              }}
-            </p>
-            <button
-              mat-stroked-button
-              type="button"
-              [disabled]="publication.busy()"
-              (click)="rotate(feed)"
-            >
-              {{ T.CALENDAR_PUBLICATION.ROTATE | translate }}
-            </button>
-            <button
-              mat-button
-              type="button"
-              [disabled]="publication.busy()"
-              (click)="stop(feed)"
-            >
-              {{ T.CALENDAR_PUBLICATION.STOP | translate }}
-            </button>
-          </article>
-        }
-      </section>
-    }
-  `,
+  templateUrl: './calendar-publications.component.html',
+  styleUrl: './calendar-publications.component.scss',
 })
 export class CalendarPublicationsComponent {
   readonly T = T;
+  /** The label is announced as required, but an empty field is not painted as an error. */
+  readonly plainFieldMatcher: ErrorStateMatcher = { isErrorState: () => false };
   readonly publication = inject(CalendarPublicationService);
   readonly projects = inject(ProjectService);
   readonly tags = inject(TagService);

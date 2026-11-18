@@ -95,6 +95,15 @@ describe('NativeSyncService', () => {
       'NATIVE_SYNC.ERROR_URL',
     );
   });
+  it('opens the account website, at its sign-up view when asked', async () => {
+    const openWindow = spyOn(window, 'open');
+    await service.openAccount('http://localhost:1900');
+    await service.openAccount('http://localhost:1900/', 'signup');
+    expect(openWindow.calls.allArgs()).toEqual([
+      ['http://localhost:1900/account', '_blank', 'noopener,noreferrer'],
+      ['http://localhost:1900/account?view=signup', '_blank', 'noopener,noreferrer'],
+    ]);
+  });
   it('awaits certificate trust before sign-in and retains it through MFA until lock', async () => {
     let acknowledge!: () => void;
     certTrust.setPendingConfig.and.returnValue(

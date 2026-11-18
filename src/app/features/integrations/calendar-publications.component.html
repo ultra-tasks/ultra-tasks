@@ -1,0 +1,154 @@
+@if (publication.available()) {
+  <details class="calendar-publications">
+    <summary>{{ T.CALENDAR_PUBLICATION.TITLE | translate }}</summary>
+    <div class="calendar-body">
+      <div class="callout callout--warning">
+        <mat-icon aria-hidden="true">visibility</mat-icon>
+        <p>{{ T.CALENDAR_PUBLICATION.DISCLOSURE | translate }}</p>
+      </div>
+      <p class="quiet">{{ T.CALENDAR_PUBLICATION.REFRESH_HELP | translate }}</p>
+      @if (failed() || publication.error()) {
+        <div
+          class="callout callout--danger"
+          role="alert"
+        >
+          <mat-icon aria-hidden="true">error_outline</mat-icon>
+          <p>{{ T.CALENDAR_PUBLICATION.ERROR | translate }}</p>
+        </div>
+      }
+      <form
+        class="publish-form"
+        (ngSubmit)="publish()"
+      >
+        <mat-form-field
+          class="field"
+          subscriptSizing="dynamic"
+          hideRequiredMarker
+        >
+          <mat-label>{{ T.CALENDAR_PUBLICATION.LABEL | translate }}</mat-label>
+          <input
+            matInput
+            name="calendarLabel"
+            [(ngModel)]="label"
+            required
+            [errorStateMatcher]="plainFieldMatcher"
+            maxlength="100"
+          />
+        </mat-form-field>
+        <mat-form-field
+          class="field"
+          subscriptSizing="dynamic"
+        >
+          <mat-label>{{ T.CALENDAR_PUBLICATION.SELECTION | translate }}</mat-label>
+          <mat-select
+            name="calendarSelection"
+            [(ngModel)]="selection"
+          >
+            <mat-option value="all">{{
+              T.CALENDAR_PUBLICATION.ALL | translate
+            }}</mat-option>
+            @for (project of projects.list(); track project.id) {
+              <mat-option [value]="'project:' + project.id">{{
+                project.title
+              }}</mat-option>
+            }
+            @for (tag of tags.tagsNoMyDayAndNoList(); track tag.id) {
+              <mat-option [value]="'tag:' + tag.id">#{{ tag.title }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field
+          class="field"
+          subscriptSizing="dynamic"
+        >
+          <mat-label>{{ T.CALENDAR_PUBLICATION.PRIVACY | translate }}</mat-label>
+          <mat-select
+            name="calendarPrivacy"
+            [(ngModel)]="privacy"
+          >
+            <mat-option value="busy">{{
+              T.CALENDAR_PUBLICATION.BUSY | translate
+            }}</mat-option>
+            <mat-option value="titles">{{
+              T.CALENDAR_PUBLICATION.TITLES | translate
+            }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-checkbox
+          name="calendarConsent"
+          [(ngModel)]="consent"
+          >{{ T.CALENDAR_PUBLICATION.CONSENT | translate }}</mat-checkbox
+        >
+        <button
+          mat-stroked-button
+          type="submit"
+          [disabled]="!consent || !label.trim() || publication.busy()"
+        >
+          {{ T.CALENDAR_PUBLICATION.PUBLISH | translate }}
+        </button>
+      </form>
+      @if (url()) {
+        <div class="url-block">
+          <p class="quiet">{{ T.CALENDAR_PUBLICATION.URL_HELP | translate }}</p>
+          <mat-form-field
+            class="field"
+            subscriptSizing="dynamic"
+          >
+            <mat-label>{{ T.CALENDAR_PUBLICATION.URL | translate }}</mat-label>
+            <input
+              matInput
+              readonly
+              [value]="url()"
+              (focus)="$any($event.target).select()"
+            />
+          </mat-form-field>
+        </div>
+      }
+      @if (publication.feeds().length) {
+        <ul class="feeds">
+          @for (feed of publication.feeds(); track feed.id) {
+            <li>
+              <h3>{{ feed.label }}</h3>
+              <p class="quiet">
+                {{
+                  (publication.ownedIds().has(feed.id)
+                    ? T.CALENDAR_PUBLICATION.OWNER
+                    : T.CALENDAR_PUBLICATION.OTHER_DEVICE
+                  ) | translate
+                }}
+              </p>
+              <div class="feed-actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [disabled]="publication.busy()"
+                  (click)="rotate(feed)"
+                >
+                  {{ T.CALENDAR_PUBLICATION.ROTATE | translate }}
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="publication.busy()"
+                  (click)="stop(feed)"
+                >
+                  {{ T.CALENDAR_PUBLICATION.STOP | translate }}
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+      <div class="feed-actions">
+        <button
+          mat-button
+          type="button"
+          [disabled]="publication.busy()"
+          (click)="publication.refresh()"
+        >
+          {{ T.PS.RELOAD | translate }}
+        </button>
+      </div>
+    </div>
+  </details>
+}
