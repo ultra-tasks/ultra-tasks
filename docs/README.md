@@ -49,6 +49,9 @@ must link to their replacement, and keep their original number.
 
 ## Active plans
 
+- [Ultra Tasks account beta 2 audit and handoff](plans/2026-11-18-account-beta2-audit-and-handoff.md)
+  — confirmed mobile first-sync choice issue, shared account/sync status, simpler
+  identity, dashboard and login UX, email new-device verification and website promotion
 - [Context identity: paper prototype and test plan](plans/2026-11-11-context-identity-paper-prototype.md)
   — four variants of project colour identity, rules, and a user-test plan; paper only until a test passes
 - [Zen-inspired shell: audit and combined proposal](plans/2026-11-10-zen-inspired-shell-proposal.md)
