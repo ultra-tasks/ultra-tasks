@@ -296,9 +296,24 @@ export const connectFirstDevice = async (
   account: string,
 ): Promise<void> => {
   await signIn(device.page, account);
-  await expect(
-    device.page.getByRole('button', { name: 'Sync now', exact: true }),
-  ).toBeEnabled({ timeout: 90000 });
+  // Connected means: the account page offers an enabled "Sync now", or the first connection
+  // finished and the app already moved on to the task workspace. The page leaves on its own
+  // once the first sync ends, so waiting only for the button is a race.
+  await expect
+    .poll(
+      async () => {
+        if (!/native-sync/.test(device.page.url())) return 'workspace';
+        const syncNow = device.page.getByRole('button', {
+          name: 'Sync now',
+          exact: true,
+        });
+        return (await syncNow.count()) && (await syncNow.isEnabled())
+          ? 'account'
+          : 'pending';
+      },
+      { timeout: 90000, message: 'the first device never finished connecting' },
+    )
+    .not.toBe('pending');
   await expect(device.page.locator('native-sync [role=alert]')).toHaveCount(0);
 };
 
