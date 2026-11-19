@@ -107,6 +107,9 @@ it wrong: any claim about which releases carry a change must be re-derived with
 any code changing.
 
 - [Recurring events implementation plan](research/recurring-events-implementation-plan.md)
+- [Account flow desktop UI/UX audit](research/2026-11-18-account-flow-desktop-ux-audit.md)
+  — screen-level findings for the server login, dashboard and in-app sign-in with
+  before/after screenshots and the beta 2 changes
 - [Main interface UI/UX simplification audit](research/2026-11-05-main-interface-ui-ux-audit.md)
   — recommendations against Claude's November 5 shell/task-surface checkpoint
 - [UI icon audit](research/icon-audit.md) — dated semantic inventory, contextual
