@@ -20,6 +20,7 @@ export enum BannerId {
   UpdateAvailable = 'UpdateAvailable',
   LocalRecoveryPoint = 'LocalRecoveryPoint',
   TrackingMovedToOtherDevice = 'TrackingMovedToOtherDevice',
+  AccountSyncAttention = 'AccountSyncAttention',
 }
 
 export const BANNER_SORT_PRIO_MAP = {
@@ -43,6 +44,9 @@ export const BANNER_SORT_PRIO_MAP = {
   [BannerId.LocalRecoveryPoint]: 1,
   // above StartTrackingReminder, which would contradict it while another device tracks
   [BannerId.TrackingMovedToOtherDevice]: 3,
+  // The account needs the user (sign in again, unlock, finish connecting): above the calm
+  // notices, below anything with a clock on it.
+  [BannerId.AccountSyncAttention]: 2,
 } as const;
 
 export interface BannerAction {

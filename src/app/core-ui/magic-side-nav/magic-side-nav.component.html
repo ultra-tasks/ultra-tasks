@@ -197,6 +197,10 @@
                       [showLabels]="showText()"
                       [tourClass]="item.tourClass"
                       [featureConfigKey]="item.featureConfigKey"
+                      [showAccountAttention]="
+                        item.accountAttention === 'any' ||
+                        (item.accountAttention === 'phone' && isMobile())
+                      "
                       (clicked)="onItemClick(item)"
                     ></nav-item>
                   }
@@ -272,6 +276,9 @@
                     [showLabels]="showText()"
                     [tourClass]="item.tourClass"
                     [featureConfigKey]="item.featureConfigKey"
+                    [showAccountAttention]="
+                      item.accountAttention === 'any' || item.accountAttention === 'phone'
+                    "
                     (clicked)="onItemClick(item)"
                   ></nav-item>
                 </li>

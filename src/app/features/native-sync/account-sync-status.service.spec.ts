@@ -1,8 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { SyncProviderId } from '../../op-log/sync-providers/provider.const';
+import { IS_ONLINE$ } from '../../util/is-online.token';
 import { NativeSyncService } from './native-sync.service';
 import { AccountSyncStatusService } from './account-sync-status.service';
 import type { AccountDataChoice, AccountPhase } from './account-sync.types';
@@ -23,6 +24,7 @@ describe('AccountSyncStatusService', () => {
   let state$: BehaviorSubject<string>;
   let inProgress$: BehaviorSubject<boolean>;
   let clean$: BehaviorSubject<boolean>;
+  let online$: BehaviorSubject<boolean>;
 
   beforeEach(() => {
     configured = signal(false);
@@ -42,8 +44,12 @@ describe('AccountSyncStatusService', () => {
     state$ = new BehaviorSubject('UNKNOWN_OR_CHANGED');
     inProgress$ = new BehaviorSubject(false);
     clean$ = new BehaviorSubject(true);
+    // Not the module-level `isOnline$`: it is a debounced singleton shared by the whole run, so
+    // its state leaks between specs and cannot be driven without waiting in real time.
+    online$ = new BehaviorSubject(true);
     TestBed.configureTestingModule({
       providers: [
+        { provide: IS_ONLINE$, useValue: online$ },
         {
           provide: NativeSyncService,
           useValue: {
@@ -172,6 +178,68 @@ describe('AccountSyncStatusService', () => {
     expect(service.status().engine).toBe('account');
   });
 
+  it('offers a manual sync from the calm states, so a click on them does something', () => {
+    account('synced');
+    expect(service.status().action).toBe('sync');
+    emptyAccount.set(true);
+    expect(service.status().action).toBe('sync');
+    emptyAccount.set(false);
+    offline.set(true);
+    expect(service.status().action).toBe('sync');
+    // Work that is already running has nothing to start.
+    offline.set(false);
+    phase.set('downloading');
+    expect(service.status().action).toBeNull();
+  });
+
+  describe('needsAttention', () => {
+    it('is false while nothing is configured', () => {
+      expect(service.needsAttention()).toBeFalse();
+    });
+
+    it('is false for a healthy, working or offline account: they resolve by themselves', () => {
+      account('synced');
+      expect(service.needsAttention()).toBeFalse();
+      phase.set('syncing');
+      expect(service.needsAttention()).toBeFalse();
+      phase.set('downloading');
+      expect(service.needsAttention()).toBeFalse();
+      phase.set('synced');
+      offline.set(true);
+      expect(service.needsAttention()).toBeFalse();
+    });
+
+    for (const next of ['locked', 'reauth', 'choose-data', 'verify-device'] as const) {
+      it(`is true while an account is "${next}"`, () => {
+        account(next);
+        expect(service.needsAttention()).toBeTrue();
+      });
+    }
+
+    it('is true after a failure and clears with the next success', () => {
+      account('synced');
+      error.set('NATIVE_SYNC.ERROR_SYNC');
+      expect(service.needsAttention()).toBeTrue();
+      error.set('');
+      expect(service.needsAttention()).toBeFalse();
+    });
+
+    it('is only a boolean, so a sync cycle does not wake its readers', () => {
+      account('synced');
+      let runs = 0;
+      const reader = computed(() => {
+        runs++;
+        return service.needsAttention();
+      });
+      reader();
+      lastSyncedAt.set(1);
+      phase.set('syncing');
+      phase.set('synced');
+      reader();
+      expect(runs).toBe(1);
+    });
+  });
+
   describe('legacy provider', () => {
     beforeEach(() => {
       syncCfg$.next({ isEnabled: true, syncProvider: SyncProviderId.WebDAV });
@@ -183,6 +251,19 @@ describe('AccountSyncStatusService', () => {
       expect(status.id).toBe('provider-attention');
       expect(status.engine).toBe('provider');
       expect(status.configured).toBeTrue();
+      expect(service.needsAttention()).toBeTrue();
+    });
+
+    it('sends a provider that needs reconnecting to its dialog, not to the account page', () => {
+      ready$.next(false);
+      expect(service.status().action).toBe('setup');
+    });
+
+    it('needs attention after a failure, and not while healthy', () => {
+      ready$.next(true);
+      expect(service.needsAttention()).toBeFalse();
+      state$.next('ERROR');
+      expect(service.needsAttention()).toBeTrue();
     });
 
     it('reports error, syncing and up to date with the header precedence', () => {
@@ -199,19 +280,18 @@ describe('AccountSyncStatusService', () => {
       expect(service.status().busy).toBeTrue();
     });
 
-    it('reports offline ahead of the provider state', async () => {
+    it('reports offline ahead of the provider state', () => {
       ready$.next(true);
-      // `isOnline$` debounces in the root zone, so wait in real time.
-      const settled = (): Promise<void> => new Promise((done) => setTimeout(done, 1150));
-      window.dispatchEvent(new Event('offline'));
-      await settled();
-      try {
-        expect(service.status().id).toBe('offline');
-      } finally {
-        window.dispatchEvent(new Event('online'));
-        await settled();
-      }
+      online$.next(false);
+      expect(service.status().id).toBe('offline');
+      online$.next(true);
       expect(service.status().id).toBe('up-to-date');
-    }, 8000);
+    });
+
+    it('keeps a provider that needs reconnecting ahead of offline', () => {
+      ready$.next(false);
+      online$.next(false);
+      expect(service.status().id).toBe('provider-attention');
+    });
   });
 });

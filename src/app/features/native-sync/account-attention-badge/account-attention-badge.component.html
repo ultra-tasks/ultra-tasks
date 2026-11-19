@@ -1,0 +1,13 @@
+@if (attention()) {
+  <span
+    class="badge"
+    [class.badge--error]="isError()"
+    aria-hidden="true"
+    >!</span
+  >
+  <span
+    class="cdk-visually-hidden"
+    [attr.id]="textId()"
+    >{{ T.ACCOUNT_STATUS.NEEDS_ATTENTION | translate }}</span
+  >
+}

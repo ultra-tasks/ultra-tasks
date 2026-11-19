@@ -58,7 +58,12 @@ test('dedicated settings categories reveal themes, shortcuts, sound and date exa
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.locator('a[href="#/account"]').click();
   const account = page.getByRole('dialog', { name: 'Account', exact: true });
-  await expect(account.locator('.sync-summary')).toBeVisible();
+  // A fresh profile has no account: the window says so and offers the one way in.
+  await expect(account.locator('account-sync-summary')).toBeVisible();
+  await expect(account.getByText('Local only', { exact: true })).toBeVisible();
+  await expect(
+    account.getByRole('button', { name: 'Set up sync', exact: true }),
+  ).toBeVisible();
   await expect(account.locator('.settings-categories')).toBeHidden();
   await expect(account.locator('file-imex')).toHaveCount(0);
 });

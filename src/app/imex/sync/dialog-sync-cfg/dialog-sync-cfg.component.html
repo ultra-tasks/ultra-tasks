@@ -1,6 +1,17 @@
 <h2 mat-dialog-title>{{ T.F.SYNC.D_INITIAL_CFG.TITLE | translate }}</h2>
 
 <mat-dialog-content>
+  @if (native.configured()) {
+    <!-- A connected account comes first, as itself: its status, its Account ID and what to
+         do about it. Switching this device to another provider is the secondary choice
+         below. The chooser stays visible (no extra click) so no saved connection is hidden. -->
+    <account-sync-summary
+      class="dialog-account-summary"
+      [compact]="true"
+      [showOtherOptions]="false"
+    />
+    <h3 class="dialog-other-options">{{ T.ACCOUNT_STATUS.OTHER_OPTIONS | translate }}</h3>
+  }
   <mat-form-field>
     <mat-label>{{ T.F.SYNC.FORM.L_SYNC_PROVIDER | translate }}</mat-label>
     <mat-select
@@ -8,7 +19,9 @@
       [value]="setupProvider()"
       (selectionChange)="selectSetupProvider($event.value)"
     >
-      <mat-option [value]="ultraSync">UltraTasks Account</mat-option>
+      <mat-option [value]="ultraSync">{{
+        T.SYNC_SETUP.ULTRA_OPTION | translate
+      }}</mat-option>
       @for (option of setupOptions(); track option.value) {
         <mat-option [value]="option.value">
           {{ option.label | translate }}
@@ -29,12 +42,17 @@
       {{ T.SYNC_SETUP.RETRY_PROVIDER | translate }}
     </button>
   }
-  @if (isWasEnabled() || native.configured()) {
+  <!-- Switching is what the help is about: with the account connected and still selected,
+       nothing is being switched. -->
+  @if (isWasEnabled() || (native.configured() && setupProvider() !== ultraSync)) {
     <p>{{ T.SYNC_SETUP.SWITCH_HELP | translate }}</p>
   }
   @if (setupProvider() === ultraSync) {
-    <p>{{ T.SYNC_SETUP.ULTRA_DESCRIPTION | translate }}</p>
-    <p>{{ T.SYNC_SETUP.PRIVATE_BETA | translate }}</p>
+    <!-- Already connected: the summary above says it, so there is nothing to describe. -->
+    @if (!native.configured()) {
+      <p>{{ T.SYNC_SETUP.ULTRA_DESCRIPTION | translate }}</p>
+      <p>{{ T.SYNC_SETUP.PRIVATE_BETA | translate }}</p>
+    }
   } @else {
     <p>{{ T.SYNC_SETUP.BASIC_DESCRIPTION | translate }}</p>
     @if (legacyProvider()) {
@@ -89,15 +107,18 @@
       {{ T.G.CANCEL | translate }}
     </button>
     @if (setupProvider() === ultraSync) {
-      <button
-        mat-flat-button
-        color="primary"
-        [disabled]="isInitialSettingsUnavailable() || isSaving()"
-        routerLink="/native-sync"
-        (click)="openUltraSync()"
-      >
-        {{ T.SYNC_SETUP.CONTINUE_ULTRA | translate }}
-      </button>
+      <!-- A connected account has nothing to continue to: the summary opens it. -->
+      @if (!native.configured()) {
+        <button
+          mat-flat-button
+          color="primary"
+          [disabled]="isInitialSettingsUnavailable() || isSaving()"
+          routerLink="/native-sync"
+          (click)="openUltraSync()"
+        >
+          {{ T.SYNC_SETUP.CONTINUE_ULTRA | translate }}
+        </button>
+      }
     } @else {
       <button
         [disabled]="

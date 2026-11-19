@@ -3,10 +3,14 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { toSyncProviderId } from '../../op-log/sync-providers/provider.const';
-import { isOnline$ } from '../../util/is-online';
+import { IS_ONLINE$ } from '../../util/is-online.token';
 import { T } from '../../t.const';
 import { NativeSyncService } from './native-sync.service';
-import type { AccountStatusId, AccountSyncStatus } from './account-sync-status.model';
+import {
+  isAttentionStatus,
+  type AccountStatusId,
+  type AccountSyncStatus,
+} from './account-sync-status.model';
 
 type StatusSeed = Pick<
   AccountSyncStatus,
@@ -33,7 +37,8 @@ export class AccountSyncStatusService {
   private readonly native = inject(NativeSyncService);
   private readonly legacy = inject(SyncWrapperService);
 
-  private readonly online = toSignal(isOnline$, { initialValue: true });
+  // The injectable form of the shared `isOnline$` (same stream at runtime), so a spec can drive it.
+  private readonly online = toSignal(inject(IS_ONLINE$), { initialValue: true });
   private readonly providerConfigured = toSignal(
     this.legacy.syncCfg$.pipe(
       map((cfg) => !!cfg?.isEnabled && toSyncProviderId(cfg.syncProvider) !== null),
@@ -68,6 +73,13 @@ export class AccountSyncStatusService {
   readonly status = computed<AccountSyncStatus>(() =>
     this.isAccountEngine() ? this.accountStatus() : this.providerStatus(),
   );
+
+  /**
+   * Something is configured and needs the user (sign in again, unlock, choose data, a failed
+   * sync, a provider to reconnect). A boolean, so its dependents only run when it flips, not on
+   * every sync cycle: the header override, the navigation badge and the banner read this.
+   */
+  readonly needsAttention = computed(() => isAttentionStatus(this.status()));
 
   private build(
     seed: StatusSeed,
@@ -176,6 +188,9 @@ export class AccountSyncStatusService {
         ...MATERIAL,
         labelKey: T.ACCOUNT_STATUS.OFFLINE,
         detailKey: T.ACCOUNT_STATUS.OFFLINE_DETAIL,
+        // A manual attempt is allowed: it fails fast and says so, or it recovers.
+        action: 'sync',
+        actionLabelKey: T.ACCOUNT_STATUS.ACTION_SYNC,
       });
     }
     if (phase === 'downloading' || phase === 'applying' || phase === 'syncing') {
@@ -201,6 +216,8 @@ export class AccountSyncStatusService {
       labelKey: native.emptyAccount()
         ? T.ACCOUNT_STATUS.UP_TO_DATE_EMPTY
         : T.ACCOUNT_STATUS.UP_TO_DATE,
+      action: 'sync',
+      actionLabelKey: T.ACCOUNT_STATUS.ACTION_SYNC,
     });
   }
 
@@ -232,8 +249,9 @@ export class AccountSyncStatusService {
         ...SVG,
         labelKey: T.ACCOUNT_STATUS.PROVIDER_ATTENTION,
         detailKey: T.ACCOUNT_STATUS.PROVIDER_ATTENTION_DETAIL,
-        action: 'open-account',
-        actionLabelKey: T.ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT,
+        // Reconnecting a provider happens in its own dialog, not on the account page.
+        action: 'setup',
+        actionLabelKey: T.ACCOUNT_STATUS.ACTION_SYNC_SETTINGS,
       });
     }
     if (!this.online()) {

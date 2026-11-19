@@ -134,6 +134,9 @@
               >
                 <mat-icon aria-hidden="true">{{ link.icon }}</mat-icon
                 >{{ link.label | translate }}
+                @if (link.hasAccountAttention) {
+                  <account-attention-badge class="window-link-attention" />
+                }
               </button>
             }
           }
@@ -274,61 +277,13 @@
           }
           @if (selectedTabIndex === 9) {
             <div class="tab-content">
-              <section class="config-section sync-summary">
-                @let status = syncStatus();
-                @if (!status.providerId) {
-                  <p class="sync-summary__intro">
-                    {{ 'PS.SYNC.EMPTY_STATE_HINT' | translate }}
-                  </p>
-                  <div class="sync-summary__actions">
-                    <button
-                      (click)="openSyncCfgDialog()"
-                      color="primary"
-                      mat-flat-button
-                      type="button"
-                    >
-                      <mat-icon>cloud_sync</mat-icon>
-                      {{ 'PS.SYNC.SET_UP_SYNC' | translate }}
-                    </button>
-                  </div>
-                } @else {
-                  <div class="sync-summary__status">
-                    <span class="sync-summary__provider">
-                      <mat-icon>cloud_sync</mat-icon>
-                      {{ status.providerId }}
-                    </span>
-                    @if (status.needsAuth) {
-                      <span class="sync-summary__pill sync-summary__pill--warn">
-                        {{ 'PS.SYNC.NEEDS_AUTH' | translate }}
-                      </span>
-                    }
-                    @if (status.isEncrypted) {
-                      <span class="sync-summary__pill">
-                        <mat-icon>lock</mat-icon>
-                        {{ 'PS.SYNC.ENCRYPTED' | translate }}
-                      </span>
-                    }
-                  </div>
-                  <div class="sync-summary__actions">
-                    <button
-                      (click)="triggerSync()"
-                      color="primary"
-                      mat-flat-button
-                      type="button"
-                    >
-                      <mat-icon>sync</mat-icon>
-                      {{ 'F.SYNC.BTN_SYNC_NOW' | translate }}
-                    </button>
-                    <button
-                      (click)="openSyncCfgDialog()"
-                      mat-stroked-button
-                      type="button"
-                    >
-                      <mat-icon>tune</mat-icon>
-                      {{ 'PS.SYNC.CONFIGURE' | translate }}
-                    </button>
-                  </div>
-                }
+              <!-- One summary for every state: the connected account (locked, offline or
+                   signed out by the server included), a legacy provider, or local only. -->
+              <section class="config-section">
+                <account-sync-summary
+                  [provider]="syncStatus()"
+                  (setupRequested)="openSyncCfgDialog()"
+                />
               </section>
             </div>
           }

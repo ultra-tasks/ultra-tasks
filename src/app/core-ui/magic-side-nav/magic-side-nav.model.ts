@@ -57,6 +57,12 @@ export interface NavRouteItem extends NavBaseItem {
   label: string;
   icon: string;
   route: string;
+  /**
+   * The row leads to the account, so it carries a small "!" while sync needs the user (see
+   * `account-attention-badge`): `any` on every screen size (the Account row), `phone` only in
+   * the phone drawer (Settings, which is the way to Account there). Nothing at all otherwise.
+   */
+  accountAttention?: 'any' | 'phone';
 }
 
 export interface NavHrefItem extends NavBaseItem {

@@ -20,7 +20,11 @@ export type AccountStatusId =
 
 export type AccountStatusSeverity = 'neutral' | 'progress' | 'ok' | 'warning' | 'error';
 
-/** What the primary affordance of the status does when activated. */
+/**
+ * What the primary affordance of the status does when activated. `sync` and `retry` run a
+ * manual sync on the active engine, `setup` opens the provider dialog, and `null` means
+ * there is nothing to start right now (work is already running).
+ */
 export type AccountStatusAction =
   | 'sync'
   | 'open-account'
@@ -63,3 +67,22 @@ export interface AccountSyncStatus {
   /** The account engine's phase, for consumers that need more than the headline. */
   phase: AccountPhase | null;
 }
+
+/**
+ * States where the user has something to do or something is broken. Offline and progress are
+ * deliberately absent: they resolve by themselves, so they never earn a badge, a banner or an
+ * override of the "show the sync button" preference.
+ */
+const ATTENTION_STATUS_IDS: ReadonlySet<AccountStatusId> = new Set<AccountStatusId>([
+  'verify-device',
+  'choose-data',
+  'locked',
+  'reauth',
+  'error',
+  'provider-attention',
+]);
+
+/** Whether a configured account or provider is in a state that needs the user. */
+export const isAttentionStatus = (
+  status: Pick<AccountSyncStatus, 'id' | 'configured'>,
+): boolean => status.configured && ATTENTION_STATUS_IDS.has(status.id);

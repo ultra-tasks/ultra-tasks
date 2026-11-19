@@ -16,7 +16,7 @@ import { ProjectService } from '../../features/project/project.service';
 import { LayoutService } from '../layout/layout.service';
 import { TaskService } from '../../features/tasks/task.service';
 import { T } from '../../t.const';
-import { distinctUntilChanged, filter, map, switchMap } from 'rxjs/operators';
+import { filter, map, switchMap } from 'rxjs/operators';
 import { of, Subscription } from 'rxjs';
 import { WorkContextService } from '../../features/work-context/work-context.service';
 import { SimpleCounterService } from '../../features/simple-counter/simple-counter.service';
@@ -36,7 +36,10 @@ import { LongPressDirective } from '../../ui/longpress/longpress.directive';
 import { isOnline$ } from '../../util/is-online';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import { SyncStatus } from '../../op-log/sync-exports';
-import { toSyncProviderId } from '../../op-log/sync-providers/provider.const';
+import { AccountSyncActionsService } from '../../features/native-sync/account-sync-actions.service';
+import { AccountSyncStatusService } from '../../features/native-sync/account-sync-status.service';
+import { AccountSyncTextService } from '../../features/native-sync/account-sync-text.service';
+import { announcementFor } from '../../features/native-sync/account-sync-announcement';
 import { PluginHeaderBtnsComponent } from '../../plugins/ui/plugin-header-btns.component';
 import { PluginWorkContextHeaderBtnsComponent } from '../../plugins/ui/plugin-work-context-header-btns.component';
 import { PluginSidePanelBtnsComponent } from '../../plugins/ui/plugin-side-panel-btns.component';
@@ -169,22 +172,10 @@ export class MainHeaderComponent implements OnDestroy {
     }
     return null;
   });
+  // The legacy provider's own streams. They no longer decide what the button shows (the shared
+  // status below does); they stay for the provider-only parts: its click path (sync vs. set
+  // up) and the upload-confirmation hook the E2E sync helpers wait on.
   syncIsEnabledAndReady = toSignal(this.syncWrapperService.isEnabledAndReady$);
-  /**
-   * Sync is switched on and a provider is chosen. Deliberately not "ready": a
-   * provider that needs re-authorisation or a re-picked file is not ready, but
-   * its icon is the recovery path and must stay. Mirrors the Settings sync
-   * summary, which treats "off" and "no provider" as the same empty state.
-   */
-  readonly hasSyncConfigured = toSignal(
-    this.syncWrapperService.syncCfg$.pipe(
-      map((cfg) => !!cfg?.isEnabled && toSyncProviderId(cfg.syncProvider) !== null),
-      distinctUntilChanged(),
-    ),
-    { initialValue: false },
-  );
-  syncState = toSignal(this.syncWrapperService.syncState$);
-  isSyncInProgress = toSignal(this.syncWrapperService.isSyncInProgress$);
   hasNoPendingOps = toSignal(this.syncWrapperService.hasNoPendingOps$, {
     initialValue: false,
   });
@@ -193,62 +184,70 @@ export class MainHeaderComponent implements OnDestroy {
     { initialValue: false },
   );
   isOnline = toSignal(isOnline$);
-  // State-aware tooltip for the sync button: the icon alone (sync_error /
-  // cloud_off) signals a problem but never explains it. Surfacing the state in
-  // the tooltip is the ambient counterpart to suppressing the transient
-  // network snack on automatic syncs — a persistent problem stays discoverable
-  // by glancing at / hovering the always-present header button.
-  // Precedence mirrors `syncIcon` (disabled → offline → error → syncing →
-  // in-sync); keep the two in sync.
+
+  private readonly _accountStatus = inject(AccountSyncStatusService);
+  private readonly _accountActions = inject(AccountSyncActionsService);
+  /**
+   * One status for both engines, the Ultra Tasks account and a legacy provider (OneDrive,
+   * WebDAV, SuperSync): it drives the icon, the label, the classes and the spin below, and the
+   * same value is what Account, Settings and the search commands show.
+   */
+  readonly accountStatus = this._accountStatus.status;
+  /** Sync needs the user: sign in again, unlock, finish connecting, a failure, a provider to reconnect. */
+  readonly needsSyncAttention = this._accountStatus.needsAttention;
+  readonly isAccountEngine = computed(() => this.accountStatus().engine === 'account');
+  /** The account's tooltip and accessible name: its label, then the last sync when it is known. */
+  readonly accountTooltip = inject(AccountSyncTextService).tooltip;
+  /**
+   * What a screen reader hears when the status changes in a way that matters (never at first
+   * render, never for routine background syncing); see `nextAnnouncement`.
+   */
+  readonly syncAnnouncement = announcementFor(this.accountStatus);
+  // The tooltip's translation key. The account uses the shared label (the template adds its last
+  // sync). The provider keeps the wording it always had ("Sync problem — click to retry" is
+  // pinned by an E2E), except for a provider that needs reconnecting, which is no longer called
+  // "Set up sync". The icon alone (sync_error / cloud_off) signals a problem but never explains
+  // it, so a persistent problem stays discoverable by glancing at or hovering the button.
   syncTooltip = computed(() => {
-    // Not set up yet: the button opens the sync setup.
-    if (!this.syncIsEnabledAndReady()) {
-      return T.PS.SYNC.SET_UP_SYNC;
+    const status = this.accountStatus();
+    if (status.engine !== 'provider') {
+      return status.labelKey;
     }
-    if (!this.isOnline()) {
-      return T.MH.SYNC_STATE.OFFLINE;
+    switch (status.id) {
+      case 'provider-attention':
+        return status.labelKey;
+      case 'offline':
+        return T.MH.SYNC_STATE.OFFLINE;
+      case 'error':
+        return T.MH.SYNC_STATE.ERROR;
+      case 'syncing':
+        return status.busy ? T.MH.SYNC_STATE.SYNCING : T.MH.TRIGGER_SYNC;
+      default:
+        return this.superSyncIsConfirmedInSync()
+          ? T.MH.SYNC_STATE.IN_SYNC_CONFIRMED
+          : T.MH.SYNC_STATE.IN_SYNC;
     }
-    if (this.syncState() === 'ERROR') {
-      return T.MH.SYNC_STATE.ERROR;
-    }
-    if (this.isSyncInProgress()) {
-      return T.MH.SYNC_STATE.SYNCING;
-    }
-    if (this.hasNoPendingOps()) {
-      return this.superSyncIsConfirmedInSync()
-        ? T.MH.SYNC_STATE.IN_SYNC_CONFIRMED
-        : T.MH.SYNC_STATE.IN_SYNC;
-    }
-    return T.MH.TRIGGER_SYNC;
   });
-  // One icon per state, nothing drawn over it (#10427). All but `cloud_off` are
-  // the SVG icons in `BUILT_IN_SVG_ICONS`: one sync ring at the header's icon
-  // size, with a check, "!" or slash inside, so the arrows stay identical
-  // across states and in-sync differs from pending only by the check.
-  // Same precedence as `syncTooltip`.
-  syncIcon = computed(() => {
-    if (!this.syncIsEnabledAndReady()) {
-      return 'sync_off';
-    }
-    if (!this.isOnline()) {
-      return 'cloud_off';
-    }
-    if (this.syncState() === 'ERROR') {
-      return 'sync_error';
-    }
-    if (this.isSyncInProgress()) {
-      return 'sync_ring';
-    }
-    return this.hasNoPendingOps() ? 'sync_done' : 'sync_ring';
+  // One icon per state, nothing drawn over it (#10427). Most are the SVG icons in
+  // `BUILT_IN_SVG_ICONS`: one sync ring at the header's icon size, with a check, "!" or slash
+  // inside, so the arrows stay identical across states and in-sync differs from pending only by
+  // the check. The Material ones (`cloud_off`, `lock`, `sync_problem`) are drawn as ligatures.
+  syncIcon = computed(() => this.accountStatus().icon);
+  isSyncIconSpinning = computed(() => {
+    const status = this.accountStatus();
+    return status.busy && status.icon === 'sync_ring';
   });
-  isSyncIconSpinning = computed(
-    () => this.syncIcon() === 'sync_ring' && !!this.isSyncInProgress(),
-  );
-  // Test hook for the E2E sync helpers, which wait on these states. 'local':
-  // every local change is uploaded. 'remote': the remote was also checked
-  // within the last minute. Deliberately independent of the spinner and
-  // the error state, as the checkmark badges it replaces were.
+  // Test hook for the E2E sync helpers, which wait on these states. Provider: 'local' = every
+  // local change is uploaded, 'remote' = the remote was also checked within the last minute
+  // (deliberately independent of the spinner and the error state, as the checkmark badges it
+  // replaces were). Account: 'remote' once the status is up to date.
   syncConfirmation = computed(() => {
+    const status = this.accountStatus();
+    if (status.engine === 'account') {
+      return status.id === 'up-to-date' || status.id === 'up-to-date-empty'
+        ? 'remote'
+        : null;
+    }
     if (!this.syncIsEnabledAndReady() || !this.isOnline() || !this.hasNoPendingOps()) {
       return null;
     }
@@ -264,6 +263,19 @@ export class MainHeaderComponent implements OnDestroy {
   );
   readonly isSyncIconEnabled = computed(
     () => IS_SYNC_AVAILABLE && this.globalConfigService.appFeatures().isSyncIconEnabled,
+  );
+  /**
+   * The button shows once an account or a provider is configured, locked, offline and signed
+   * out by the server included, and the "Sync button" preference is on. While sync needs the
+   * user it shows whatever that preference says: the preference hides a calm indicator, it must
+   * not hide a problem only the user can fix. Offline and syncing never override it, since they
+   * resolve by themselves.
+   */
+  readonly isSyncButtonShown = computed(
+    () =>
+      IS_SYNC_AVAILABLE &&
+      this.accountStatus().configured &&
+      (this.isSyncIconEnabled() || this.needsSyncAttention()),
   );
   /**
    * The desktop panel buttons and the plugin side-panel buttons are absent below
@@ -690,6 +702,13 @@ export class MainHeaderComponent implements OnDestroy {
   }
 
   onSyncButtonClick(): void {
+    const status = this.accountStatus();
+    if (status.engine === 'account') {
+      // Sync now, finish connecting, or the account page: whatever the status asks for.
+      void this._accountActions.run(status);
+      return;
+    }
+    // A legacy provider keeps exactly the behaviour it always had.
     const ready = !!this.syncIsEnabledAndReady();
     if (ready) {
       this.sync();

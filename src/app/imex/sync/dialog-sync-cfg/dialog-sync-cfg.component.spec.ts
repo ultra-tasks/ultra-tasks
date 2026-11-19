@@ -24,6 +24,10 @@ import { SyncLocalStateService } from '../../../op-log/sync/sync-local-state.ser
 import { CertTrustService } from '../../../features/issue/cert-trust.service';
 import { NativeSyncService } from '../../../features/native-sync/native-sync.service';
 import { ULTRA_SYNC_SETUP } from '../sync-setup-options';
+import { By } from '@angular/platform-browser';
+import { provideRouter } from '@angular/router';
+import { Component, input, output, signal } from '@angular/core';
+import { AccountSyncSummaryComponent } from '../../../features/native-sync/account-sync-summary/account-sync-summary.component';
 import { BackupService } from '../../../op-log/backup/backup.service';
 import { OperationWriteFlushService } from '../../../op-log/sync/operation-write-flush.service';
 import type { LocalFileSyncPrivateCfg } from '@sp/sync-providers/local-file';
@@ -148,7 +152,7 @@ describe('DialogSyncCfgComponent', () => {
     component = fixture.componentInstance;
   });
 
-  describe('UltraTasks Account setup', () => {
+  describe('Ultra Tasks account setup', () => {
     it('waits for initial sync settings before accepting a provider choice', () => {
       const settings = new Subject<SyncConfig>();
       (
@@ -216,12 +220,12 @@ describe('DialogSyncCfgComponent', () => {
       ).toBeFalse();
       expect(saved.setupProvider()).toBe(ULTRA_SYNC_SETUP);
     }));
-    it('closes the underlying Account window when continuing to UltraTasks Account', () => {
+    it('closes the underlying Account window when continuing to the Ultra Tasks account', () => {
       component.openUltraSync();
       expect(mockMatDialog.closeAll).toHaveBeenCalled();
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
     });
-    it('defaults new setup to UltraTasks Account without persisting a legacy target', () => {
+    it('defaults new setup to the Ultra Tasks account without persisting a legacy target', () => {
       expect(component.setupProvider()).toBe(ULTRA_SYNC_SETUP);
       expect(mockSyncConfigService.updateSettingsFromForm).not.toHaveBeenCalled();
       expect(
@@ -257,7 +261,7 @@ describe('DialogSyncCfgComponent', () => {
       expect(component._tmpUpdatedCfg.syncProvider).toBe(SyncProviderId.WebDAV);
     }));
 
-    it('ignores a pending provider load after switching to UltraTasks Account', fakeAsync(() => {
+    it('ignores a pending provider load after switching to the Ultra Tasks account', fakeAsync(() => {
       let finishLoad!: (value: { encryptKey: string }) => void;
       const load = new Promise<{ encryptKey: string }>(
         (resolve) => (finishLoad = resolve),
@@ -1094,7 +1098,7 @@ describe('DialogSyncCfgComponent', () => {
   });
 
   describe('save() — provider without auth requirement', () => {
-    it('disconnects an unlocked UltraTasks Account session before it is locked', async () => {
+    it('disconnects an unlocked Ultra Tasks account session before it is locked', async () => {
       let unlocked = true;
       const disconnect = jasmine.createSpy('disconnect').and.callFake(async () => {
         expect(unlocked).toBeTrue();
@@ -1674,6 +1678,177 @@ describe('DialogSyncCfgComponent', () => {
         mockSyncLocalStateService.confirmOverwriteOfUndecryptableRemoteOps,
       ).toHaveBeenCalled();
       expect(mockSyncWrapperService.forceUpload).toHaveBeenCalled();
+    });
+  });
+});
+
+/**
+ * The real template, with the account summary stubbed: what the dialog leads with, and what it
+ * calls the account, for a device with and without a connected Ultra Tasks account.
+ */
+@Component({ selector: 'account-sync-summary', template: '', standalone: true })
+class StubAccountSummaryComponent {
+  readonly compact = input(false);
+  readonly showOtherOptions = input(true);
+}
+
+/** The provider forms need every Formly field type; this template test is not about them. */
+@Component({ selector: 'formly-form', template: '', standalone: true })
+class StubFormlyFormComponent {
+  readonly fields = input<unknown>();
+  readonly form = input<unknown>();
+  readonly model = input<unknown>();
+  readonly modelChange = output<unknown>();
+}
+
+describe('DialogSyncCfgComponent template', () => {
+  let fixture: ComponentFixture<DialogSyncCfgComponent>;
+  const configured = signal(false);
+
+  const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const text = (): string => (el().textContent ?? '').replace(/\s+/g, ' ').trim();
+  const summary = (): StubAccountSummaryComponent | undefined =>
+    fixture.debugElement.query(By.directive(StubAccountSummaryComponent))
+      ?.componentInstance;
+
+  beforeEach(async () => {
+    configured.set(false);
+    const dialogRef = jasmine.createSpyObj('MatDialogRef', [
+      'close',
+      'backdropClick',
+      'keydownEvents',
+    ]);
+    dialogRef.backdropClick.and.returnValue(EMPTY);
+    dialogRef.keydownEvents.and.returnValue(EMPTY);
+    const syncConfig = {
+      isEnabled: false,
+      syncProvider: null,
+      syncInterval: 300000,
+      encryptKey: '',
+      isEncryptionEnabled: false,
+      localFileSync: {},
+      webDav: {},
+      nextcloud: {},
+      superSync: {},
+    } as unknown as SyncConfig;
+    const providerManager = jasmine.createSpyObj('SyncProviderManager', [
+      'getProviderById',
+      'getAllProviders',
+      'notifyProviderTargetChanged',
+      'markSwitchFromNative',
+    ]);
+    providerManager.getAllProviders.and.resolveTo([]);
+
+    await TestBed.configureTestingModule({
+      imports: [
+        DialogSyncCfgComponent,
+        TranslateModule.forRoot(),
+        FormlyModule.forRoot(),
+      ],
+      providers: [
+        provideNoopAnimations(),
+        provideRouter([]),
+        { provide: MatDialogRef, useValue: dialogRef },
+        {
+          provide: SyncConfigService,
+          useValue: {
+            syncSettingsForm$: of(syncConfig),
+            updateSettingsFromForm: () => {},
+          },
+        },
+        {
+          provide: SyncWrapperService,
+          useValue: jasmine.createSpyObj('SyncWrapperService', ['sync']),
+        },
+        { provide: SyncProviderManager, useValue: providerManager },
+        { provide: GlobalConfigService, useValue: { sync$: of(syncConfig) } },
+        {
+          provide: SnackService,
+          useValue: jasmine.createSpyObj('SnackService', ['open']),
+        },
+        {
+          provide: MatDialog,
+          useValue: jasmine.createSpyObj('MatDialog', ['open', 'closeAll']),
+        },
+        {
+          provide: SyncLocalStateService,
+          useValue: jasmine.createSpyObj('SyncLocalStateService', [
+            'confirmOverwriteOfUndecryptableRemoteOps',
+          ]),
+        },
+        {
+          provide: CertTrustService,
+          useValue: { setPendingConfig: () => Promise.resolve() },
+        },
+        { provide: NativeSyncService, useValue: { configured } },
+        { provide: BackupService, useValue: {} },
+        {
+          provide: OperationWriteFlushService,
+          useValue: { flushPendingWrites: async () => undefined },
+        },
+      ],
+    })
+      .overrideComponent(DialogSyncCfgComponent, {
+        remove: { imports: [AccountSyncSummaryComponent, FormlyModule] },
+        add: { imports: [StubAccountSummaryComponent, StubFormlyFormComponent] },
+      })
+      .compileComponents();
+    fixture = TestBed.createComponent(DialogSyncCfgComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  });
+
+  describe('without a connected account', () => {
+    it('names the account option by its translated label, not a literal', () => {
+      expect(text()).toContain(T.SYNC_SETUP.ULTRA_OPTION);
+    });
+
+    it('describes the account and continues to it', () => {
+      expect(text()).toContain(T.SYNC_SETUP.ULTRA_DESCRIPTION);
+      expect(text()).toContain(T.SYNC_SETUP.PRIVATE_BETA);
+      expect(text()).toContain(T.SYNC_SETUP.CONTINUE_ULTRA);
+      expect(summary()).toBeUndefined();
+    });
+  });
+
+  describe('with a connected account', () => {
+    beforeEach(async () => {
+      configured.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    });
+
+    it('leads with the account summary, as itself and without a second filled button', () => {
+      const first = el().querySelector('mat-dialog-content')!.firstElementChild!;
+      expect(first.tagName.toLowerCase()).toBe('account-sync-summary');
+      expect(summary()!.compact()).toBeTrue();
+      // The dialog itself is the way to other options, so the summary hides its own entry.
+      expect(summary()!.showOtherOptions()).toBeFalse();
+    });
+
+    it('puts the provider chooser under Other sync options, visible without another click', () => {
+      expect(el().querySelector('h3')!.textContent).toContain(
+        T.ACCOUNT_STATUS.OTHER_OPTIONS,
+      );
+      expect(el().querySelector('mat-select')).not.toBeNull();
+    });
+
+    it('explains switching only once another provider is picked', async () => {
+      expect(text()).not.toContain(T.SYNC_SETUP.SWITCH_HELP);
+
+      fixture.componentInstance.selectSetupProvider(SyncProviderId.WebDAV);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(text()).toContain(T.SYNC_SETUP.SWITCH_HELP);
+    });
+
+    it('has nothing to continue to, and does not describe the account twice', () => {
+      expect(text()).not.toContain(T.SYNC_SETUP.CONTINUE_ULTRA);
+      expect(text()).not.toContain(T.SYNC_SETUP.ULTRA_DESCRIPTION);
     });
   });
 });

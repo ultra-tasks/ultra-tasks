@@ -1,0 +1,167 @@
+:host {
+  display: block;
+}
+
+.ass {
+  display: grid;
+  gap: var(--s2);
+}
+
+// A card for what is self-contained: the status and who it belongs to.
+.ass__card {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s2);
+  background: var(--card-bg);
+  border: 1px solid var(--palette-border);
+  border-radius: var(--r-md);
+}
+
+.ass__status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s1-5);
+}
+
+.ass__icon {
+  flex: none;
+  font-size: var(--icon-lg);
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+// The icon differs per state and the label always says it, so colour only reinforces.
+.ass--warning .ass__icon {
+  color: var(--color-warning);
+}
+
+.ass--error .ass__icon {
+  color: var(--c-warn);
+}
+
+.ass__text {
+  min-width: 0;
+}
+
+.ass__label {
+  margin: 0;
+  font: var(--type-body-strong);
+}
+
+.ass__detail {
+  margin: var(--s-half) 0 0;
+  font: var(--type-body);
+}
+
+.ass__meta {
+  margin: var(--s-half) 0 0;
+  font: var(--type-meta);
+  color: var(--text-color-muted);
+}
+
+// Stacked, label over value: the Account ID is 36 characters and must wrap on a phone, where a
+// two-column grid left its label floating beside a broken line.
+.ass__identity {
+  display: grid;
+  gap: var(--s-half);
+  margin: 0;
+
+  dt {
+    margin-top: var(--s1-5);
+    font: var(--type-meta);
+    color: var(--text-color-muted);
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  dd {
+    margin: 0;
+    min-width: 0;
+    font: var(--type-body);
+    overflow-wrap: anywhere;
+  }
+}
+
+// The copy button follows the ID. When the ID does not fit (a phone) it wraps inside the room
+// that is left and the button stays beside it.
+.ass__value--id {
+  display: flex;
+  align-items: center;
+  gap: var(--s);
+}
+
+// Read-only and easy to select whole: it is read out to support, not typed.
+.ass__id {
+  flex: 0 1 auto;
+  min-width: 0;
+  font: var(--type-meta);
+  font-family: var(--font-mono-stack);
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.ass__copy {
+  flex: none;
+}
+
+.ass__hint {
+  margin: 0;
+  font: var(--type-meta);
+  color: var(--text-color-muted);
+}
+
+.ass__provider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.ass__provider-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-half);
+  font: var(--type-body-strong);
+
+  mat-icon {
+    font-size: var(--icon-md);
+    width: var(--icon-md);
+    height: var(--icon-md);
+  }
+}
+
+.ass__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-half);
+  padding: var(--s-half) var(--s);
+  border: 1px solid var(--separator);
+  border-radius: var(--r-full);
+  font: var(--type-meta);
+
+  mat-icon {
+    font-size: var(--icon-sm);
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+  }
+
+  &--warn {
+    border-color: var(--color-warning);
+    color: var(--color-warning);
+  }
+}
+
+.ass__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s);
+}
+
+.ass__other-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--s);
+  padding-top: var(--s);
+}

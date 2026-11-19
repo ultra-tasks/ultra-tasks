@@ -15,6 +15,8 @@ export type SearchCommandId =
   | 'add-task'
   | 'focus'
   | 'sync'
+  | 'account'
+  | 'sync-settings'
   | 'undo'
   | 'redo'
   | 'shortcuts';
@@ -48,6 +50,84 @@ export interface SearchCommandHistory {
 }
 
 /**
+ * Which engine a manual sync reaches right now (see `AccountSyncStatus.engine`): the Ultra Tasks
+ * account, a legacy provider, or `null` while nothing is configured.
+ */
+export type SearchCommandSyncEngine = 'account' | 'provider' | null;
+
+/** What the sync commands follow: the active engine, and what an account's status asks for. */
+export interface SearchCommandSync {
+  engine: SearchCommandSyncEngine;
+  /**
+   * Label of what a connected account needs now (Unlock, Sign in, Finish connecting, Retry);
+   * "Sync now" when it only has to sync. The command then says what it will do.
+   */
+  actionLabelKey?: string | null;
+}
+
+/** The glyph of what the account's command does; a sync glyph for anything that is a sync. */
+const SYNC_COMMAND_ICON: Record<string, string> = {
+  [T.ACCOUNT_STATUS.ACTION_UNLOCK]: 'lock_open',
+  [T.ACCOUNT_STATUS.ACTION_SIGN_IN]: 'login',
+  [T.ACCOUNT_STATUS.ACTION_CHOOSE_DATA]: 'link',
+};
+
+/**
+ * The sync commands follow the one shared status. Nothing configured: one way in, to sign in
+ * (the provider dialog, as before). Configured: Sync now on the active engine (or what the
+ * account needs instead), and the way to the account (or, for a legacy provider, to its
+ * settings). Never "Set up sync" for something that is already set up.
+ */
+const syncCommands = ({ engine, actionLabelKey }: SearchCommandSync): SearchCommand[] => {
+  if (!engine) {
+    return [
+      {
+        // The header button only appears once sync is chosen, so this is the way in from
+        // anywhere; it opens the same dialog, for first set-up and for changes.
+        id: 'sync',
+        kind: 'action',
+        labelKey: T.ACCOUNT_STATUS.COMMAND_SIGN_IN,
+        icon: 'cloud_sync',
+        aliases: ['set up sync', 'configure sync', 'sync', 'account'],
+      },
+    ];
+  }
+  const labelKey =
+    engine === 'account' && actionLabelKey
+      ? actionLabelKey
+      : T.ACCOUNT_STATUS.ACTION_SYNC;
+  const syncNow: SearchCommand = {
+    id: 'sync',
+    kind: 'action',
+    labelKey,
+    icon: SYNC_COMMAND_ICON[labelKey] ?? 'sync',
+    // Still found by typing "sync" when the label says what the account needs instead.
+    aliases: ['sync', 'sync now'],
+  };
+  return engine === 'account'
+    ? [
+        syncNow,
+        {
+          id: 'account',
+          kind: 'action',
+          labelKey: T.ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT,
+          icon: 'account_circle',
+          aliases: ['account', 'sign in', 'account id'],
+        },
+      ]
+    : [
+        syncNow,
+        {
+          id: 'sync-settings',
+          kind: 'action',
+          labelKey: T.ACCOUNT_STATUS.ACTION_SYNC_SETTINGS,
+          icon: 'tune',
+          aliases: ['set up sync', 'configure sync', 'provider'],
+        },
+      ];
+};
+
+/**
  * The places and actions Search offers next to tasks. Only what the user can
  * reach is listed: Upcoming, Calendar and Focus follow their feature switches.
  * Integrations is always listed, because its navigation row appears only once
@@ -56,6 +136,7 @@ export interface SearchCommandHistory {
 export const buildSearchCommands = (
   features: SearchCommandFeatures,
   history: SearchCommandHistory = {},
+  sync: SearchCommandSync = { engine: null },
 ): SearchCommand[] => [
   {
     id: 'today',
@@ -133,20 +214,8 @@ export const buildSearchCommands = (
         } satisfies SearchCommand,
       ]
     : []),
-  ...(IS_SYNC_AVAILABLE
-    ? [
-        {
-          // The header button only appears once sync is chosen, so this is the way
-          // in from anywhere; it opens the same dialog, for first set-up and for
-          // changes. The standalone web build has no sync at all.
-          id: 'sync',
-          kind: 'action',
-          labelKey: T.PS.SYNC.SET_UP_SYNC,
-          icon: 'cloud_sync',
-          aliases: ['configure sync'],
-        } satisfies SearchCommand,
-      ]
-    : []),
+  // The standalone web build has no sync at all.
+  ...(IS_SYNC_AVAILABLE ? syncCommands(sync) : []),
   // Undo and Redo are offered only while there is something to undo or redo, and
   // are named after what they would change.
   ...(history.undoLabelKey

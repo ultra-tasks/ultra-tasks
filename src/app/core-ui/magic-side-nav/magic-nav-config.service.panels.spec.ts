@@ -285,6 +285,18 @@ describe('MagicNavConfigService phone drawer placement', () => {
     expect(find('integrations')).toBeUndefined();
   });
 
+  it('marks the rows that lead to the account, so a sync problem is not only in the header', () => {
+    // Desktop has the Account row itself; on a phone Account is a Settings row, so the drawer's
+    // Settings row carries the mark there and only there.
+    const account = find('account');
+    const settings = find('settings');
+    expect(account?.type === 'route' && account.accountAttention).toBe('any');
+    expect(settings?.type === 'route' && settings.accountAttention).toBe('phone');
+    // One action, one home: nothing else leads to the account, so nothing else is marked.
+    const marked = items.filter((i) => i.type === 'route' && i.accountAttention);
+    expect(marked.map((i) => i.id)).toEqual(['settings', 'account']);
+  });
+
   it('keeps Settings and Help in the drawer', () => {
     expect(find('settings')?.desktopOnly).toBeUndefined();
     expect(find('help')?.desktopOnly).toBeUndefined();

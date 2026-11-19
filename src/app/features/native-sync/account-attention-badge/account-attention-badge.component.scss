@@ -1,0 +1,31 @@
+@use '@angular/cdk' as cdk;
+
+// The "Needs attention" text for assistive technology (`.cdk-visually-hidden`, scoped to this view).
+@include cdk.a11y-visually-hidden();
+
+:host {
+  display: inline-flex;
+  flex: none;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: var(--icon-sm);
+  height: var(--icon-sm);
+  border-radius: var(--r-full);
+  background: var(--color-warning);
+  color: var(--palette-warning-ink);
+  font: var(--type-label);
+  letter-spacing: 0;
+  line-height: 1;
+  // Never takes the click from the row it sits on.
+  pointer-events: none;
+}
+
+.badge--error {
+  background: var(--c-warn);
+  color: var(--c-warn-contrast);
+}

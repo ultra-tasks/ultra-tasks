@@ -9,6 +9,7 @@ import { LayoutService } from '../layout/layout.service';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { DEFAULT_GLOBAL_CONFIG } from '../../features/config/default-global-config.const';
 import { AppFeaturesConfig } from '../../features/config/global-config.model';
+import { AccountSyncStatusService } from '../../features/native-sync/account-sync-status.service';
 
 @Component({ standalone: true, template: '' })
 class DummyPageComponent {}
@@ -23,6 +24,7 @@ describe('MobileBottomNavComponent', () => {
   let fixture: ComponentFixture<MobileBottomNavComponent>;
   let isMobileSideNavOpen: ReturnType<typeof signal<boolean>>;
   let scrollPageToTop: jasmine.Spy;
+  let needsAttention: ReturnType<typeof signal<boolean>>;
 
   const render = async (
     over: Partial<AppFeaturesConfig> = {},
@@ -30,6 +32,7 @@ describe('MobileBottomNavComponent', () => {
   ): Promise<void> => {
     isMobileSideNavOpen = signal(false);
     scrollPageToTop = jasmine.createSpy('scrollPageToTop');
+    needsAttention = signal(false);
 
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
@@ -37,6 +40,10 @@ describe('MobileBottomNavComponent', () => {
       providers: [
         provideRouter([{ path: '**', component: DummyPageComponent }]),
         { provide: LayoutService, useValue: { isMobileSideNavOpen, scrollPageToTop } },
+        {
+          provide: AccountSyncStatusService,
+          useValue: { needsAttention, status: () => ({ severity: 'warning' }) },
+        },
         {
           provide: GlobalConfigService,
           useValue: {
@@ -131,6 +138,21 @@ describe('MobileBottomNavComponent', () => {
       expect(emitted).toBe(1);
       expect(browse().getAttribute('aria-expanded')).toBe('true');
       expect(browse().classList).toContain('active');
+    });
+
+    it('is calm while sync is fine, and carries a "!" with a hidden name while it needs the user', async () => {
+      await render();
+      expect(browse().querySelector('.badge')).toBeNull();
+
+      needsAttention.set(true);
+      fixture.detectChanges();
+
+      expect(browse().querySelector('.badge')?.textContent?.trim()).toBe('!');
+      expect(browse().querySelector('.cdk-visually-hidden')?.textContent).toContain(
+        'ACCOUNT_STATUS.NEEDS_ATTENTION',
+      );
+      // Only Browse leads to the account: the three tabs stay as they were.
+      expect(nav().querySelectorAll('.badge').length).toBe(1);
     });
 
     it('is a folder, which agrees with its label', async () => {

@@ -42,6 +42,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { isSingleEmoji } from '../../../util/extract-first-emoji';
 import { MenuTreeKind } from '../../../features/menu-tree/store/menu-tree.model';
 import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon.component';
+import { AccountAttentionBadgeComponent } from '../../../features/native-sync/account-attention-badge/account-attention-badge.component';
 
 @Component({
   selector: 'nav-item',
@@ -59,6 +60,7 @@ import { PluginIconComponent } from '../../../plugins/ui/plugin-icon/plugin-icon
     MatTooltip,
     TranslatePipe,
     PluginIconComponent,
+    AccountAttentionBadgeComponent,
   ],
   templateUrl: './nav-item.component.html',
   styleUrl: './nav-item.component.scss',
@@ -90,6 +92,7 @@ export class NavItemComponent {
   });
   private readonly _store = inject(Store);
   private static readonly _registeredIcons = new Set<string>();
+  private static _nextAttentionId = 0;
 
   mode = input<'work' | 'folder' | 'row'>('work');
   variant = input<'default' | 'nav'>('default');
@@ -129,6 +132,13 @@ export class NavItemComponent {
 
   // Feature flag key for disable-feature context menu
   featureConfigKey = input<keyof AppFeaturesConfig | undefined>(undefined);
+
+  // The row leads to the account: it carries a small "!" while sync needs the user. The badge
+  // decides by itself whether there is anything to show; this only says the row may carry it.
+  showAccountAttention = input<boolean>(false);
+  // Names the badge's hidden text, so a collapsed rail (whose aria-label replaces the row's
+  // content) can still describe the row with it.
+  readonly attentionTextId = `nav-attention-${NavItemComponent._nextAttentionId++}`;
 
   // Events
   clicked = output<void>();

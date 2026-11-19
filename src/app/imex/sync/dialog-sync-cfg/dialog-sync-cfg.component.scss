@@ -1,0 +1,10 @@
+// With a connected account the dialog leads with its summary; the provider chooser follows
+// under "Other sync options".
+.dialog-account-summary {
+  margin-bottom: var(--s3);
+}
+
+.dialog-other-options {
+  margin: 0 0 var(--s);
+  font: var(--type-heading);
+}

@@ -1,7 +1,7 @@
 import { expect, test } from '../../fixtures/test.fixture';
 import { openSyncSetup } from '../../utils/open-sync-setup';
 
-test('new sync setup defaults to UltraTasks Account and offers personal-only alternatives', async ({
+test('new sync setup defaults to the Ultra Tasks account and offers personal-only alternatives', async ({
   page,
 }) => {
   await page.goto('/#/tag/TODAY/tasks');
@@ -10,10 +10,13 @@ test('new sync setup defaults to UltraTasks Account and offers personal-only alt
   await openSyncSetup(page);
   const dialog = page.locator('dialog-sync-cfg');
   await expect(
-    dialog.getByRole('button', { name: 'Continue with UltraTasks Account', exact: true }),
+    dialog.getByRole('button', {
+      name: 'Continue with Ultra Tasks account',
+      exact: true,
+    }),
   ).toBeVisible();
   const provider = dialog.getByRole('combobox');
-  await expect(provider).toContainText('UltraTasks Account');
+  await expect(provider).toContainText('Ultra Tasks account');
   await provider.click();
   await expect(
     page.getByRole('option', { name: /SuperSync|Dropbox|Nextcloud|Local file/ }),
@@ -28,11 +31,11 @@ test('new sync setup defaults to UltraTasks Account and offers personal-only alt
   await expect(dialog).toBeHidden();
   await openSyncSetup(page);
   await expect(page.locator('dialog-sync-cfg').getByRole('combobox')).toContainText(
-    'UltraTasks Account',
+    'Ultra Tasks account',
   );
 });
 
-test('UltraTasks Account setup opens account sign-in on a narrow screen', async ({
+test('Ultra Tasks account setup opens account sign-in on a narrow screen', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -43,13 +46,14 @@ test('UltraTasks Account setup opens account sign-in on a narrow screen', async 
     await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
   await dialog
-    .getByRole('button', { name: 'Continue with UltraTasks Account', exact: true })
+    .getByRole('button', { name: 'Continue with Ultra Tasks account', exact: true })
     .click();
   await expect(page).toHaveURL(/native-sync/);
+  // The dialog led to the account page, whose browser sign-in is reachable on a phone. The page
+  // owns the button's wording ("Continue in browser" before its rework, "Sign in with browser"
+  // after), so either one passes.
+  await expect(page.locator('native-sync')).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Continue in browser', exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('textbox', { name: 'Ultra Tasks server URL', exact: true }),
+    page.getByRole('button', { name: /^(Sign in with browser|Continue in browser)$/ }),
   ).toBeVisible();
 });

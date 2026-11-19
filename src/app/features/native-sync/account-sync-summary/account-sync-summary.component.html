@@ -1,0 +1,174 @@
+@let s = status();
+<section
+  class="ass"
+  [class.ass--compact]="compact()"
+  [class.ass--warning]="s.severity === 'warning'"
+  [class.ass--error]="s.severity === 'error'"
+  [attr.data-status]="s.id"
+>
+  <div class="ass__card">
+    <div class="ass__status">
+      @if (s.isSvgIcon) {
+        <mat-icon
+          class="ass__icon"
+          aria-hidden="true"
+          [svgIcon]="s.icon"
+        ></mat-icon>
+      } @else {
+        <mat-icon
+          class="ass__icon"
+          aria-hidden="true"
+          >{{ s.icon }}</mat-icon
+        >
+      }
+      <div class="ass__text">
+        <p class="ass__label">{{ s.labelKey | translate }}</p>
+        @if (s.detailKey) {
+          <p class="ass__detail">{{ s.detailKey | translate }}</p>
+        }
+        @if (s.reason) {
+          <p class="ass__detail">{{ s.reason | translate }}</p>
+        }
+        @if (s.pendingChanges) {
+          <p class="ass__meta">
+            {{
+              T.ACCOUNT_STATUS.PENDING_CHANGES | translate: { count: s.pendingChanges }
+            }}
+          </p>
+        }
+        @if (lastSynced(); as lastSyncedText) {
+          <p class="ass__meta">{{ lastSyncedText }}</p>
+        }
+      </div>
+    </div>
+
+    @if (isAccount()) {
+      @if (identity(); as who) {
+        <dl class="ass__identity">
+          <dt>{{ T.ACCOUNT_STATUS.EMAIL | translate }}</dt>
+          <dd class="ass__value">{{ who.email }}</dd>
+          <dt>{{ T.ACCOUNT_STATUS.ACCOUNT_ID | translate }}</dt>
+          <dd class="ass__value ass__value--id">
+            <code class="ass__id">{{ who.id }}</code>
+            <button
+              class="ass__copy"
+              mat-icon-button
+              type="button"
+              [attr.aria-label]="T.ACCOUNT_STATUS.COPY_ACCOUNT_ID | translate"
+              [attr.aria-describedby]="hintId"
+              [matTooltip]="T.ACCOUNT_STATUS.COPY_ACCOUNT_ID | translate"
+              (click)="copyAccountId()"
+            >
+              <!-- The icon turns into a check for a moment, so there is nothing to shift. -->
+              <mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon>
+            </button>
+          </dd>
+        </dl>
+        <p
+          class="ass__hint"
+          [id]="hintId"
+        >
+          {{ T.ACCOUNT_STATUS.ACCOUNT_ID_HINT | translate }}
+        </p>
+      }
+    } @else if (isProvider()) {
+      @if (provider(); as p) {
+        @if (p.providerId) {
+          <div class="ass__provider">
+            <span class="ass__provider-name">
+              <mat-icon aria-hidden="true">cloud_sync</mat-icon>
+              {{ p.providerId }}
+            </span>
+            @if (p.needsAuth) {
+              <span class="ass__pill ass__pill--warn">
+                {{ T.PS.SYNC.NEEDS_AUTH | translate }}
+              </span>
+            }
+            @if (p.isEncrypted) {
+              <span class="ass__pill">
+                <mat-icon aria-hidden="true">lock</mat-icon>
+                {{ T.PS.SYNC.ENCRYPTED | translate }}
+              </span>
+            }
+          </div>
+        }
+      }
+    }
+  </div>
+
+  <div class="ass__actions">
+    @if (isLocalOnly()) {
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="requestSetup()"
+      >
+        <mat-icon>cloud_sync</mat-icon>
+        {{ T.ACCOUNT_STATUS.ACTION_SETUP | translate }}
+      </button>
+    } @else if (isProvider()) {
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="s.busy"
+        (click)="syncNow()"
+      >
+        <mat-icon>sync</mat-icon>
+        {{ T.ACCOUNT_STATUS.ACTION_SYNC | translate }}
+      </button>
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="requestSetup()"
+      >
+        <mat-icon>tune</mat-icon>
+        {{ T.PS.SYNC.CONFIGURE | translate }}
+      </button>
+    } @else {
+      <!-- One element whose appearance is bound, as the styling guide asks: a dialog that has
+           a primary action of its own shows this one as outlined, so there is a single filled
+           button per surface. -->
+      <button
+        class="ass__primary"
+        type="button"
+        [matButton]="compact() ? 'outlined' : 'filled'"
+        [color]="compact() ? '' : 'primary'"
+        [disabled]="s.busy"
+        (click)="runPrimary()"
+      >
+        @if (s.action === 'sync' || s.action === 'retry' || !s.action) {
+          <mat-icon>sync</mat-icon>
+        }
+        {{ primaryLabelKey() | translate }}
+      </button>
+      @if (hasOpenAccountButton()) {
+        <button
+          mat-button
+          type="button"
+          (click)="openAccount()"
+        >
+          {{ T.ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT | translate }}
+        </button>
+      }
+    }
+  </div>
+
+  @if (isAccount() && showOtherOptions()) {
+    <details class="ass__other">
+      <summary>{{ T.ACCOUNT_STATUS.OTHER_OPTIONS | translate }}</summary>
+      <div class="ass__other-body">
+        <p class="ass__hint">{{ T.ACCOUNT_STATUS.OTHER_OPTIONS_HELP | translate }}</p>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="requestSetup()"
+        >
+          <mat-icon>tune</mat-icon>
+          {{ T.ACCOUNT_STATUS.ACTION_OTHER_OPTIONS | translate }}
+        </button>
+      </div>
+    </details>
+  }
+</section>

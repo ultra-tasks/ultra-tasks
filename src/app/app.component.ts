@@ -68,6 +68,7 @@ import { MatIcon } from '@angular/material/icon';
 import { NoteStartupBannerService } from './features/note/note-startup-banner.service';
 import { SyncSafetyBannerService } from './imex/sync/sync-safety-banner.service';
 import { SuperSyncEncryptionMigrationBannerService } from './imex/sync/super-sync-encryption-migration-banner.service';
+import { AccountAttentionBannerService } from './features/native-sync/account-attention-banner.service';
 import { ProjectService } from './features/project/project.service';
 import { TagService } from './features/tag/tag.service';
 import { ContextMenuComponent } from './ui/context-menu/context-menu.component';
@@ -168,6 +169,8 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   private _superSyncEncryptionMigrationBannerService = inject(
     SuperSyncEncryptionMigrationBannerService,
   );
+  // Injected for side effect: shows the durable account banner (sign in again, unlock, finish connecting).
+  private _accountAttentionBanner = inject(AccountAttentionBannerService);
   private _ngZone = inject(NgZone);
   private _document = inject(DOCUMENT, { optional: true });
   private _certTrustService = inject(CertTrustService);

@@ -43,6 +43,13 @@ import { GlobalTrackingIntervalService } from '../../core/global-tracking-interv
 import { BannerService } from '../../core/banner/banner.service';
 import { NavigateToTaskService } from '../navigate-to-task/navigate-to-task.service';
 import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
+import { DateTimeFormatService } from '../../core/date-time-format/date-time-format.service';
+import { NativeSyncService } from '../../features/native-sync/native-sync.service';
+import { AccountSyncActionsService } from '../../features/native-sync/account-sync-actions.service';
+import type {
+  AccountDataChoice,
+  AccountPhase,
+} from '../../features/native-sync/account-sync.types';
 
 // Regression test for #7477: in a project view a long title pushed the
 // right-side header actions (simple-counter / habit buttons) off screen.
@@ -423,6 +430,21 @@ describe('MainHeaderComponent action placement', () => {
     hasNoPendingOps: true,
     isConfirmedInSync: false,
   };
+  // The Ultra Tasks account engine, read by the real AccountSyncStatusService.
+  let native = {
+    configured: signal(false),
+    unlocked: signal(false),
+    phase: signal<AccountPhase>('signed-out'),
+    error: signal(''),
+    busy: signal(false),
+    offline: signal(false),
+    emptyAccount: signal(false),
+    lastSyncedAt: signal<number | null>(null),
+    pendingChanges: signal(0),
+    dataChoice: signal<AccountDataChoice | null>(null),
+    accountIdentity: signal<{ email: string; id: string } | null>(null),
+  };
+  let accountActions: jasmine.SpyObj<AccountSyncActionsService>;
 
   const configureTestBed = (): void => {
     const cfg = {
@@ -501,6 +523,12 @@ describe('MainHeaderComponent action placement', () => {
           },
         },
         { provide: Router, useValue: { events: EMPTY } },
+        { provide: NativeSyncService, useValue: native },
+        { provide: AccountSyncActionsService, useValue: accountActions },
+        {
+          provide: DateTimeFormatService,
+          useValue: { formatTime: () => '14:30', formatDate: () => '17/11/2026' },
+        },
         {
           provide: GlobalConfigService,
           useValue: {
@@ -573,6 +601,25 @@ describe('MainHeaderComponent action placement', () => {
       hasNoPendingOps: true,
       isConfirmedInSync: false,
     };
+    native = {
+      configured: signal(false),
+      unlocked: signal(false),
+      phase: signal<AccountPhase>('signed-out'),
+      error: signal(''),
+      busy: signal(false),
+      offline: signal(false),
+      emptyAccount: signal(false),
+      lastSyncedAt: signal<number | null>(null),
+      pendingChanges: signal(0),
+      dataChoice: signal<AccountDataChoice | null>(null),
+      accountIdentity: signal<{ email: string; id: string } | null>(null),
+    };
+    accountActions = jasmine.createSpyObj('AccountSyncActionsService', [
+      'run',
+      'syncNow',
+      'openAccount',
+    ]);
+    accountActions.run.and.resolveTo();
   });
 
   afterEach(() => {
@@ -955,6 +1002,28 @@ describe('MainHeaderComponent action placement', () => {
       expect(component.syncTooltip()).toBe(T.MH.SYNC_STATE.IN_SYNC_CONFIRMED);
     });
 
+    it('keeps the provider error wording, which an E2E pins as the button name', async () => {
+      readySync({ syncState: 'ERROR' });
+
+      const host = await mountAtWidth(1200);
+
+      expect(host.querySelector('button.sync-btn')!.getAttribute('aria-label')).toBe(
+        T.MH.SYNC_STATE.ERROR,
+      );
+    });
+
+    it('names a provider that needs reconnecting by what to do, no longer "Set up sync"', () => {
+      syncWrapperState = {
+        ...syncWrapperState,
+        isEnabledAndReady: false,
+        syncCfg: { isEnabled: true, syncProvider: SyncProviderId.WebDAV },
+      };
+
+      component = createComponent();
+
+      expect(component.syncTooltip()).toBe(T.ACCOUNT_STATUS.PROVIDER_ATTENTION);
+    });
+
     it('keeps the plain in-sync tooltip until the remote was checked', () => {
       readySync({ hasNoPendingOps: true, isConfirmedInSync: false });
 
@@ -1090,6 +1159,270 @@ describe('MainHeaderComponent action placement', () => {
       component = createComponent();
 
       expect(component.syncIcon()).toBe('sync_off');
+    });
+
+    describe('with an Ultra Tasks account', () => {
+      const connect = (phase: AccountPhase = 'synced'): void => {
+        native.configured.set(true);
+        native.unlocked.set(phase !== 'locked' && phase !== 'reauth');
+        native.phase.set(phase);
+      };
+      const withPreference = (isSyncIconEnabled: boolean): void => {
+        appFeatures = signal({
+          ...DEFAULT_GLOBAL_CONFIG.appFeatures,
+          isSyncIconEnabled,
+        });
+      };
+      const button = (host: HTMLElement): HTMLButtonElement | null =>
+        host.querySelector<HTMLButtonElement>('button.sync-btn');
+      const liveRegion = (host: HTMLElement): HTMLElement | null =>
+        host.querySelector<HTMLElement>('button.sync-btn + [role="status"]');
+
+      it('shows the button for a connected account with no legacy provider, on every width', async () => {
+        connect();
+
+        expect(button(await mountAtWidth(1200))).toBeTruthy();
+        box?.remove();
+        fixture?.destroy();
+
+        TestBed.resetTestingModule();
+        connect();
+        isXs = signal(true);
+        expect(button(await mountAtWidth(404))).toBeTruthy();
+      });
+
+      it('keeps the button for an account that is locked, offline or signed out by the server', async () => {
+        for (const phase of ['locked', 'reauth'] as const) {
+          TestBed.resetTestingModule();
+          native.configured.set(true);
+          native.unlocked.set(false);
+          native.phase.set(phase);
+          const host = await mountAtWidth(1200);
+          expect(button(host)).withContext(phase).toBeTruthy();
+          box?.remove();
+          fixture?.destroy();
+        }
+      });
+
+      it('names the state and the last sync, so the icon is never the only cue', async () => {
+        connect();
+        native.lastSyncedAt.set(Date.now());
+
+        const host = await mountAtWidth(1200);
+
+        const label = button(host)!.getAttribute('aria-label')!;
+        expect(label).toContain(T.ACCOUNT_STATUS.UP_TO_DATE);
+        expect(label).toContain(T.ACCOUNT_STATUS.LAST_SYNCED);
+      });
+
+      it('names a locked account by what to do, not by an icon', async () => {
+        connect('locked');
+
+        const host = await mountAtWidth(1200);
+
+        expect(button(host)!.getAttribute('aria-label')).toBe(T.ACCOUNT_STATUS.LOCKED);
+        expect(button(host)!.querySelector('mat-icon')!.textContent!.trim()).toBe('lock');
+        expect(button(host)!.classList).toContain('is-attention');
+      });
+
+      it('marks a failed sync', async () => {
+        connect();
+        native.error.set('NATIVE_SYNC.ERROR_SYNC');
+
+        const host = await mountAtWidth(1200);
+
+        expect(button(host)!.classList).toContain('is-error');
+        expect(
+          button(host)!.querySelector<HTMLElement & { svgIcon?: string }>('mat-icon')!
+            .svgIcon,
+        ).toBe('sync_error');
+      });
+
+      it('marks offline without calling it a problem that needs the user', async () => {
+        connect();
+        native.offline.set(true);
+
+        const host = await mountAtWidth(1200);
+
+        expect(button(host)!.classList).toContain('is-offline');
+        expect(button(host)!.classList).not.toContain('is-attention');
+        expect(button(host)!.getAttribute('aria-label')).toBe(T.ACCOUNT_STATUS.OFFLINE);
+      });
+
+      it('spins the ring while syncing, and says so', async () => {
+        connect('syncing');
+
+        const host = await mountAtWidth(1200);
+
+        expect(button(host)!.classList).toContain('is-in-progress');
+        expect(host.querySelector('button.sync-btn mat-icon.spin')).toBeTruthy();
+      });
+
+      it('exposes the up-to-date state to the E2E sync helpers as a remote confirmation', () => {
+        connect();
+        component = createComponent();
+        expect(component.syncConfirmation()).toBe('remote');
+
+        native.phase.set('syncing');
+        expect(component.syncConfirmation()).toBeNull();
+      });
+
+      describe('the "Sync button" preference', () => {
+        it('hides a calm, healthy account', async () => {
+          connect();
+          withPreference(false);
+
+          expect(button(await mountAtWidth(1200))).toBeFalsy();
+        });
+
+        it('still hides an account that is only offline: it resolves by itself', async () => {
+          withPreference(false);
+          connect();
+          native.offline.set(true);
+
+          expect(button(await mountAtWidth(1200))).toBeFalsy();
+        });
+
+        for (const phase of ['locked', 'reauth', 'choose-data'] as const) {
+          it(`never hides an account that is "${phase}", whatever it says`, async () => {
+            withPreference(false);
+            connect(phase);
+
+            expect(button(await mountAtWidth(1200)))
+              .withContext(phase)
+              .toBeTruthy();
+          });
+        }
+
+        it('never hides a failed sync', async () => {
+          withPreference(false);
+          connect();
+          native.error.set('NATIVE_SYNC.ERROR_SYNC');
+
+          expect(button(await mountAtWidth(1200))).toBeTruthy();
+        });
+
+        it('never hides a legacy provider that needs reconnecting', async () => {
+          withPreference(false);
+          chosenButNotReady();
+
+          expect(button(await mountAtWidth(1200))).toBeTruthy();
+        });
+
+        it('still hides a healthy legacy provider', async () => {
+          withPreference(false);
+          readySync();
+
+          expect(button(await mountAtWidth(1200))).toBeFalsy();
+        });
+
+        it('shows nothing, preference or not, while nothing is configured', async () => {
+          withPreference(true);
+
+          expect(button(await mountAtWidth(1200))).toBeFalsy();
+        });
+      });
+
+      describe('clicking', () => {
+        it('syncs the account, once, and never the legacy provider', () => {
+          connect();
+          component = createComponent();
+          const legacy = TestBed.inject(
+            SyncWrapperService,
+          ) as jasmine.SpyObj<SyncWrapperService>;
+
+          component.onSyncButtonClick();
+
+          expect(accountActions.run).toHaveBeenCalledOnceWith(component.accountStatus());
+          expect(component.accountStatus().action).toBe('sync');
+          expect(legacy.sync).not.toHaveBeenCalled();
+        });
+
+        it('hands every other account state to its own action: unlock, sign in, finish connecting', () => {
+          component = createComponent();
+          for (const [phase, action] of [
+            ['locked', 'unlock'],
+            ['reauth', 'sign-in'],
+            ['choose-data', 'choose-data'],
+          ] as const) {
+            accountActions.run.calls.reset();
+            connect(phase);
+
+            component.onSyncButtonClick();
+
+            expect(accountActions.run).toHaveBeenCalledTimes(1);
+            expect(accountActions.run.calls.mostRecent().args[0]?.action).toBe(action);
+          }
+        });
+
+        it('keeps the legacy provider exactly as it was: sync when ready', () => {
+          readySync();
+          component = createComponent();
+          const legacy = TestBed.inject(
+            SyncWrapperService,
+          ) as jasmine.SpyObj<SyncWrapperService>;
+          legacy.sync.and.resolveTo(SyncStatus.InSync);
+
+          component.onSyncButtonClick();
+
+          expect(legacy.sync).toHaveBeenCalledOnceWith(true);
+          expect(accountActions.run).not.toHaveBeenCalled();
+        });
+
+        it('keeps the legacy provider exactly as it was: the setup dialog when not ready', () => {
+          chosenButNotReady();
+          component = createComponent();
+          const legacy = TestBed.inject(
+            SyncWrapperService,
+          ) as jasmine.SpyObj<SyncWrapperService>;
+          const setup = spyOn(component, 'setupSync').and.resolveTo();
+
+          component.onSyncButtonClick();
+
+          expect(setup).toHaveBeenCalledTimes(1);
+          expect(legacy.sync).not.toHaveBeenCalled();
+          expect(accountActions.run).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('the polite live region', () => {
+        it('is there, visually hidden, and says nothing at first render', async () => {
+          connect();
+
+          const region = liveRegion(await mountAtWidth(1200))!;
+
+          expect(region.getAttribute('aria-live')).toBe('polite');
+          expect(region.classList).toContain('cdk-visually-hidden');
+          expect(region.textContent!.trim()).toBe('');
+        });
+
+        it('announces a state that needs the user, then the recovery from it', async () => {
+          connect();
+          const host = await mountAtWidth(1200);
+
+          native.phase.set('locked');
+          native.unlocked.set(false);
+          await settle();
+          expect(liveRegion(host)!.textContent!.trim()).toBe(T.ACCOUNT_STATUS.LOCKED);
+
+          native.unlocked.set(true);
+          native.phase.set('synced');
+          await settle();
+          expect(liveRegion(host)!.textContent!.trim()).toBe(T.ACCOUNT_STATUS.UP_TO_DATE);
+        });
+
+        it('stays silent through the routine sync that runs every minute', async () => {
+          connect();
+          const host = await mountAtWidth(1200);
+
+          native.phase.set('syncing');
+          await settle();
+          native.phase.set('synced');
+          await settle();
+
+          expect(liveRegion(host)!.textContent!.trim()).toBe('');
+        });
+      });
     });
   });
 

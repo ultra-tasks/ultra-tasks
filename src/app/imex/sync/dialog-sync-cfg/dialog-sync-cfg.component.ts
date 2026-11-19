@@ -32,6 +32,7 @@ import {
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatSelect, MatOption } from '@angular/material/select';
 import { NativeSyncService } from '../../../features/native-sync/native-sync.service';
+import { AccountSyncSummaryComponent } from '../../../features/native-sync/account-sync-summary/account-sync-summary.component';
 import { IS_ONEDRIVE_SUPPORTED } from '../onedrive-auth-mode.const';
 import {
   basicSyncSetupOptions,
@@ -114,8 +115,10 @@ type SyncFormModel = SyncConfig & {
 @Component({
   selector: 'dialog-sync-cfg',
   templateUrl: './dialog-sync-cfg.component.html',
+  styleUrls: ['./dialog-sync-cfg.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AccountSyncSummaryComponent,
     RouterLink,
     MatDialogTitle,
     MatDialogContent,

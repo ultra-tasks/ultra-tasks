@@ -3,10 +3,12 @@ import { expect, type Page } from '@playwright/test';
 /**
  * Opens the sync setup dialog without needing the header's sync button.
  *
- * The header button exists only once sync is switched on and a provider is
- * chosen, so a fresh profile, or one whose sync was just disabled, has no button
- * to click. The search command bar's "Set up sync" action opens the very same
- * dialog from anywhere, and leaves the current page where it is, so callers
+ * The header button exists only once an Ultra Tasks account or a sync provider is
+ * configured (and its "Sync button" preference is on, or sync needs attention), so
+ * a fresh profile, or one whose sync was just disabled, has no button to click.
+ * While nothing is configured the search command bar's sign-in command ("Sign in
+ * to your Ultra Tasks account", which "set up sync" also finds) opens the very
+ * same dialog from anywhere, and leaves the current page where it is, so callers
  * continue from the view they were on.
  *
  * Use the header button (`SyncPage.syncBtn`) only for what it is for once sync

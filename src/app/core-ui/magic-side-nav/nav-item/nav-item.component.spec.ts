@@ -233,3 +233,84 @@ describe('NavItemComponent Today count', () => {
     ).toBeNull();
   });
 });
+
+import { AccountSyncStatusService } from '../../../features/native-sync/account-sync-status.service';
+
+describe('NavItemComponent account attention', () => {
+  const needsAttention = signal(false);
+  let fixture: ComponentFixture<NavItemComponent>;
+
+  const row = (): HTMLAnchorElement => fixture.nativeElement.querySelector('a.nav-link');
+  const render = async (showLabels: boolean, flagged = true): Promise<void> => {
+    fixture.componentRef.setInput('container', 'route');
+    fixture.componentRef.setInput('navRoute', '/account');
+    fixture.componentRef.setInput('label', 'Account');
+    fixture.componentRef.setInput('icon', 'account_circle');
+    fixture.componentRef.setInput('showLabels', showLabels);
+    fixture.componentRef.setInput('showAccountAttention', flagged);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
+
+  beforeEach(async () => {
+    needsAttention.set(false);
+    await TestBed.configureTestingModule({
+      imports: [NavItemComponent, NoopAnimationsModule, TranslateModule.forRoot()],
+      providers: [
+        provideRouter([]),
+        provideMockStore({ selectors: [{ selector: selectAllDoneIds, value: [] }] }),
+        { provide: GlobalThemeService, useValue: { registerSvgIcon: () => undefined } },
+        { provide: MagicNavConfigService, useValue: {} },
+        {
+          provide: AccountSyncStatusService,
+          useValue: { needsAttention, status: () => ({ severity: 'warning' }) },
+        },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(NavItemComponent);
+  });
+
+  it('is calm while sync is fine: no mark, nothing read out', async () => {
+    await render(true);
+
+    expect(row().querySelector('.badge')).toBeNull();
+    expect(row().textContent).not.toContain('NEEDS_ATTENTION');
+  });
+
+  it('marks a row that leads to the account with a "!" and a hidden "Needs attention"', async () => {
+    needsAttention.set(true);
+    await render(true);
+
+    expect(row().querySelector('.badge')?.textContent?.trim()).toBe('!');
+    expect(row().querySelector('.cdk-visually-hidden')?.textContent).toContain(
+      'ACCOUNT_STATUS.NEEDS_ATTENTION',
+    );
+  });
+
+  it('describes a collapsed rail row with the same text, since its label replaces the content', async () => {
+    needsAttention.set(true);
+    await render(false);
+
+    const describedBy = row().getAttribute('aria-describedby')!;
+    expect(row().getAttribute('aria-label')).toBe('Account');
+    expect(fixture.nativeElement.querySelector('#' + describedBy)?.textContent).toContain(
+      'ACCOUNT_STATUS.NEEDS_ATTENTION',
+    );
+  });
+
+  it('does not describe an expanded row twice', async () => {
+    needsAttention.set(true);
+    await render(true);
+
+    expect(row().hasAttribute('aria-describedby')).toBeFalse();
+  });
+
+  it('puts nothing on a row that is not flagged, whatever the status', async () => {
+    needsAttention.set(true);
+    await render(true, false);
+
+    expect(row().querySelector('account-attention-badge')).toBeNull();
+    expect(row().hasAttribute('aria-describedby')).toBeFalse();
+  });
+});

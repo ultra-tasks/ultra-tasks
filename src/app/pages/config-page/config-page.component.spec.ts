@@ -177,16 +177,19 @@ describe('ConfigPageComponent', () => {
     expect(component.syncStatus().needsAuth).toBe(false);
   });
 
-  it('triggerSync() should call SyncWrapperService.sync()', () => {
-    component.triggerSync();
-    expect(mockSyncWrapperService.sync).toHaveBeenCalled();
-  });
-
   it('lists Plugins & integrations and Account as the windows Settings points to', () => {
     expect(component.windowLinks.map((link) => link.path)).toEqual([
       '/plugins',
       '/account',
     ]);
+  });
+
+  it('marks only the Account row as the one that carries the sync attention badge', () => {
+    expect(
+      component.windowLinks
+        .filter((link) => link.hasAccountAttention)
+        .map((link) => link.path),
+    ).toEqual(['/account']);
   });
 
   it('shows Plugins & integrations on every screen size and Account on a phone only', () => {

@@ -20,6 +20,8 @@ import { RecentlyDeletedService } from '../../features/tasks/recently-deleted/re
 import { Task } from '../../features/tasks/task.model';
 import { TaskService } from '../../features/tasks/task.service';
 import { SearchPageComponent } from './search-page.component';
+import { AccountSyncActionsService } from '../../features/native-sync/account-sync-actions.service';
+import { AccountSyncStatusService } from '../../features/native-sync/account-sync-status.service';
 
 /**
  * Renders the real template (the main spec swaps it for a bare input), so the
@@ -31,6 +33,13 @@ describe('SearchPageComponent commands (real template)', () => {
   let routerSpy: jasmine.SpyObj<Router>;
   let taskServiceSpy: jasmine.SpyObj<TaskService>;
   let layoutSpy: jasmine.SpyObj<LayoutService>;
+  let syncStatus: ReturnType<
+    typeof signal<{
+      engine: 'account' | 'provider' | null;
+      actionLabelKey?: string | null;
+    }>
+  >;
+  let syncActions: jasmine.SpyObj<AccountSyncActionsService>;
   const el = (): HTMLElement => fixture.nativeElement;
 
   const task = (id: string, title: string): Task =>
@@ -62,6 +71,18 @@ describe('SearchPageComponent commands (real template)', () => {
     layoutSpy = jasmine.createSpyObj('LayoutService', ['toggleNotes', 'showAddTaskBar'], {
       isShowNotes: signal(false),
     });
+    syncStatus = signal<{
+      engine: 'account' | 'provider' | null;
+      actionLabelKey?: string | null;
+    }>({ engine: null });
+    syncActions = jasmine.createSpyObj('AccountSyncActionsService', [
+      'syncNow',
+      'openAccount',
+      'openSetup',
+    ]);
+    syncActions.syncNow.and.resolveTo();
+    syncActions.openAccount.and.resolveTo();
+    syncActions.openSetup.and.resolveTo();
 
     await TestBed.configureTestingModule({
       imports: [SearchPageComponent, NoopAnimationsModule, TranslateModule.forRoot()],
@@ -83,6 +104,8 @@ describe('SearchPageComponent commands (real template)', () => {
         { provide: NoteService, useValue: { notes$: new BehaviorSubject<Note[]>([]) } },
         { provide: Router, useValue: routerSpy },
         { provide: LayoutService, useValue: layoutSpy },
+        { provide: AccountSyncStatusService, useValue: { status: syncStatus } },
+        { provide: AccountSyncActionsService, useValue: syncActions },
         {
           provide: RecentlyDeletedService,
           useValue: { getEntries: () => Promise.resolve([]), restore: () => undefined },
@@ -160,7 +183,7 @@ describe('SearchPageComponent commands (real template)', () => {
     expect(rowLabels()).toEqual([
       'GCF.KEYBOARD.ADD_NEW_TASK',
       'GCF.KEYBOARD.GO_TO_FOCUS_MODE',
-      'PS.SYNC.SET_UP_SYNC',
+      'ACCOUNT_STATUS.COMMAND_SIGN_IN',
       'GCF.KEYBOARD.UNDO_TITLE',
       'GCF.KEYBOARD.SHOW_HELP',
       'G.TODAY',
@@ -248,6 +271,70 @@ describe('SearchPageComponent commands (real template)', () => {
     add?.click();
     expect(layoutSpy.showAddTaskBar).toHaveBeenCalled();
   }));
+
+  describe('sync commands', () => {
+    const commandButton = (labelKey: string): HTMLButtonElement | undefined =>
+      Array.from(el().querySelectorAll<HTMLButtonElement>('.search-command')).find((b) =>
+        b.textContent?.includes(labelKey),
+      );
+
+    it('offers to sign in, and only that, while nothing is connected', fakeAsync(() => {
+      open();
+      expect(commandButton('ACCOUNT_STATUS.COMMAND_SIGN_IN')).toBeTruthy();
+      expect(commandButton('ACCOUNT_STATUS.ACTION_SYNC')).toBeUndefined();
+      expect(commandButton('ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT')).toBeUndefined();
+    }));
+
+    it('hands the sign-in row to the sync action, which opens the provider dialog', fakeAsync(() => {
+      open();
+      commandButton('ACCOUNT_STATUS.COMMAND_SIGN_IN')!.click();
+      expect(syncActions.syncNow).toHaveBeenCalledTimes(1);
+    }));
+
+    it('offers Sync now and the account page for a connected account, instead of "Set up sync"', fakeAsync(() => {
+      syncStatus.set({ engine: 'account' });
+      open();
+      expect(commandButton('ACCOUNT_STATUS.ACTION_SYNC')).toBeTruthy();
+      expect(commandButton('ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT')).toBeTruthy();
+      expect(commandButton('ACCOUNT_STATUS.COMMAND_SIGN_IN')).toBeUndefined();
+      expect(el().textContent).not.toContain('PS.SYNC.SET_UP_SYNC');
+    }));
+
+    it('says what a locked account needs, and runs it from the same command', fakeAsync(() => {
+      syncStatus.set({
+        engine: 'account',
+        actionLabelKey: 'ACCOUNT_STATUS.ACTION_UNLOCK',
+      });
+      open();
+      expect(commandButton('ACCOUNT_STATUS.ACTION_SYNC')).toBeUndefined();
+      commandButton('ACCOUNT_STATUS.ACTION_UNLOCK')!.click();
+      expect(syncActions.syncNow).toHaveBeenCalledTimes(1);
+    }));
+
+    it('syncs the active engine once from Sync now', fakeAsync(() => {
+      syncStatus.set({ engine: 'account' });
+      open();
+      commandButton('ACCOUNT_STATUS.ACTION_SYNC')!.click();
+      expect(syncActions.syncNow).toHaveBeenCalledTimes(1);
+      expect(syncActions.openAccount).not.toHaveBeenCalled();
+    }));
+
+    it('opens the account page from its command, without syncing', fakeAsync(() => {
+      syncStatus.set({ engine: 'account' });
+      open();
+      commandButton('ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT')!.click();
+      expect(syncActions.openAccount).toHaveBeenCalledTimes(1);
+      expect(syncActions.syncNow).not.toHaveBeenCalled();
+    }));
+
+    it('opens the settings of a legacy provider from its own command', fakeAsync(() => {
+      syncStatus.set({ engine: 'provider' });
+      open();
+      expect(commandButton('ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT')).toBeUndefined();
+      commandButton('ACCOUNT_STATUS.ACTION_SYNC_SETTINGS')!.click();
+      expect(syncActions.openSetup).toHaveBeenCalledTimes(1);
+    }));
+  });
 
   it('opens the first match when Enter is pressed in the field', fakeAsync(() => {
     open();

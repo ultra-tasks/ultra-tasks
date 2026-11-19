@@ -60,6 +60,8 @@ import { ConfigSoundFormComponent } from '../../features/config/config-sound-for
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { SyncProviderManager } from '../../op-log/sync-providers/provider-manager.service';
 import { SyncConfigService } from '../../imex/sync/sync-config.service';
+import { AccountSyncSummaryComponent } from '../../features/native-sync/account-sync-summary/account-sync-summary.component';
+import { AccountAttentionBadgeComponent } from '../../features/native-sync/account-attention-badge/account-attention-badge.component';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
 import { createPluginShortcutFormItems } from '../../features/config/form-cfgs/plugin-keyboard-shortcuts';
 import { PluginShortcutCfg } from '../../plugins/plugin-api.model';
@@ -68,7 +70,6 @@ import { Log } from '../../core/log';
 import { DialogLogsComponent } from '../../ui/dialog-logs/dialog-logs.component';
 import { SnackService } from '../../core/snack/snack.service';
 import { ShareService } from '../../core/share/share.service';
-import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import {
   MAT_DIALOG_DATA,
   MatDialog,
@@ -145,6 +146,8 @@ const FEEDBACK_URL =
     MatAutocompleteTrigger,
     MatOption,
     NgTemplateOutlet,
+    AccountSyncSummaryComponent,
+    AccountAttentionBadgeComponent,
   ],
 })
 export class ConfigPageComponent implements OnInit {
@@ -155,7 +158,6 @@ export class ConfigPageComponent implements OnInit {
   private readonly _layout = viewChild<ElementRef<HTMLElement>>('settingsLayout');
   private readonly _route = inject(ActivatedRoute);
   private readonly _providerManager = inject(SyncProviderManager);
-  private readonly _syncWrapperService = inject(SyncWrapperService);
   private readonly _pluginBridgeService = inject(PluginBridgeService);
   private readonly _snackService = inject(SnackService);
   private readonly _shareService = inject(ShareService);
@@ -287,12 +289,15 @@ export class ConfigPageComponent implements OnInit {
       label: T.PS.REDESIGN.PLUGINS,
       icon: 'extension',
       isPhoneOnly: false,
+      hasAccountAttention: false,
     },
     {
       path: '/account',
       label: T.PS.REFINEMENT.ACCOUNT,
       icon: 'account_circle',
       isPhoneOnly: true,
+      // A small "!" while sync needs the user, so the way to Account is marked on a phone too.
+      hasAccountAttention: true,
     },
   ];
   readonly visibleWindowLinks = computed(() =>
@@ -578,10 +583,6 @@ export class ConfigPageComponent implements OnInit {
     const { DialogSyncCfgComponent } =
       await import('../../imex/sync/dialog-sync-cfg/dialog-sync-cfg.component');
     this._matDialog.open(DialogSyncCfgComponent);
-  }
-
-  triggerSync(): void {
-    this._syncWrapperService.sync(true);
   }
 
   saveGlobalCfg($event: {

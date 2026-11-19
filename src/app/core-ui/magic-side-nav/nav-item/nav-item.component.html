@@ -136,6 +136,9 @@
       [class.expanded]="expanded()"
       [class]="tourClass()"
       [attr.aria-label]="showLabels() ? null : rowLabel"
+      [attr.aria-describedby]="
+        showAccountAttention() && !showLabels() ? attentionTextId : null
+      "
       [matTooltip]="showLabels() ? '' : rowLabel"
       matTooltipPosition="right"
       matTooltipTouchGestures="off"
@@ -173,6 +176,12 @@
         >
           {{ label() | translate }}
         </span>
+      }
+      @if (showAccountAttention()) {
+        <account-attention-badge
+          class="nav-attention"
+          [textId]="attentionTextId"
+        />
       }
     </a>
 

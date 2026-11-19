@@ -106,32 +106,52 @@
           }
         </div>
 
-        <!-- The icon appears once sync is chosen, on every screen size, so a sync
-             error stays visible and recoverable. Before that it is absent: setting
-             sync up lives in Settings (Sync), the search command bar and first run. -->
-        @if (isSyncIconEnabled() && hasSyncConfigured()) {
+        <!-- The icon appears once an account or a provider is configured (locked,
+             offline or signed out by the server included), on every screen size, so
+             a sync problem stays visible and recoverable; it also appears while sync
+             needs the user, whatever the Sync button preference says. Before that it
+             is absent: setting sync up lives in Settings (Account), the search
+             command bar and first run. Its accessible name is the status label (plus
+             the last sync), never the icon alone. -->
+        @if (isSyncButtonShown()) {
+          @let status = accountStatus();
+          @let syncLabel =
+            isAccountEngine() ? accountTooltip() : (syncTooltip() | translate);
           <button
             class="sync-btn secondary-header-action"
-            [class.is-error]="syncIsEnabledAndReady() && syncState() === 'ERROR'"
-            [class.is-offline]="syncIsEnabledAndReady() && !isOnline()"
-            [class.is-in-progress]="syncIsEnabledAndReady() && isSyncInProgress()"
-            [attr.aria-label]="syncTooltip() | translate"
-            matTooltip="{{ syncTooltip() | translate }}"
+            [class.is-error]="status.severity === 'error'"
+            [class.is-offline]="status.id === 'offline'"
+            [class.is-attention]="needsSyncAttention()"
+            [class.is-in-progress]="status.busy"
+            [attr.aria-label]="syncLabel"
+            [matTooltip]="syncLabel"
             (click)="onSyncButtonClick()"
             (longPress)="setupSync()"
             (contextmenu)="$event.preventDefault(); setupSync()"
             [attr.data-sync-confirmation]="syncConfirmation()"
             mat-icon-button
           >
-            @if (syncIcon() === 'cloud_off') {
-              <mat-icon>cloud_off</mat-icon>
-            } @else {
+            @if (status.isSvgIcon) {
               <mat-icon
                 [svgIcon]="syncIcon()"
                 [class.spin]="isSyncIconSpinning()"
               ></mat-icon>
+            } @else {
+              <mat-icon>{{ syncIcon() }}</mat-icon>
             }
           </button>
+          <!-- Meaningful changes only (never at first render, never routine background
+               syncing); the text is the status label. -->
+          <span
+            class="cdk-visually-hidden"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            @if (syncAnnouncement().labelKey; as announcement) {
+              {{ announcement | translate }}
+            }
+          </span>
         }
 
         <plugin-work-context-header-btns

@@ -361,6 +361,9 @@ export class MagicNavConfigService {
         route: '/config',
         tourClass: 'tour-settingsMenuBtn',
         pinBottom: true,
+        // Account is a Settings row on a phone, so the drawer's Settings row is where the
+        // way to it is marked there (desktop has the Account row itself).
+        accountAttention: 'phone',
       },
       ...(IS_SYNC_AVAILABLE
         ? [
@@ -372,6 +375,7 @@ export class MagicNavConfigService {
               route: '/account',
               // Settings lists Account as a category on a phone.
               desktopOnly: true as const,
+              accountAttention: 'any' as const,
             },
           ]
         : []),

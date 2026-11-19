@@ -1,5 +1,22 @@
 @use '../../../../styles/_globals.scss' as *;
 
+// The "!" that marks a row leading to the account while sync needs the user (shown only then).
+// On the row's own end, like the task count, so it never moves the label.
+.nav-attention {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  inset-inline-end: var(--s1-5);
+  pointer-events: none;
+}
+
+// The 56px rail has no room beside the icon: the "!" sits on the icon's corner instead.
+:host-context(.nav-sidenav.compactMode) .nav-attention {
+  top: var(--s);
+  transform: none;
+  inset-inline-end: var(--s);
+}
+
 // Folder expand/collapse icon animation
 .folder-icon {
   transition: transform 0.3s ease-in-out;

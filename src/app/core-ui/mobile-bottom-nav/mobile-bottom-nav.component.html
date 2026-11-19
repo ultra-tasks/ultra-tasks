@@ -64,6 +64,9 @@
     (click)="toggleMobileNav()"
   >
     <mat-icon aria-hidden="true">folder_open</mat-icon>
+    <!-- Browse leads to Settings and Account: a small "!" here while sync needs the user,
+         nothing otherwise. -->
+    <account-attention-badge class="nav-attention" />
     <span class="nav-label">{{ T.MH.BROWSE | translate }}</span>
   </button>
 </nav>

@@ -52,6 +52,8 @@ import { RecentlyDeletedService } from '../../features/tasks/recently-deleted/re
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { FocusModeService } from '../../features/focus-mode/focus-mode.service';
 import { TaskUndoService } from '../../features/tasks/task-undo.service';
+import { AccountSyncActionsService } from '../../features/native-sync/account-sync-actions.service';
+import { AccountSyncStatusService } from '../../features/native-sync/account-sync-status.service';
 import {
   displayShortcut,
   taskHistoryLabel,
@@ -108,6 +110,8 @@ export class SearchPageComponent implements OnInit {
   private _globalConfig = inject(GlobalConfigService);
   private _focusMode = inject(FocusModeService);
   private _taskUndo = inject(TaskUndoService);
+  private _syncStatus = inject(AccountSyncStatusService);
+  private _syncActions = inject(AccountSyncActionsService);
 
   /** Shown in a dialog over another page rather than as a page of its own. */
   readonly isPopup = input(false);
@@ -115,16 +119,25 @@ export class SearchPageComponent implements OnInit {
   readonly itemChosen = output<void>();
   readonly appFeatures = this._globalConfig.appFeatures;
   readonly keyboard = computed(() => this._globalConfig.cfg()?.keyboard);
+  /** The engine a manual sync reaches; its own computed, so a sync cycle does not rebuild the list. */
+  private readonly _syncEngine = computed(() => this._syncStatus.status().engine);
+  private readonly _syncActionLabelKey = computed(
+    () => this._syncStatus.status().actionLabelKey,
+  );
   /** Places and actions Search offers next to tasks; only those the user can reach. */
   readonly commands = computed(() =>
-    buildSearchCommands(this.appFeatures(), {
-      undoLabelKey: this._taskUndo.canUndo()
-        ? taskHistoryLabel(this._taskUndo.undoField(), false)
-        : undefined,
-      redoLabelKey: this._taskUndo.canRedo()
-        ? taskHistoryLabel(this._taskUndo.redoField(), true)
-        : undefined,
-    }),
+    buildSearchCommands(
+      this.appFeatures(),
+      {
+        undoLabelKey: this._taskUndo.canUndo()
+          ? taskHistoryLabel(this._taskUndo.undoField(), false)
+          : undefined,
+        redoLabelKey: this._taskUndo.canRedo()
+          ? taskHistoryLabel(this._taskUndo.redoField(), true)
+          : undefined,
+      },
+      { engine: this._syncEngine(), actionLabelKey: this._syncActionLabelKey() },
+    ),
   );
   private _commands$ = toObservable(this.commands);
 
@@ -726,11 +739,15 @@ export class SearchPageComponent implements OnInit {
           if (this.appFeatures().isFocusModeEnabled) this._focusMode.openOverlay();
           break;
         case 'sync':
-          void import('../../imex/sync/dialog-sync-cfg/dialog-sync-cfg.component').then(
-            ({ DialogSyncCfgComponent }) => {
-              this._matDialog.open(DialogSyncCfgComponent);
-            },
-          );
+          // Sync now on the active engine; with nothing configured it opens the sign-in
+          // dialog, as it always did.
+          void this._syncActions.syncNow();
+          break;
+        case 'account':
+          void this._syncActions.openAccount();
+          break;
+        case 'sync-settings':
+          void this._syncActions.openSetup();
           break;
         case 'undo':
           this._taskUndo.undo();

@@ -4,6 +4,8 @@ import { Router } from '@angular/router';
 import { NoteService } from '../../features/note/note.service';
 import { Note } from '../../features/note/note.model';
 import { LayoutService } from '../../core-ui/layout/layout.service';
+import { AccountSyncActionsService } from '../../features/native-sync/account-sync-actions.service';
+import { AccountSyncStatusService } from '../../features/native-sync/account-sync-status.service';
 import { MenuTreeService } from '../../features/menu-tree/menu-tree.service';
 
 import { SearchPageComponent } from './search-page.component';
@@ -138,6 +140,18 @@ describe('SearchPageComponent', () => {
         },
         { provide: NoteService, useValue: { notes$ } },
         { provide: Router, useValue: routerSpy },
+        {
+          provide: AccountSyncStatusService,
+          useValue: { status: signal({ engine: null }) },
+        },
+        {
+          provide: AccountSyncActionsService,
+          useValue: jasmine.createSpyObj('AccountSyncActionsService', [
+            'syncNow',
+            'openAccount',
+            'openSetup',
+          ]),
+        },
         { provide: LayoutService, useValue: layoutServiceSpy },
         { provide: RecentlyDeletedService, useValue: recentlyDeletedSpy },
         {
