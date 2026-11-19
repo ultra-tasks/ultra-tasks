@@ -1,0 +1,59 @@
+<h2
+  mat-dialog-title
+  id="account-data-choice-title"
+>
+  {{ T.ACCOUNT_DATA.CHOICE_TITLE | translate }}
+</h2>
+<mat-dialog-content id="account-data-choice-body">
+  <p>{{ T.ACCOUNT_DATA.CHOICE_INTRO | translate }}</p>
+  @if (notice()) {
+    <div
+      class="callout callout--warning"
+      role="alert"
+    >
+      <mat-icon aria-hidden="true">warning</mat-icon>
+      <p>{{ notice() | translate }}</p>
+    </div>
+  }
+  <dl class="summaries">
+    <div>
+      <dt>{{ T.ACCOUNT_DATA.IN_ACCOUNT | translate }}</dt>
+      <dd>{{ T.ACCOUNT_DATA.COUNTS | translate: counts(account()) }}</dd>
+    </div>
+    <div>
+      <dt>{{ T.ACCOUNT_DATA.ON_DEVICE | translate }}</dt>
+      <dd>{{ T.ACCOUNT_DATA.COUNTS | translate: counts(local()) }}</dd>
+    </div>
+  </dl>
+  <ul class="consequences">
+    <li>{{ T.ACCOUNT_DATA.DOWNLOAD_HINT | translate }}</li>
+    <li>{{ T.ACCOUNT_DATA.REPLACE_HINT | translate }}</li>
+    <li>{{ T.ACCOUNT_DATA.LATER_HINT | translate }}</li>
+  </ul>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button
+    mat-stroked-button
+    color="warn"
+    class="dialog-action-start"
+    type="button"
+    (click)="replace()"
+  >
+    {{ T.ACCOUNT_DATA.REPLACE | translate }}
+  </button>
+  <button
+    mat-button
+    type="button"
+    (click)="later()"
+  >
+    {{ T.ACCOUNT_DATA.LATER | translate }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    (click)="download()"
+  >
+    {{ T.ACCOUNT_DATA.DOWNLOAD | translate }}
+  </button>
+</mat-dialog-actions>

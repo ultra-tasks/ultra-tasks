@@ -5,6 +5,7 @@ import { BannerService } from '../../core/banner/banner.service';
 import { BannerId } from '../../core/banner/banner.model';
 import { LS } from '../../core/persistence/storage-keys.const';
 import { GlobalConfigService } from '../../features/config/global-config.service';
+import { NativeSyncService } from '../../features/native-sync/native-sync.service';
 import { OnboardingHintService } from '../../features/onboarding/onboarding-hint.service';
 import { selectTaskFeatureState } from '../../features/tasks/store/task.selectors';
 import { devError } from '../../util/dev-error';
@@ -32,6 +33,7 @@ const MIN_TASKS = 20;
 export class SyncSafetyBannerService {
   private readonly _bannerService = inject(BannerService);
   private readonly _globalConfigService = inject(GlobalConfigService);
+  private readonly _native = inject(NativeSyncService);
   private readonly _matDialog = inject(MatDialog);
   private readonly _store = inject(Store);
 
@@ -50,6 +52,13 @@ export class SyncSafetyBannerService {
 
     // Don't interrupt the first-run onboarding flow.
     if (OnboardingHintService.isOnboardingInProgress()) {
+      return;
+    }
+    // A configured Ultra Tasks account is "already using sync" in every state: locked,
+    // offline, signed out by the server or not yet connected. A person who has an account
+    // never gets the new-user setup nudge; if they must sign in again, the account's own
+    // status says so.
+    if (this._native.configured()) {
       return;
     }
     // Already using sync → nothing to nudge. Treat "config not loaded yet"

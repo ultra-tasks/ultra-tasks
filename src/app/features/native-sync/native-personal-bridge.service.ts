@@ -27,6 +27,9 @@ import { ValidateStateService } from '../../op-log/validation/validate-state.ser
 import { replacePersonalRecords } from './native-personal-replacement';
 import { TabSeqFrontierService } from '../../op-log/persistence/tab-seq-frontier.service';
 
+/** Where an initial switch stands, so every surface can say "Downloading" and then "Applying". */
+export type BridgeStage = 'downloading' | 'applying' | 'uploading';
+
 /** Keeps the local op log as the durable intent source; only encrypted records leave the device. */
 @Injectable({ providedIn: 'root' })
 export class NativePersonalBridgeService {
@@ -81,7 +84,7 @@ export class NativePersonalBridgeService {
         : undefined;
     return !!this.baseline && !!this.scopeId;
   }
-  async migrate(): Promise<void> {
+  async migrate(onStage?: (stage: BridgeStage) => void): Promise<void> {
     const client = this.client!;
     const source = await this.snapshot();
     const validation = await this.validation.validateAndRepair(
@@ -101,20 +104,28 @@ export class NativePersonalBridgeService {
     }
     const imported = client.records(this.scopeId);
     this.baseline = baselineFromHeads(imported, restorePersonal(imported));
+    onStage?.('applying');
     await this.apply(() => this.assertSafeTabFrontier());
   }
-  async useExisting(assertUnchanged?: () => void): Promise<void> {
+  async useExisting(
+    assertUnchanged?: () => void,
+    onStage?: (stage: BridgeStage) => void,
+  ): Promise<void> {
     if (!this.scopeId) throw new Error('NATIVE_SYNC.ERROR_NO_PERSONAL');
     await this.snapshot();
+    // The recovery copy holds THIS device's data (archives included) before it is replaced.
+    // It is saved on this device only: the account's own data is never copied anywhere.
     await this.backups.captureImportBackup('REMOTE_IMPORT');
     const scope = this.client!.state.scopes[this.scopeId];
     if (scope.intents.length || scope.uncertain)
       throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');
+    onStage?.('downloading');
     await this.client!.syncScope(this.scopeId);
     if (this.client!.state.scopes[this.scopeId].info.state !== 'active')
       throw new Error('Personal migration is still in progress on another device');
     // The user explicitly chose the account's existing dataset; the recovery copy retains this device's data.
     this.baseline = undefined;
+    onStage?.('applying');
     await this.apply(async () => {
       await this.assertSafeTabFrontier();
       assertUnchanged?.();

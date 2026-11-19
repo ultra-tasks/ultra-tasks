@@ -160,6 +160,28 @@ describe('NativePersonalBridgeService', () => {
       }),
     ).toBeRejectedWithError('choice guard reached');
   });
+  it('saves a recovery copy of THIS device first, then reports downloading and applying in order', async () => {
+    await service.bind(client);
+    const steps: string[] = [];
+    const backups = TestBed.inject(BackupService).captureImportBackup as jasmine.Spy;
+    backups.and.callFake(async () => {
+      steps.push('recovery copy');
+      return {};
+    });
+    (client.syncScope as jasmine.Spy).and.callFake(async () => {
+      steps.push('fetch');
+    });
+    await expectAsync(
+      service.useExisting(
+        () => {
+          throw new Error('choice guard reached');
+        },
+        (stage) => steps.push(stage),
+      ),
+    ).toBeRejectedWithError('choice guard reached');
+    expect(backups).toHaveBeenCalledOnceWith('REMOTE_IMPORT');
+    expect(steps).toEqual(['recovery copy', 'downloading', 'fetch', 'applying']);
+  });
   it('retains local changes and refuses to dual-write while a legacy provider is enabled', async () => {
     await baseline();
     await service.bind(client);

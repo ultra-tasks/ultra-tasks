@@ -36,6 +36,7 @@ import { CertTrustElectronApi } from './shared-with-frontend/cert-trust-hosts';
 import { JiraElectronApi } from './shared-with-frontend/jira-request.model';
 
 import { AccountLoginStoreApi } from './shared-with-frontend/account-login-api';
+import { AccountSessionStoreApi } from './shared-with-frontend/account-session-api';
 
 export interface ElectronAPI {
   on(channel: string, listener: (...args: unknown[]) => void): void;
@@ -301,6 +302,7 @@ export interface ElectronAPI {
 
   consumeCertTrustApi(): CertTrustElectronApi | null;
   consumeAccountLoginStore(): AccountLoginStoreApi | null;
+  consumeAccountSessionStore(): AccountSessionStoreApi | null;
 
   consumePluginNodeExecutionApi(): PluginNodeExecutionElectronApi | null;
 

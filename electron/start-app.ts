@@ -32,6 +32,8 @@ import {
 import { getIsQuiting } from './shared-state';
 import { initPowerMonitorHandlers } from './power-monitor-handlers';
 import { evaluateGpuStartupGuard } from './gpu-startup-guard';
+import { initAccountSessionStore } from './account-session-store';
+import { initLifecycleDiagnostics } from './lifecycle-diagnostics';
 import * as fs from 'fs';
 
 const ICONS_FOLDER = __dirname + '/assets/icons/';
@@ -68,6 +70,7 @@ export const startApp = (): void => {
 
   // LOAD IPC STUFF
   initIpcInterfaces();
+  initAccountSessionStore();
 
   electronLog.initialize();
 
@@ -206,6 +209,12 @@ export const startApp = (): void => {
   }
 
   initDebug({ showDevTools: isShowDevTools }, IS_DEV);
+
+  // After every userData override above: records why this run ends, logs why the last one did.
+  const lifecycle = initLifecycleDiagnostics({
+    app,
+    userDataPath: app.getPath('userData'),
+  });
 
   // NOTE: opening the folder crashes the mas build
   if (!IS_MAC) {
@@ -399,6 +408,7 @@ export const startApp = (): void => {
     // --------END IDLE HANDLING---------
 
     initPowerMonitorHandlers(powerMonitor, () => mainWin, sendIdleMsgIfOverMin);
+    lifecycle.watchPower(powerMonitor);
   });
 
   appIN.on('will-quit', () => {

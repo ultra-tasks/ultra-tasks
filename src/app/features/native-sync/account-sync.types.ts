@@ -48,3 +48,22 @@ export interface AccountDataChoice {
   /** The user closed the dialog without deciding: show "Data connection not finished". */
   deferred: boolean;
 }
+
+/**
+ * Where the first connection of this device to the account's data stands. It explains
+ * `phase` (`discovering` is still "Signing in", `downloading` and `applying` map to the
+ * phases of the same name, `uploading` is "Syncing changes") and carries the two states
+ * that need an action: `failed` (the account could not be read: Retry) and `waiting`
+ * (another device is still setting the account up).
+ */
+export type DataConnectionState =
+  | 'idle'
+  | 'discovering'
+  | 'downloading'
+  | 'applying'
+  | 'uploading'
+  | 'failed'
+  | 'waiting';
+
+/** What a session that cannot sync on its own needs from the person. */
+export type AccountReconnect = 'unlock' | 'sign-in' | null;

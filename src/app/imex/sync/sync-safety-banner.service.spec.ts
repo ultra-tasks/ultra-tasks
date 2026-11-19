@@ -1,3 +1,4 @@
+import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { Store } from '@ngrx/store';
@@ -7,6 +8,8 @@ import { BannerId, Banner } from '../../core/banner/banner.model';
 import { LS } from '../../core/persistence/storage-keys.const';
 import { GlobalConfigService } from '../../features/config/global-config.service';
 import { OnboardingHintService } from '../../features/onboarding/onboarding-hint.service';
+import { NativeSyncService } from '../../features/native-sync/native-sync.service';
+import type { AccountPhase } from '../../features/native-sync/account-sync.types';
 import { SyncConfig } from '../../features/config/global-config.model';
 import { SyncProviderId } from '../../op-log/sync-providers/provider.const';
 import { selectTaskFeatureState } from '../../features/tasks/store/task.selectors';
@@ -27,6 +30,8 @@ describe('SyncSafetyBannerService', () => {
   let selectSignalSpy: jasmine.Spy;
   let lsStore: Record<string, string>;
   let taskIds: string[];
+  let nativeConfigured: WritableSignal<boolean>;
+  let nativePhase: WritableSignal<AccountPhase>;
 
   const lastBanner = (): Banner =>
     bannerService.open.calls.mostRecent().args[0] as Banner;
@@ -52,6 +57,8 @@ describe('SyncSafetyBannerService', () => {
       lsStore[k] = v;
     });
     spyOn(OnboardingHintService, 'isOnboardingInProgress').and.returnValue(false);
+    nativeConfigured = signal(false);
+    nativePhase = signal<AccountPhase>('signed-out');
 
     bannerService = jasmine.createSpyObj<BannerService>('BannerService', ['open']);
     matDialog = jasmine.createSpyObj<MatDialog>('MatDialog', ['open']);
@@ -67,6 +74,10 @@ describe('SyncSafetyBannerService', () => {
         { provide: BannerService, useValue: bannerService },
         { provide: MatDialog, useValue: matDialog },
         { provide: GlobalConfigService, useValue: { sync: syncSpy } },
+        {
+          provide: NativeSyncService,
+          useValue: { configured: nativeConfigured, phase: nativePhase },
+        },
         { provide: Store, useValue: { selectSignal: selectSignalSpy } },
       ],
     });
@@ -146,6 +157,46 @@ describe('SyncSafetyBannerService', () => {
     syncSpy.and.returnValue(CONFIGURED);
     service.showReminderIfNeeded();
     expect(bannerService.open).not.toHaveBeenCalled();
+  });
+
+  // The legacy provider flag is off for every one of these, exactly as for a person who
+  // only ever used an Ultra Tasks account. Each state keeps the configured identity.
+  (
+    [
+      ['locked', 'the vault is closed'],
+      ['reauth', 'the server asked for a new sign-in'],
+      ['choose-data', 'the data connection is not finished'],
+      ['syncing', 'a sync is running'],
+      ['synced', 'everything is up to date'],
+    ] as [AccountPhase, string][]
+  ).forEach(([phase, description]) => {
+    it(`never nudges to set up sync for a configured Ultra Tasks account (${description})`, () => {
+      setEligible();
+      syncSpy.and.returnValue(UNCONFIGURED);
+      nativeConfigured.set(true);
+      nativePhase.set(phase);
+      service.showReminderIfNeeded();
+      expect(bannerService.open).not.toHaveBeenCalled();
+    });
+  });
+
+  it('never nudges a configured account that is offline either', () => {
+    setEligible();
+    nativeConfigured.set(true);
+    service.showReminderIfNeeded();
+    expect(bannerService.open).not.toHaveBeenCalled();
+    // The first-use clock still ticks, and nothing was dismissed for good.
+    expect(lsStore[LS.SYNC_SAFETY_NUDGE_DISMISSED]).toBeUndefined();
+  });
+
+  it('nudges again once the account is removed from this device', () => {
+    setEligible();
+    nativeConfigured.set(true);
+    service.showReminderIfNeeded();
+    expect(bannerService.open).not.toHaveBeenCalled();
+    nativeConfigured.set(false);
+    service.showReminderIfNeeded();
+    expect(bannerService.open).toHaveBeenCalledTimes(1);
   });
 
   it('persists dismissal when the user clicks "Not now"', () => {

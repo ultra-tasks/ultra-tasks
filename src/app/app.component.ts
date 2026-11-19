@@ -83,6 +83,8 @@ import { readableUrl } from './util/readable-url';
 import { MobileBottomNavComponent } from './core-ui/mobile-bottom-nav/mobile-bottom-nav.component';
 import { CertTrustService } from './features/issue/cert-trust.service';
 import { NativeAccountLoginService } from './features/native-sync/native-account-login.service';
+import { NativeSessionRestoreService } from './features/native-sync/native-session-restore.service';
+import { AccountDataChoiceHostService } from './features/native-sync/dialog-account-data-choice/account-data-choice-host.service';
 import { StartupService } from './core/startup/startup.service';
 import { DataInitStateService } from './core/data-init/data-init-state.service';
 import { AppUriTaskActionsService } from './features/tasks/app-uri-actions/app-uri-task-actions.service';
@@ -190,6 +192,9 @@ export class AppComponent implements OnDestroy, AfterViewInit {
   // cold-launch add-task/complete-task URL action is never missed.
   private _appUriTaskActionsService = inject(AppUriTaskActionsService);
   private readonly _accountLogin = inject(NativeAccountLoginService);
+  private readonly _sessionRestore = inject(NativeSessionRestoreService);
+  // Injected for side-effect: opens the account data-choice dialog on any screen.
+  private readonly _accountDataChoice = inject(AccountDataChoiceHostService);
   private _iosShareService = inject(IosShareService);
   private _agentCaptureService = inject(AgentCaptureService);
   readonly onboardingHintService = inject(OnboardingHintService);
@@ -278,6 +283,8 @@ export class AppComponent implements OnDestroy, AfterViewInit {
     // Claim the one-shot certificate-trust API before plugins load (#11097).
     this._certTrustService.init();
     this._accountLogin.initialize();
+    // Trusted desktop devices reopen their account from OS-protected storage.
+    this._sessionRestore.initialize();
     this._startupService.init();
     this._iosShareService.start();
     this._agentCaptureService.start();

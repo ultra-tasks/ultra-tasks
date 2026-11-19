@@ -1,0 +1,31 @@
+// Dialog anatomy, tokens and buttons come from the shared style layer
+// (docs/styling-guide.md § Dialogs); only the two summary lines and the list are local.
+.summaries {
+  display: grid;
+  gap: var(--s2);
+  margin: var(--s2) 0;
+
+  > div {
+    display: grid;
+    gap: var(--s-half);
+  }
+
+  dt {
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.consequences {
+  margin: 0;
+  padding-inline-start: var(--s3);
+  display: grid;
+  gap: var(--s);
+}
+
+.callout {
+  margin-bottom: var(--s2);
+}
