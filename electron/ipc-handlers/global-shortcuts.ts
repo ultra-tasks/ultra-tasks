@@ -40,13 +40,15 @@ const GLOBAL_SHORTCUT_ACTIONS: Record<string, () => void> = {
 
 // Same grace period errorHandlerWithFrontendInform gives a renderer that is still booting.
 const WAIT_FOR_RENDERER_DURATION = 4000;
+// A slow start (a large profile, a first run after an update) can take longer than one wait. The
+// conflict keeps waiting for the renderer for about a minute, then is given up quietly: it is
+// still in the log, and the settings page shows it the next time the shortcut is applied.
+const MAX_RENDERER_WAITS = 15;
 
 // A conflict is a settings problem, not an app error: it goes out on its own channel and
-// is never handed to errorHandlerWithFrontendInform.
-const sendConflictToRenderer = (
-  conflict: GlobalShortcutConflict,
-  isRetry = false,
-): void => {
+// is never handed to errorHandlerWithFrontendInform. The registry reports a conflict once;
+// this only makes sure that one report arrives.
+const sendConflictToRenderer = (conflict: GlobalShortcutConflict, waits = 0): void => {
   try {
     if (getIsAppReady()) {
       getWin().webContents.send(IPC.GLOBAL_SHORTCUT_CONFLICT, conflict);
@@ -55,8 +57,11 @@ const sendConflictToRenderer = (
   } catch {
     // window already gone
   }
-  if (!isRetry) {
-    setTimeout(() => sendConflictToRenderer(conflict, true), WAIT_FOR_RENDERER_DURATION);
+  if (waits < MAX_RENDERER_WAITS) {
+    setTimeout(
+      () => sendConflictToRenderer(conflict, waits + 1),
+      WAIT_FOR_RENDERER_DURATION,
+    );
   }
 };
 

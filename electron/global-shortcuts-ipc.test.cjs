@@ -7,6 +7,10 @@ require('ts-node/register/transpile-only');
 
 const originalModuleLoad = Module._load;
 const handlerModulePath = path.resolve(__dirname, 'ipc-handlers/global-shortcuts.ts');
+// NOTE: the handler under test imports './shared-with-frontend/ipc-events.const' without an
+// extension, and Node prefers a compiled sibling `.js` (left by `npm run electron:build`) over the
+// `.ts`. A stale one predates GLOBAL_SHORTCUT_CONFLICT and makes the channel `undefined` here:
+// rebuild (or delete the generated .js) before reading a failure of this file as a real one.
 const { IPC } = require('./shared-with-frontend/ipc-events.const.ts');
 
 let ipcHandlers;
@@ -184,15 +188,42 @@ test('a conflict found while the renderer boots is delivered once it is ready', 
   ]);
 });
 
-test('a conflict is dropped quietly when the renderer never becomes ready', (t) => {
+test('a conflict waits through a slow renderer start and is still delivered once', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   isAppReady = false;
   heldByOtherApp.add('Ctrl+Shift+X');
   const register = loadHandler();
 
   register({}, { globalShowHide: 'Ctrl+Shift+X' });
+  // Well past the first grace period, still booting.
+  for (let wait = 0; wait < 9; wait++) t.mock.timers.tick(4000);
+  assert.deepEqual(currentWin.sent, []);
+
+  isAppReady = true;
   t.mock.timers.tick(4000);
-  t.mock.timers.tick(60000);
+  // Later waits find nothing left to deliver.
+  for (let wait = 0; wait < 20; wait++) t.mock.timers.tick(4000);
+
+  assert.deepEqual(currentWin.sent, [
+    [
+      IPC.GLOBAL_SHORTCUT_CONFLICT,
+      { shortcut: 'Ctrl+Shift+X', action: 'globalShowHide' },
+    ],
+  ]);
+});
+
+test('a conflict is dropped quietly, and stops waiting, when the renderer never becomes ready', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  isAppReady = false;
+  heldByOtherApp.add('Ctrl+Shift+X');
+  const register = loadHandler();
+
+  register({}, { globalShowHide: 'Ctrl+Shift+X' });
+  // One wait at a time: each wait schedules the next.
+  for (let wait = 0; wait < 15; wait++) t.mock.timers.tick(4000);
+  // Ready only after the bound: nothing is delivered and no timer is left behind.
+  isAppReady = true;
+  for (let wait = 0; wait < 20; wait++) t.mock.timers.tick(4000);
 
   assert.deepEqual(currentWin.sent, []);
 });

@@ -9,6 +9,7 @@ import {
   OperationLogStoreService,
 } from '../persistence/operation-log-store.service';
 import { countAllTasks } from '../../imex/local-backup/backup-ring.util';
+import { deepEqual } from '@sp/sync-core';
 import { hasRecoverableData } from './has-recoverable-data.util';
 import { generateClientId } from '../../core/util/generate-client-id';
 import { Operation, OpType, ActionType } from '../core/operation.types';
@@ -285,6 +286,32 @@ export class BackupService {
     const currentState = await this._stateSnapshotService.getStateSnapshotAsync();
     if (!hasRecoverableData(currentState)) {
       return null;
+    }
+    const taskCount = countAllTasks(currentState);
+    const ref = await this._saveRecoveryPoint(currentState, reason, taskCount);
+    return { ...ref, reason, taskCount };
+  }
+
+  /**
+   * Recovery point before a replacement that may be attempted again automatically (the account
+   * sync's first download). Nothing is saved when there is nothing worth recovering, or when the
+   * newest ring entry already holds exactly this state: a retry must not push a real snapshot
+   * out of the ring of three with copies of the same data. Either way the state is covered
+   * before the caller goes on; returns the entry that covers it, or null for nothing meaningful.
+   */
+  async captureRecoveryPointUnlessCovered(
+    reason: ImportBackupReason,
+  ): Promise<ImportBackupMeta | null> {
+    const currentState = await this._stateSnapshotService.getStateSnapshotAsync();
+    if (!hasRecoverableData(currentState)) {
+      return null;
+    }
+    const [newest] = await this._opLogStore.listImportBackups();
+    if (newest) {
+      const saved = await this._opLogStore.loadImportBackupById(newest.backupId);
+      if (saved && deepEqual(saved.state, currentState)) {
+        return newest;
+      }
     }
     const taskCount = countAllTasks(currentState);
     const ref = await this._saveRecoveryPoint(currentState, reason, taskCount);

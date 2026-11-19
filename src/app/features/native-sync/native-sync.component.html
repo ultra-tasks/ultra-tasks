@@ -119,13 +119,85 @@
                 {{ T.NATIVE_SYNC.BACK | translate }}
               </button>
             </div>
+          } @else if (deviceVerification(); as verification) {
+            <!-- Step: verify this device with the code the server emailed -->
+            <h2 id="account-step-title">{{ T.ACCOUNT_DEVICE.TITLE | translate }}</h2>
+            <p
+              class="intro"
+              id="device-code-intro"
+            >
+              {{ T.ACCOUNT_DEVICE.INTRO | translate: { email: verification.emailHint } }}
+              {{ T.ACCOUNT_DEVICE.VALID_FOR | translate: { minutes: codeMinutes() } }}
+            </p>
+            <form
+              class="sign-in-form"
+              (ngSubmit)="completeDeviceVerification()"
+            >
+              <mat-form-field
+                class="field"
+                subscriptSizing="dynamic"
+                hideRequiredMarker
+              >
+                <mat-label>{{ T.ACCOUNT_DEVICE.CODE | translate }}</mat-label>
+                <input
+                  matInput
+                  #codeField
+                  name="code"
+                  [(ngModel)]="deviceCode"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  aria-describedby="device-code-intro"
+                  required
+                  [errorStateMatcher]="plainFieldMatcher"
+                />
+              </mat-form-field>
+              <ng-container [ngTemplateOutlet]="stepError" />
+              <button
+                mat-flat-button
+                color="primary"
+                type="submit"
+                class="wide"
+                [disabled]="working()"
+              >
+                {{ T.NATIVE_SYNC.VERIFY | translate }}
+              </button>
+            </form>
+            <div class="step-actions">
+              <!-- Stays reachable by keyboard and screen reader while it waits out the cooldown. -->
+              <button
+                mat-stroked-button
+                type="button"
+                disabledInteractive
+                (click)="resendDeviceCode()"
+                [disabled]="working() || !canResend()"
+              >
+                {{ T.ACCOUNT_DEVICE.RESEND | translate }}
+              </button>
+              <button
+                mat-button
+                type="button"
+                (click)="cancelDeviceVerification()"
+                [disabled]="working()"
+              >
+                {{ T.NATIVE_SYNC.BACK | translate }}
+              </button>
+            </div>
+            <p class="quiet resend-note">
+              <!-- The seconds tick visibly but silently; the live text below says the rest. -->
+              @if (resendIn() > 0) {
+                <span aria-hidden="true">{{
+                  T.ACCOUNT_DEVICE.RESEND_IN | translate: { seconds: resendIn() }
+                }}</span>
+              }
+              <span
+                role="status"
+                aria-live="polite"
+                >{{ deviceNote() }}</span
+              >
+            </p>
           } @else {
-            <!--
-              SLOT "Verify this device" (the new-device email code). When the sign-in service
-              exposes it (`native.deviceVerification`), add an `@else if (native.deviceVerification())`
-              branch BEFORE this final `@else`: same card, a heading, one sentence, the code
-              field (`#codeField`), the `stepError` outlet and Back. Until then it does not exist.
-            -->
             @if (resumeStatus(); as resume) {
               <h2 id="account-step-title">{{ resume.labelKey | translate }}</h2>
               @if (resume.detailKey) {

@@ -118,6 +118,14 @@
   font: var(--type-meta);
 }
 
+// The countdown and the one sentence that says what just happened (sent, or ready again).
+.resend-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s);
+  font: var(--type-meta);
+}
+
 .request-code {
   display: flex;
   flex-wrap: wrap;

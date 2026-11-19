@@ -158,7 +158,12 @@ export class AccountSyncStatusService {
           icon: 'lock',
           ...MATERIAL,
           labelKey: T.ACCOUNT_STATUS.LOCKED,
-          detailKey: T.ACCOUNT_STATUS.LOCKED_DETAIL,
+          // Secure storage that cannot be read is a different problem from a vault that simply
+          // has not been unlocked yet; every surface that shows this status says which.
+          detailKey:
+            this.native.lockReason() === 'storage-unavailable'
+              ? T.ACCOUNT_DATA.ERROR_STORAGE
+              : T.ACCOUNT_STATUS.LOCKED_DETAIL,
           action: 'unlock',
           actionLabelKey: T.ACCOUNT_STATUS.ACTION_UNLOCK,
         });

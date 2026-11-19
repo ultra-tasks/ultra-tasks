@@ -1,5 +1,12 @@
 import { signal } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+  ComponentFixture,
+  TestBed,
+  discardPeriodicTasks,
+  fakeAsync,
+  flushMicrotasks,
+  tick,
+} from '@angular/core/testing';
 import { MatIconTestingModule } from '@angular/material/icon/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
@@ -15,7 +22,11 @@ import { BehaviorSubject, Observable, of } from 'rxjs';
 import { NativeSyncComponent } from './native-sync.component';
 import { NativeSyncService } from './native-sync.service';
 import { NativeAccountLoginService } from './native-account-login.service';
-import type { AccountDataChoice, AccountPhase } from './account-sync.types';
+import type {
+  AccountDataChoice,
+  AccountPhase,
+  DeviceVerificationView,
+} from './account-sync.types';
 import { StateSnapshotService } from '../../op-log/backup/state-snapshot.service';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { DateService } from '../../core/date/date.service';
@@ -51,8 +62,10 @@ const createNative = () => ({
   offline: signal(false),
   emptyAccount: signal(false),
   lastSyncedAt: signal<number | null>(null),
+  lockReason: signal<'storage-unavailable' | null>(null),
   pendingChanges: signal(0),
   dataChoice: signal<AccountDataChoice | null>(null),
+  deviceVerification: signal<DeviceVerificationView | null>(null),
   accountIdentity: signal<{ email: string; id: string } | null>(null),
   mfaMethods: signal<string[]>([]),
   status: signal('NATIVE_SYNC.LOCKED'),
@@ -73,6 +86,11 @@ const createNative = () => ({
   openAccount: jasmine.createSpy('openAccount').and.resolveTo(),
   resumeDataConnection: jasmine.createSpy('resumeDataConnection').and.resolveTo(),
   completeMfa: jasmine.createSpy('completeMfa').and.resolveTo(),
+  completeDeviceVerification: jasmine
+    .createSpy('completeDeviceVerification')
+    .and.resolveTo(),
+  resendDeviceVerification: jasmine.createSpy('resendDeviceVerification').and.resolveTo(),
+  cancelDeviceVerification: jasmine.createSpy('cancelDeviceVerification').and.resolveTo(),
   passkey: jasmine.createSpy('passkey').and.resolveTo(),
   deleteAccount: jasmine.createSpy('deleteAccount').and.resolveTo(),
 });
@@ -579,6 +597,216 @@ describe('NativeSyncComponent', () => {
       await settle();
       expect(el('.status')).toBeNull();
       expect(button('Sync now')).toBeUndefined();
+    });
+  });
+
+  describe('verify this device (a new device is asked for an emailed code)', () => {
+    beforeEach(configure);
+
+    const step = (over: Partial<DeviceVerificationView> = {}): DeviceVerificationView => {
+      // Sent long enough ago that a new code may be requested; valid for the server's ten minutes.
+      const issuedAt = over.issuedAt ?? Date.now() - 31_000;
+      return {
+        emailHint: 'a***@example.test',
+        expiresAt: issuedAt + 600_000,
+        resendAfter: 30,
+        resendsLeft: 3,
+        issuedAt,
+        ...over,
+      };
+    };
+    const open = (over: Partial<DeviceVerificationView> = {}): void => {
+      native.deviceVerification.set(step(over));
+      native.phase.set('verify-device');
+    };
+    const submit = async (): Promise<void> => {
+      el<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      await settle();
+    };
+    /** Unavailable, but still reachable: the button keeps its place in the tab order. */
+    const unavailable = (b: HTMLButtonElement): boolean =>
+      b.disabled || b.getAttribute('aria-disabled') === 'true';
+
+    it('moves the sign-in on to the code in the same card, naming the masked address only', async () => {
+      native.login.and.callFake(async () => {
+        open();
+        return false;
+      });
+      await render();
+      await type('input[name="identifier"]', 'ada@example.test');
+      await type('input[name="password"]', 'a long test password');
+      await submit();
+      expect(fixture.nativeElement.querySelectorAll('section').length).toBe(1);
+      expect(el('h2')!.textContent).toContain('Verify this device');
+      expect(text()).toContain('We emailed a code to a***@example.test');
+      expect(text()).toContain('The code is valid for 10 minutes.');
+      expect(text()).not.toContain('ada@example.test');
+      // It is not the two-factor step, and the sign-in form is gone.
+      expect(text()).not.toContain('Two-factor');
+      expect(button('Use security key or passkey')).toBeUndefined();
+      expect(el('input[name="identifier"]')).toBeNull();
+      expect(el('input[name="password"]')).toBeNull();
+      expect(button('Verify')).toBeDefined();
+      expect(button('Send a new code')).toBeDefined();
+      expect(button('Back')).toBeDefined();
+    });
+
+    it('asks for the code the way a browser and a phone can fill it in', async () => {
+      open();
+      await render();
+      const field = el<HTMLInputElement>('input[name="code"]')!;
+      expect(field.getAttribute('autocomplete')).toBe('one-time-code');
+      expect(field.getAttribute('inputmode')).toBe('numeric');
+      expect(field.required).toBeTrue();
+      expect(field.getAttribute('aria-describedby')).toBe('device-code-intro');
+      expect(el('#device-code-intro')!.textContent).toContain('We emailed a code');
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('label, mat-label')!
+          .textContent,
+      ).toContain('Verification code');
+    });
+
+    it('puts the cursor on the code when the step appears', async () => {
+      open();
+      await render();
+      expect(document.activeElement).toBe(el('input[name="code"]'));
+    });
+
+    it('verifies on Enter with what was typed, spaces and all', async () => {
+      open();
+      await render();
+      await type('input[name="code"]', '1234 5678');
+      await submit();
+      expect(native.completeDeviceVerification).toHaveBeenCalledOnceWith('1234 5678');
+    });
+
+    it('shows a wrong code as one alert, once, and puts the cursor back on it', async () => {
+      open();
+      native.completeDeviceVerification.and.rejectWith(
+        new Error('ACCOUNT_DEVICE.ERROR_CODE'),
+      );
+      await render();
+      await type('input[name="code"]', '00000000');
+      await submit();
+      const alerts = (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '[role="alert"]',
+      );
+      expect(alerts.length).toBe(1);
+      expect(alerts[0].textContent).toContain('That code did not work or has expired.');
+      expect(el('h2')!.textContent).toContain('Verify this device');
+      expect(document.activeElement).toBe(el('input[name="code"]'));
+    });
+
+    it('goes Back to the sign-in, which comes back untouched', async () => {
+      open();
+      native.cancelDeviceVerification.and.callFake(async () => {
+        native.deviceVerification.set(null);
+        native.phase.set('signed-out');
+      });
+      await render();
+      button('Back')!.click();
+      await settle();
+      expect(native.cancelDeviceVerification).toHaveBeenCalledTimes(1);
+      expect(el('input[name="identifier"]')).not.toBeNull();
+      expect(el('input[name="code"]')).toBeNull();
+      expect(el('h2')!.textContent).toContain('Sign in to your Ultra Tasks account');
+    });
+
+    it('returns to the sign-in with the reason when the server closed the challenge', async () => {
+      open();
+      native.resendDeviceVerification.and.callFake(async () => {
+        native.deviceVerification.set(null);
+        native.phase.set('signed-out');
+        throw new Error('ACCOUNT_DEVICE.ERROR_ENDED');
+      });
+      await render();
+      button('Send a new code')!.click();
+      await settle();
+      expect(el('input[name="identifier"]')).not.toBeNull();
+      const alert = el('[role="alert"]')!;
+      expect(alert.textContent).toContain('expired or was closed');
+    });
+
+    it('never shows a signed-in state while the code is awaited', async () => {
+      open();
+      await render();
+      expect(el('.status')).toBeNull();
+      expect(button('Sync now')).toBeUndefined();
+    });
+
+    it('counts the server’s cooldown down in plain sight, silently, and says only when it ends', fakeAsync(() => {
+      // Three seconds of the server's 30-second cooldown are left.
+      open({ issuedAt: Date.now() - 27_000 });
+      fixture = TestBed.createComponent(NativeSyncComponent);
+      fixture.detectChanges();
+      flushMicrotasks();
+      fixture.detectChanges();
+      const resend = (): HTMLButtonElement => button('Send a new code')!;
+      const note = (): HTMLElement => el('.resend-note')!;
+      const live = (): string =>
+        el(
+          '[role="status"].resend-note, .resend-note [role="status"]',
+        )!.textContent!.trim();
+      expect(unavailable(resend())).toBeTrue();
+      // Waiting does not take the button out of reach of a keyboard or a screen reader.
+      expect(resend().disabled).toBeFalse();
+      expect(note().textContent).toContain('New code available in 3 s');
+      // The ticking seconds are hidden from screen readers; the live text stays empty.
+      expect(note().querySelector('[aria-hidden="true"]')).not.toBeNull();
+      expect(live()).toBe('');
+
+      tick(1000);
+      fixture.detectChanges();
+      expect(note().textContent).toContain('New code available in 2 s');
+      expect(live()).toBe('');
+
+      tick(2000);
+      fixture.detectChanges();
+      expect(unavailable(resend())).toBeFalse();
+      expect(note().textContent).not.toContain('New code available');
+      expect(live()).toBe('You can send a new code now.');
+      discardPeriodicTasks();
+    }));
+
+    it('keeps "Send a new code" off while the page is busy and after the last code', async () => {
+      open({ resendsLeft: 0 });
+      await render();
+      expect(unavailable(button('Send a new code')!)).toBeTrue();
+      button('Send a new code')!.click();
+      await settle();
+      expect(native.resendDeviceVerification).not.toHaveBeenCalled();
+      native.deviceVerification.set(step({ resendsLeft: 1 }));
+      await settle();
+      expect(unavailable(button('Send a new code')!)).toBeFalse();
+    });
+
+    it('sends a new code and says so in plain sight', async () => {
+      open();
+      native.resendDeviceVerification.and.callFake(async () => {
+        native.deviceVerification.set(step({ issuedAt: Date.now(), resendsLeft: 2 }));
+      });
+      await render();
+      button('Send a new code')!.click();
+      await settle();
+      expect(native.resendDeviceVerification).toHaveBeenCalledTimes(1);
+      const status = el('.resend-note [role="status"]')!;
+      expect(status.textContent).toContain('A new code was sent to a***@example.test.');
+      // The server's cooldown starts again.
+      expect(unavailable(button('Send a new code')!)).toBeTrue();
+      expect(el('.resend-note')!.textContent).toContain('New code available in');
+    });
+
+    it('forgets the typed code when the step ends', async () => {
+      open();
+      await render();
+      await type('input[name="code"]', '12345678');
+      native.deviceVerification.set(null);
+      native.phase.set('signed-out');
+      await settle();
+      native.deviceVerification.set(step());
+      native.phase.set('verify-device');
+      await settle();
+      expect(el<HTMLInputElement>('input[name="code"]')!.value).toBe('');
     });
   });
 

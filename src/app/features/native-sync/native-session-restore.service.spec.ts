@@ -98,6 +98,25 @@ describe('NativeSessionRestoreService', () => {
     expect(native.restoreSession).not.toHaveBeenCalled();
   });
 
+  it('is settled only once the attempt to bring the session back has ended', async () => {
+    const service = create();
+    expect(service.restoreSettled()).toBeFalse();
+    service.initialize();
+    await settle();
+    // Still waiting for the app's own data: the account is not "locked", it is on its way.
+    expect(service.restoreSettled()).toBeFalse();
+    loaded.next(true);
+    await settle();
+    expect(service.restoreSettled()).toBeTrue();
+  });
+
+  it('is settled at once where nothing is remembered', async () => {
+    store.supported = false;
+    const service = create();
+    service.initialize();
+    expect(service.restoreSettled()).toBeTrue();
+  });
+
   it('waits for the app data before opening the account', async () => {
     const service = create();
     service.initialize();

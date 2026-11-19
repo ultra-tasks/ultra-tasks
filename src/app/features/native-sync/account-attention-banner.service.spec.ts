@@ -13,6 +13,7 @@ import { AccountSyncActionsService } from './account-sync-actions.service';
 import { AccountSyncStatusService } from './account-sync-status.service';
 import type { AccountStatusId, AccountSyncStatus } from './account-sync-status.model';
 import type { AccountDataChoice } from './account-sync.types';
+import { NativeSessionRestoreService } from './native-session-restore.service';
 import { NativeSyncService } from './native-sync.service';
 
 describe('AccountAttentionBannerService', () => {
@@ -21,6 +22,7 @@ describe('AccountAttentionBannerService', () => {
   let native: { dataChoice: typeof dataChoice; resumeDataConnection: jasmine.Spy };
   let actions: jasmine.SpyObj<AccountSyncActionsService>;
   let banners: BannerService;
+  let restoreSettled: ReturnType<typeof signal<boolean>>;
   let router: { url: string; events: Subject<unknown> };
 
   const navigate = (url: string): void => {
@@ -71,8 +73,10 @@ describe('AccountAttentionBannerService', () => {
     actions = jasmine.createSpyObj('AccountSyncActionsService', ['openAccount']);
     actions.openAccount.and.resolveTo();
     router = { url: '/tag/TODAY/tasks', events: new Subject<unknown>() };
+    restoreSettled = signal(true);
     TestBed.configureTestingModule({
       providers: [
+        { provide: NativeSessionRestoreService, useValue: { restoreSettled } },
         { provide: AccountSyncStatusService, useValue: { status } },
         { provide: NativeSyncService, useValue: native },
         { provide: AccountSyncActionsService, useValue: actions },
@@ -124,6 +128,43 @@ describe('AccountAttentionBannerService', () => {
     expect(banner.action?.label).toBe(T.ACCOUNT_STATUS.ACTION_UNLOCK);
     banner.action!.fn();
     expect(actions.openAccount).toHaveBeenCalledTimes(1);
+  }));
+
+  it('does not ask to unlock while the remembered session is still being brought back', fakeAsync(() => {
+    restoreSettled.set(false);
+    status.set(make('locked', { severity: 'warning' }));
+    // A slow start: far longer than the settle time, and still nothing to nag about.
+    settle();
+    tick(ACCOUNT_ATTENTION_SETTLE_MS * 4);
+    TestBed.tick();
+    expect(shown()).toBeNull();
+    // The restore did not bring it back: now it is a state the person has to resolve.
+    restoreSettled.set(true);
+    settle();
+    expect(shown()?.msg).toBe(T.ACCOUNT_STATUS.LOCKED);
+  }));
+
+  it('does not raise a banner for the sign-in that a restore settles by itself', fakeAsync(() => {
+    restoreSettled.set(false);
+    status.set(make('locked', { severity: 'warning' }));
+    settle();
+    status.set(make('up-to-date'));
+    restoreSettled.set(true);
+    settle();
+    expect(shown()).toBeNull();
+  }));
+
+  it('lets a person wave away the reminder to unlock, but never the server’s sign-in-again', fakeAsync(() => {
+    status.set(make('locked', { severity: 'warning' }));
+    settle();
+    expect(shown()!.isHideDismissBtn).toBeFalsy();
+    status.set(make('reauth', { severity: 'error' }));
+    settle();
+    expect(shown()!.isHideDismissBtn).toBeTrue();
+    dataChoice.set(choice(true));
+    status.set(make('choose-data', { severity: 'warning' }));
+    settle();
+    expect(shown()!.isHideDismissBtn).toBeTrue();
   }));
 
   it('offers to finish an unfinished data connection, and resumes it', fakeAsync(() => {

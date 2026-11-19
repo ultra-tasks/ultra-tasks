@@ -75,7 +75,7 @@ import { IS_ELECTRON } from '../app.constants';
 import { isAllowedPluginAction } from './allowed-plugin-actions.const';
 import { TranslateService } from '@ngx-translate/core';
 import { T } from '../t.const';
-import { SyncWrapperService } from '../imex/sync/sync-wrapper.service';
+import { AccountSyncActionsService } from '../features/native-sync/account-sync-actions.service';
 import { Log, PluginLog } from '../core/log';
 import { TaskCopy } from '../features/tasks/task.model';
 import { ProjectCopy } from '../features/project/project.model';
@@ -161,7 +161,6 @@ export class PluginBridgeService implements OnDestroy {
   private _router = inject(Router);
   private _injector = inject(Injector);
   private _translateService = inject(TranslateService);
-  private _syncWrapperService = inject(SyncWrapperService);
   private _pluginIssueProviderRegistry = inject(PluginIssueProviderRegistryService);
   private _globalThemeService = inject(GlobalThemeService);
   private _syncAdapterRegistry = inject(IssueSyncAdapterRegistryService);
@@ -1420,7 +1419,8 @@ export class PluginBridgeService implements OnDestroy {
   private async _triggerSync(pluginId: string): Promise<void> {
     try {
       PluginLog.log('PluginBridge: Triggering sync for plugin', pluginId);
-      await this._syncWrapperService.sync();
+      // Resolved on use: most of the bridge never needs the account engine.
+      await this._injector.get(AccountSyncActionsService).syncQuietly(false);
       PluginLog.log('PluginBridge: Sync completed successfully');
     } catch (error) {
       PluginLog.err('PluginBridge: Sync failed:', error);

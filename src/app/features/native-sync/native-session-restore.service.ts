@@ -1,4 +1,4 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import { IS_ELECTRON_TOKEN } from '../../app.constants';
@@ -39,6 +39,12 @@ export class NativeSessionRestoreService {
   private readonly dataInit = inject(DataInitStateService);
   private readonly isElectron = inject(IS_ELECTRON_TOKEN);
   readonly outcome = signal<SessionRestoreOutcome>('pending');
+  /**
+   * The attempt to bring the remembered session back has ended, one way or the other. Until
+   * then a locked account is not "locked": its session is on its way back, and nothing should
+   * tell the person to unlock it.
+   */
+  readonly restoreSettled = computed(() => this.outcome() !== 'pending');
   private started = false;
   private attempt?: Promise<SessionRestoreOutcome>;
 

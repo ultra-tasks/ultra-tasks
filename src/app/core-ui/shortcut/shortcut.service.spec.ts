@@ -8,7 +8,7 @@ import { TaskService } from '../../features/tasks/task.service';
 import { WorkContextService } from '../../features/work-context/work-context.service';
 import { ActivatedRoute } from '@angular/router';
 import { UiHelperService } from '../../features/ui-helper/ui-helper.service';
-import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
+import { AccountSyncActionsService } from '../../features/native-sync/account-sync-actions.service';
 import { Store } from '@ngrx/store';
 import { SearchDialogService } from '../../pages/search-page/search-dialog/search-dialog.service';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
@@ -33,6 +33,7 @@ describe('ShortcutService', () => {
   let mockMatDialog: any;
   let mockPluginBridgeService: any;
   let mockLayoutService: any;
+  let mockSyncActions: { syncQuietly: jasmine.Spy };
   let mockUndo: {
     canUndo: ReturnType<typeof signal<boolean>>;
     canRedo: ReturnType<typeof signal<boolean>>;
@@ -68,6 +69,7 @@ describe('ShortcutService', () => {
       shortcuts: signal<any[]>([]),
       executeShortcut: jasmine.createSpy('executeShortcut'),
     };
+    mockSyncActions = { syncQuietly: jasmine.createSpy('syncQuietly').and.resolveTo() };
     mockLayoutService = {
       isNavOpen: signal(false),
       showAddTaskBar: jasmine.createSpy('showAddTaskBar'),
@@ -103,7 +105,7 @@ describe('ShortcutService', () => {
         { provide: WorkContextService, useValue: { activeWorkContext$: signal({}) } },
         { provide: ActivatedRoute, useValue: { queryParams: of({}) } },
         { provide: UiHelperService, useValue: {} },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: mockSyncActions },
         { provide: Store, useValue: { dispatch: jasmine.createSpy('dispatch') } },
         { provide: PluginBridgeService, useValue: mockPluginBridgeService },
         {
@@ -170,6 +172,21 @@ describe('ShortcutService', () => {
       expect(mockUndo.undo).not.toHaveBeenCalled();
       expect(ev.defaultPrevented).toBeFalse();
     });
+    it('syncs through the active engine on the sync shortcut', async () => {
+      mockConfigService.cfg.set({ keyboard: { triggerSync: 'Ctrl+S' } });
+      const ev = new KeyboardEvent('keydown', {
+        code: 'KeyS',
+        ctrlKey: true,
+        cancelable: true,
+      });
+      Object.defineProperty(ev, 'target', { value: document.body });
+
+      await service.handleKeyDown(ev);
+
+      expect(mockSyncActions.syncQuietly).toHaveBeenCalledOnceWith(true);
+      expect(ev.defaultPrevented).toBeTrue();
+    });
+
     it('opens search with the new default and consumes a conflicting plugin shortcut', async () => {
       mockConfigService.cfg.set({
         keyboard: { showSearchBar: 'Ctrl+F', [PLUGIN_SHORTCUT_CFG_KEY]: 'Ctrl+F' },

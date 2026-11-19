@@ -4278,6 +4278,7 @@
     "ERROR_DISCOVERY": "Your account could not be read just now. Nothing was changed on this device or in your account. Trying again automatically.",
     "ERROR_SWITCH": "The switch did not finish. Nothing was changed. You can choose again.",
     "ERROR_STORAGE": "Secure storage on this device is not available, so the account could not be unlocked automatically. Your tasks and unsent changes are safe. Sign in to resume sync.",
+    "ERROR_STORAGE_CLEAR": "The saved sign-in on this device could not be removed. Your account is signed out here, but the app's saved data may still hold it: remove the app's data to be sure.",
     "OFFLINE": "Offline — changes saved on this device",
     "SYNCING": "Syncing changes",
     "SYNC_FAILED": "Sync failed. Your changes are saved on this device."
@@ -4416,5 +4417,26 @@
     "LOCK_HELP": "Stops syncing on this device until you sign in again.",
     "SIGN_OUT_HELP": "Your tasks stay on this device and your encrypted data stays in your account.",
     "DELETE_ACCOUNT_HELP": "Permanently deletes your Ultra Tasks account and its encrypted sync data. Tasks on this device stay."
+  },
+  "ACCOUNT_DEVICE": {
+    "TITLE": "Verify this device",
+    "INTRO": "This looks like a new device for your account. We emailed a code to {{email}}. Enter it to finish signing in.",
+    "VALID_FOR": "The code is valid for {{minutes}} minutes.",
+    "CODE": "Verification code",
+    "RESEND": "Send a new code",
+    "RESEND_IN": "New code available in {{seconds}} s",
+    "RESEND_READY": "You can send a new code now.",
+    "RESENT": "A new code was sent to {{email}}.",
+    "ERROR_CODE": "That code did not work or has expired.",
+    "ERROR_CODE_FORMAT": "Enter the 8-digit code from the email.",
+    "ERROR_LOCKED": "Too many wrong codes. Sign in again to get a new code.",
+    "ERROR_ENDED": "This verification expired or was closed. Sign in again to get a new code.",
+    "ERROR_UPDATE": "Update Ultra Tasks to sign in on a new device.",
+    "ERROR_SESSION_LIMIT": "This account has too many signed-in devices. Sign in on a device you already use and remove an old one in the account dashboard.",
+    "ERROR_RATE_LIMITED": "Too many verification emails were requested for this account. Try again later.",
+    "ERROR_TOO_MANY": "Too many attempts. Wait a few minutes and try again.",
+    "ERROR_EMAIL": "The verification email could not be sent. Try again.",
+    "ERROR_RESEND_SOON": "Wait a moment before asking for another code.",
+    "ERROR_RESEND_LIMIT": "No more codes can be sent for this sign-in. Use the latest code, or go back and sign in again."
   }
 }

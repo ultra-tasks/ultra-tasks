@@ -43,6 +43,10 @@ interface Rig {
   setLocal: (summary: AccountDataSummary) => void;
   setAccount: (summary: AccountDataSummary) => void;
   linkCalls: () => [boolean, boolean | undefined][];
+  /** Every edit watch the planner started, in order. */
+  watches: { changed: boolean; stop: jasmine.Spy }[];
+  /** What happened, in order: 'watch', 'measure', 'bind', 'link'. */
+  steps: string[];
 }
 
 const rig = (
@@ -56,6 +60,8 @@ const rig = (
   let local = options.local ?? nothing;
   let account = options.account ?? something;
   let linked = false;
+  const watches: Rig['watches'] = [];
+  const steps: string[] = [];
   const scopes = signal<ScopeInfo[]>([]);
   const client = {
     refreshScopes: jasmine
@@ -71,14 +77,27 @@ const rig = (
     client: () => client as unknown as SyncClient,
     linked: () => linked,
     scopes,
-    bind: jasmine.createSpy('bind').and.resolveTo(false),
+    bind: jasmine.createSpy('bind').and.callFake(async () => {
+      steps.push('bind');
+      return false;
+    }),
     summary: {
-      local: () => Promise.resolve(local),
+      local: () => {
+        steps.push('measure');
+        return Promise.resolve(local);
+      },
       fromRecords: () => account,
     },
     link: jasmine.createSpy('link').and.callFake(async () => {
+      steps.push('link');
       linked = true;
     }),
+    watchEdits: () => {
+      steps.push('watch');
+      const watch = { changed: false, stop: jasmine.createSpy('stop') };
+      watches.push(watch);
+      return watch;
+    },
     serverHasPersonalScope: jasmine
       .createSpy('serverHasPersonalScope')
       .and.resolveTo(false),
@@ -96,7 +115,14 @@ const rig = (
     setLocal: (summary) => (local = summary),
     setAccount: (summary) => (account = summary),
     linkCalls: () =>
-      (host.link as jasmine.Spy).calls.allArgs() as [boolean, boolean | undefined][],
+      (host.link as jasmine.Spy).calls
+        .allArgs()
+        .map(([migrate, automatic]) => [migrate, automatic]) as [
+        boolean,
+        boolean | undefined,
+      ][],
+    watches,
+    steps,
   };
 };
 
@@ -165,6 +191,77 @@ describe('NativeDataConnection', () => {
       expect(r.connection.needsRetry()).toBeTrue();
       expect(r.connection.choice()).toBeNull();
       expect(r.host.showWorkspace).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('an edit between measuring a device and switching it', () => {
+    it('is watched for from BEFORE the device is measured, and handed to the switch', async () => {
+      const r = rig({ local: nothing, account: something });
+      await r.connection.connect();
+      expect(r.steps).toEqual(['watch', 'measure', 'bind', 'link']);
+      const [, , since] = (r.host.link as jasmine.Spy).calls.mostRecent().args;
+      expect(since).toBe(r.watches[0]);
+    });
+
+    it('stops watching on every way out', async () => {
+      // Both sides hold work: the dialog is shown and nothing is switched.
+      const asked = rig({ local: something, account: something });
+      await asked.connection.connect();
+      expect(asked.watches.map((watch) => watch.stop.calls.count())).toEqual([1]);
+      // The look at the account fails.
+      const failed = rig({ local: something });
+      failed.client.syncScope.and.rejectWith(new TypeError('Failed to fetch'));
+      await failed.connection.connect();
+      expect(failed.watches.map((watch) => watch.stop.calls.count())).toEqual([1]);
+      // A download that goes through.
+      const downloaded = rig({ local: nothing, account: something });
+      await downloaded.connection.connect();
+      expect(downloaded.watches.map((watch) => watch.stop.calls.count())).toEqual([1]);
+    });
+
+    it('is watched afresh on every automatic retry', async () => {
+      const r = rig({ local: nothing, account: something });
+      (r.host.link as jasmine.Spy).and.rejectWith(new Error(ERROR_LOCAL_CHANGED));
+      await r.connection.connect();
+      // The first attempt, its one silent retry, and the fetch that finally asks.
+      expect(r.watches.length).toBe(3);
+      expect(r.watches.every((watch) => watch.stop.calls.count() === 1)).toBeTrue();
+    });
+  });
+
+  describe('a failure after the switch committed', () => {
+    it('is not an unfinished connection: the device is connected and shows its tasks', async () => {
+      const r = rig({ local: nothing, account: something });
+      (r.host.link as jasmine.Spy).and.callFake(async () => {
+        (r.host as unknown as { linked: () => boolean }).linked = () => true;
+        throw new TypeError('Failed to fetch'); // the follow-up listing, after the switch
+      });
+      await r.connection.connect();
+      expect(r.connection.stage()).toBe('idle');
+      expect(r.connection.needsRetry()).toBeFalse();
+      expect(r.connection.choice()).toBeNull();
+      expect(r.host.showWorkspace).toHaveBeenCalledTimes(1);
+      expect(r.host.fail).not.toHaveBeenCalled();
+    });
+
+    it('is not an unfinished first upload either', async () => {
+      const r = rig({ scopes: [] });
+      (r.host.link as jasmine.Spy).and.callFake(async () => {
+        (r.host as unknown as { linked: () => boolean }).linked = () => true;
+        throw new TypeError('Failed to fetch');
+      });
+      await r.connection.connect();
+      expect(r.connection.stage()).toBe('idle');
+      expect(r.connection.needsRetry()).toBeFalse();
+      expect(r.host.fail).not.toHaveBeenCalled();
+    });
+
+    it('still reports a switch that did NOT commit as unfinished', async () => {
+      const r = rig({ local: nothing, account: something });
+      (r.host.link as jasmine.Spy).and.rejectWith(new TypeError('Failed to fetch'));
+      await r.connection.connect();
+      expect(r.connection.stage()).toBe('failed');
+      expect(r.host.fail).toHaveBeenCalled();
     });
   });
 

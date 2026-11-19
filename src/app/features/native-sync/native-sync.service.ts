@@ -10,7 +10,6 @@ import {
   unlockBundle,
   unlockBundleWithMasterKey,
   RealtimeSync,
-  createRealtimeSocket,
   type AccountBundle,
   type AccountInfo,
   type Capabilities,
@@ -18,6 +17,7 @@ import {
   type Invitation,
   type ScopeInfo,
   type OwnershipOffer,
+  type Transport,
 } from '@sp/sync-providers/ultra-tasks';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
@@ -40,9 +40,21 @@ import type {
   AccountPhase,
   AccountReconnect,
   DataConnectionState,
+  DeviceVerificationView,
 } from './account-sync.types';
 import { AccountDataSummaryService } from './account-data-summary.service';
 import { NativeDataConnection } from './native-data-connection';
+import { NativeDeviceTrustService } from './native-device-trust.service';
+import { watchLocalEdits, type LocalEditWatch } from './native-local-edits';
+import { signInWithPasskey } from './native-passkey-sign-in';
+import { freshCapabilities } from './native-capabilities';
+import { createRealtime, RecordedFailure } from './native-realtime';
+import { NativeSessionRenewal } from './native-session-renewal';
+import {
+  deviceLabel,
+  explainDeviceError,
+  NativeDeviceVerification,
+} from './native-device-verification';
 import {
   classifyFailure,
   NativeSyncHealth,
@@ -62,9 +74,8 @@ interface CachedAccount {
 const PERIOD = 60000;
 /** After a wake, the network, the window and the OS all report at once: wait for them to settle. */
 const RESUME_SETTLE_MS = 1500;
-
-/** A sync that already reported its own failure; only the socket's retry needs to hear of it. */
-class RecordedFailure extends Error {}
+/** The browser's "offline" flag is unreliable (Linux, Electron): it counts once it has held. */
+const OFFLINE_SETTLE_MS = 1000;
 
 @Injectable({ providedIn: 'root' })
 export class NativeSyncService {
@@ -78,6 +89,7 @@ export class NativeSyncService {
   private readonly router = inject(Router);
   private readonly summary = inject(AccountDataSummaryService);
   private readonly sessions = inject(NativeSessionStoreService);
+  private readonly deviceTrust = inject(NativeDeviceTrustService);
   readonly platform = inject(NativeSyncPlatformService);
   readonly backgroundError = signal('');
   readonly status = signal('NATIVE_SYNC.LOCKED');
@@ -112,6 +124,8 @@ export class NativeSyncService {
   );
   /** Facts about the last attempts, derived from engine events; nothing here is synced. */
   private readonly health = new NativeSyncHealth();
+  /** One renewal for a refused access token, never for a refused refresh credential. */
+  private readonly renewal = new NativeSessionRenewal();
   /** The last attempt failed because the device or the server was unreachable. */
   readonly offline = this.health.offline;
   /** Last fully successful sync (including the apply), in ms since epoch. */
@@ -133,7 +147,8 @@ export class NativeSyncService {
     scopes: this.scopes,
     bind: (client) => this.bridge.bind(client),
     summary: this.summary,
-    link: (migrate, automatic) => this.link(migrate, automatic),
+    link: (migrate, automatic, since) => this.link(migrate, automatic, since),
+    watchEdits: () => watchLocalEdits(this.localActions),
     serverHasPersonalScope: async (client) =>
       (await client.account.request<{ scopes: ScopeInfo[] }>('/sync/scopes')).scopes.some(
         (scope) => scope.kind === 'personal',
@@ -145,6 +160,15 @@ export class NativeSyncService {
     },
     showWorkspace: () => this.showWorkspace(),
   });
+  /** Sign-in on a device the account does not recognise yet: the emailed code is awaited. */
+  private readonly deviceCheck = new NativeDeviceVerification({
+    account: () => this.account,
+    finishLogin: () => this.finishLogin(),
+    abandon: () => this.lock(),
+  });
+  /** The pending "Verify this device" step, or null. Nothing is signed in while it is pending. */
+  readonly deviceVerification: Signal<DeviceVerificationView | null> =
+    this.deviceCheck.pending;
   /** Both sides hold real data (or the person chose "Decide later"). */
   readonly dataChoice: Signal<AccountDataChoice | null> = this.dataConnection.choice;
   /** Why the choice is being asked again (an i18n key), or ''. */
@@ -153,6 +177,8 @@ export class NativeSyncService {
   readonly connection: Signal<DataConnectionState> = this.dataConnection.stage;
   /** Derived presentation state; see {@link AccountPhase}. Not persisted. */
   readonly phase = computed<AccountPhase>(() => {
+    // Waiting for the emailed code outranks everything else: the person is mid sign-in.
+    if (this.deviceVerification()) return 'verify-device';
     if (this.reauth()) return 'reauth';
     if (!this.unlocked()) {
       if (this.signingIn() || this.status() === 'NATIVE_SYNC.MFA') return 'signing-in';
@@ -170,7 +196,8 @@ export class NativeSyncService {
         return 'syncing';
       case 'failed':
       case 'waiting':
-        return 'choose-data';
+        // Only an unconnected device is waiting: one that got linked is judged by its syncs.
+        if (!this.linked()) return 'choose-data';
     }
     // The vault is open but nothing has been discovered yet: the connection is only starting,
     // which is still "Signing in" and not an unfinished connection.
@@ -195,9 +222,13 @@ export class NativeSyncService {
   private localEdits?: Subscription;
   private resyncRequested = false;
   private resumeTimer?: ReturnType<typeof setTimeout>;
+  private offlineTimer?: ReturnType<typeof setTimeout>;
+  /** The sync in flight was started by the app's own loops (not by a person). */
+  private syncAutomatic = false;
   private expiring?: Promise<void>;
   private rememberedToken?: string;
-  private emptyChecked = '';
+  /** What the person typed to sign in; one of the names the device's trust marker is kept under. */
+  private signInIdentifier?: string;
   /** A restored session must not interrupt with a dialog the person already deferred. */
   private restoring = false;
 
@@ -279,8 +310,6 @@ export class NativeSyncService {
     if (!this.sessions.supported || !account?.unlocked || !account.tokens) return;
     const token = account.tokens.refreshToken;
     if (token === this.rememberedToken) return;
-    // Present once the account SDK issues new-device trust markers; never sent from here.
-    const { deviceToken } = account as AccountClient & { deviceToken?: string };
     const session: StoredAccountSession = {
       v: 1,
       serverUrl: this.serverUrl,
@@ -288,7 +317,6 @@ export class NativeSyncService {
       serverId: account.capabilities!.serverId,
       masterKey: account.unlocked.masterKey,
       refreshToken: token,
-      ...(deviceToken ? { deviceToken } : {}),
     };
     try {
       await this.sessions.save(session);
@@ -297,6 +325,10 @@ export class NativeSyncService {
     } catch {
       this.backgroundError.set('ACCOUNT_DATA.ERROR_STORAGE');
     }
+  }
+  /** The account server's transport; it notes when the refresh credential itself was refused. */
+  private transport(): Transport {
+    return this.renewal.guard(this.platform.transport(httpTransport(this.serverUrl)));
   }
   private normalizeServerUrl(serverUrl: string): string {
     return normalizeServerUrl(serverUrl);
@@ -318,9 +350,15 @@ export class NativeSyncService {
       this.signingIn.set(false);
     }
   }
+  /**
+   * Resolves true when signed in, and false when a further step is pending: two-factor
+   * (`mfaMethods`) or the emailed code of a new device (`deviceVerification`).
+   */
   async login(serverUrl: string, identifier: string, password: string): Promise<boolean> {
     this.error.set('');
     this.mfaMethods.set([]);
+    this.deviceCheck.reset();
+    this.signInIdentifier = identifier.trim();
     this.serverUrl = this.normalizeServerUrl(serverUrl);
     return this.signingInWhile(async () => {
       try {
@@ -337,7 +375,7 @@ export class NativeSyncService {
     await this.teardown();
     this.serverUrl = this.normalizeServerUrl(serverUrl);
     await this.certTrust.setPendingConfig(this, { baseUrl: this.serverUrl });
-    return new AccountClient(this.platform.transport(httpTransport(this.serverUrl)));
+    return new AccountClient(this.transport());
   }
   async finishBrowserAccount(account: AccountClient, serverUrl: string): Promise<void> {
     if (this.unlocked() || !account.unlocked || !account.tokens)
@@ -354,18 +392,26 @@ export class NativeSyncService {
     });
   }
   private async authenticate(identifier: string, password: string): Promise<boolean> {
-    this.account = new AccountClient(
-      this.platform.transport(httpTransport(this.serverUrl)),
-    );
+    this.account = new AccountClient(this.transport());
     try {
-      const result = await this.account.login(identifier, password);
+      // The server decides from the device's trust marker whether this device needs a code.
+      const { serverId } = await this.account.init();
+      const result = await this.account.login(identifier, password, deviceLabel(), {
+        deviceToken: await this.deviceTrust.recall(serverId, [identifier]),
+      });
+      // Enrolled two-factor always takes precedence: the emailed code never replaces it.
       if (result.mfaToken) {
         this.mfaMethods.set(result.factors ?? []);
         this.status.set('NATIVE_SYNC.MFA');
         return false;
       }
+      if (result.verification) {
+        this.deviceCheck.begin(result.verification);
+        this.status.set('ACCOUNT_STATUS.VERIFY_DEVICE');
+        return false;
+      }
     } catch (error) {
-      if (!(error instanceof TypeError)) throw error;
+      if (!(error instanceof TypeError)) throw explainDeviceError(error, 'sign-in');
       const raw = localStorage.getItem(this.cacheKey());
       if (!raw) throw error;
       const cached = JSON.parse(raw) as CachedAccount;
@@ -394,43 +440,28 @@ export class NativeSyncService {
       await this.finishLogin();
     });
   }
-  async passkey(): Promise<void> {
-    await this.signingInWhile(() => this.signInWithPasskey());
+  /** The code emailed to a new device; opens the account exactly like a two-factor code. */
+  async completeDeviceVerification(code: string): Promise<void> {
+    await this.signingInWhile(() => this.deviceCheck.complete(code));
   }
-  private async signInWithPasskey(): Promise<void> {
-    if (location.origin !== new URL(this.serverUrl).origin) {
-      if (!this.account!.capabilities?.features['browserMfa'])
-        throw new Error('NATIVE_SYNC.ERROR_SERVER_UPDATE');
-      const flow = await this.account!.startBrowserMfa();
-      if (new URL(flow.url).origin !== new URL(this.serverUrl).origin)
-        throw new Error('NATIVE_SYNC.ERROR_PASSKEY');
-      if (Capacitor.isNativePlatform()) await Browser.open({ url: flow.url });
-      else if (IS_ELECTRON) window.ea.openExternalUrl(flow.url);
-      else window.open(flow.url, '_blank', 'noopener,noreferrer');
-      const account = this.account!;
-      const deadline = Date.now() + 180000;
-      while (this.account === account && Date.now() < deadline) {
-        if (await account.pollBrowserMfa(flow)) {
-          if (Capacitor.isNativePlatform()) await Browser.close().catch(() => undefined);
-          await this.finishLogin();
-          return;
-        }
-        await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-      }
-      throw new Error('NATIVE_SYNC.ERROR_PASSKEY');
-    }
-    const { options, credentialToken } = await this.account!.webauthnLoginOptions();
-    const credentialClass = PublicKeyCredential as typeof PublicKeyCredential & {
-      parseRequestOptionsFromJSON(options: object): PublicKeyCredentialRequestOptions;
-    };
-    if (!credentialClass.parseRequestOptionsFromJSON)
-      throw new Error('NATIVE_SYNC.ERROR_PASSKEY');
-    const credential = (await navigator.credentials.get({
-      publicKey: credentialClass.parseRequestOptionsFromJSON(options),
-    })) as (PublicKeyCredential & { toJSON(): unknown }) | null;
-    if (!credential) throw new Error('NATIVE_SYNC.ERROR_PASSKEY');
-    await this.account!.completeWebauthn(credentialToken, credential.toJSON());
-    await this.finishLogin();
+  /** A replacement code. The server limits how often and how many. */
+  resendDeviceVerification(): Promise<void> {
+    return this.deviceCheck.resend();
+  }
+  /** Back from "Verify this device": nothing was signed in, so the sign-in just ends. */
+  cancelDeviceVerification(): Promise<void> {
+    return this.deviceCheck.cancel();
+  }
+
+  async passkey(): Promise<void> {
+    await this.signingInWhile(() =>
+      signInWithPasskey(
+        this.account!,
+        this.serverUrl,
+        () => this.account,
+        () => this.finishLogin(),
+      ),
+    );
   }
   private async lease(): Promise<void> {
     if (!navigator.locks) throw new Error('NATIVE_SYNC.ERROR_BROWSER');
@@ -456,6 +487,8 @@ export class NativeSyncService {
    * the data connection of a new one, and each reports its own failures.
    */
   private async finishLogin(): Promise<void> {
+    // Signing out keeps the device's trust marker (deleting the account forgets it).
+    await this.deviceTrust.rememberFrom(this.account, this.signInIdentifier);
     await this.lease();
     const account = this.account!;
     account.onTokensChanged = () => this.cache();
@@ -477,7 +510,7 @@ export class NativeSyncService {
         await this.platform.bind(
           client,
           this.serverUrl,
-          () => this.syncNow(),
+          () => this.syncNow(true),
           async () => {
             if (this.client !== client) return;
             for (const scope of Object.values(client.state.scopes))
@@ -510,7 +543,7 @@ export class NativeSyncService {
       this.localChanges = this.localActions
         .pipe(filter(isPersistentAction), auditTime(500))
         .subscribe(() => {
-          if (this.linked() && !this.closing) void this.syncNow();
+          if (this.linked() && !this.closing) void this.syncNow(true);
         });
       this.localEdits = this.localActions
         .pipe(filter(isPersistentAction))
@@ -520,12 +553,12 @@ export class NativeSyncService {
       this.status.set('NATIVE_SYNC.READY');
       this.interval = setInterval(() => {
         if (!this.personalRealtimeEnabled() || this.dataConnection.needsRetry())
-          void this.syncNow();
+          void this.syncNow(true);
       }, PERIOD);
       window.addEventListener('online', this.resume);
       window.addEventListener('offline', this.markOffline);
       document.addEventListener('visibilitychange', this.resume);
-      if (this.linked()) await this.syncNow();
+      if (this.linked()) await this.syncNow(true);
       // A refused session is already being closed: nothing more may talk to the server.
       if (this.expiring || this.reauth()) return;
       this.startRealtime();
@@ -536,11 +569,19 @@ export class NativeSyncService {
       throw error;
     }
   }
-  /** The OS or browser says there is no network: say so now instead of at the next failure. */
+  /**
+   * The browser says there is no network: say so instead of waiting for the next failure. The
+   * flag flaps and is wrong on some systems, so it only counts when it still holds a moment
+   * later; a real failed request is what settles it either way.
+   */
   private readonly markOffline = (): void => {
-    if (!this.unlocked()) return;
-    this.health.failed('offline');
-    this.status.set('ACCOUNT_DATA.OFFLINE');
+    clearTimeout(this.offlineTimer);
+    this.offlineTimer = setTimeout(() => {
+      this.offlineTimer = undefined;
+      if (!this.unlocked() || navigator.onLine !== false) return;
+      this.health.failed('offline');
+      this.status.set('ACCOUNT_DATA.OFFLINE');
+    }, OFFLINE_SETTLE_MS);
   };
   /**
    * Network back, window visible again or the OS resumed from sleep. Several of these fire
@@ -553,41 +594,27 @@ export class NativeSyncService {
     clearTimeout(this.resumeTimer);
     this.resumeTimer = setTimeout(() => {
       this.resumeTimer = undefined;
-      void this.syncNow().then(() => {
+      void this.syncNow(true).then(() => {
         if (!this.live()) this.realtime?.resume();
       });
     }, RESUME_SETTLE_MS);
   };
   private startRealtime(): void {
-    if (
-      !this.client ||
-      this.expiring ||
-      !(
-        this.account?.capabilities?.features['sharedRealtime'] ||
-        this.account?.capabilities?.features['personalRealtime']
-      )
-    )
-      return;
-    this.realtime = new RealtimeSync(this.client, {
+    const client = this.client;
+    if (!client || this.expiring) return;
+    this.realtime = createRealtime({
+      client,
+      features: this.account?.capabilities?.features,
+      serverUrl: this.serverUrl,
       fallbackMs: PERIOD,
-      includePersonal: this.account?.capabilities?.features['personalRealtime'] === true,
-      includeShared: this.account?.capabilities?.features['sharedRealtime'] === true,
-      syncScope: async (scopeId) => {
-        if (this.client?.state.scopes[scopeId]?.info.kind === 'personal') {
-          await this.syncNow();
-          // Make the socket retry with its back-off; the failure itself is already recorded.
-          if (this.error() || this.offline()) throw new RecordedFailure();
-        } else await this.client!.syncScope(scopeId);
+      syncPersonal: async () => {
+        await this.syncNow(true);
+        // Make the socket retry with its back-off; the failure itself is already recorded.
+        if (this.error() || this.offline()) throw new RecordedFailure();
       },
-      socket: (ticket) =>
-        createRealtimeSocket(
-          this.serverUrl.replace(/^http/, 'ws') +
-            '/api/v2/accounts/sync/events?ticket=' +
-            encodeURIComponent(ticket),
-        ),
       updated: () => {
         this.scopes.set(
-          Object.values(this.client!.state.scopes)
+          Object.values(client.state.scopes)
             .filter((s) => !s.revoked)
             .map((s) => s.info),
         );
@@ -599,13 +626,10 @@ export class NativeSyncService {
         this.revision.update((n) => n + 1);
         void this.updatePlatform();
       },
-      failed: (scopeId, error) => {
-        if (scopeId && !(error instanceof RecordedFailure)) this.failure(error);
-      },
-      // An open socket says nothing about whether tasks have synced: connection detail only.
-      status: (connected) => this.live.set(connected),
+      failed: (error) => this.failure(error),
+      connected: (isOpen) => this.live.set(isOpen),
     });
-    this.realtime.start();
+    this.realtime?.start();
   }
   private async updatePlatform(): Promise<void> {
     if (!this.client || !this.unlocked() || !this.linked()) return;
@@ -644,7 +668,7 @@ export class NativeSyncService {
    * person through the choice dialog or the first-connection rules in
    * {@link NativeDataConnection}; this method only refuses unsafe switches.
    */
-  async link(migrate: boolean, automatic = false): Promise<void> {
+  async link(migrate: boolean, automatic = false, since?: LocalEditWatch): Promise<void> {
     this.busy.set(true);
     this.error.set('');
     // A switch started directly (not by the first-connection planner) still reports its stage.
@@ -652,20 +676,17 @@ export class NativeSyncService {
     if (ownStage) this.dataConnection.stage.set(migrate ? 'uploading' : 'downloading');
     const onStage = (stage: 'downloading' | 'applying' | 'uploading'): void =>
       this.dataConnection.stage.set(stage);
-    let changedWhileChoosing = false;
     let retiringLegacy = false;
     let retiredLegacy = false;
     const choiceChanges = !migrate
-      ? this.localActions.pipe(filter(isPersistentAction)).subscribe((action) => {
+      ? watchLocalEdits(
+          this.localActions,
           // The provider switch itself disables local-only sync settings.
-          if (
+          (action) =>
             retiringLegacy &&
             action.type === updateGlobalConfigSection.type &&
-            action.sectionKey === 'sync'
-          )
-            return;
-          changedWhileChoosing = true;
-        })
+            action.sectionKey === 'sync',
+        )
       : undefined;
     try {
       if (!this.client) throw new Error('NATIVE_SYNC.ERROR_SYNC');
@@ -736,7 +757,7 @@ export class NativeSyncService {
         if (migrate) await this.bridge.migrate(onStage);
         else
           await this.bridge.useExisting(() => {
-            if (changedWhileChoosing) {
+            if (since?.changed || choiceChanges?.changed) {
               this.error.set('NATIVE_SYNC.ERROR_LOCAL_CHANGED');
               throw new Error('NATIVE_SYNC.ERROR_LOCAL_CHANGED');
             }
@@ -749,9 +770,7 @@ export class NativeSyncService {
       // The connection is finished (the planner or dialog clears the rest); settle the stage
       // before the follow-up sync so it reads as "Syncing changes", not "Downloading".
       if (ownStage) this.dataConnection.stage.set('idle');
-      await this.refresh();
-      await this.syncNow();
-      await this.updatePlatform();
+      await this.afterSwitch();
     } catch (error) {
       if (error instanceof Error && error.message === 'NATIVE_SYNC.ERROR_LOCAL_CHANGED') {
         this.error.set(error.message);
@@ -761,16 +780,23 @@ export class NativeSyncService {
       }
       throw error;
     } finally {
-      choiceChanges?.unsubscribe();
+      choiceChanges?.stop();
       if (ownStage && this.dataConnection.stage() !== 'idle' && !this.linked())
         this.dataConnection.stage.set('idle');
       this.busy.set(false);
     }
   }
-  /** Sync now. Reaches exactly one engine: a device that is not connected yet only retries. */
-  syncNow(): Promise<void> {
+  /**
+   * Sync now. Reaches exactly one engine: a device that is not connected yet only retries.
+   * `automatic` is for the app's own loops (timer, edits, wake): they may skip while the browser
+   * says there is no network. A person pressing "Sync now" always gets a real attempt, because
+   * that flag is unreliable and is the very thing they are trying.
+   */
+  syncNow(automatic = false): Promise<void> {
     if (this.inFlight) {
       this.resyncRequested = true;
+      // A person's request outranks an automatic one it was folded into.
+      this.syncAutomatic &&= automatic;
       return this.inFlight;
     }
     if (!this.client || !this.unlocked() || this.closing) return Promise.resolve();
@@ -779,23 +805,24 @@ export class NativeSyncService {
       return this.dataConnection.needsRetry()
         ? this.dataConnection.connect(false)
         : Promise.resolve();
+    this.syncAutomatic = automatic;
     this.inFlight = (async () => {
       do {
         this.resyncRequested = false;
-        await this.sync();
+        await this.sync(this.syncAutomatic);
       } while (this.resyncRequested && !this.closing);
     })().finally(() => {
       this.inFlight = undefined;
     });
     return this.inFlight;
   }
-  private async sync(): Promise<void> {
+  private async sync(automatic: boolean): Promise<void> {
     this.busy.set(true);
     this.error.set('');
     // Stale success ends the moment new work starts.
     this.status.set('ACCOUNT_DATA.SYNCING');
     try {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false)
+      if (automatic && typeof navigator !== 'undefined' && navigator.onLine === false)
         throw new TypeError('Failed to fetch');
       const reminderBarrier = await this.platform.reminderBarrier(this.account!);
       if (this.linked()) {
@@ -824,25 +851,12 @@ export class NativeSyncService {
   private syncSucceeded(): void {
     const at = Date.now();
     this.status.set('NATIVE_SYNC.SYNCED');
+    this.renewal.succeeded();
     this.health.succeeded(at);
     this.writeFlag('synced', String(at));
-    this.refreshEmptyAccount();
-  }
-  /** "Up to date, no tasks yet" is only true after a complete fetch found none. */
-  private refreshEmptyAccount(): void {
-    const scopeId = this.bridge.scopeId;
-    const scope = scopeId ? this.client?.state.scopes[scopeId] : undefined;
-    if (!scopeId || !scope) return;
-    const marker = `${scopeId}:${scope.info.sequence}:${scope.info.generation}`;
-    if (marker === this.emptyChecked) return;
-    try {
-      this.health.emptyAccount.set(
-        !this.summary.fromRecords(this.client!, scopeId).hasUserData,
-      );
-      this.emptyChecked = marker;
-    } catch {
-      /* Unreadable data is reported by the sync itself, never as "empty". */
-    }
+    this.health.refreshEmpty(this.client, this.bridge.scopeId, (client, id) =>
+      this.summary.fromRecords(client, id),
+    );
   }
   /**
    * Records a failure the way every surface reports it and returns its kind. Failing to
@@ -852,6 +866,13 @@ export class NativeSyncService {
    */
   private failure(error: unknown, connecting = false): FailureKind {
     const kind = classifyFailure(error);
+    if (kind === 'auth' && this.renewal.renew(this.account)) {
+      // The refresh credential was not refused: the access token only looked fine on this
+      // device. The SDK renews it on its next request; try again, once.
+      this.status.set('ACCOUNT_DATA.SYNCING');
+      void this.syncNow(true);
+      return 'other';
+    }
     this.health.failed(kind);
     const message =
       error instanceof Error && error.message ? error.message : 'NATIVE_SYNC.ERROR_SYNC';
@@ -882,7 +903,7 @@ export class NativeSyncService {
   private expireSession(): Promise<void> {
     return (this.expiring ??= (async () => {
       this.health.reauth.set(true);
-      await this.sessions.clear();
+      await this.forgetSession();
       await this.teardown();
     })().finally(() => {
       this.expiring = undefined;
@@ -927,9 +948,7 @@ export class NativeSyncService {
       this.restoring = true;
       try {
         await this.certTrust.setPendingConfig(this, { baseUrl: this.serverUrl });
-        const account = new AccountClient(
-          this.platform.transport(httpTransport(this.serverUrl)),
-        );
+        const account = new AccountClient(this.transport());
         account.capabilities = cached.capabilities;
         account.account = cached.account;
         account.bundle = cached.bundle;
@@ -944,6 +963,11 @@ export class NativeSyncService {
           refreshToken: session.refreshToken,
           expiresIn: 0,
         };
+        // What the server can do may have changed since sign-in (an upgrade): ask again, bounded.
+        // `cache()` then keeps the fresh copy; offline, the cached one stays.
+        const latest = await freshCapabilities(account, session.serverId);
+        if (latest === 'other-server') throw new Error('Account server identity changed');
+        if (latest) account.capabilities = latest;
         this.rememberedToken = session.refreshToken;
         this.account = account;
         await this.finishLogin();
@@ -976,10 +1000,12 @@ export class NativeSyncService {
       account.unlocked!.masterKey,
       account.identity(),
     );
+    const trusted = this.deviceTrust.whoIs(account, this.signInIdentifier);
     let deleted = false;
     try {
       await account.deleteAccount();
       deleted = true;
+      await this.deviceTrust.forget(trusted);
       await storage.clear();
     } catch (error) {
       if (!deleted) this.startRealtime();
@@ -1032,8 +1058,7 @@ export class NativeSyncService {
     this.writeFlag('deferred', null);
     this.writeFlag('synced', null);
     localStorage.removeItem(cacheKey);
-    await this.sessions.clear();
-    this.rememberedToken = undefined;
+    await this.forgetSession();
     this.health.reset();
     this.lockReason.set(null);
     this.configured.set(false);
@@ -1047,9 +1072,19 @@ export class NativeSyncService {
   async lock(): Promise<void> {
     const wasUnlocked = this.unlocked();
     await this.teardown();
-    if (wasUnlocked) {
+    if (wasUnlocked) await this.forgetSession();
+  }
+  /**
+   * Forgets the remembered desktop session. A store that refuses (a Windows file lock, say) must
+   * never keep the vault open or the account configured: closing and resetting go on, and the
+   * person is told the saved sign-in may still be on this device.
+   */
+  private async forgetSession(): Promise<void> {
+    this.rememberedToken = undefined;
+    try {
       await this.sessions.clear();
-      this.rememberedToken = undefined;
+    } catch {
+      this.backgroundError.set('ACCOUNT_DATA.ERROR_STORAGE_CLEAR');
     }
   }
   /** Closes the vault and stops every timer. Keeps the configured identity and cached session. */
@@ -1062,6 +1097,9 @@ export class NativeSyncService {
     if (this.interval) clearInterval(this.interval);
     clearTimeout(this.resumeTimer);
     this.resumeTimer = undefined;
+    clearTimeout(this.offlineTimer);
+    this.offlineTimer = undefined;
+    this.renewal.reset();
     window.removeEventListener('online', this.resume);
     window.removeEventListener('offline', this.markOffline);
     document.removeEventListener('visibilitychange', this.resume);
@@ -1091,15 +1129,27 @@ export class NativeSyncService {
     this.ownershipOffers.set([]);
     this.unlocked.set(false);
     this.mfaMethods.set([]);
+    this.deviceCheck.reset();
+    this.signInIdentifier = undefined;
     this.linked.set(false);
     this.dataConnection.reset();
-    this.emptyChecked = '';
-    this.health.offline.set(false);
-    this.health.pendingChanges.set(0);
-    this.health.emptyAccount.set(false);
+    this.health.closed();
     this.status.set('NATIVE_SYNC.LOCKED');
     await this.certTrust.setPendingConfig(this, null);
     this.closing = false;
+  }
+  /**
+   * The switch has happened. What fails after it (no network for the listing or the first sync)
+   * is an ordinary sync failure, never a reason to call the connection unfinished.
+   */
+  private async afterSwitch(): Promise<void> {
+    try {
+      await this.refresh();
+    } catch (error) {
+      this.failure(error);
+    }
+    await this.syncNow();
+    await this.updatePlatform();
   }
   /** The person's decision from the data-choice dialog (the replacement was confirmed first). */
   chooseData(kind: 'download' | 'replace'): Promise<void> {

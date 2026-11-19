@@ -119,7 +119,9 @@ const signInWithPassword = async (
   const card = page.locator('native-sync');
   // Right after a route change the leaving page can still be mounted next to the entering one.
   await expect(card).toHaveCount(1);
-  await card.locator('input[name="server"]').fill(origin);
+  // A configured account signing in again to its own server has no address field.
+  const server = card.locator('input[name="server"]');
+  if (await server.count()) await server.fill(origin);
   await card.locator('input[name="identifier"]').fill(account);
   await card.locator('input[name="password"]').fill(ACCOUNT_PASSWORD);
   await card.locator('button[type="submit"]').click();

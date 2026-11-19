@@ -91,7 +91,7 @@ export class NativePersonalBridgeService {
       this.withLocalSettings(withDefaultModelSlices(source)),
     );
     if (!validation.isValid) throw new Error('NATIVE_SYNC.ERROR_DATA');
-    await this.backups.captureImportBackup('LOCAL_IMPORT');
+    await this.backups.captureRecoveryPointUnlessCovered('LOCAL_IMPORT');
     const baseline = await personalRecords(source, client.state.device.id);
     const incomplete =
       this.scopeId &&
@@ -115,7 +115,7 @@ export class NativePersonalBridgeService {
     await this.snapshot();
     // The recovery copy holds THIS device's data (archives included) before it is replaced.
     // It is saved on this device only: the account's own data is never copied anywhere.
-    await this.backups.captureImportBackup('REMOTE_IMPORT');
+    await this.backups.captureRecoveryPointUnlessCovered('REMOTE_IMPORT');
     const scope = this.client!.state.scopes[this.scopeId];
     if (scope.intents.length || scope.uncertain)
       throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');

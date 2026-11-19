@@ -31,7 +31,7 @@ import { selectPluginUserDataFeatureState } from './store/plugin-user-data.reduc
 import { TaskArchiveService } from '../features/archive/task-archive.service';
 import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
-import { SyncWrapperService } from '../imex/sync/sync-wrapper.service';
+import { AccountSyncActionsService } from '../features/native-sync/account-sync-actions.service';
 import { GlobalThemeService } from '../core/theme/global-theme.service';
 import { PluginIssueProviderRegistryService } from './issue-provider/plugin-issue-provider-registry.service';
 import {
@@ -133,7 +133,10 @@ describe('PluginBridgeService - Counter Methods', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: {} },
-        { provide: SyncWrapperService, useValue: {} },
+        {
+          provide: AccountSyncActionsService,
+          useValue: jasmine.createSpyObj('AccountSyncActionsService', ['syncQuietly']),
+        },
         {
           provide: GlobalThemeService,
           useValue: jasmine.createSpyObj('GlobalThemeService', ['hasPluginIcon']),
@@ -335,6 +338,27 @@ describe('PluginBridgeService - Counter Methods', () => {
       service.unregisterPluginHooks('test-plugin');
 
       expect(service.hasConfigHandler('test-plugin')).toBe(false);
+    });
+  });
+
+  describe('triggerSync', () => {
+    it('syncs through the engine that is active, never the legacy provider directly', async () => {
+      const actions = TestBed.inject(
+        AccountSyncActionsService,
+      ) as jasmine.SpyObj<AccountSyncActionsService>;
+      actions.syncQuietly.and.resolveTo();
+      await service.createBoundMethods('test-plugin').triggerSync();
+      expect(actions.syncQuietly).toHaveBeenCalledOnceWith(false);
+    });
+
+    it('lets a failed sync reach the plugin', async () => {
+      const actions = TestBed.inject(
+        AccountSyncActionsService,
+      ) as jasmine.SpyObj<AccountSyncActionsService>;
+      actions.syncQuietly.and.rejectWith(new Error('offline'));
+      await expectAsync(
+        service.createBoundMethods('test-plugin').triggerSync(),
+      ).toBeRejectedWithError('offline');
     });
   });
 
@@ -561,7 +585,7 @@ describe('PluginBridgeService - dispatchAction privacy (#7619)', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: translateService },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -686,7 +710,7 @@ describe('PluginBridgeService - iframe task selection methods', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: {} },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -764,7 +788,7 @@ describe('PluginBridgeService - deleteTask() with an unknown id', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: { instant: () => 'Task not found' } },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -816,7 +840,7 @@ describe('PluginBridgeService - request()', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: {} },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -943,7 +967,7 @@ describe('PluginBridgeService - openDialog', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: {} },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -1037,7 +1061,7 @@ describe('PluginBridgeService - nodeExecution grant tokens', () => {
           provide: TranslateService,
           useValue: { instant: (key: string): string => key },
         },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -1143,7 +1167,7 @@ describe('PluginBridgeService - getAppState credential redaction', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: {} },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -1245,7 +1269,7 @@ describe('PluginBridgeService - deleteProject', () => {
           provide: TranslateService,
           useValue: { instant: (key: string): string => key },
         },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },
@@ -1374,7 +1398,7 @@ describe('PluginBridgeService - updateTask() with a new projectId', () => {
         { provide: TaskArchiveService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: TranslateService, useValue: { instant: (key: string) => key } },
-        { provide: SyncWrapperService, useValue: {} },
+        { provide: AccountSyncActionsService, useValue: {} },
         { provide: GlobalThemeService, useValue: {} },
         { provide: PluginIssueProviderRegistryService, useValue: {} },
         { provide: IssueSyncAdapterRegistryService, useValue: {} },

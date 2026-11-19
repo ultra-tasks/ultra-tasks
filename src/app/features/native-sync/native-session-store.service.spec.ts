@@ -28,10 +28,20 @@ describe('NativeSessionStoreService', () => {
   };
 
   beforeEach(() => {
-    api = jasmine.createSpyObj<AccountSessionStoreApi>('api', ['load', 'save', 'clear']);
+    api = jasmine.createSpyObj<AccountSessionStoreApi>('api', [
+      'load',
+      'save',
+      'clear',
+      'loadDeviceToken',
+      'saveDeviceToken',
+      'forgetDeviceToken',
+    ]);
     api.load.and.resolveTo(null);
     api.save.and.resolveTo();
     api.clear.and.resolveTo();
+    api.loadDeviceToken.and.resolveTo(null);
+    api.saveDeviceToken.and.resolveTo();
+    api.forgetDeviceToken.and.resolveTo();
     consume = jasmine.createSpy('consumeAccountSessionStore').and.returnValue(api);
     oldEa = window.ea;
     window.ea = { consumeAccountSessionStore: consume } as unknown as Window['ea'];
@@ -130,5 +140,79 @@ describe('NativeSessionStoreService', () => {
     api.save.and.resolveTo();
     await store.save(session('4'.repeat(43)));
     expect(api.save).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('NativeSessionStoreService device trust', () => {
+  const request = {
+    serverId: '3e2edea8-ff50-4f20-87f6-a8f0465f9946',
+    keys: ['a'.repeat(64)],
+  };
+  let api: jasmine.SpyObj<AccountSessionStoreApi>;
+  let oldEa: Window['ea'];
+
+  const create = (isElectron: boolean): NativeSessionStoreService => {
+    TestBed.configureTestingModule({
+      providers: [{ provide: IS_ELECTRON_TOKEN, useValue: isElectron }],
+    });
+    const store = TestBed.inject(NativeSessionStoreService);
+    store.initialize();
+    return store;
+  };
+
+  beforeEach(() => {
+    api = jasmine.createSpyObj<AccountSessionStoreApi>('api', [
+      'load',
+      'save',
+      'clear',
+      'loadDeviceToken',
+      'saveDeviceToken',
+      'forgetDeviceToken',
+    ]);
+    api.loadDeviceToken.and.resolveTo('T'.repeat(43));
+    api.saveDeviceToken.and.resolveTo();
+    api.forgetDeviceToken.and.resolveTo();
+    oldEa = window.ea;
+    window.ea = {
+      consumeAccountSessionStore: () => api,
+    } as unknown as Window['ea'];
+  });
+  afterEach(() => {
+    window.ea = oldEa;
+  });
+
+  it('hands the main process one JSON request per call and returns what it knows', async () => {
+    const store = create(true);
+    expect(await store.loadDeviceToken(request)).toBe('T'.repeat(43));
+    await store.saveDeviceToken({ ...request, token: 'N'.repeat(43) });
+    await store.forgetDeviceToken(request);
+    expect(api.loadDeviceToken).toHaveBeenCalledOnceWith(JSON.stringify(request));
+    expect(api.saveDeviceToken).toHaveBeenCalledOnceWith(
+      JSON.stringify({ ...request, token: 'N'.repeat(43) }),
+    );
+    expect(api.forgetDeviceToken).toHaveBeenCalledOnceWith(JSON.stringify(request));
+  });
+
+  it('is a convenience: a refusing or unavailable store reads as "none" and never throws', async () => {
+    const store = create(true);
+    const unavailable = new Error('Protected account session storage is unavailable');
+    api.loadDeviceToken.and.rejectWith(unavailable);
+    api.saveDeviceToken.and.rejectWith(unavailable);
+    api.forgetDeviceToken.and.rejectWith(unavailable);
+    expect(await store.loadDeviceToken(request)).toBeNull();
+    await expectAsync(
+      store.saveDeviceToken({ ...request, token: 'N'.repeat(43) }),
+    ).toBeResolved();
+    await expectAsync(store.forgetDeviceToken(request)).toBeResolved();
+  });
+
+  it('never reaches for the protected store outside the desktop app', async () => {
+    const store = create(false);
+    expect(await store.loadDeviceToken(request)).toBeNull();
+    await store.saveDeviceToken({ ...request, token: 'N'.repeat(43) });
+    await store.forgetDeviceToken(request);
+    expect(api.loadDeviceToken).not.toHaveBeenCalled();
+    expect(api.saveDeviceToken).not.toHaveBeenCalled();
+    expect(api.forgetDeviceToken).not.toHaveBeenCalled();
   });
 });

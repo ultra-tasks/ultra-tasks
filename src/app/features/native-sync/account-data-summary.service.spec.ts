@@ -9,11 +9,20 @@ import { SyncLocalStateService } from '../../op-log/sync/sync-local-state.servic
 import {
   ActionType,
   OpType,
+  type Operation,
   type OperationLogEntry,
 } from '../../op-log/core/operation.types';
 import { DEFAULT_SIMPLE_COUNTERS } from '../simple-counter/simple-counter.const';
 import { DEFAULT_BOARDS } from '../boards/boards.const';
 import { SYSTEM_TAG_IDS } from '../tag/tag.const';
+import { personalRecords, type SyncClient } from '@sp/sync-providers/ultra-tasks';
+import { MODEL_CONFIGS } from '../../op-log/model/model-config';
+import { VectorClockService } from '../../op-log/sync/vector-clock.service';
+import {
+  CLIENT_ID_PROVIDER,
+  type ClientIdProvider,
+} from '../../op-log/util/client-id.provider';
+import { uuidv7 } from '../../util/uuid-v7';
 
 const trackedDay = '2026-11-17';
 const entities = (
@@ -39,6 +48,11 @@ const freshState = (): Record<string, unknown> => ({
     ),
   },
   boards: { boardCfgs: DEFAULT_BOARDS },
+  section: entities([]),
+  menuTree: { projectTree: [], tagTree: [] },
+  pluginMetadata: [],
+  reminders: [],
+  globalConfig: MODEL_CONFIGS.globalConfig.defaultData,
   timeTracking: { project: {}, tag: {} },
   pluginUserData: [],
   archiveYoung: { task: entities([]), timeTracking: { project: {}, tag: {} } },
@@ -160,6 +174,89 @@ describe('summarizeAccountData', () => {
     expect(summarizeAccountData(board).hasUserData).toBeTrue();
   });
 
+  describe('the arrangements a download would erase', () => {
+    const shippedBoards = (): typeof DEFAULT_BOARDS =>
+      JSON.parse(JSON.stringify(DEFAULT_BOARDS));
+    const cases: Record<string, Record<string, unknown>> = {
+      section: { section: entities(['s1']) },
+      projectFolder: {
+        menuTree: {
+          projectTree: [{ id: 'f', k: 'f', name: 'Work', children: [] }],
+          tagTree: [],
+        },
+      },
+      nestedTagFolder: {
+        menuTree: {
+          projectTree: [],
+          tagTree: [
+            {
+              id: 'outer',
+              k: 'f',
+              name: 'Outer',
+              children: [{ id: 'inner', k: 'f', name: 'Inner', children: [] }],
+            },
+          ],
+        },
+      },
+      editedBoard: {
+        boards: {
+          boardCfgs: shippedBoards().map((board, i) =>
+            i === 0 ? { ...board, title: 'My board' } : board,
+          ),
+        },
+      },
+      removedBoard: { boards: { boardCfgs: shippedBoards().slice(1) } },
+      pluginSettings: { pluginMetadata: [{ id: 'my-plugin', isEnabled: true }] },
+      reminders: { reminders: [{ id: 'r', remindAt: 1 }] },
+    };
+
+    it('counts each of them as real data on the device', () => {
+      for (const [name, patch] of Object.entries(cases))
+        expect(summarizeAccountData({ ...freshState(), ...patch }).hasUserData)
+          .withContext(name)
+          .toBeTrue();
+    });
+
+    it('counts each of them as real data in the account too', () => {
+      for (const [name, patch] of Object.entries(cases))
+        expect(
+          summarizeAccountData({ ...freshState(), ...patch }, new Set(), {
+            settings: true,
+          }).hasUserData,
+        )
+          .withContext(name)
+          .toBeTrue();
+    });
+
+    it('does not mistake what is only shipped, or only a project or tag in the menu, for them', () => {
+      const plain = {
+        ...freshState(),
+        menuTree: {
+          projectTree: [{ id: 'INBOX_PROJECT', k: 'p' }],
+          tagTree: [{ id: 'my-tag', k: 't' }],
+        },
+        // A saved copy reads back without its `undefined` members.
+        boards: { boardCfgs: shippedBoards() },
+        globalConfig: JSON.parse(JSON.stringify(MODEL_CONFIGS.globalConfig.defaultData)),
+      };
+      expect(summarizeAccountData(plain).hasUserData).toBeFalse();
+      expect(
+        summarizeAccountData(plain, new Set(), { settings: true }).hasUserData,
+      ).toBeFalse();
+    });
+
+    it('counts settings for the account only: a device with nothing else is still pristine', () => {
+      const customised = {
+        ...freshState(),
+        globalConfig: { ...MODEL_CONFIGS.globalConfig.defaultData, customised: true },
+      };
+      expect(summarizeAccountData(customised).hasUserData).toBeFalse();
+      expect(summarizeAccountData(customised, new Set(), { settings: true })).toEqual(
+        jasmine.objectContaining({ hasUserData: true, tasks: 0 }),
+      );
+    });
+  });
+
   it('never throws on partial or foreign data', () => {
     expect(summarizeAccountData(undefined).hasUserData).toBeFalse();
     expect(summarizeAccountData({ task: 'nope', project: 3 }).hasUserData).toBeFalse();
@@ -205,17 +302,56 @@ describe('AccountDataSummaryService', () => {
     expect(localState.hasMeaningfulStoreData).toHaveBeenCalledWith(new Set(['example']));
   });
 
-  it('does not let a remote operation vouch for a task: only local pending ops are read', async () => {
-    snapshots.getStateSnapshotAsync.and.resolveTo({
-      ...freshState(),
-      task: entities(['imported']),
-    } as never);
-    const remote = exampleOp('imported');
-    (remote as { source: string }).source = 'remote';
-    // getUnsynced never returns remote ops; a synced one is simply not in its result.
-    opStore.getUnsynced.and.resolveTo([]);
-    expect((await service.local()).hasUserData).toBeTrue();
-    void remote;
+  describe('the account side, read from the records the account holds', () => {
+    const clientHolding = async (state: Record<string, unknown>): Promise<SyncClient> => {
+      const baseline = await personalRecords(state, 'device');
+      const heads = Object.fromEntries(
+        Object.values(baseline.records).map((record) => [
+          record.entityId,
+          { ...record, revision: 1, deleted: false },
+        ]),
+      );
+      return { records: () => heads } as unknown as SyncClient;
+    };
+
+    it('reads an empty account as empty', async () => {
+      expect(
+        service.fromRecords(await clientHolding(freshState()), 'personal').hasUserData,
+      ).toBeFalse();
+    });
+
+    it('never reads an account holding only a section, a folder, an edited board, plugin settings, reminders or customised settings as empty', async () => {
+      const arrangements: Record<string, Record<string, unknown>> = {
+        section: { section: entities(['s1']) },
+        folder: {
+          menuTree: {
+            projectTree: [{ id: 'f', k: 'f', name: 'Work', children: [] }],
+            tagTree: [],
+          },
+        },
+        editedBoard: {
+          boards: {
+            boardCfgs: DEFAULT_BOARDS.map((board, i) =>
+              i === 0 ? { ...board, title: 'My board' } : board,
+            ),
+          },
+        },
+        pluginSettings: { pluginMetadata: [{ id: 'my-plugin', isEnabled: true }] },
+        reminders: { reminders: [{ id: 'r', remindAt: 1 }] },
+        settings: {
+          globalConfig: { ...MODEL_CONFIGS.globalConfig.defaultData, customised: true },
+        },
+      };
+      for (const [name, patch] of Object.entries(arrangements))
+        expect(
+          service.fromRecords(
+            await clientHolding({ ...freshState(), ...patch }),
+            'personal',
+          ).hasUserData,
+        )
+          .withContext(name)
+          .toBeTrue();
+    });
   });
 
   it('is never less careful than the fresh-client gate of the file providers', async () => {
@@ -226,5 +362,114 @@ describe('AccountDataSummaryService', () => {
   it('fails closed: an unreadable snapshot is "has data", so nothing is replaced silently', async () => {
     snapshots.getStateSnapshotAsync.and.rejectWith(new Error('IndexedDB closed'));
     expect((await service.local()).hasUserData).toBeTrue();
+  });
+});
+
+describe('AccountDataSummaryService with the real operation log', () => {
+  const clientIds: ClientIdProvider = {
+    loadClientId: () => Promise.resolve('testClient'),
+    getOrGenerateClientId: () => Promise.resolve('testClient'),
+    clearCache: () => undefined,
+  };
+  let store: OperationLogStoreService;
+  let snapshots: jasmine.SpyObj<StateSnapshotService>;
+  let service: AccountDataSummaryService;
+
+  const taskOp = (
+    taskId: string,
+    over: Partial<Operation> = {},
+    isExample = false,
+  ): Operation =>
+    ({
+      id: uuidv7(),
+      clientId: 'testClient',
+      actionType: ActionType.TASK_SHARED_ADD,
+      opType: OpType.Create,
+      entityType: 'TASK',
+      entityId: taskId,
+      payload: {
+        actionPayload: {
+          task: { id: taskId },
+          ...(isExample ? { isExampleTask: true } : {}),
+        },
+        entityChanges: [],
+      },
+      vectorClock: { testClient: 1 },
+      timestamp: Date.now(),
+      schemaVersion: 1,
+      ...over,
+    }) as Operation;
+  const renamed = (taskId: string): Operation =>
+    taskOp(taskId, {
+      actionType: '[Task Shared] Update Task' as ActionType,
+      opType: OpType.Update,
+      payload: { actionPayload: { task: { id: taskId, changes: { title: 'Mine' } } } },
+    });
+
+  beforeEach(async () => {
+    snapshots = jasmine.createSpyObj('StateSnapshotService', ['getStateSnapshotAsync']);
+    TestBed.configureTestingModule({
+      providers: [
+        AccountDataSummaryService,
+        OperationLogStoreService,
+        VectorClockService,
+        { provide: CLIENT_ID_PROVIDER, useValue: clientIds },
+        { provide: StateSnapshotService, useValue: snapshots },
+        {
+          provide: SyncLocalStateService,
+          useValue: { hasMeaningfulStoreData: () => Promise.resolve(false) },
+        },
+      ],
+    });
+    store = TestBed.inject(OperationLogStoreService);
+    await store.init();
+    await store._clearAllDataForTesting();
+    service = TestBed.inject(AccountDataSummaryService);
+  });
+  afterEach(async () => store._clearAllDataForTesting());
+
+  it('calls a device holding only the example task its create op names pristine', async () => {
+    snapshots.getStateSnapshotAsync.and.resolveTo({
+      ...freshState(),
+      task: entities(['example']),
+    } as never);
+    await store.append(taskOp('example', {}, true), 'local');
+    expect(await service.local()).toEqual(
+      jasmine.objectContaining({ tasks: 0, hasUserData: false }),
+    );
+  });
+
+  it('does not let a remote operation vouch for a task: only local pending ops are read', async () => {
+    snapshots.getStateSnapshotAsync.and.resolveTo({
+      ...freshState(),
+      task: entities(['imported']),
+    } as never);
+    // The same marker, but it arrived from the account: it must never exempt the task.
+    await store.append(taskOp('imported', {}, true), 'remote');
+    expect(await service.local()).toEqual(
+      jasmine.objectContaining({ tasks: 1, hasUserData: true }),
+    );
+  });
+
+  it('stops exempting the example task once the person edits it: it is their work now', async () => {
+    snapshots.getStateSnapshotAsync.and.resolveTo({
+      ...freshState(),
+      task: entities(['example']),
+    } as never);
+    await store.append(taskOp('example', {}, true), 'local');
+    await store.append(renamed('example'), 'local');
+    expect(await service.local()).toEqual(
+      jasmine.objectContaining({ tasks: 1, hasUserData: true }),
+    );
+  });
+
+  it('keeps exempting an example task when other tasks are edited', async () => {
+    snapshots.getStateSnapshotAsync.and.resolveTo({
+      ...freshState(),
+      task: entities(['example']),
+    } as never);
+    await store.append(taskOp('example', {}, true), 'local');
+    await store.append(renamed('someone-elses-entity'), 'local');
+    expect((await service.local()).hasUserData).toBeFalse();
   });
 });

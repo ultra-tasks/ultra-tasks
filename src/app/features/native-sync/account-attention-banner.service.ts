@@ -17,6 +17,7 @@ import {
   AccountSyncActionsService,
 } from './account-sync-actions.service';
 import { AccountSyncStatusService } from './account-sync-status.service';
+import { NativeSessionRestoreService } from './native-session-restore.service';
 import { NativeSyncService } from './native-sync.service';
 
 /**
@@ -49,6 +50,7 @@ export class AccountAttentionBannerService {
   private readonly _banner = inject(BannerService);
   private readonly _status = inject(AccountSyncStatusService);
   private readonly _native = inject(NativeSyncService);
+  private readonly _restore = inject(NativeSessionRestoreService);
   private readonly _actions = inject(AccountSyncActionsService);
   private readonly _router = inject(Router);
   private _timer?: ReturnType<typeof setTimeout>;
@@ -67,6 +69,10 @@ export class AccountAttentionBannerService {
   private readonly _kind = computed<AttentionKind | null>(() => {
     const status = this._status.status();
     if (status.engine !== 'account') {
+      return null;
+    }
+    // A remembered session that is still on its way back is not "locked": wait for it.
+    if (!this._restore.restoreSettled()) {
       return null;
     }
     switch (status.id) {
@@ -128,7 +134,9 @@ export class AccountAttentionBannerService {
       // It goes away when the state clears, not when the button is pressed: signing in can fail
       // or be abandoned, and the banner must still be there.
       isKeepVisibleAfterAction: true,
-      isHideDismissBtn: true,
+      // A person who locked the account on purpose (or on a device that never remembers its
+      // session) can wave the reminder away; being signed out by the server cannot be ignored.
+      isHideDismissBtn: kind !== 'locked',
     });
   }
 }

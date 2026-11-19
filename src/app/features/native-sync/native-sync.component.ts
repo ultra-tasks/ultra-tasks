@@ -59,6 +59,7 @@ const BACKGROUND_SYNC_STATES: readonly AccountStatusId[] = [
   'up-to-date-empty',
 ];
 const COPY_CONFIRMATION_MS = 4000;
+const millis = (seconds: number): number => seconds * 1000;
 
 const hostOf = (url: string): string => {
   try {
@@ -131,6 +132,32 @@ export class NativeSyncComponent implements OnInit {
   readonly showPassword = signal(false);
   mfa = '';
   readonly needsMfa = signal(false);
+  /** The emailed code of "Verify this device" (a sign-in on a device the account does not know). */
+  deviceCode = '';
+  /** The pending step, or null. It lives in the engine: leaving the page does not lose it. */
+  readonly deviceVerification = this.native.deviceVerification;
+  /** Ticks once a second while that step is open, so the resend cooldown counts down. */
+  private readonly clock = signal(Date.now());
+  /** Seconds until the server lets a new code be requested; 0 when it may be requested now. */
+  readonly resendIn = computed(() => {
+    const step = this.deviceVerification();
+    if (!step) return 0;
+    const until = step.issuedAt + millis(step.resendAfter);
+    return Math.max(0, Math.ceil((until - this.clock()) / 1000));
+  });
+  readonly canResend = computed(
+    () =>
+      !!this.deviceVerification() && this.resendIn() === 0 && this.resendsLeft() !== 0,
+  );
+  private readonly resendsLeft = computed(() => this.deviceVerification()?.resendsLeft);
+  /** How long the code that was just sent stays valid, in whole minutes. */
+  readonly codeMinutes = computed(() => {
+    const step = this.deviceVerification();
+    return step ? Math.max(1, Math.ceil((step.expiresAt - step.issuedAt) / 60_000)) : 0;
+  });
+  /** Polite live text of the step, shown too: a sent code and the end of the cooldown only. */
+  readonly deviceNote = signal('');
+  private previousResendIn = 0;
   projectTitle = '';
   sourceProject = '';
   includeDescription = false;
@@ -266,6 +293,26 @@ export class NativeSyncComponent implements OnInit {
     effect(() => {
       const phase = this.native.phase();
       untracked(() => this.leaveAfterInitialConnection(phase));
+    });
+    // While the emailed-code step is open the clock ticks; otherwise nothing runs.
+    effect((onCleanup) => {
+      if (!this.deviceVerification()) {
+        this.deviceCode = '';
+        untracked(() => this.deviceNote.set(''));
+        return;
+      }
+      this.clock.set(Date.now());
+      const tick = setInterval(() => this.clock.set(Date.now()), 1000);
+      onCleanup(() => clearInterval(tick));
+    });
+    // Only the end of the cooldown is worth saying out loud, never each second of it.
+    effect(() => {
+      const seconds = this.resendIn();
+      untracked(() => {
+        if (this.previousResendIn > 0 && seconds === 0 && this.canResend())
+          this.deviceNote.set(this.translate.instant(T.ACCOUNT_DEVICE.RESEND_READY));
+        this.previousResendIn = seconds;
+      });
     });
     effect(() => {
       const status = this.accountStatus();
@@ -420,9 +467,9 @@ export class NativeSyncComponent implements OnInit {
     if (!server) return;
     await this.run(async () => {
       try {
-        this.needsMfa.set(
-          !(await this.native.login(server, this.identifier, this.password)),
-        );
+        const signedIn = await this.native.login(server, this.identifier, this.password);
+        // A further step is pending: two-factor, or the emailed code of a new device.
+        this.needsMfa.set(!signedIn && !this.deviceVerification());
       } finally {
         this.password = '';
       }
@@ -479,6 +526,33 @@ export class NativeSyncComponent implements OnInit {
       await this.native.passkey();
       this.needsMfa.set(false);
     });
+  }
+  /** "Verify this device": the eight digits from the email (spaces and dashes are fine). */
+  async completeDeviceVerification(): Promise<void> {
+    this.deviceNote.set('');
+    await this.run(() => this.native.completeDeviceVerification(this.deviceCode));
+    // A wrong code leaves the step open: put the cursor back on it, selected, to retype.
+    if (this.deviceVerification()) {
+      const field = this.codeField()?.nativeElement;
+      field?.focus();
+      field?.select();
+    }
+  }
+  async resendDeviceCode(): Promise<void> {
+    if (!this.canResend()) return;
+    this.deviceNote.set('');
+    await this.run(async () => {
+      await this.native.resendDeviceVerification();
+      const step = this.deviceVerification();
+      if (step)
+        this.deviceNote.set(
+          this.translate.instant(T.ACCOUNT_DEVICE.RESENT, { email: step.emailHint }),
+        );
+    });
+  }
+  /** Back: nothing was signed in, so the sign-in form simply comes back. */
+  async cancelDeviceVerification(): Promise<void> {
+    await this.run(() => this.native.cancelDeviceVerification());
   }
   async runLock(): Promise<void> {
     await this.run(() => this.native.lock());

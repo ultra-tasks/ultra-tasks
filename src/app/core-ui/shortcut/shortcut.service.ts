@@ -18,8 +18,8 @@ import { WorkContextType } from '../../features/work-context/work-context.model'
 import { T } from '../../t.const';
 import { Store } from '@ngrx/store';
 import { showFocusOverlay } from '../../features/focus-mode/store/focus-mode.actions';
-import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
-import { first, mapTo, switchMap } from 'rxjs/operators';
+import { AccountSyncActionsService } from '../../features/native-sync/account-sync-actions.service';
+import { mapTo, switchMap } from 'rxjs/operators';
 import { firstValueFrom, fromEvent, merge, Observable, of } from 'rxjs';
 import { PluginBridgeService } from '../../plugins/plugin-bridge.service';
 import { TaskShortcutService } from '../../features/tasks/task-shortcut.service';
@@ -70,7 +70,7 @@ export class ShortcutService {
   private _workContextService = inject(WorkContextService);
   private _activatedRoute = inject(ActivatedRoute);
   private _uiHelperService = inject(UiHelperService);
-  private _syncWrapperService = inject(SyncWrapperService);
+  private _syncActions = inject(AccountSyncActionsService);
   private _store = inject(Store);
   private _pluginBridgeService = inject(PluginBridgeService);
   private _taskShortcutService = inject(TaskShortcutService);
@@ -368,9 +368,9 @@ export class ShortcutService {
       this._layoutService.toggleAddTaskPanel();
     } else if (checkKeyCombo(ev, keys.triggerSync)) {
       ev.preventDefault();
-      if (await this._syncWrapperService.isEnabledAndReady$.pipe(first()).toPromise()) {
-        this._syncWrapperService.sync(true);
-      }
+      // The active engine decides: a native account must not be skipped because no legacy
+      // provider is configured, and a legacy provider keeps its own readiness check.
+      await this._syncActions.syncQuietly(true);
     } else if (this._taskShortcutService.handleTogglePlayFallback(ev)) {
       return;
     }

@@ -58,6 +58,12 @@ const ea: ElectronAPI = {
     save: (value) =>
       _invoke('ACCOUNT_SESSION_STORE', 'save', value).then(() => undefined),
     clear: () => _invoke('ACCOUNT_SESSION_STORE', 'clear').then(() => undefined),
+    loadDeviceToken: (request) =>
+      _invoke('ACCOUNT_SESSION_STORE', 'device-load', request) as Promise<string | null>,
+    saveDeviceToken: (request) =>
+      _invoke('ACCOUNT_SESSION_STORE', 'device-save', request).then(() => undefined),
+    forgetDeviceToken: (request) =>
+      _invoke('ACCOUNT_SESSION_STORE', 'device-forget', request).then(() => undefined),
   })),
   on: (channel: string, listener: (...args: unknown[]) => void) => {
     // NOTE: there is no proper way to unsubscribe apart from unsubscribing all

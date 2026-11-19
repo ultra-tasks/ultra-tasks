@@ -13,6 +13,7 @@ import {
   type Tokens,
 } from '@sp/sync-providers/ultra-tasks';
 import { NativeSyncService } from './native-sync.service';
+import { NativeDeviceTrustService } from './native-device-trust.service';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import {
   pendingAccountLoginCallback$,
@@ -28,6 +29,7 @@ import { Router } from '@angular/router';
 @Injectable({ providedIn: 'root' })
 export class NativeAccountLoginService {
   private readonly native = inject(NativeSyncService);
+  private readonly trust = inject(NativeDeviceTrustService);
   private readonly dataInit = inject(DataInitStateService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -39,6 +41,8 @@ export class NativeAccountLoginService {
   readonly error = signal('');
   private flow?: PendingBrowserLogin;
   private client?: AccountClient;
+  /** The marker this installation holds for the account being signed in to, if it is known. */
+  private trustedDevice?: string;
   private desktopStore?: AccountLoginStoreApi | null;
   private started = false;
   private initialization: Promise<void> = Promise.resolve();
@@ -116,6 +120,12 @@ export class NativeAccountLoginService {
     this.server.set(flow.request.serverUrl);
     const code = (await fingerprint(flow.request)).slice(0, 8).toUpperCase();
     if (this.flow !== flow) return;
+    // Presented when the approved sign-in is redeemed, so a device the account already
+    // recognises reuses its record instead of adding a new one.
+    this.trustedDevice = await this.trust.recall(flow.request.serverId, [
+      flow.request.identifier,
+    ]);
+    if (this.flow !== flow) return;
     this.code.set(code);
     this.active.set(true);
     this.schedule();
@@ -192,7 +202,7 @@ export class NativeAccountLoginService {
     if (!flow || !client || this.completing()) return;
     let issuedTokens: Tokens | undefined;
     try {
-      if (!(await client.pollBrowserLogin())) return;
+      if (!(await client.pollBrowserLogin({ deviceToken: this.trustedDevice }))) return;
       issuedTokens = client.tokens;
       this.completing.set(true);
       await firstValueFrom(this.dataInit.isAllDataLoadedInitially$);

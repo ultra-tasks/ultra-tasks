@@ -131,6 +131,7 @@ describe('BackupService', () => {
     ]);
     mockOpLogStore = jasmine.createSpyObj('OperationLogStoreService', [
       'saveImportBackup',
+      'listImportBackups',
       'pruneImportBackups',
       'loadImportBackup',
       'loadImportBackupById',
@@ -313,6 +314,78 @@ describe('BackupService', () => {
         reason: 'REMOTE_IMPORT',
         taskCount: 2,
       });
+    });
+  });
+
+  describe('captureRecoveryPointUnlessCovered', () => {
+    const withTask = (id: string): unknown => ({
+      ...createMinimalValidBackup(),
+      task: {
+        ids: [id],
+        entities: { [id]: { id } },
+        currentTaskId: null,
+        selectedTaskId: null,
+      },
+    });
+    const newest = {
+      backupId: 'b0',
+      savedAt: 1,
+      reason: 'REMOTE_IMPORT' as const,
+      taskCount: 1,
+    };
+
+    it('skips a pristine device without looking at the ring', async () => {
+      expect(await service.captureRecoveryPointUnlessCovered('REMOTE_IMPORT')).toBeNull();
+      expect(mockOpLogStore.saveImportBackup).not.toHaveBeenCalled();
+      expect(mockOpLogStore.listImportBackups).not.toHaveBeenCalled();
+    });
+
+    it('captures a device that holds data when the ring is empty', async () => {
+      mockStateSnapshotService.getStateSnapshotAsync.and.resolveTo(withTask('t1') as any);
+      mockOpLogStore.listImportBackups.and.resolveTo([]);
+      await service.captureRecoveryPointUnlessCovered('REMOTE_IMPORT');
+      expect(mockOpLogStore.saveImportBackup).toHaveBeenCalledTimes(1);
+    });
+
+    it('adds nothing when the newest entry already holds exactly this state', async () => {
+      mockStateSnapshotService.getStateSnapshotAsync.and.resolveTo(withTask('t1') as any);
+      mockOpLogStore.listImportBackups.and.resolveTo([newest]);
+      mockOpLogStore.loadImportBackupById.and.resolveTo({
+        ...newest,
+        state: withTask('t1'),
+      });
+      expect(await service.captureRecoveryPointUnlessCovered('REMOTE_IMPORT')).toBe(
+        newest,
+      );
+      expect(mockOpLogStore.saveImportBackup).not.toHaveBeenCalled();
+    });
+
+    it('captures again once the data differs from the newest entry', async () => {
+      mockStateSnapshotService.getStateSnapshotAsync.and.resolveTo(withTask('t2') as any);
+      mockOpLogStore.listImportBackups.and.resolveTo([newest]);
+      mockOpLogStore.loadImportBackupById.and.resolveTo({
+        ...newest,
+        state: withTask('t1'),
+      });
+      await service.captureRecoveryPointUnlessCovered('REMOTE_IMPORT');
+      expect(mockOpLogStore.saveImportBackup).toHaveBeenCalledTimes(1);
+    });
+
+    it('captures when the newest entry cannot be read', async () => {
+      mockStateSnapshotService.getStateSnapshotAsync.and.resolveTo(withTask('t1') as any);
+      mockOpLogStore.listImportBackups.and.resolveTo([newest]);
+      mockOpLogStore.loadImportBackupById.and.resolveTo(null);
+      await service.captureRecoveryPointUnlessCovered('REMOTE_IMPORT');
+      expect(mockOpLogStore.saveImportBackup).toHaveBeenCalledTimes(1);
+    });
+
+    it('lets errors of the capture itself through, so the caller stops before replacing', async () => {
+      mockStateSnapshotService.getStateSnapshotAsync.and.resolveTo(withTask('t1') as any);
+      mockOpLogStore.listImportBackups.and.resolveTo([]);
+      mockOpLogStore.saveImportBackup.and.rejectWith(new Error('disk full'));
+      await expectAsync(
+        service.captureRecoveryPointUnlessCovered('REMOTE_IMPORT'),
+      ).toBeRejectedWithError('disk full');
     });
   });
 

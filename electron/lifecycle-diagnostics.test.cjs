@@ -11,18 +11,27 @@ const source = ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
 ).outputText;
 
-const load = (files = new Map(), logs = []) => {
+const load = (files = new Map(), logs = [], clock = { now: undefined }) => {
   const exports = {};
+  const heartbeats = [];
+  const FakeDate = class extends Date {
+    static now() {
+      return clock.now ?? Date.now();
+    }
+  };
   const processEvents = new EventEmitter();
   vm.runInNewContext(source, {
     exports,
     process: { pid: 4242, on: (event, listener) => processEvents.on(event, listener) },
-    Date,
+    Date: FakeDate,
     JSON,
     String,
     Math,
     Set,
-    setInterval: () => ({ unref: () => undefined }),
+    setInterval: (listener) => {
+      heartbeats.push(listener);
+      return { unref: () => undefined };
+    },
     require: (name) => {
       if (name === 'electron-log/main')
         return {
@@ -41,13 +50,13 @@ const load = (files = new Map(), logs = []) => {
       return require(name);
     },
   });
-  return { exports, processEvents, files, logs };
+  return { exports, processEvents, files, logs, heartbeats };
 };
 
 const FILE = '/profile/lifecycle.json';
 const marker = (files) => JSON.parse(files.get(FILE));
-const boot = (files = new Map(), logs = []) => {
-  const env = load(files, logs);
+const boot = (files = new Map(), logs = [], clock = { now: undefined }) => {
+  const env = load(files, logs, clock);
   const app = new EventEmitter();
   const power = new EventEmitter();
   const lifecycle = env.exports.initLifecycleDiagnostics({ app, userDataPath: '/profile' });
@@ -139,4 +148,43 @@ test('a corrupt or unwritable marker never breaks startup', () => {
   const files = new Map([[FILE, '{not json']]);
   const { logs } = boot(files);
   assert.match(logs[0][1], /no lifecycle marker/);
+});
+
+test('a window hidden to the tray does not explain a power loss many hours later', () => {
+  const clock = { now: Date.UTC(2026, 10, 17, 18, 0, 0) };
+  const files = new Map();
+  const run = boot(files, [], clock);
+  // The window is closed to the tray at 18:00; the app keeps running.
+  run.window.emit('close');
+  assert.equal(marker(files).reason, null);
+  // Fourteen hours of heartbeats, then the power goes: no quit, no exit.
+  for (let minutes = 5; minutes <= 14 * 60; minutes += 5) {
+    clock.now += 5 * 60 * 1000;
+    run.heartbeats[0]();
+  }
+  assert.equal(marker(files).reason, null);
+  const next = boot(files, [], clock);
+  assert.match(next.logs[0][1], /previous run ended: unknown/);
+  assert.match(next.logs[0][1], /after 14h00m/);
+  assert.doesNotMatch(next.logs[0][1], /window-close/);
+});
+
+test('a real quit long after a hidden window is a quit, not that window close', () => {
+  const clock = { now: Date.UTC(2026, 10, 17, 18, 0, 0) };
+  const run = boot(new Map(), [], clock);
+  run.window.emit('close');
+  clock.now += 3 * 60 * 60 * 1000;
+  run.app.emit('before-quit', {});
+  run.app.emit('quit', {}, 0);
+  assert.equal(marker(run.files).reason, 'user-quit');
+});
+
+test('closing the last window and quitting together is still a window close', () => {
+  const clock = { now: Date.UTC(2026, 10, 17, 18, 0, 0) };
+  const run = boot(new Map(), [], clock);
+  run.window.emit('close');
+  clock.now += 200;
+  run.app.emit('before-quit', {});
+  run.app.emit('quit', {}, 0);
+  assert.equal(marker(run.files).reason, 'window-close');
 });

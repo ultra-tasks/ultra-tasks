@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { IS_ELECTRON_TOKEN } from '../../app.constants';
 import type {
   AccountSessionStoreApi,
+  DeviceTrustRequest,
   StoredAccountSession,
 } from '../../../../electron/shared-with-frontend/account-session-api';
 
@@ -76,6 +77,39 @@ export class NativeSessionStoreService {
     this.epoch++;
     if (!api) return Promise.resolve();
     return this.enqueue(() => api.clear());
+  }
+
+  /**
+   * The new-device trust marker of an account: a convenience (it only spares an emailed code),
+   * so every failure reads as "none" and nothing here ever throws. It is not tied to the
+   * session: signing out keeps it.
+   */
+  async loadDeviceToken(request: DeviceTrustRequest): Promise<string | null> {
+    if (!this.api) return null;
+    try {
+      return await this.api.loadDeviceToken(JSON.stringify(request));
+    } catch {
+      return null;
+    }
+  }
+
+  async saveDeviceToken(request: DeviceTrustRequest & { token: string }): Promise<void> {
+    if (!this.api) return;
+    try {
+      await this.api.saveDeviceToken(JSON.stringify(request));
+    } catch {
+      /* A refusing protected store only costs one more emailed code. */
+    }
+  }
+
+  /** Deleting the account is the one thing that forgets its marker. */
+  async forgetDeviceToken(request: DeviceTrustRequest): Promise<void> {
+    if (!this.api) return;
+    try {
+      await this.api.forgetDeviceToken(JSON.stringify(request));
+    } catch {
+      /* Nothing to forget that could be read. */
+    }
   }
 
   private enqueue(work: () => Promise<void>): Promise<void> {

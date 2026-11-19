@@ -5,6 +5,7 @@ import type {
   AccountDataSummary,
   DataConnectionState,
 } from './account-sync.types';
+import type { LocalEditWatch } from './native-local-edits';
 
 export const ERROR_LOCAL_CHANGED = 'NATIVE_SYNC.ERROR_LOCAL_CHANGED';
 export const ERROR_REMOTE_CHANGED = 'NATIVE_SYNC.ERROR_REMOTE_CHANGED';
@@ -28,8 +29,14 @@ export interface DataConnectionHost {
     local(): Promise<AccountDataSummary>;
     fromRecords(client: SyncClient, scopeId: string): AccountDataSummary;
   };
-  /** The engine's transactional switch: `migrate` replaces the account with this device. */
-  link(migrate: boolean, automatic?: boolean): Promise<void>;
+  /**
+   * The engine's transactional switch: `migrate` replaces the account with this device. `since`
+   * is the watch that was started before this device was measured: an edit it saw refuses the
+   * download.
+   */
+  link(migrate: boolean, automatic?: boolean, since?: LocalEditWatch): Promise<void>;
+  /** Starts watching for edits to this device's data. */
+  watchEdits(): LocalEditWatch;
   /** The server's own list of datasets, to cross-check what the client could verify. */
   serverHasPersonalScope(client: SyncClient): Promise<boolean>;
   /** Reports a failure like every other engine failure; true when the session is gone. */
@@ -168,8 +175,9 @@ export class NativeDataConnection {
     try {
       await this.host.link(true, true);
     } catch (error) {
-      if (!this.stale(generation)) this.fail(error);
-      return;
+      if (this.stale(generation)) return;
+      // The upload committed and a step after it failed: the device is connected.
+      return this.host.linked() ? this.complete(false) : this.fail(error);
     }
     if (this.stale(generation)) return;
     if (this.host.linked()) return this.complete(false);
@@ -185,6 +193,24 @@ export class NativeDataConnection {
     attempts: number,
   ): Promise<void> {
     if (personal.state !== 'active') return this.waitForOtherDevice();
+    // Watch from BEFORE this device is measured: an edit between "nothing here" and the start of
+    // the switch must stop the switch, and only a watch that began earlier can see it.
+    const edits = this.host.watchEdits();
+    try {
+      await this.decide(client, personal, userInitiated, generation, attempts, edits);
+    } finally {
+      edits.stop();
+    }
+  }
+
+  private async decide(
+    client: SyncClient,
+    personal: ScopeInfo,
+    userInitiated: boolean,
+    generation: number,
+    attempts: number,
+    edits: LocalEditWatch,
+  ): Promise<void> {
     // Measure this device first: what it holds decides how much has to be known.
     let local: AccountDataSummary;
     try {
@@ -204,7 +230,7 @@ export class NativeDataConnection {
     const mayDecideAlone = attempts < MAX_AUTOMATIC_ATTEMPTS;
     if (mayDecideAlone && !local.hasUserData)
       // An empty device holds nothing to lose, whatever the account holds.
-      return this.switchTo('download', 'automatic', generation, attempts);
+      return this.switchTo('download', 'automatic', generation, attempts, edits);
     this.stage.set('downloading');
     let account: AccountDataSummary;
     try {
@@ -220,7 +246,7 @@ export class NativeDataConnection {
     if (this.stale(generation)) return;
     if (mayDecideAlone && !account.hasUserData)
       // Nothing on the account side can be lost: seed it with this device's data.
-      return this.switchTo('replace', 'automatic', generation, attempts);
+      return this.switchTo('replace', 'automatic', generation, attempts, edits);
     this.stage.set('idle');
     this.choice.set({
       local,
@@ -239,14 +265,18 @@ export class NativeDataConnection {
     origin: 'automatic' | 'user',
     generation: number,
     attempts: number,
+    edits?: LocalEditWatch,
   ): Promise<void> {
     if (this.stale(generation)) return;
     this.stage.set(kind === 'download' ? 'downloading' : 'uploading');
     try {
-      await this.host.link(kind === 'replace', origin === 'automatic');
+      await this.host.link(kind === 'replace', origin === 'automatic', edits);
     } catch (error) {
-      if (!this.stale(generation))
-        await this.refused(error, origin, generation, attempts);
+      if (this.stale(generation)) return;
+      // The switch committed and a step after it failed (the follow-up listing, say): the device
+      // is connected, and the failure is an ordinary sync failure that was already recorded.
+      if (this.host.linked()) return this.complete(kind === 'download');
+      await this.refused(error, origin, generation, attempts);
       return;
     }
     if (!this.stale(generation)) this.complete(kind === 'download');

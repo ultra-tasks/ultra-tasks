@@ -14,8 +14,13 @@ export interface StoredAccountSession {
   masterKey: string;
   /** The current single-use refresh credential; rewritten on every rotation. */
   refreshToken: string;
-  /** Opaque new-device trust marker (account SDK 0.1.5 and later); absent until then. */
-  deviceToken?: string;
+}
+
+/** Which account a new-device trust marker belongs to: the server and SHA-256 keys of its names. */
+export interface DeviceTrustRequest {
+  serverId: string;
+  /** Hex SHA-256 of the lower-cased email (and of any other name the account signed in with). */
+  keys: string[];
 }
 
 export interface AccountSessionStoreApi {
@@ -23,4 +28,13 @@ export interface AccountSessionStoreApi {
   load(): Promise<string | null>;
   save(value: string): Promise<void>;
   clear(): Promise<void>;
+  /**
+   * The new-device trust marker of the account (JSON `DeviceTrustRequest`), or `null`. It
+   * outlives sign-out: the device stays recognised until the account is deleted.
+   */
+  loadDeviceToken(request: string): Promise<string | null>;
+  /** JSON `DeviceTrustRequest & { token }`. */
+  saveDeviceToken(request: string): Promise<void>;
+  /** Only deleting the account forgets its marker. */
+  forgetDeviceToken(request: string): Promise<void>;
 }

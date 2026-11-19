@@ -11,6 +11,7 @@ import { IS_ELECTRON_TOKEN } from '../../app.constants';
 import { DataInitStateService } from '../../core/data-init/data-init-state.service';
 import { NativeSyncService } from './native-sync.service';
 import { NativeAccountLoginService } from './native-account-login.service';
+import { NativeDeviceTrustService } from './native-device-trust.service';
 import { type AccountLoginStoreApi } from '../../../../electron/shared-with-frontend/account-login-api';
 
 describe('NativeAccountLoginService', () => {
@@ -23,6 +24,7 @@ describe('NativeAccountLoginService', () => {
     finishBrowserAccount: jasmine.Spy;
     serverUrl: string;
   };
+  let trust: { recall: jasmine.Spy };
   let hydration: ReplaySubject<boolean>;
   let hydrationOwner: { isAllDataLoadedInitially$: ReplaySubject<boolean> };
   let navigate: jasmine.Spy;
@@ -67,6 +69,7 @@ describe('NativeAccountLoginService', () => {
       finishBrowserAccount: jasmine.createSpy().and.resolveTo(),
       serverUrl: flow.request.serverUrl,
     };
+    trust = { recall: jasmine.createSpy('recall').and.resolveTo(undefined) };
     hydration = new ReplaySubject<boolean>(1);
     hydration.next(true);
     hydrationOwner = { isAllDataLoadedInitially$: hydration };
@@ -75,6 +78,7 @@ describe('NativeAccountLoginService', () => {
       providers: [
         { provide: IS_ELECTRON_TOKEN, useValue: true },
         { provide: NativeSyncService, useValue: native },
+        { provide: NativeDeviceTrustService, useValue: trust },
         { provide: DataInitStateService, useValue: hydrationOwner },
         { provide: Router, useValue: { navigate } },
       ],
@@ -110,6 +114,24 @@ describe('NativeAccountLoginService', () => {
     expect(url.href).not.toContain(flow.verifier);
     expect(url.href).not.toContain(flow.privateKey.d!);
     expect(service.active()).toBeTrue();
+  });
+  it('presents the device marker held for the account when the approved sign-in is redeemed', async () => {
+    trust.recall.and.resolveTo('T'.repeat(43));
+    await service.start(flow.request.serverUrl, 'ada@example.test');
+    // Looked up once, when the flow starts, not on every poll.
+    expect(trust.recall).toHaveBeenCalledOnceWith(flow.request.serverId, [
+      flow.request.identifier,
+    ]);
+    (client.pollBrowserLogin as jasmine.Spy).and.resolveTo(false);
+    await service.check();
+    await service.check();
+    expect(client.pollBrowserLogin).toHaveBeenCalledWith({ deviceToken: 'T'.repeat(43) });
+    expect(trust.recall).toHaveBeenCalledTimes(1);
+  });
+  it('presents no marker for an account this installation does not know', async () => {
+    await service.start(flow.request.serverUrl, '');
+    await service.check();
+    expect(client.pollBrowserLogin).toHaveBeenCalledWith({ deviceToken: undefined });
   });
   it('does not open the browser when protected persistence fails', async () => {
     store.save.and.rejectWith(new Error('Keystore unavailable'));

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { computed, signal } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
+import { T } from '../../t.const';
 import { SyncProviderId } from '../../op-log/sync-providers/provider.const';
 import { IS_ONLINE$ } from '../../util/is-online.token';
 import { NativeSyncService } from './native-sync.service';
@@ -15,6 +16,7 @@ describe('AccountSyncStatusService', () => {
   let phase: ReturnType<typeof signal<AccountPhase>>;
   let error: ReturnType<typeof signal<string>>;
   let busy: ReturnType<typeof signal<boolean>>;
+  let lockReason: ReturnType<typeof signal<'storage-unavailable' | null>>;
   let offline: ReturnType<typeof signal<boolean>>;
   let emptyAccount: ReturnType<typeof signal<boolean>>;
   let lastSyncedAt: ReturnType<typeof signal<number | null>>;
@@ -32,6 +34,7 @@ describe('AccountSyncStatusService', () => {
     phase = signal<AccountPhase>('signed-out');
     error = signal('');
     busy = signal(false);
+    lockReason = signal<'storage-unavailable' | null>(null);
     offline = signal(false);
     emptyAccount = signal(false);
     lastSyncedAt = signal<number | null>(null);
@@ -58,6 +61,7 @@ describe('AccountSyncStatusService', () => {
             phase,
             error,
             busy,
+            lockReason,
             offline,
             emptyAccount,
             lastSyncedAt,
@@ -108,6 +112,14 @@ describe('AccountSyncStatusService', () => {
     account('synced');
     emptyAccount.set(true);
     expect(service.status().id).toBe('up-to-date-empty');
+  });
+
+  it('says why a locked account is locked when secure storage cannot be read', () => {
+    account('locked');
+    expect(service.status().detailKey).toBe(T.ACCOUNT_STATUS.LOCKED_DETAIL);
+    lockReason.set('storage-unavailable');
+    expect(service.status().id).toBe('locked');
+    expect(service.status().detailKey).toBe(T.ACCOUNT_DATA.ERROR_STORAGE);
   });
 
   it('never presents a locked account as "set up sync"', () => {

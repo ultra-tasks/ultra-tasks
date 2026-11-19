@@ -1,6 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { first } from 'rxjs/operators';
 import { ShareService } from '../../core/share/share.service';
 import { SnackService } from '../../core/snack/snack.service';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
@@ -47,6 +49,25 @@ export class AccountSyncActionsService {
         return;
       default:
         return this.openSetup();
+    }
+  }
+
+  /**
+   * For callers with no screen of their own (a keyboard shortcut, a plugin): syncs the engine that
+   * is active right now and never opens a dialog or a page. An account that needs something first
+   * (unlock, sign in, a data choice) or a provider that is not ready is left alone; the header and
+   * the banner already say so.
+   */
+  async syncQuietly(isUserTriggered = true): Promise<void> {
+    const status = this._status.status();
+    if (status.engine === 'account') {
+      if (!status.action || status.action === 'sync' || status.action === 'retry') {
+        await this._syncAccount();
+      }
+    } else if (status.engine === 'provider') {
+      if (await firstValueFrom(this._legacy.isEnabledAndReady$.pipe(first()))) {
+        await this._legacy.sync(isUserTriggered);
+      }
     }
   }
 

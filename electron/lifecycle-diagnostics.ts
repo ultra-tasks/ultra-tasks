@@ -38,6 +38,12 @@ const STRONG: ReadonlySet<ExitReason> = new Set([
   'uncaught-exception',
 ]);
 const HEARTBEAT_MS = 5 * 60 * 1000;
+/**
+ * A window close or quit request only explains the exit it leads to. An app that hides to the
+ * tray keeps running, so one that is not followed by the real quit within this time says nothing
+ * about how the app ended later (a power loss 14 hours on).
+ */
+const QUIT_FOLLOWS_MS = 15 * 1000;
 
 export const parseLifecycleMarker = (raw: string | null): LifecycleMarker | null => {
   if (!raw) return null;
@@ -104,6 +110,8 @@ export const createLifecycleMarker = (
   finish(exitCode: number): void;
 } => {
   let previous: LifecycleMarker | null = null;
+  /** A quit path that has been asked for but has not ended the process (yet). */
+  let requested: { reason: ExitReason; detail: string | null; at: number } | null = null;
   try {
     previous = parseLifecycleMarker(storage.read());
   } catch {
@@ -129,8 +137,14 @@ export const createLifecycleMarker = (
   return {
     previous,
     record: (reason, detail) => {
-      // First cause wins among the quit paths; a strong cause replaces a weak one.
-      if (marker.reason && !(STRONG.has(reason) && !STRONG.has(marker.reason))) return;
+      if (!STRONG.has(reason)) {
+        // Only remembered: it is written when the app really quits. The first request wins
+        // while it is fresh; a stale one (a window hidden to the tray) is replaced.
+        if (!requested || now() - requested.at > QUIT_FOLLOWS_MS)
+          requested = { reason, detail: detail ?? null, at: now() };
+        return;
+      }
+      if (marker.reason) return;
       marker.reason = reason;
       marker.detail = detail ?? null;
       marker.endedAt = now();
@@ -143,6 +157,14 @@ export const createLifecycleMarker = (
     finish: (exitCode) => {
       marker.endedAt = now();
       marker.lastAliveAt = marker.endedAt;
+      if (
+        !marker.reason &&
+        requested &&
+        marker.endedAt - requested.at <= QUIT_FOLLOWS_MS
+      ) {
+        marker.reason = requested.reason;
+        marker.detail = requested.detail;
+      }
       if (!marker.reason && exitCode === 333) {
         marker.reason = 'uncaught-exception';
         marker.detail = 'exit code 333';

@@ -73,7 +73,9 @@ describe('NativePersonalBridgeService', () => {
         },
         {
           provide: BackupService,
-          useValue: { captureImportBackup: jasmine.createSpy().and.resolveTo({}) },
+          useValue: {
+            captureRecoveryPointUnlessCovered: jasmine.createSpy().and.resolveTo(null),
+          },
         },
         { provide: ValidateStateService, useValue: {} },
       ],
@@ -163,7 +165,8 @@ describe('NativePersonalBridgeService', () => {
   it('saves a recovery copy of THIS device first, then reports downloading and applying in order', async () => {
     await service.bind(client);
     const steps: string[] = [];
-    const backups = TestBed.inject(BackupService).captureImportBackup as jasmine.Spy;
+    const backups = TestBed.inject(BackupService)
+      .captureRecoveryPointUnlessCovered as jasmine.Spy;
     backups.and.callFake(async () => {
       steps.push('recovery copy');
       return {};

@@ -67,3 +67,20 @@ export type DataConnectionState =
 
 /** What a session that cannot sync on its own needs from the person. */
 export type AccountReconnect = 'unlock' | 'sign-in' | null;
+
+/**
+ * The emailed-code step of a sign-in on a new device: the server answered the password with
+ * "send a code" instead of a session. Nothing is signed in while this is pending.
+ */
+export interface DeviceVerificationView {
+  /** Masked address the code went to, such as `d***@example.test`; never the full address. */
+  emailHint: string;
+  /** When the code stops working (ms since epoch). Asking for a new code does not extend it. */
+  expiresAt: number;
+  /** Seconds to wait between codes, counted from `issuedAt` (the server's cooldown). */
+  resendAfter: number;
+  /** Codes that can still be requested for this sign-in; null when the server did not say. */
+  resendsLeft: number | null;
+  /** When the code that is valid now was sent (ms since epoch). */
+  issuedAt: number;
+}

@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { AccountApiError, type SyncClient } from '@sp/sync-providers/ultra-tasks';
+import type { AccountDataSummary } from './account-sync.types';
 
 /**
  * Why an attempt failed, in the only terms the status surfaces need:
@@ -68,6 +69,37 @@ export class NativeSyncHealth {
   readonly reauth = signal(false);
   /** A local edit happened that has not been captured into an intent yet. */
   private uncaptured = false;
+  /** The dataset version `emptyAccount` was last measured for. */
+  private emptyChecked = '';
+
+  /**
+   * "Up to date, no tasks yet" is only true after a complete fetch found none. Measured again
+   * only when the dataset moved; unreadable data is reported by the sync itself, never as "empty".
+   */
+  refreshEmpty(
+    client: SyncClient | undefined,
+    scopeId: string | undefined,
+    measure: (client: SyncClient, scopeId: string) => AccountDataSummary,
+  ): void {
+    const scope = scopeId ? client?.state.scopes[scopeId] : undefined;
+    if (!client || !scopeId || !scope) return;
+    const marker = `${scopeId}:${scope.info.sequence}:${scope.info.generation}`;
+    if (marker === this.emptyChecked) return;
+    try {
+      this.emptyAccount.set(!measure(client, scopeId).hasUserData);
+      this.emptyChecked = marker;
+    } catch {
+      /* Left as it was. */
+    }
+  }
+
+  /** The vault closed: what was true of the open account is not true any more. */
+  closed(): void {
+    this.offline.set(false);
+    this.pendingChanges.set(0);
+    this.emptyAccount.set(false);
+    this.emptyChecked = '';
+  }
 
   noteLocalEdit(client: SyncClient | undefined): void {
     this.uncaptured = true;
@@ -103,5 +135,6 @@ export class NativeSyncHealth {
     this.emptyAccount.set(false);
     this.reauth.set(false);
     this.uncaptured = false;
+    this.emptyChecked = '';
   }
 }

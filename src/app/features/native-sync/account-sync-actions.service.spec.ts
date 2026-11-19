@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { ShareService } from '../../core/share/share.service';
@@ -27,6 +28,7 @@ describe('AccountSyncActionsService', () => {
   let dialogs: jasmine.SpyObj<MatDialog>;
   let snack: jasmine.SpyObj<SnackService>;
   let share: jasmine.SpyObj<ShareService>;
+  let providerReady: BehaviorSubject<boolean>;
 
   const make = (
     id: AccountStatusId,
@@ -65,6 +67,8 @@ describe('AccountSyncActionsService', () => {
     native.resumeDataConnection.and.resolveTo();
     legacy = jasmine.createSpyObj('SyncWrapperService', ['sync']);
     legacy.sync.and.resolveTo('HANDLED_ERROR');
+    providerReady = new BehaviorSubject(true);
+    Object.assign(legacy, { isEnabledAndReady$: providerReady });
     router = jasmine.createSpyObj('Router', ['navigateByUrl']);
     router.navigateByUrl.and.resolveTo(true);
     dialogs = jasmine.createSpyObj('MatDialog', ['closeAll', 'open']);
@@ -85,6 +89,40 @@ describe('AccountSyncActionsService', () => {
       ],
     });
     service = TestBed.inject(AccountSyncActionsService);
+  });
+
+  describe('syncQuietly', () => {
+    it('syncs a native account that is ready, with no legacy provider configured', async () => {
+      providerReady.next(false);
+      await service.syncQuietly();
+      expect(native.syncNow).toHaveBeenCalledTimes(1);
+      expect(legacy.sync).not.toHaveBeenCalled();
+    });
+
+    it('syncs a ready legacy provider the way it was asked to', async () => {
+      status.set(make('up-to-date', { engine: 'provider' }));
+      await service.syncQuietly(false);
+      expect(legacy.sync).toHaveBeenCalledOnceWith(false);
+      expect(native.syncNow).not.toHaveBeenCalled();
+    });
+
+    it('leaves a legacy provider that is not ready alone', async () => {
+      status.set(make('up-to-date', { engine: 'provider' }));
+      providerReady.next(false);
+      await service.syncQuietly();
+      expect(legacy.sync).not.toHaveBeenCalled();
+    });
+
+    it('opens nothing when there is nothing to sync or the account needs something first', async () => {
+      status.set(make('local-only', { engine: null, configured: false }));
+      await service.syncQuietly();
+      status.set(withAction('locked', 'unlock'));
+      await service.syncQuietly();
+      expect(native.syncNow).not.toHaveBeenCalled();
+      expect(legacy.sync).not.toHaveBeenCalled();
+      expect(dialogs.open).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
   });
 
   describe('syncNow', () => {

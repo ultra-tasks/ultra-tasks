@@ -8,6 +8,8 @@ import {
   randomKey,
   open,
   type AccountBundle,
+  type DeviceVerification,
+  type Transport,
 } from '@sp/sync-providers/ultra-tasks';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
 import { NativeSyncService } from './native-sync.service';
@@ -21,6 +23,7 @@ import { GlobalConfigService } from '../config/global-config.service';
 import { SyncWrapperService } from '../../imex/sync/sync-wrapper.service';
 import { BackupService } from '../../op-log/backup/backup.service';
 import { AccountDataSummaryService } from './account-data-summary.service';
+import { NativeDeviceTrustService } from './native-device-trust.service';
 import {
   NativeSessionStoreService,
   type StoredAccountSession,
@@ -124,10 +127,22 @@ describe('NativeSyncService', () => {
       ],
     });
     service = TestBed.inject(NativeSyncService);
+    // Signing in reads the server's identity first (to look up this device's trust marker).
+    spyOn(AccountClient.prototype, 'init').and.callFake(async function (
+      this: AccountClient,
+    ) {
+      this.capabilities = {
+        serverId: '3e2edea8-ff50-4f20-87f6-a8f0465f9946',
+        protocol: 2,
+        features: {},
+      };
+      return this.capabilities;
+    });
   });
   afterEach(async () => {
     await service.lock();
     localStorage.removeItem('ultra-native-account:http://localhost:1900');
+    localStorage.removeItem('ultra-native-device-trust');
   });
   it('rejects insecure remote endpoints before sending credentials', async () => {
     await expectAsync(
@@ -478,6 +493,61 @@ describe('NativeSyncService', () => {
       expect(service.linked()).toBeTrue();
     });
 
+    it('refuses the download when something was edited between measuring the device and the switch, and asks', async () => {
+      prepareAccount();
+      const bridge = TestBed.inject(NativePersonalBridgeService) as unknown as FakeBridge;
+      // What the real bridge does: it refuses at its last look when the person edited meanwhile.
+      bridge.useExisting.and.callFake(async (assertUnchanged?: () => void) =>
+        assertUnchanged?.(),
+      );
+      const summary = TestBed.inject(AccountDataSummaryService) as unknown as {
+        local: () => Promise<unknown>;
+        fromRecords: () => unknown;
+      };
+      const real = { tasks: 1, projects: 0, notes: 0, archived: 0, hasUserData: true };
+      let measured = 0;
+      summary.local = async () => {
+        // The edit lands right after the device was found empty, before the switch starts.
+        if (++measured === 1) {
+          actions.next({ type: 'Add task', meta: { isPersistent: true } } as Action);
+          return { tasks: 0, projects: 0, notes: 0, archived: 0, hasUserData: false };
+        }
+        return real;
+      };
+      summary.fromRecords = () => ({ ...real, tasks: 9 });
+      await service.resumeDataConnection();
+      // The switch looked, found the edit and stopped: nothing was replaced.
+      expect(bridge.useExisting).toHaveBeenCalledTimes(1);
+      expect(service.linked()).toBeFalse();
+      // The device now holds real work, so the person is asked instead.
+      expect(service.dataChoice()).toEqual(
+        jasmine.objectContaining({ local: real, account: { ...real, tasks: 9 } }),
+      );
+      expect(service.dataNotice()).toBe('ACCOUNT_DATA.NOTICE_LOCAL_CHANGED');
+    });
+
+    it('treats a failure after the switch committed as a sync failure, not as an unfinished connection', async () => {
+      const client = prepareAccount();
+      // The first look finds the account, the switch's own look works, the follow-up listing fails.
+      let listings = 0;
+      (client.refreshScopes as jasmine.Spy).and.callFake(async () => {
+        if (++listings >= 3) throw new TypeError('Failed to fetch');
+        return [scope];
+      });
+      await service.resumeDataConnection();
+      expect(listings).toBeGreaterThanOrEqual(3);
+      expect(service.linked()).toBeTrue();
+      expect(service.connection()).toBe('idle');
+      expect(service.dataChoice()).toBeNull();
+      expect(service.offline()).toBeTrue();
+      expect(service.phase()).toBe('synced');
+      // The next successful sync clears the offline flag and the page stays on its tasks.
+      (client.refreshScopes as jasmine.Spy).and.resolveTo([scope]);
+      await service.syncNow();
+      expect(service.offline()).toBeFalse();
+      expect(service.phase()).toBe('synced');
+    });
+
     it('asks, and replaces nothing, when both sides hold real work', async () => {
       prepareAccount();
       const summary = TestBed.inject(AccountDataSummaryService) as unknown as {
@@ -672,15 +742,48 @@ describe('NativeSyncService', () => {
       expect(TestBed.inject(NativePersonalBridgeService).unlink).not.toHaveBeenCalled();
     });
 
-    it('does not even try while the browser knows there is no network, and recovers on its own', async () => {
+    it('the app’s own loops do not try while the browser says there is no network', async () => {
       const client = preparePrivateClient();
       service.linked.set(true);
       const upload = spyOn(client, 'syncAll').and.resolveTo({});
       spyOnProperty(navigator, 'onLine', 'get').and.returnValue(false);
-      await service.syncNow();
+      await service.syncNow(true);
       expect(upload).not.toHaveBeenCalled();
       expect(service.offline()).toBeTrue();
       expect(service.error()).toBe('');
+    });
+
+    it('a person pressing Sync now always reaches the server, whatever the browser claims', async () => {
+      const client = preparePrivateClient();
+      service.linked.set(true);
+      const upload = spyOn(client, 'syncAll').and.resolveTo({});
+      // The flag is unreliable (Linux, Electron) and is exactly what the person is checking.
+      spyOnProperty(navigator, 'onLine', 'get').and.returnValue(false);
+      await service.syncNow();
+      expect(upload).toHaveBeenCalledTimes(1);
+      expect(service.offline()).toBeFalse();
+      expect(service.lastSyncedAt()).toEqual(jasmine.any(Number));
+    });
+
+    it('keeps a person’s request a real one when it is folded into a sync that is already running', async () => {
+      const client = preparePrivateClient();
+      service.linked.set(true);
+      let release!: () => void;
+      const upload = spyOn(client, 'syncAll').and.callFake(
+        () =>
+          new Promise<Record<string, string>>((resolve) => (release = () => resolve({}))),
+      );
+      const onLine = spyOnProperty(navigator, 'onLine', 'get').and.returnValue(true);
+      const automatic = service.syncNow(true);
+      await new Promise((resolve) => setTimeout(resolve));
+      onLine.and.returnValue(false);
+      const manual = service.syncNow();
+      upload.and.resolveTo({});
+      release();
+      await Promise.all([automatic, manual]);
+      // The repeat pass belongs to the person: it reached the server.
+      expect(upload).toHaveBeenCalledTimes(2);
+      expect(service.offline()).toBeFalse();
     });
 
     it('success after an offline period clears offline and the error', async () => {
@@ -790,6 +893,8 @@ describe('NativeSyncService', () => {
         this.state = { scopes: {}, migrations: {} } as SyncClient['state'];
       });
       spyOn(SyncClient.prototype, 'refreshScopes').and.resolveTo([]);
+      // A restored session asks the server what it can do: never a real server in a spec.
+      spyOn(window, 'fetch').and.rejectWith(new TypeError('Failed to fetch'));
       sessions().supported = true;
     });
     afterEach(() => {
@@ -814,6 +919,90 @@ describe('NativeSyncService', () => {
       expect(service.accountIdentity()).toEqual({ email: info.email, id: info.id });
     });
 
+    describe('what the server can do after an upgrade', () => {
+      const answers = (answer: () => Promise<Response>): void => {
+        (window.fetch as jasmine.Spy).and.callFake((input: RequestInfo | URL) =>
+          String(input).endsWith('/capabilities')
+            ? answer()
+            : Promise.reject(new TypeError('Failed to fetch')),
+        );
+      };
+      const upgraded = (): Response =>
+        new Response(
+          JSON.stringify({
+            protocol: 2,
+            serverId: identity.serverId,
+            features: { personalReplacement: true },
+          }),
+          { status: 200 },
+        );
+      const cachedFeatures = (): Record<string, unknown> =>
+        JSON.parse(localStorage.getItem(cacheKey)!).capabilities.features;
+
+      beforeEach(() => {
+        spyOn(SyncClient.prototype, 'syncAll').and.resolveTo({});
+        spyOn(TestBed.inject(NativePersonalBridgeService), 'bind').and.resolveTo(true);
+      });
+
+      it('is seen after a restore, for this session and for the next start', async () => {
+        answers(() => Promise.resolve(upgraded()));
+        expect(cachedFeatures()['personalReplacement']).toBeUndefined();
+        expect(await service.restoreSession(stored())).toBe('restored');
+        expect(service.account!.capabilities!.features['personalReplacement']).toBeTrue();
+        expect(cachedFeatures()['personalReplacement']).toBeTrue();
+      });
+
+      it('keeps the cached copy when the server cannot be reached', async () => {
+        answers(() => Promise.reject(new TypeError('Failed to fetch')));
+        expect(await service.restoreSession(stored())).toBe('restored');
+        expect(service.unlocked()).toBeTrue();
+        expect(
+          service.account!.capabilities!.features['personalReplacement'],
+        ).toBeUndefined();
+        expect(cachedFeatures()['personalReplacement']).toBeUndefined();
+      });
+
+      it('refuses a restored session when a different server answers at that address', async () => {
+        answers(() =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({
+                protocol: 2,
+                serverId: '9b1c3f5e-6a2d-4c81-8e07-5d2f9a4b7c10',
+                features: {},
+              }),
+              { status: 200 },
+            ),
+          ),
+        );
+        expect(await service.restoreSession(stored())).toBe('invalid');
+        expect(service.unlocked()).toBeFalse();
+        expect(service.account).toBeUndefined();
+        expect(sessions().save).not.toHaveBeenCalled();
+      });
+    });
+
+    it('unlocks with the password from the cached account while the server cannot be reached, with no code step', async () => {
+      (AccountClient.prototype.init as jasmine.Spy).and.rejectWith(
+        new TypeError('Failed to fetch'),
+      );
+      const login = spyOn(AccountClient.prototype, 'login');
+      spyOn(SyncClient.prototype, 'syncAll').and.resolveTo({});
+      spyOn(TestBed.inject(NativePersonalBridgeService), 'bind').and.resolveTo(false);
+      expect(
+        await service.login(
+          'http://localhost:1900',
+          info.email,
+          'a long enough test password',
+        ),
+      ).toBeTrue();
+      // Nothing was asked of the server, so the device's trust was never in question.
+      expect(login).not.toHaveBeenCalled();
+      expect(service.unlocked()).toBeTrue();
+      expect(service.deviceVerification()).toBeNull();
+      expect(service.account?.account?.email).toBe(info.email);
+    }, 60000);
+
     it('opens locally while offline: edits stay, the status says so, and nothing is cleared', async () => {
       spyOn(SyncClient.prototype, 'syncAll').and.rejectWith(
         new TypeError('Failed to fetch'),
@@ -837,6 +1026,56 @@ describe('NativeSyncService', () => {
       expect(service.phase()).toBe('reauth');
       expect(service.configured()).toBeTrue();
       expect(sessions().clear).toHaveBeenCalled();
+    });
+
+    describe('a store that refuses to forget the session (a Windows file lock, say)', () => {
+      const refuse = (): void => {
+        sessions().clear.and.rejectWith(new Error('EBUSY: resource busy or locked'));
+      };
+      const settle = async (): Promise<void> => {
+        await new Promise((resolve) => setTimeout(resolve));
+        await new Promise((resolve) => setTimeout(resolve));
+      };
+      beforeEach(() => {
+        spyOn(TestBed.inject(NativePersonalBridgeService), 'bind').and.resolveTo(true);
+      });
+
+      it('still closes the vault on an explicit lock, and says the saved sign-in may remain', async () => {
+        spyOn(SyncClient.prototype, 'syncAll').and.resolveTo({});
+        await service.restoreSession(stored());
+        refuse();
+        await expectAsync(service.lock()).toBeResolved();
+        expect(service.unlocked()).toBeFalse();
+        expect(service.account).toBeUndefined();
+        expect(service.configured()).toBeTrue();
+        expect(service.backgroundError()).toBe('ACCOUNT_DATA.ERROR_STORAGE_CLEAR');
+      });
+
+      it('still ends a revoked session: the vault closes and the account asks to sign in again', async () => {
+        spyOn(SyncClient.prototype, 'syncAll').and.rejectWith(
+          new AccountApiError(401, 'x'),
+        );
+        refuse();
+        await service.restoreSession(stored());
+        await settle();
+        expect(service.phase()).toBe('reauth');
+        expect(service.unlocked()).toBeFalse();
+        expect(service.account).toBeUndefined();
+        expect(service.configured()).toBeTrue();
+        expect(service.backgroundError()).toBe('ACCOUNT_DATA.ERROR_STORAGE_CLEAR');
+      });
+
+      it('still signs the account out of this device', async () => {
+        spyOn(SyncClient.prototype, 'syncAll').and.resolveTo({});
+        await service.restoreSession(stored());
+        refuse();
+        await expectAsync(service.disconnect()).toBeResolved();
+        expect(service.unlocked()).toBeFalse();
+        expect(service.configured()).toBeFalse();
+        expect(service.accountIdentity()).toBeNull();
+        expect(localStorage.getItem(cacheKey)).toBeNull();
+        expect(service.backgroundError()).toBe('ACCOUNT_DATA.ERROR_STORAGE_CLEAR');
+      });
     });
 
     it('refuses a remembered session that does not belong to the account on this device', async () => {
@@ -928,6 +1167,472 @@ describe('NativeSyncService', () => {
       await service.disconnect();
       expect(sessions().clear.calls.count()).toBeGreaterThan(1);
       expect(service.configured()).toBeFalse();
+    });
+  });
+
+  describe('an access token the server refuses although it looks valid here (a clock stepped back)', () => {
+    const T0 = Date.UTC(2026, 10, 18, 12, 0, 0);
+    let serverAccepts: string | null;
+    let refreshes: string[];
+    let refreshRefused: boolean;
+    let apiRefusesEverything: boolean;
+
+    /** A server that holds one valid access token and rotates the refresh credential. */
+    const openAccount = (): void => {
+      const transport: Transport = async (path, body, accessToken) => {
+        if (path === '/sessions/refresh') {
+          refreshes.push((body as { refreshToken: string }).refreshToken);
+          if (refreshRefused) throw new AccountApiError(401, 'Invalid refresh token');
+          serverAccepts = 'access-' + refreshes.length;
+          return {
+            accessToken: serverAccepts,
+            refreshToken: 'refresh-' + (refreshes.length + 1),
+            expiresIn: 600,
+          };
+        }
+        if (apiRefusesEverything || accessToken !== serverAccepts)
+          throw new AccountApiError(401, 'Unauthorized');
+        return path === '/sync/scopes' ? { scopes: [] } : {};
+      };
+      const guarded = (
+        service as unknown as { renewal: { guard: (inner: Transport) => Transport } }
+      ).renewal.guard(transport);
+      const account = new AccountClient(guarded);
+      account.capabilities = {
+        serverId: '3e2edea8-ff50-4f20-87f6-a8f0465f9946',
+        protocol: 2,
+        features: {},
+      };
+      account.account = {
+        id: 'account',
+        email: 'a@example.test',
+        username: null,
+        displayName: '',
+        vaultVersion: 1,
+      };
+      account.adoptTokens({
+        accessToken: 'access-0',
+        refreshToken: 'refresh-1',
+        expiresIn: 600,
+      });
+      serverAccepts = 'access-0';
+      const client = new SyncClient(account, {
+        load: async () => null,
+        save: async () => undefined,
+      });
+      client.state = { scopes: {}, migrations: {} } as SyncClient['state'];
+      service.account = account;
+      service.client = client;
+      service.unlocked.set(true);
+      service.linked.set(true);
+    };
+    /** Ten minutes pass on the server while this device's clock goes back an hour. */
+    const stepClockBack = (): void => {
+      serverAccepts = 'expired-on-the-server';
+      jasmine.clock().mockDate(new Date(T0 - 3_600_000));
+    };
+    /** The mock clock stops timers, so only promises can be waited on. */
+    const settle = async (): Promise<void> => {
+      for (let i = 0; i < 200; i++) await Promise.resolve();
+    };
+
+    beforeEach(() => {
+      refreshes = [];
+      refreshRefused = false;
+      apiRefusesEverything = false;
+      jasmine.clock().install();
+      jasmine.clock().mockDate(new Date(T0));
+      openAccount();
+    });
+    afterEach(() => jasmine.clock().uninstall());
+
+    it('renews once through the refresh credential it still holds, and carries on', async () => {
+      stepClockBack();
+      await service.syncNow();
+      await settle();
+      // Exactly one refresh, with the credential that was never spent.
+      expect(refreshes).toEqual(['refresh-1']);
+      expect(service.reauth()).toBeFalse();
+      expect(service.unlocked()).toBeTrue();
+      expect(service.phase()).toBe('synced');
+      expect(service.lastSyncedAt()).toEqual(jasmine.any(Number));
+      expect(service.error()).toBe('');
+    });
+
+    it('is armed again after it worked: a later refusal is renewed too', async () => {
+      stepClockBack();
+      await service.syncNow();
+      await settle();
+      serverAccepts = 'expired-again';
+      await service.syncNow();
+      await settle();
+      expect(refreshes).toEqual(['refresh-1', 'refresh-2']);
+      expect(service.reauth()).toBeFalse();
+      expect(service.phase()).toBe('synced');
+    });
+
+    it('ends the session when the refresh credential itself is refused, and presents it only once', async () => {
+      refreshRefused = true;
+      stepClockBack();
+      await service.syncNow();
+      await settle();
+      expect(refreshes).toEqual(['refresh-1']);
+      expect(service.reauth()).toBeTrue();
+      expect(service.phase()).toBe('reauth');
+      expect(service.unlocked()).toBeFalse();
+    });
+
+    it('ends the session when a renewal did not help, without looping', async () => {
+      apiRefusesEverything = true;
+      stepClockBack();
+      await service.syncNow();
+      await settle();
+      expect(refreshes).toEqual(['refresh-1']);
+      expect(service.reauth()).toBeTrue();
+      expect(service.unlocked()).toBeFalse();
+    });
+  });
+
+  describe('the browser saying it is offline', () => {
+    const signIn = async (): Promise<void> => {
+      spyOn(AccountClient.prototype, 'login').and.callFake(async function (
+        this: AccountClient,
+      ) {
+        this.capabilities = {
+          serverId: '3e2edea8-ff50-4f20-87f6-a8f0465f9946',
+          protocol: 2,
+          features: {},
+        };
+        this.account = {
+          id: 'account',
+          email: 'a@example.test',
+          username: null,
+          displayName: '',
+          vaultVersion: 1,
+        };
+        this.unlocked = {
+          masterKey: randomKey(),
+          secrets: {} as NonNullable<AccountClient['unlocked']>['secrets'],
+        };
+        this.tokens = { accessToken: 'access', refreshToken: 'refresh', expiresIn: 600 };
+        return this.tokens;
+      });
+      spyOn(SyncClient.prototype, 'init').and.callFake(async function (this: SyncClient) {
+        this.state = { scopes: {} } as SyncClient['state'];
+      });
+      spyOn(SyncClient.prototype, 'refreshScopes').and.resolveTo([]);
+      spyOn(service, 'syncNow').and.resolveTo();
+      await service.login(
+        'http://localhost:1900',
+        'a@example.test',
+        'a long test password',
+      );
+    };
+
+    it('is believed only once it has held for a moment', async () => {
+      jasmine.clock().install();
+      try {
+        await signIn();
+        spyOnProperty(navigator, 'onLine', 'get').and.returnValue(false);
+        window.dispatchEvent(new Event('offline'));
+        jasmine.clock().tick(999);
+        expect(service.offline()).toBeFalse();
+        jasmine.clock().tick(1);
+        expect(service.offline()).toBeTrue();
+        expect(service.status()).toBe('ACCOUNT_DATA.OFFLINE');
+      } finally {
+        jasmine.clock().uninstall();
+      }
+    });
+
+    it('is not believed at all when the network is back before that moment is over', async () => {
+      jasmine.clock().install();
+      try {
+        await signIn();
+        const onLine = spyOnProperty(navigator, 'onLine', 'get').and.returnValue(false);
+        window.dispatchEvent(new Event('offline'));
+        jasmine.clock().tick(400);
+        onLine.and.returnValue(true);
+        window.dispatchEvent(new Event('online'));
+        jasmine.clock().tick(5000);
+        expect(service.offline()).toBeFalse();
+        expect(service.status()).not.toBe('ACCOUNT_DATA.OFFLINE');
+      } finally {
+        jasmine.clock().uninstall();
+      }
+    });
+  });
+
+  describe('new-device email verification', () => {
+    const SERVER_ID = '3e2edea8-ff50-4f20-87f6-a8f0465f9946';
+    const TOKEN = 'T'.repeat(43);
+    const EMAIL = 'ada@example.test';
+    const ACCOUNT_URL = 'http://localhost:1900';
+    const challenge = (over: Partial<DeviceVerification> = {}): DeviceVerification => ({
+      kind: 'email',
+      token: 'C'.repeat(43),
+      expiresIn: 600,
+      resendAfter: 30,
+      resendsLeft: 3,
+      emailHint: 'a***@example.test',
+      ...over,
+    });
+    /** What a successful sign-in leaves on the SDK: an open vault and fresh tokens. */
+    const openVault = function (this: AccountClient): void {
+      this.capabilities = { serverId: SERVER_ID, protocol: 2, features: {} };
+      this.account = {
+        id: 'account',
+        email: EMAIL,
+        username: null,
+        displayName: '',
+        vaultVersion: 1,
+      };
+      this.unlocked = {
+        masterKey: randomKey(),
+        secrets: {} as NonNullable<AccountClient['unlocked']>['secrets'],
+      };
+      this.tokens = { accessToken: 'access', refreshToken: 'refresh', expiresIn: 600 };
+    };
+    const refusal = (status: number, code?: string): AccountApiError =>
+      new AccountApiError(status, 'Server text that must never be shown', code);
+    let login: jasmine.Spy;
+    let trust: NativeDeviceTrustService;
+
+    beforeEach(() => {
+      trust = TestBed.inject(NativeDeviceTrustService);
+      login = spyOn(AccountClient.prototype, 'login').and.resolveTo({
+        verification: challenge(),
+      });
+      spyOn(SyncClient.prototype, 'init').and.callFake(async function (this: SyncClient) {
+        this.state = { scopes: {} } as SyncClient['state'];
+      });
+      spyOn(SyncClient.prototype, 'refreshScopes').and.resolveTo([]);
+      spyOn(service, 'syncNow').and.resolveTo();
+    });
+    afterEach(() => localStorage.removeItem('ultra-native-device-trust'));
+
+    const signInToChallenge = (): Promise<boolean> =>
+      service.login(ACCOUNT_URL, EMAIL, 'a long test password');
+    /** The workspace lock is handed back a moment after the vault closes. */
+    const lockReleased = (): Promise<void> =>
+      new Promise((resolve) => setTimeout(resolve, 30));
+    const deviceToken = (token: string | undefined): jasmine.Spy =>
+      spyOnProperty(AccountClient.prototype, 'deviceToken', 'get').and.returnValue(token);
+
+    it('asks a new device for the emailed code instead of signing it in', async () => {
+      expect(await signInToChallenge()).toBeFalse();
+      expect(service.deviceVerification()).toEqual(
+        jasmine.objectContaining({
+          emailHint: 'a***@example.test',
+          resendAfter: 30,
+          resendsLeft: 3,
+        }),
+      );
+      expect(service.phase()).toBe('verify-device');
+      expect(service.status()).toBe('ACCOUNT_STATUS.VERIFY_DEVICE');
+      // Nothing is signed in, opened or remembered while the code is awaited.
+      expect(service.unlocked()).toBeFalse();
+      expect(service.configured()).toBeFalse();
+      expect(service.client).toBeUndefined();
+      expect(service.signingIn()).toBeFalse();
+      expect(localStorage.getItem('ultra-native-account:' + ACCOUNT_URL)).toBeNull();
+      expect(service.error()).toBe('');
+    });
+
+    it('presents the marker this installation holds for the account, and labels the device', async () => {
+      await trust.remember(SERVER_ID, [EMAIL], TOKEN);
+      await signInToChallenge();
+      expect(login).toHaveBeenCalledOnceWith(
+        EMAIL,
+        'a long test password',
+        'Ultra Tasks (web)',
+        {
+          deviceToken: TOKEN,
+        },
+      );
+      await service.lock();
+      await service.login(ACCOUNT_URL, 'grace@example.test', 'a long test password');
+      expect(login.calls.mostRecent().args[3]).toEqual({ deviceToken: undefined });
+    });
+
+    it('keeps two-factor first: an enrolled factor is never replaced by an emailed code', async () => {
+      login.and.resolveTo({
+        mfaToken: 'pending-factor',
+        factors: ['totp'],
+        verification: challenge(),
+      });
+      expect(await signInToChallenge()).toBeFalse();
+      expect(service.mfaMethods()).toEqual(['totp']);
+      expect(service.deviceVerification()).toBeNull();
+      expect(service.status()).toBe('NATIVE_SYNC.MFA');
+      expect(service.phase()).toBe('signing-in');
+    });
+
+    it('opens the account with the code like any other sign-in, and remembers the device', async () => {
+      const complete = spyOn(
+        AccountClient.prototype,
+        'completeDeviceVerification',
+      ).and.callFake(async function (this: AccountClient) {
+        openVault.call(this);
+      });
+      deviceToken(TOKEN);
+      await signInToChallenge();
+      await service.completeDeviceVerification('1234 5678');
+      expect(complete).toHaveBeenCalledOnceWith('12345678');
+      expect(service.unlocked()).toBeTrue();
+      expect(service.configured()).toBeTrue();
+      expect(service.deviceVerification()).toBeNull();
+      expect(service.phase()).toBe('synced');
+      // Remembered under the email and under what was typed to sign in.
+      expect(await trust.recall(SERVER_ID, [EMAIL])).toBe(TOKEN);
+      expect(await trust.recall(SERVER_ID, ['ADA@example.test'])).toBe(TOKEN);
+    });
+
+    it('keeps the step after a wrong code and says so once, without detail', async () => {
+      spyOn(AccountClient.prototype, 'completeDeviceVerification').and.rejectWith(
+        refusal(401),
+      );
+      await signInToChallenge();
+      await expectAsync(
+        service.completeDeviceVerification('00000000'),
+      ).toBeRejectedWithError('ACCOUNT_DEVICE.ERROR_CODE');
+      expect(service.deviceVerification()).not.toBeNull();
+      expect(service.phase()).toBe('verify-device');
+      expect(service.signingIn()).toBeFalse();
+      expect(service.unlocked()).toBeFalse();
+    });
+
+    it('ends the sign-in after five wrong codes and leaves the account unconfigured', async () => {
+      spyOn(AccountClient.prototype, 'completeDeviceVerification').and.rejectWith(
+        refusal(401),
+      );
+      await signInToChallenge();
+      for (let i = 0; i < 4; i++)
+        await expectAsync(service.completeDeviceVerification('00000000')).toBeRejected();
+      await expectAsync(
+        service.completeDeviceVerification('00000000'),
+      ).toBeRejectedWithError('ACCOUNT_DEVICE.ERROR_LOCKED');
+      expect(service.deviceVerification()).toBeNull();
+      expect(service.phase()).toBe('signed-out');
+      expect(service.configured()).toBeFalse();
+      expect(service.account).toBeUndefined();
+    });
+
+    it('sends a new code and shows the server’s new cooldown; the server’s limits end the step', async () => {
+      const resend = spyOn(AccountClient.prototype, 'resendDeviceVerification');
+      resend.and.resolveTo(challenge({ resendsLeft: 2 }));
+      await signInToChallenge();
+      await service.resendDeviceVerification();
+      expect(service.deviceVerification()!.resendsLeft).toBe(2);
+
+      resend.and.rejectWith(refusal(429, 'resend_too_soon'));
+      await expectAsync(service.resendDeviceVerification()).toBeRejectedWithError(
+        'ACCOUNT_DEVICE.ERROR_RESEND_SOON',
+      );
+      expect(service.deviceVerification()).not.toBeNull();
+
+      resend.and.rejectWith(refusal(401));
+      await expectAsync(service.resendDeviceVerification()).toBeRejectedWithError(
+        'ACCOUNT_DEVICE.ERROR_ENDED',
+      );
+      expect(service.deviceVerification()).toBeNull();
+      expect(service.phase()).toBe('signed-out');
+    });
+
+    it('goes Back to a clean sign-in: nothing configured, no endpoint trust left behind', async () => {
+      await signInToChallenge();
+      await service.cancelDeviceVerification();
+      expect(service.deviceVerification()).toBeNull();
+      expect(service.phase()).toBe('signed-out');
+      expect(service.configured()).toBeFalse();
+      expect(service.account).toBeUndefined();
+      expect(certTrust.setPendingConfig.calls.mostRecent().args).toEqual([service, null]);
+      expect(localStorage.getItem('ultra-native-account:' + ACCOUNT_URL)).toBeNull();
+    });
+
+    it('starting over discards a pending step', async () => {
+      await signInToChallenge();
+      login.and.resolveTo({
+        verification: challenge({ emailHint: 'b***@example.test' }),
+      });
+      await signInToChallenge();
+      expect(service.deviceVerification()!.emailHint).toBe('b***@example.test');
+    });
+
+    it('says what the server refused in the app’s own words, and lets nothing through', async () => {
+      const cases: [AccountApiError, string][] = [
+        [refusal(426, 'client_update_required'), 'ACCOUNT_DEVICE.ERROR_UPDATE'],
+        [refusal(409, 'session_limit'), 'ACCOUNT_DEVICE.ERROR_SESSION_LIMIT'],
+        [refusal(429, 'verification_rate_limited'), 'ACCOUNT_DEVICE.ERROR_RATE_LIMITED'],
+        [refusal(503, 'email_delivery_failed'), 'ACCOUNT_DEVICE.ERROR_EMAIL'],
+      ];
+      for (const [error, key] of cases) {
+        login.and.rejectWith(error);
+        await expectAsync(signInToChallenge()).toBeRejectedWithError(key);
+        expect(service.deviceVerification()).toBeNull();
+        expect(service.configured()).toBeFalse();
+        expect(certTrust.setPendingConfig.calls.mostRecent().args).toEqual([
+          service,
+          null,
+        ]);
+      }
+      // A wrong password stays the server's own answer.
+      const wrong = refusal(401);
+      login.and.rejectWith(wrong);
+      await expectAsync(signInToChallenge()).toBeRejectedWith(wrong);
+    });
+
+    it('remembers the device after every kind of sign-in that leaves a marker', async () => {
+      deviceToken(TOKEN);
+      login.and.callFake(async function (this: AccountClient) {
+        openVault.call(this);
+        return this.tokens!;
+      });
+      expect(await signInToChallenge()).toBeTrue();
+      expect(await trust.recall(SERVER_ID, [EMAIL])).toBe(TOKEN);
+      await service.lock();
+      await lockReleased();
+
+      localStorage.removeItem('ultra-native-device-trust');
+      login.and.resolveTo({ mfaToken: 'pending-factor', factors: ['totp'] });
+      spyOn(AccountClient.prototype, 'completeMfa').and.callFake(async function (
+        this: AccountClient,
+      ) {
+        openVault.call(this);
+      });
+      await signInToChallenge();
+      expect(await trust.recall(SERVER_ID, [EMAIL])).toBeUndefined();
+      await service.completeMfa('123456');
+      expect(await trust.recall(SERVER_ID, [EMAIL])).toBe(TOKEN);
+    });
+
+    it('leaves the marker alone when a sign-in carries none (an offline unlock, a restored session)', async () => {
+      await trust.remember(SERVER_ID, [EMAIL], TOKEN);
+      deviceToken(undefined);
+      login.and.callFake(async function (this: AccountClient) {
+        openVault.call(this);
+        return this.tokens!;
+      });
+      await signInToChallenge();
+      expect(await trust.recall(SERVER_ID, [EMAIL])).toBe(TOKEN);
+    });
+
+    it('keeps the marker when signing out, and forgets it only when the account is deleted', async () => {
+      deviceToken(TOKEN);
+      login.and.callFake(async function (this: AccountClient) {
+        openVault.call(this);
+        return this.tokens!;
+      });
+      spyOn(AccountClient.prototype, 'request').and.resolveTo([]);
+      await signInToChallenge();
+      await service.logout();
+      await lockReleased();
+      expect(await trust.recall(SERVER_ID, [EMAIL])).toBe(TOKEN);
+
+      await signInToChallenge();
+      spyOn(AccountClient.prototype, 'deleteAccount').and.resolveTo();
+      await service.deleteAccount();
+      expect(await trust.recall(SERVER_ID, [EMAIL])).toBeUndefined();
     });
   });
 });
