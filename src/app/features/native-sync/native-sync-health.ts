@@ -39,6 +39,14 @@ export const classifyFailure = (error: unknown): FailureKind => {
 /** Upper bound shown to people; the real queue can be longer. */
 export const MAX_PENDING_COUNT = 9999;
 
+export const isUploadDraft = ({ reason }: { reason: string }): boolean =>
+  reason === 'upload';
+
+export const hasUploadDrafts = (client: SyncClient | undefined): boolean =>
+  Object.values(client?.state.scopes ?? {}).some(
+    (scope) => !scope.revoked && scope.conflicts.some(isUploadDraft),
+  );
+
 /**
  * Unsent local change intents across every dataset: bounded, derived from the encrypted
  * sync state, and never carrying content. A mutation sent without an answer counts as one.

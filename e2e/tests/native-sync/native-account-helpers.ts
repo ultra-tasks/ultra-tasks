@@ -1,4 +1,12 @@
-import { expect, type Browser, type Locator, type Page } from '@playwright/test';
+import { stat } from 'node:fs/promises';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
+import {
+  expect,
+  type Browser,
+  type Locator,
+  type Page,
+  type Route,
+} from '@playwright/test';
 import {
   archiveDoneTasks,
   closeClient,
@@ -55,6 +63,30 @@ export const newDevice = async (
     allowOnboardingHints: kind === 'first-run',
     isNewInstallAppFeatures: kind === 'first-run',
   });
+
+/** Serve another build's static assets while keeping this device on the same account API. */
+export const useAccountAppBundle = async (
+  page: Page,
+  directory: string,
+): Promise<() => Promise<void>> => {
+  const origin = new URL(ultraUrl()).origin;
+  const root = resolve(directory);
+  const serveAsset = async (route: Route): Promise<void> => {
+    const url = new URL(route.request().url());
+    if (url.origin !== origin || url.pathname.startsWith('/api/'))
+      return route.fallback();
+    const file = resolve(root, url.pathname === '/' ? 'index.html' : `.${url.pathname}`);
+    const childPath = relative(root, file);
+    if (isAbsolute(childPath) || childPath === '..' || childPath.startsWith(`..${sep}`))
+      return route.fallback();
+    const asset = await stat(file).catch(() => null);
+    if (!asset?.isFile()) return route.fallback();
+    await route.fulfill({ path: file });
+  };
+  const context = page.context();
+  await context.route('**/*', serveAsset);
+  return () => context.unroute('**/*', serveAsset);
+};
 
 export const closeDevices = async (...devices: SimulatedE2EClient[]): Promise<void> => {
   for (const device of devices) await closeClient(device);

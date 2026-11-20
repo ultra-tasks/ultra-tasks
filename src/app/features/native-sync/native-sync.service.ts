@@ -10,16 +10,19 @@ import {
   unlockBundle,
   unlockBundleWithMasterKey,
   RealtimeSync,
-  type AccountBundle,
-  type AccountInfo,
-  type Capabilities,
-  type Envelope,
   type Invitation,
   type ScopeInfo,
   type OwnershipOffer,
   type Transport,
 } from '@sp/sync-providers/ultra-tasks';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
+import {
+  detachPersonal,
+  HISTORY_CHANGED,
+  isHistoryFailure,
+  personalRecoveryScope,
+  supportsRecovery,
+} from './native-personal-recovery';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
 import { normalizeServerUrl } from './native-server-url.util';
 import { Capacitor } from '@capacitor/core';
@@ -43,6 +46,12 @@ import type {
   DeviceVerificationView,
 } from './account-sync.types';
 import { AccountDataSummaryService } from './account-data-summary.service';
+import {
+  accountCacheKey,
+  cachedAccountIdentity,
+  NativeAccountLocalFlags,
+  type CachedAccount,
+} from './native-account-local-state';
 import { NativeDataConnection } from './native-data-connection';
 import { NativeDeviceTrustService } from './native-device-trust.service';
 import { watchLocalEdits, type LocalEditWatch } from './native-local-edits';
@@ -57,6 +66,7 @@ import {
 } from './native-device-verification';
 import {
   classifyFailure,
+  hasUploadDrafts,
   NativeSyncHealth,
   type FailureKind,
 } from './native-sync-health';
@@ -65,12 +75,6 @@ import {
   type StoredAccountSession,
 } from './native-session-store.service';
 
-interface CachedAccount {
-  capabilities: Capabilities;
-  account: AccountInfo;
-  bundle: AccountBundle;
-  refresh: Envelope;
-}
 const PERIOD = 60000;
 /** After a wake, the network, the window and the OS all report at once: wait for them to settle. */
 const RESUME_SETTLE_MS = 1500;
@@ -96,12 +100,14 @@ export class NativeSyncService {
   readonly error = signal('');
   readonly busy = signal(false);
   readonly unlocked = signal(false);
-  readonly linked = signal(false);
-  readonly configured = signal(
-    !!localStorage.getItem(
-      'ultra-native-account:' + (localStorage.getItem('ultra-native-server') ?? ''),
-    ),
+  readonly canRecoverPersonal = computed(
+    () =>
+      this.unlocked() &&
+      this.error() === HISTORY_CHANGED &&
+      supportsRecovery(this.client),
   );
+  readonly linked = signal(false);
+  readonly configured = signal(!!localStorage.getItem(accountCacheKey()));
   readonly scopes = signal<ScopeInfo[]>([]);
   readonly invitations = signal<Invitation[]>([]);
   readonly ownershipOffers = signal<OwnershipOffer[]>([]);
@@ -119,8 +125,9 @@ export class NativeSyncService {
       this.account?.capabilities?.features['personalRealtime'] === true,
   );
   /** Email and support ID of the configured account; known even while the vault is closed. */
-  readonly accountIdentity = signal<{ email: string; id: string } | null>(
-    NativeSyncService.cachedIdentity(),
+  readonly accountIdentity = signal(cachedAccountIdentity());
+  private readonly localFlags = new NativeAccountLocalFlags(
+    () => this.account?.account?.id ?? this.accountIdentity()?.id,
   );
   /** Facts about the last attempts, derived from engine events; nothing here is synced. */
   private readonly health = new NativeSyncHealth();
@@ -155,8 +162,8 @@ export class NativeSyncService {
       ),
     fail: (error) => ({ sessionLost: this.failure(error, true) === 'auth' }),
     deferred: {
-      read: () => this.readFlag('deferred') === '1',
-      write: (on) => this.writeFlag('deferred', on ? '1' : null),
+      read: () => this.localFlags.read('deferred') === '1',
+      write: (on) => this.localFlags.write('deferred', on ? '1' : null),
     },
     showWorkspace: () => this.showWorkspace(),
   });
@@ -175,6 +182,12 @@ export class NativeSyncService {
   readonly dataNotice: Signal<string> = this.dataConnection.notice;
   /** Where the first connection stands; `failed` and `waiting` need Retry or time. */
   readonly connection: Signal<DataConnectionState> = this.dataConnection.stage;
+  readonly abandonedPersonalSetup = computed(() => {
+    const scope = this.dataConnection.abandonedPersonalSetup();
+    return scope && this.bridge.canRecoverSetup(scope.sequence > 0)
+      ? { id: scope.id, uploaded: scope.sequence > 0 }
+      : undefined;
+  });
   /** Derived presentation state; see {@link AccountPhase}. Not persisted. */
   readonly phase = computed<AccountPhase>(() => {
     // Waiting for the emailed code outranks everything else: the person is mid sign-in.
@@ -240,43 +253,8 @@ export class NativeSyncService {
         this;
   }
 
-  private static cachedIdentity(): { email: string; id: string } | null {
-    try {
-      const raw = localStorage.getItem(
-        'ultra-native-account:' + (localStorage.getItem('ultra-native-server') ?? ''),
-      );
-      const account = raw ? (JSON.parse(raw) as CachedAccount).account : undefined;
-      return account?.email && account.id
-        ? { email: account.email, id: account.id }
-        : null;
-    } catch {
-      return null;
-    }
-  }
-  private cacheKey(): string {
-    return 'ultra-native-account:' + this.serverUrl;
-  }
   private cacheContext(): string {
     return JSON.stringify({ ...this.account!.identity(), purpose: 'native-session' });
-  }
-  /** Small device-local facts per account (never synced): the deferral and the last sync. */
-  private flagKey(name: string): string {
-    return `ultra-native-${name}:${this.account?.account?.id ?? this.accountIdentity()?.id ?? ''}`;
-  }
-  private readFlag(name: string): string | null {
-    try {
-      return localStorage.getItem(this.flagKey(name));
-    } catch {
-      return null;
-    }
-  }
-  private writeFlag(name: string, value: string | null): void {
-    try {
-      if (value === null) localStorage.removeItem(this.flagKey(name));
-      else localStorage.setItem(this.flagKey(name), value);
-    } catch {
-      /* A full or blocked storage only loses the convenience. */
-    }
   }
   private async cache(): Promise<void> {
     const account = this.account!;
@@ -286,7 +264,7 @@ export class NativeSyncService {
       this.cacheContext(),
     );
     localStorage.setItem(
-      this.cacheKey(),
+      accountCacheKey(this.serverUrl),
       JSON.stringify({
         capabilities: account.capabilities,
         account: account.account,
@@ -412,7 +390,7 @@ export class NativeSyncService {
       }
     } catch (error) {
       if (!(error instanceof TypeError)) throw explainDeviceError(error, 'sign-in');
-      const raw = localStorage.getItem(this.cacheKey());
+      const raw = localStorage.getItem(accountCacheKey(this.serverUrl));
       if (!raw) throw error;
       const cached = JSON.parse(raw) as CachedAccount;
       if (
@@ -502,7 +480,9 @@ export class NativeSyncService {
       try {
         const cached =
           !account.tokens && this.platform.supported
-            ? (JSON.parse(localStorage.getItem(this.cacheKey())!) as CachedAccount)
+            ? (JSON.parse(
+                localStorage.getItem(accountCacheKey(this.serverUrl))!,
+              ) as CachedAccount)
             : undefined;
         const refresh = cached
           ? await open(account.unlocked!.masterKey, cached.refresh, this.cacheContext())
@@ -538,7 +518,7 @@ export class NativeSyncService {
       this.unlocked.set(true);
       this.health.reauth.set(false);
       this.lockReason.set(null);
-      this.health.lastSyncedAt.set(Number(this.readFlag('synced')) || null);
+      this.health.lastSyncedAt.set(Number(this.localFlags.read('synced')) || null);
       this.health.refreshPending(this.client);
       this.localChanges = this.localActions
         .pipe(filter(isPersistentAction), auditTime(500))
@@ -558,6 +538,13 @@ export class NativeSyncService {
       window.addEventListener('online', this.resume);
       window.addEventListener('offline', this.markOffline);
       document.addEventListener('visibilitychange', this.resume);
+      const recovering = this.localFlags.read('recovering');
+      if (recovering && client.state.scopes[recovering]) {
+        this.linked.set(false);
+        this.failure(new Error(HISTORY_CHANGED));
+        return;
+      }
+      if (recovering) this.localFlags.write('recovering', null);
       if (this.linked()) await this.syncNow(true);
       // A refused session is already being closed: nothing more may talk to the server.
       if (this.expiring || this.reauth()) return;
@@ -651,7 +638,9 @@ export class NativeSyncService {
       await this.cache();
     }
     if (this.account!.tokens) return;
-    const cached = JSON.parse(localStorage.getItem(this.cacheKey())!) as CachedAccount;
+    const cached = JSON.parse(
+      localStorage.getItem(accountCacheKey(this.serverUrl))!,
+    ) as CachedAccount;
     const refreshToken = await open(
       this.account!.unlocked!.masterKey,
       cached.refresh,
@@ -668,11 +657,16 @@ export class NativeSyncService {
    * person through the choice dialog or the first-connection rules in
    * {@link NativeDataConnection}; this method only refuses unsafe switches.
    */
-  async link(migrate: boolean, automatic = false, since?: LocalEditWatch): Promise<void> {
+  async link(
+    migrate: boolean,
+    automatic = false,
+    since?: LocalEditWatch,
+    restartScopeId?: string,
+  ): Promise<void> {
     this.busy.set(true);
     this.error.set('');
     // A switch started directly (not by the first-connection planner) still reports its stage.
-    const ownStage = this.dataConnection.stage() === 'idle';
+    const ownStage = !!restartScopeId || this.dataConnection.stage() === 'idle';
     if (ownStage) this.dataConnection.stage.set(migrate ? 'uploading' : 'downloading');
     const onStage = (stage: 'downloading' | 'applying' | 'uploading'): void =>
       this.dataConnection.stage.set(stage);
@@ -689,58 +683,17 @@ export class NativeSyncService {
         )
       : undefined;
     try {
-      if (!this.client) throw new Error('NATIVE_SYNC.ERROR_SYNC');
-      const chosenScope = this.scopes().find((scope) => scope.kind === 'personal');
-      const previousScopeId = this.bridge.scopeId;
-      const scopes = await this.client.refreshScopes();
-      this.scopes.set(scopes);
-      const discoveredPersonal = scopes.find((scope) => scope.kind === 'personal');
-      if (!previousScopeId && discoveredPersonal) {
-        await this.bridge.bind(this.client);
-        // A second device may have initialized the account while sign-in ran.
-        if (automatic) return;
-      }
-      const personal =
-        this.bridge.scopeId && this.client?.state.scopes[this.bridge.scopeId];
-      const journal = personal && this.client?.state.migrations[personal.info.id];
-      const resumingInitialMigration = !!journal && !journal.complete;
-      const changedSinceChoice = (scope: ScopeInfo): boolean =>
-        !!chosenScope &&
-        (scope.id !== chosenScope.id ||
-          scope.sequence !== chosenScope.sequence ||
-          scope.generation !== chosenScope.generation ||
-          scope.controlVersion !== chosenScope.controlVersion);
       if (
-        migrate &&
-        !resumingInitialMigration &&
-        discoveredPersonal &&
-        changedSinceChoice(discoveredPersonal)
+        !(await this.dataConnection.prepareLink({
+          scopeId: () => this.bridge.scopeId,
+          migrate,
+          automatic,
+          restartScopeId,
+          replacementAvailable:
+            this.account?.capabilities?.features['personalReplacement'] === true,
+        }))
       )
-        throw new Error('NATIVE_SYNC.ERROR_REMOTE_CHANGED');
-      if (
-        personal &&
-        !resumingInitialMigration &&
-        (personal.intents.length || personal.uncertain)
-      )
-        throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');
-      if (
-        migrate &&
-        personal &&
-        !resumingInitialMigration &&
-        this.account?.capabilities?.features['personalReplacement'] !== true
-      )
-        throw new Error('NATIVE_SYNC.ERROR_REPLACEMENT_UNAVAILABLE');
-      if (personal && !resumingInitialMigration) {
-        await this.client.syncScope(personal.info.id);
-        const current = this.client.state.scopes[personal.info.id].info;
-        this.scopes.update((values) =>
-          values.map((value) => (value.id === current.id ? current : value)),
-        );
-        if (migrate && changedSinceChoice(current))
-          throw new Error('NATIVE_SYNC.ERROR_REMOTE_CHANGED');
-        if (current.state !== 'active')
-          throw new Error('NATIVE_SYNC.ERROR_MIGRATION_BUSY');
-      }
+        return;
       const perform = async (): Promise<void> => {
         await this.writeFlush.flushPendingWrites();
         if (this.config.sync()?.isEnabled) {
@@ -754,7 +707,7 @@ export class NativeSyncService {
           }
           await this.writeFlush.flushPendingWrites();
         }
-        if (migrate) await this.bridge.migrate(onStage);
+        if (migrate) await this.bridge.migrate(onStage, restartScopeId, !automatic);
         else
           await this.bridge.useExisting(() => {
             if (since?.changed || choiceChanges?.changed) {
@@ -826,15 +779,20 @@ export class NativeSyncService {
         throw new TypeError('Failed to fetch');
       const reminderBarrier = await this.platform.reminderBarrier(this.account!);
       if (this.linked()) {
+        await this.bridge.rejoinRecoveredPersonalSetup();
         await this.writeFlush.flushPendingWrites();
         await this.bridge.capture();
         this.health.captured(this.client);
       }
       await this.adoptNativeSession();
       const errors = await this.client!.syncAll();
-      if (this.linked() && !errors[this.bridge.scopeId!]) await this.bridge.apply();
-      if (this.linked() && !errors[this.bridge.scopeId!])
+      const personalError = this.bridge.scopeId && errors[this.bridge.scopeId];
+      if (personalError && isHistoryFailure(personalError))
+        throw new Error(HISTORY_CHANGED);
+      if (this.linked() && !errors[this.bridge.scopeId!]) {
+        await this.bridge.apply();
         await this.platform.personalSynced(this.account!, reminderBarrier);
+      }
       await this.refresh();
       if (Object.keys(errors).length) throw new Error(Object.values(errors).join('; '));
       await this.updatePlatform();
@@ -847,13 +805,58 @@ export class NativeSyncService {
       this.revision.update((n) => n + 1);
     }
   }
+  /** Preserve both the working copy and the old SDK branch before reopening data choice. */
+  async recoverPersonalSync(
+    saveArchive: (archive: unknown) => Promise<boolean>,
+  ): Promise<void> {
+    const client = this.client;
+    if (!this.canRecoverPersonal() || !supportsRecovery(client) || this.closing) return;
+    const scopeId = personalRecoveryScope(
+      client,
+      this.localFlags.read('recovering') ?? this.bridge.scopeId,
+    );
+    if (!scopeId) return;
+    this.closing = true;
+    let detached = false;
+    try {
+      await this.realtime?.stop();
+      this.realtime = undefined;
+      if (this.inFlight) await this.inFlight;
+      await this.writeFlush.flushPendingWrites();
+      detached = await detachPersonal(client, scopeId, saveArchive, async () => {
+        if (this.client !== client)
+          throw new Error('NATIVE_SYNC.ERROR_SWITCH_INTERRUPTED');
+        await this.backups.captureImportBackup('REMOTE_IMPORT');
+        if (this.client !== client)
+          throw new Error('NATIVE_SYNC.ERROR_SWITCH_INTERRUPTED');
+        // A restart must stay paused until both stores reflect the recovery choice.
+        this.localFlags.markRecovering(scopeId);
+        await this.bridge.unlink();
+        this.linked.set(false);
+        this.localFlags.write('synced', null);
+        this.health.lastSyncedAt.set(null);
+      });
+      if (detached) {
+        this.localFlags.write('recovering', null);
+        this.error.set('');
+        this.health.refreshPending(client);
+        this.scopes.update((scopes) => scopes.filter(({ id }) => id !== scopeId));
+        this.dataConnection.reset();
+      }
+    } finally {
+      this.closing = false;
+      if (this.client === client) this.startRealtime();
+    }
+    if (detached) await this.dataConnection.connect(true);
+  }
   /** Only a sync that finished, applied and persisted everything counts as success. */
   private syncSucceeded(): void {
     const at = Date.now();
     this.status.set('NATIVE_SYNC.SYNCED');
     this.renewal.succeeded();
     this.health.succeeded(at);
-    this.writeFlag('synced', String(at));
+    if (hasUploadDrafts(this.client)) this.error.set('NATIVE_SYNC.UPLOAD_DRAFTS');
+    this.localFlags.write('synced', String(at));
     this.health.refreshEmpty(this.client, this.bridge.scopeId, (client, id) =>
       this.summary.fromRecords(client, id),
     );
@@ -936,7 +939,7 @@ export class NativeSyncService {
   ): Promise<'restored' | 'reauth' | 'invalid'> {
     if (this.unlocked() || this.signingIn()) return 'invalid';
     this.serverUrl = this.normalizeServerUrl(session.serverUrl);
-    const raw = localStorage.getItem(this.cacheKey());
+    const raw = localStorage.getItem(accountCacheKey(this.serverUrl));
     if (!raw) return 'invalid';
     const cached = JSON.parse(raw) as CachedAccount;
     if (
@@ -995,7 +998,7 @@ export class NativeSyncService {
     await this.realtime?.stop();
     if (this.inFlight) await this.inFlight;
     const account = this.account!;
-    const cacheKey = this.cacheKey();
+    const cacheKey = accountCacheKey(this.serverUrl);
     const storage = new EncryptedSyncStorage(
       account.unlocked!.masterKey,
       account.identity(),
@@ -1022,7 +1025,7 @@ export class NativeSyncService {
     }
   }
   async logout(): Promise<void> {
-    const key = this.cacheKey();
+    const key = accountCacheKey(this.serverUrl);
     this.closing = true;
     try {
       await this.realtime?.stop();
@@ -1047,16 +1050,15 @@ export class NativeSyncService {
   }
   async disconnect(): Promise<void> {
     if (this.unlocked()) return this.logout();
-    const key =
-      'ultra-native-account:' + (localStorage.getItem('ultra-native-server') ?? '');
+    const key = accountCacheKey();
     await this.teardown();
     await this.bridge.unlink();
     await this.forgetAccount(key);
   }
   /** The account is gone from this device (sign-out, disconnect or deletion). */
   private async forgetAccount(cacheKey: string): Promise<void> {
-    this.writeFlag('deferred', null);
-    this.writeFlag('synced', null);
+    this.localFlags.write('deferred', null);
+    this.localFlags.write('synced', null);
     localStorage.removeItem(cacheKey);
     await this.forgetSession();
     this.health.reset();
@@ -1165,5 +1167,23 @@ export class NativeSyncService {
    */
   resumeDataConnection(): Promise<void> {
     return this.dataConnection.resume();
+  }
+
+  async recoverAbandonedPersonalSetup(scopeId: string): Promise<void> {
+    const setup = this.abandonedPersonalSetup();
+    if (setup?.id !== scopeId) throw new Error('NATIVE_SYNC.ERROR_REMOTE_CHANGED');
+    this.busy.set(true);
+    try {
+      if (!setup.uploaded) await this.link(true, false, undefined, scopeId);
+      else {
+        await this.bridge.recoverUploadedPersonalSetup(scopeId);
+        await this.dataConnection.resume();
+      }
+    } catch (error) {
+      if (this.unlocked() && !this.linked()) this.dataConnection.stage.set('waiting');
+      throw error;
+    } finally {
+      this.busy.set(false);
+    }
   }
 }

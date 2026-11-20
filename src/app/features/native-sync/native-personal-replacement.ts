@@ -6,12 +6,14 @@ import {
   type RecordChange,
   type SyncClient,
 } from '@sp/sync-providers/ultra-tasks';
+import { wasRecoveredSetup } from './native-personal-recovery';
 
 /** Replace an existing personal inventory without exposing a partly uploaded snapshot. */
 export const replacePersonalRecords = async (
   client: SyncClient,
   scopeId: string,
   records: RecordChange[],
+  confirmedRecoveryReplacement = false,
 ): Promise<void> => {
   if (client.account.capabilities?.features['personalReplacement'] !== true)
     throw new Error('NATIVE_SYNC.ERROR_REPLACEMENT_UNAVAILABLE');
@@ -20,6 +22,9 @@ export const replacePersonalRecords = async (
     throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');
   const scope = client.state.scopes[scopeId];
   if (scope.info.state !== 'active') throw new Error('NATIVE_SYNC.ERROR_MIGRATION_BUSY');
+  const recovered = wasRecoveredSetup(scope.info);
+  if (recovered && !confirmedRecoveryReplacement)
+    throw new Error('NATIVE_SYNC.ERROR_REMOTE_CHANGED');
   const { serverId, accountId } = client.account.identity();
   const { device } = client.state;
   const membership = scope.info.members.find(
@@ -99,6 +104,7 @@ export const replacePersonalRecords = async (
     sequence: scope.info.sequence,
     generation: scope.info.generation,
     controlVersion: scope.info.controlVersion,
+    ...(recovered ? { acceptsRecoveredSetup: true } : {}),
     count: inventory.length,
     batches: await Promise.all(batches.map((batch) => fingerprint(batch))),
   };

@@ -25,6 +25,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { Store } from '@ngrx/store';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { NativeSyncService } from './native-sync.service';
+import { isUploadDraft } from './native-sync-health';
 import { NativeAccountLoginService } from './native-account-login.service';
 import { AccountSyncStatusService } from './account-sync-status.service';
 import type { AccountStatusId, AccountSyncStatus } from './account-sync-status.model';
@@ -237,6 +238,22 @@ export class NativeSyncComponent implements OnInit {
         : []),
     ]);
   });
+  readonly hasConflictDrafts = computed(() =>
+    this.drafts().some((draft) => !isUploadDraft(draft)),
+  );
+  readonly uploadDraftTitles = computed(() => {
+    const titles = this.drafts()
+      .filter(isUploadDraft)
+      .map((draft) => {
+        const value = draft.value as { data?: { title?: unknown } } | null;
+        return value?.data?.title;
+      });
+    return [
+      ...new Set(
+        titles.filter((title): title is string => typeof title === 'string' && !!title),
+      ),
+    ];
+  });
   /** The problem to show in the card next to the step's action (not under a field). */
   readonly errorText = computed(
     () =>
@@ -245,7 +262,10 @@ export class NativeSyncComponent implements OnInit {
   );
   /** Signed in, but this device has not chosen which data to sync yet. */
   readonly showDataCard = computed(
-    () => this.native.unlocked() && this.native.phase() === 'choose-data',
+    () =>
+      this.native.unlocked() &&
+      !this.native.canRecoverPersonal() &&
+      this.native.phase() === 'choose-data',
   );
   /** A configured account whose keys are closed: the sign-in card says so instead of "new". */
   readonly resumeStatus = computed(() => {
@@ -420,6 +440,18 @@ export class NativeSyncComponent implements OnInit {
     await this.native.syncNow();
     this.announce(this.accountStatus());
   }
+  async recoverPersonalSync(): Promise<void> {
+    await this.run(() =>
+      this.native.recoverPersonalSync(async (archive) => {
+        const result = await download(
+          'ultra-tasks-personal-sync-recovery.json',
+          JSON.stringify(archive, null, 2),
+        );
+        if (result.wasCanceled || (result.isSnap && !result.path)) return false;
+        return this.confirm(T.NATIVE_SYNC.HISTORY_REJOIN_CONFIRM);
+      }),
+    );
+  }
   async copyAccountId(): Promise<void> {
     const id = this.identity()?.id;
     if (!id) return;
@@ -560,6 +592,17 @@ export class NativeSyncComponent implements OnInit {
   /** Reopens the data choice. The choice itself belongs to {@link NativeSyncService}. */
   async finishConnecting(): Promise<void> {
     await this.run(() => this.native.resumeDataConnection());
+  }
+  async recoverPersonalSetup(setup: { id: string; uploaded: boolean }): Promise<void> {
+    if (
+      !(await this.confirm(
+        setup.uploaded
+          ? T.NATIVE_SYNC.RECOVER_SETUP_NOTICE
+          : T.NATIVE_SYNC.RESTART_SETUP_NOTICE,
+      ))
+    )
+      return;
+    await this.run(() => this.native.recoverAbandonedPersonalSetup(setup.id));
   }
   async createProject(): Promise<void> {
     await this.run(async () => {

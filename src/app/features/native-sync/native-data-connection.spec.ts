@@ -127,6 +127,17 @@ const rig = (
 };
 
 describe('NativeDataConnection', () => {
+  it('keeps recovered settings or other uncounted records until a person chooses a copy', async () => {
+    const scope = { ...personal(), recoveredFromMigration: true };
+    const r = rig({ local: something, account: nothing, scopes: [scope] });
+    r.client.state.scopes['personal'].info = scope;
+    await r.connection.connect();
+    expect(r.linkCalls()).toEqual([]);
+    expect(r.connection.choice()).toEqual(
+      jasmine.objectContaining({ local: something, account: nothing }),
+    );
+  });
+
   describe('an empty device and a populated account', () => {
     it('downloads the account by itself and takes the person to their tasks', async () => {
       const r = rig({ local: nothing, account: something });

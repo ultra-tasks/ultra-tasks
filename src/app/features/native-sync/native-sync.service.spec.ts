@@ -119,6 +119,7 @@ describe('NativeSyncService', () => {
             clear: () => undefined,
             unlink: jasmine.createSpy('unlink').and.resolveTo(),
             capture: async () => undefined,
+            rejoinRecoveredPersonalSetup: async () => undefined,
             apply: async () => undefined,
             migrate: jasmine.createSpy('migrate').and.resolveTo(),
             scopeId: 'personal',

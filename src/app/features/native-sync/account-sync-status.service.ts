@@ -108,6 +108,19 @@ export class AccountSyncStatusService {
     const phase = native.phase();
     const error = native.error();
 
+    if (error === T.NATIVE_SYNC.ERROR_HISTORY_CHANGED) {
+      return account({
+        id: 'error',
+        severity: 'error',
+        icon: 'sync_error',
+        ...SVG,
+        labelKey: T.ACCOUNT_STATUS.ERROR,
+        reason: error,
+        action: 'open-account',
+        actionLabelKey: T.ACCOUNT_STATUS.ACTION_OPEN_ACCOUNT,
+      });
+    }
+
     switch (phase) {
       case 'signing-in':
         return account({

@@ -6,6 +6,7 @@ import type {
   DataConnectionState,
 } from './account-sync.types';
 import type { LocalEditWatch } from './native-local-edits';
+import { hasPendingPersonalSetup, wasRecoveredSetup } from './native-personal-recovery';
 
 export const ERROR_LOCAL_CHANGED = 'NATIVE_SYNC.ERROR_LOCAL_CHANGED';
 export const ERROR_REMOTE_CHANGED = 'NATIVE_SYNC.ERROR_REMOTE_CHANGED';
@@ -78,6 +79,13 @@ export class NativeDataConnection {
     return this.stage() === 'failed' || this.stage() === 'waiting';
   }
 
+  abandonedPersonalSetup(): ScopeInfo | undefined {
+    if (this.stage() !== 'waiting') return undefined;
+    return this.host
+      .scopes()
+      .find((scope) => scope.kind === 'personal' && scope.state === 'migrating');
+  }
+
   /** Single flight. `userInitiated` is false for a restored session (no surprise modal). */
   connect(userInitiated = true): Promise<void> {
     return (this.flight ??= this.plan(userInitiated, this.generation).finally(() => {
@@ -108,6 +116,63 @@ export class NativeDataConnection {
     await (this.flight = this.switchTo(kind, 'user', generation, 0).finally(() => {
       this.flight = undefined;
     }));
+  }
+
+  async prepareLink(options: {
+    scopeId: () => string | undefined;
+    migrate: boolean;
+    automatic: boolean;
+    restartScopeId?: string;
+    replacementAvailable: boolean;
+  }): Promise<boolean> {
+    const client = this.host.client();
+    if (!client) throw new Error('NATIVE_SYNC.ERROR_SYNC');
+    const chosenScope = this.host.scopes().find((scope) => scope.kind === 'personal');
+    const previousScopeId = options.scopeId();
+    const scopes = await client.refreshScopes();
+    this.host.scopes.set(scopes);
+
+    const discovered = scopes.find((scope) => scope.kind === 'personal');
+    if (
+      options.restartScopeId &&
+      (discovered?.id !== options.restartScopeId ||
+        discovered.state !== 'migrating' ||
+        discovered.sequence !== 0)
+    )
+      throw new Error(ERROR_REMOTE_CHANGED);
+    if (!previousScopeId && discovered) {
+      await this.host.bind(client);
+      // Another device may have initialized the account while sign-in ran.
+      if (options.automatic) return false;
+    }
+
+    const scopeId = options.scopeId();
+    const personal = scopeId ? client.state.scopes[scopeId] : undefined;
+    if (personal && hasPendingPersonalSetup(client, personal.info.id)) return true;
+
+    const changedSinceChoice = (scope: ScopeInfo): boolean =>
+      !!chosenScope &&
+      (scope.id !== chosenScope.id ||
+        scope.sequence !== chosenScope.sequence ||
+        scope.generation !== chosenScope.generation ||
+        scope.controlVersion !== chosenScope.controlVersion);
+    if (options.migrate && discovered && changedSinceChoice(discovered))
+      throw new Error(ERROR_REMOTE_CHANGED);
+    if (personal?.intents.length || personal?.uncertain)
+      throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');
+    if (!personal || options.restartScopeId) return true;
+    if (options.migrate && !options.replacementAvailable)
+      throw new Error('NATIVE_SYNC.ERROR_REPLACEMENT_UNAVAILABLE');
+
+    await client.syncScope(personal.info.id);
+    const current = client.state.scopes[personal.info.id].info;
+    this.host.scopes.update((values) =>
+      values.map((value) => (value.id === current.id ? current : value)),
+    );
+    if (options.migrate && changedSinceChoice(current))
+      throw new Error(ERROR_REMOTE_CHANGED);
+    if (current.state !== 'active') throw new Error(ERROR_MIGRATION_BUSY);
+    return true;
   }
 
   /** The vault closed or the account changed: forget everything in flight. */
@@ -145,8 +210,7 @@ export class NativeDataConnection {
     if (this.stale(generation)) return;
     this.host.scopes.set(scopes);
     const personal = scopes.find((scope) => scope.kind === 'personal');
-    const journal = personal && client.state.migrations[personal.id];
-    if (!personal || (journal && !journal.complete)) {
+    if (!personal || hasPendingPersonalSetup(client, personal.id)) {
       await this.initializeAccount(client, !!personal, userInitiated, generation);
       return;
     }
@@ -244,7 +308,11 @@ export class NativeDataConnection {
       return;
     }
     if (this.stale(generation)) return;
-    if (mayDecideAlone && !account.hasUserData)
+    if (
+      mayDecideAlone &&
+      !account.hasUserData &&
+      !wasRecoveredSetup(client.state.scopes[personal.id].info)
+    )
       // Nothing on the account side can be lost: seed it with this device's data.
       return this.switchTo('replace', 'automatic', generation, attempts, edits);
     this.stage.set('idle');

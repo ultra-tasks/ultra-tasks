@@ -388,6 +388,22 @@
             >
               {{ T.ACCOUNT_STATUS.ACTION_CHOOSE_DATA | translate }}
             </button>
+            @if (native.abandonedPersonalSetup(); as setup) {
+              <button
+                mat-stroked-button
+                type="button"
+                class="wide"
+                (click)="recoverPersonalSetup(setup)"
+                [disabled]="working() || native.busy()"
+              >
+                {{
+                  (setup.uploaded
+                    ? T.NATIVE_SYNC.RECOVER_SETUP
+                    : T.NATIVE_SYNC.RESTART_SETUP
+                  ) | translate
+                }}
+              </button>
+            }
           </section>
         }
         <section
@@ -455,7 +471,17 @@
             <ng-container [ngTemplateOutlet]="stepError" />
           }
           <div class="account-actions">
-            @if (!showDataCard()) {
+            @if (native.canRecoverPersonal()) {
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                (click)="recoverPersonalSync()"
+                [disabled]="native.busy() || working()"
+              >
+                {{ T.NATIVE_SYNC.HISTORY_REJOIN | translate }}
+              </button>
+            } @else if (!showDataCard()) {
               <button
                 mat-flat-button
                 color="primary"
@@ -595,7 +621,17 @@
         @if (native.linked()) {
           @if (drafts().length) {
             <section class="account-card">
-              <p>{{ T.NATIVE_SYNC.CONFLICT_DRAFTS | translate }}</p>
+              @if (hasConflictDrafts()) {
+                <p>{{ T.NATIVE_SYNC.CONFLICT_DRAFTS | translate }}</p>
+              }
+              @if (uploadDraftTitles().length) {
+                <p>{{ T.NATIVE_SYNC.UPLOAD_DRAFT_ITEMS | translate }}</p>
+                <ul>
+                  @for (title of uploadDraftTitles(); track title) {
+                    <li>{{ title }}</li>
+                  }
+                </ul>
+              }
               <div class="account-actions">
                 <button
                   mat-stroked-button
@@ -604,13 +640,15 @@
                 >
                   {{ T.NATIVE_SYNC.EXPORT_DRAFTS | translate }}
                 </button>
-                <button
-                  mat-button
-                  type="button"
-                  (click)="dismissDrafts()"
-                >
-                  {{ T.NATIVE_SYNC.DISMISS_DRAFTS | translate }}
-                </button>
+                @if (hasConflictDrafts()) {
+                  <button
+                    mat-button
+                    type="button"
+                    (click)="dismissDrafts()"
+                  >
+                    {{ T.NATIVE_SYNC.DISMISS_DRAFTS | translate }}
+                  </button>
+                }
               </div>
             </section>
           }

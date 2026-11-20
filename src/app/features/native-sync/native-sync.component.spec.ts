@@ -65,6 +65,9 @@ const createNative = () => ({
   lockReason: signal<'storage-unavailable' | null>(null),
   pendingChanges: signal(0),
   dataChoice: signal<AccountDataChoice | null>(null),
+  canRecoverPersonal: signal(false),
+  abandonedPersonalSetup:
+    signal<ReturnType<NativeSyncService['abandonedPersonalSetup']>>(undefined),
   deviceVerification: signal<DeviceVerificationView | null>(null),
   accountIdentity: signal<{ email: string; id: string } | null>(null),
   mfaMethods: signal<string[]>([]),
@@ -85,6 +88,10 @@ const createNative = () => ({
   syncNow: jasmine.createSpy('syncNow').and.resolveTo(),
   openAccount: jasmine.createSpy('openAccount').and.resolveTo(),
   resumeDataConnection: jasmine.createSpy('resumeDataConnection').and.resolveTo(),
+  recoverPersonalSync: jasmine.createSpy('recoverPersonalSync').and.resolveTo(),
+  recoverAbandonedPersonalSetup: jasmine
+    .createSpy('recoverAbandonedPersonalSetup')
+    .and.resolveTo(),
   completeMfa: jasmine.createSpy('completeMfa').and.resolveTo(),
   completeDeviceVerification: jasmine
     .createSpy('completeDeviceVerification')

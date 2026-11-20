@@ -6,6 +6,9 @@ import {
   randomKey,
   seal,
   personalRecords,
+  type PersonalBaseline,
+  type PlainHead,
+  type RecordChange,
   type SyncClient,
 } from '@sp/sync-providers/ultra-tasks';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
@@ -15,16 +18,19 @@ import { OperationLogSyncService } from '../../op-log/sync/operation-log-sync.se
 import { BackupService } from '../../op-log/backup/backup.service';
 import { ValidateStateService } from '../../op-log/validation/validate-state.service';
 import { TabSeqFrontierService } from '../../op-log/persistence/tab-seq-frontier.service';
+import { OperationWriteFlushService } from '../../op-log/sync/operation-write-flush.service';
 
 describe('NativePersonalBridgeService', () => {
   const identity = { serverId: 'test-server', accountId: 'test-account' };
   const namespace = 'native-sync:' + canonical(identity);
   let service: NativePersonalBridgeService;
   let saved: { data: { namespace: string; envelope: unknown } } | undefined;
+  let applied: Record<string, unknown> | undefined;
   let snapshot: jasmine.Spy;
   let client: SyncClient;
   beforeEach(() => {
     saved = undefined;
+    applied = undefined;
     snapshot = jasmine.createSpy().and.resolveTo({
       task: { ids: [], entities: {} },
       globalConfig: { sync: { isEnabled: false } },
@@ -49,8 +55,17 @@ describe('NativePersonalBridgeService', () => {
         NativePersonalBridgeService,
         { provide: Store, useValue: { selectSignal: () => signal(null) } },
         {
+          provide: OperationWriteFlushService,
+          useValue: {
+            flushThenRunExclusive: async (run: () => Promise<unknown>) => run(),
+          },
+        },
+        {
           provide: StateSnapshotService,
-          useValue: { getStateSnapshotForOperationLogAsync: snapshot },
+          useValue: {
+            getStateSnapshotForOperationLogAsync: snapshot,
+            getStateSnapshot: () => ({ globalConfig: { sync: { isEnabled: false } } }),
+          },
         },
         {
           provide: OperationLogStoreService,
@@ -68,7 +83,11 @@ describe('NativePersonalBridgeService', () => {
         {
           provide: OperationLogSyncService,
           useValue: {
-            applyNativeSnapshot: async (prepare: () => Promise<unknown>) => prepare(),
+            applyNativeSnapshot: async (
+              prepare: () => Promise<{ snapshotState: Record<string, unknown> }>,
+            ) => {
+              applied = (await prepare()).snapshotState;
+            },
           },
         },
         {
@@ -77,18 +96,23 @@ describe('NativePersonalBridgeService', () => {
             captureRecoveryPointUnlessCovered: jasmine.createSpy().and.resolveTo(null),
           },
         },
-        { provide: ValidateStateService, useValue: {} },
+        {
+          provide: ValidateStateService,
+          useValue: { validateAndRepair: async () => ({ isValid: true }) },
+        },
       ],
     });
     service = TestBed.inject(NativePersonalBridgeService);
   });
-  const baseline = async (): Promise<void> => {
+  const baseline = async (
+    records: PersonalBaseline = { source: {}, records: {} },
+  ): Promise<void> => {
     saved = {
       data: {
         namespace,
         envelope: await seal(
           client.account.unlocked!.masterKey,
-          JSON.stringify({ source: {}, records: {} }),
+          JSON.stringify(records),
           namespace,
         ),
       },
@@ -125,6 +149,22 @@ describe('NativePersonalBridgeService', () => {
     await expectAsync(service.useExisting()).toBeRejectedWithError(
       'NATIVE_SYNC.ERROR_LOCAL_CHANGED',
     );
+  });
+  it('stops routine capture and apply before replacing unseen edits from another tab', async () => {
+    await baseline();
+    expect(await service.bind(client)).toBeTrue();
+    TestBed.inject(TabSeqFrontierService).establishFrontier(4);
+    (TestBed.inject(OperationLogStoreService).getLastSeq as jasmine.Spy).and.resolveTo(5);
+
+    await expectAsync(service.capture()).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_RELOAD_TAB',
+    );
+    await expectAsync(service.apply()).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_RELOAD_TAB',
+    );
+    expect(client.edit).not.toHaveBeenCalled();
+    expect(snapshot).not.toHaveBeenCalled();
+    expect(applied).toBeUndefined();
   });
   it('fails closed when the tab frontier is unknown and the operation log is nonempty', async () => {
     await service.bind(client);
@@ -197,6 +237,215 @@ describe('NativePersonalBridgeService', () => {
     );
     expect(client.edit).not.toHaveBeenCalled();
   });
+  for (const rename of [false, true]) {
+    const scenario = rename
+      ? 'retains pending references when the project and tag are renamed locally'
+      : 'does not overwrite newer project or tag heads after applying a partial upload';
+    it(scenario, async () => {
+      const project = {
+        id: 'project',
+        title: 'Project',
+        taskIds: ['visible', 'pending-active'],
+        backlogTaskIds: ['pending-backlog'],
+      };
+      const tag = { id: 'tag', title: 'Tag', taskIds: ['visible', 'pending-active'] };
+      const source = (
+        projectValue: typeof project,
+        tagValue: typeof tag,
+      ): Record<string, unknown> => ({
+        project: { ids: ['project'], entities: { project: projectValue } },
+        tag: { ids: ['tag'], entities: { tag: tagValue } },
+        task: {
+          ids: ['visible'],
+          entities: { visible: { id: 'visible', projectId: 'project', tagIds: ['tag'] } },
+          currentTaskId: null,
+          selectedTaskId: null,
+        },
+        globalConfig: { sync: { isEnabled: false, syncProvider: null } },
+      });
+      const raw = await personalRecords(source(project, tag), 'writer-device');
+      const localProject = { ...project, taskIds: ['visible'], backlogTaskIds: [] };
+      const localTag = { ...tag, taskIds: ['visible'] };
+      await baseline({ ...raw, source: source(localProject, localTag) });
+      const remoteProject = {
+        ...project,
+        taskIds: [...project.taskIds, 'new-active'],
+        backlogTaskIds: [...project.backlogTaskIds, 'new-backlog'],
+      };
+      const remoteTag = { ...tag, taskIds: [...tag.taskIds, 'new-active'] };
+      const projection = await personalRecords(
+        source(
+          { ...remoteProject, title: 'Remote project title' },
+          { ...remoteTag, title: 'Remote tag title' },
+        ),
+        'writer-device',
+      );
+      const heads: Record<string, PlainHead> = Object.fromEntries(
+        Object.values(projection.records).map((record) => [
+          record.entityId,
+          { ...record, revision: 2, deleted: false },
+        ]),
+      );
+      spyOn(client, 'records').and.returnValue(heads);
+      expect(await service.bind(client)).toBeTrue();
+
+      const projectTitle = 'Local project title';
+      const tagTitle = 'Local tag title';
+      snapshot.and.resolveTo(
+        rename
+          ? source(
+              { ...localProject, title: projectTitle },
+              { ...localTag, title: tagTitle },
+            )
+          : source(localProject, localTag),
+      );
+      await service.capture();
+
+      if (rename) {
+        const local = await personalRecords(
+          source(
+            { ...remoteProject, title: projectTitle },
+            { ...remoteTag, title: tagTitle },
+          ),
+          'device',
+        );
+        const expected = Object.values(local.records).filter((record) => {
+          const path = (record.value as { path: string[] }).path.join('/');
+          return path === 'project/entities/project' || path === 'tag/entities/tag';
+        });
+        expect(expected.length).toBe(2);
+        expect(client.edit).toHaveBeenCalledOnceWith('personal', expected);
+      } else {
+        expect(client.edit).not.toHaveBeenCalled();
+      }
+    });
+  }
+  it('captures an ordinary tag rename when task references are unchanged', async () => {
+    const tag = { id: 'tag', title: 'Tag', taskIds: [] };
+    const source = (tagValue: typeof tag): Record<string, unknown> => ({
+      tag: { ids: ['tag'], entities: { tag: tagValue } },
+      task: { ids: [], entities: {}, currentTaskId: null, selectedTaskId: null },
+      globalConfig: { sync: { isEnabled: false, syncProvider: null } },
+    });
+    const original = await personalRecords(source(tag), 'device');
+    await baseline(original);
+    const heads: Record<string, PlainHead> = Object.fromEntries(
+      Object.values(original.records).map((record) => [
+        record.entityId,
+        { ...record, revision: 1, deleted: false },
+      ]),
+    );
+    spyOn(client, 'records').and.returnValue(heads);
+    expect(await service.bind(client)).toBeTrue();
+
+    const updated = source({ ...tag, title: 'Renamed tag' });
+    snapshot.and.resolveTo(updated);
+    await service.capture();
+
+    const expected = await personalRecords(updated, 'device');
+    const tagRecords = Object.values(expected.records).filter(
+      (record) =>
+        (record.value as { path: string[] }).path.join('/') === 'tag/entities/tag',
+    );
+    expect(tagRecords.length).toBe(1);
+    expect(client.edit).toHaveBeenCalledOnceWith('personal', tagRecords);
+  });
+  for (const duringTransfer of [0, 60_000, -120_000]) {
+    it(`keeps folded archive time after a ${duringTransfer / 60_000} minute adjustment during transfer`, async () => {
+      const minute = 60_000;
+      const day = '2026-11-18';
+      const beforeTransfer = 17 * minute;
+      const expectedTotal = beforeTransfer + duringTransfer;
+      type TaskState = {
+        ids: string[];
+        entities: Record<
+          string,
+          { id: string; timeSpent: number; timeSpentOnDay: Record<string, number> }
+        >;
+      };
+      const taskState = (elapsed?: number): TaskState => ({
+        ids: elapsed === undefined ? [] : ['one'],
+        entities:
+          elapsed === undefined
+            ? {}
+            : {
+                one: {
+                  id: 'one',
+                  timeSpent: elapsed,
+                  timeSpentOnDay: { [day]: elapsed },
+                },
+              },
+      });
+      const source = (active?: number, archived?: number): Record<string, unknown> => ({
+        task: { ...taskState(active), currentTaskId: null, selectedTaskId: null },
+        archiveYoung: { task: taskState(archived) },
+        globalConfig: { sync: { isEnabled: false, syncProvider: null } },
+      });
+      const initial = await personalRecords(source(10 * minute), 'device');
+      const active = await personalRecords(source(15 * minute), 'device', initial);
+      const heads = (records: Record<string, RecordChange>): Record<string, PlainHead> =>
+        Object.fromEntries(
+          Object.values(records).map((record) => [
+            record.entityId,
+            { ...record, revision: 1, deleted: false },
+          ]),
+        );
+      let projection = heads(active.records);
+      spyOn(client, 'records').and.callFake(() => projection);
+      (client.edit as jasmine.Spy).and.callFake(
+        async (_scopeId: string, changes: RecordChange[]) => {
+          const incoming = Object.fromEntries(
+            changes.map((record) => [record.entityId, record]),
+          );
+          projection = { ...projection, ...heads(incoming) };
+        },
+      );
+      await baseline(active);
+      await service.bind(client);
+      snapshot.and.resolveTo(source(beforeTransfer));
+      await service.capture();
+
+      const changes = (client.edit as jasmine.Spy).calls.mostRecent()
+        .args[1] as RecordChange[];
+      const pending = changes.find((change) => change.entityType === 'personal.time')!;
+      expect(pending.value).toEqual(jasmine.objectContaining({ positive: 7 * minute }));
+
+      // The older archiver folded the first five minutes into the archived baseline.
+      // The SDK acknowledged only the timer's two minutes beyond that baseline.
+      const folded = await personalRecords(source(undefined, 15 * minute), 'archiver');
+      projection = {
+        ...heads(folded.records),
+        [pending.entityId]: {
+          entityId: pending.entityId,
+          entityType: 'personal.time',
+          deleted: false,
+          revision: 3,
+          value: {
+            path: ['archiveYoung', 'task', 'entities', 'one', 'timeSpentOnDay', day],
+            deviceId: 'device',
+            positive: 2 * minute,
+            negative: 0,
+            foldedTime: {
+              path: ['task', 'entities', 'one', 'timeSpentOnDay', day],
+              elapsed: 5 * minute,
+            },
+          },
+        },
+      };
+
+      // Reloading between upload and apply leaves the old local baseline on disk.
+      await service.bind(client);
+      snapshot.and.resolveTo(source(expectedTotal));
+      await service.apply();
+
+      const archived = (
+        applied!['archiveYoung'] as { task: ReturnType<typeof taskState> }
+      ).task.entities.one!;
+      expect(archived.timeSpent).toBe(expectedTotal);
+      expect(archived.timeSpentOnDay).toEqual({ [day]: expectedTotal });
+      expect(client.edit).toHaveBeenCalledTimes(duringTransfer ? 2 : 1);
+    });
+  }
   it('permits undo/archive restoration only after the deleted task was absent from the applied baseline', async () => {
     await baseline();
     const source = {
