@@ -408,9 +408,9 @@ export class NativeSyncComponent implements OnInit {
    * is the point of signing in. Ordinary incremental syncs never navigate.
    */
   private leaveAfterInitialConnection(phase: AccountPhase): void {
-    if (phase === 'choose-data' || phase === 'downloading' || phase === 'applying')
-      this.initialConnectionPending = true;
-    else if (phase === 'synced' && this.initialConnectionPending) {
+    if (phase === 'choose-data' || phase === 'downloading' || phase === 'applying') {
+      this.initialConnectionPending ||= !this.native.linked();
+    } else if (phase === 'synced' && this.initialConnectionPending) {
       this.initialConnectionPending = false;
       void this.router.navigateByUrl('/');
     } else if (phase !== 'syncing') this.initialConnectionPending = false;

@@ -1022,6 +1022,15 @@ describe('NativeSyncComponent', () => {
       }
       expect(router.navigateByUrl).not.toHaveBeenCalled();
     });
+
+    it('stays on the account page when an already-linked device finishes applying data', async () => {
+      signIn();
+      native.phase.set('applying');
+      await render();
+      native.phase.set('synced');
+      await settle();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
   });
 
   describe('status announcements', () => {
