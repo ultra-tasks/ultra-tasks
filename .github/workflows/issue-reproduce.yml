@@ -80,21 +80,23 @@ jobs:
         run: npm run buildFrontend:e2e
 
       - name: Reproduce with Claude Code
-        uses: anthropics/claude-code-action@f27be6b65a4652f08a2ba3cff79114829b588967 # v1
+        uses: anthropics/claude-code-action@4d75e5f390ee76b2e09c1980ecc99ff3a2e088c8 # v1.0.275
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           bot_name: github-actions[bot]
+          label_trigger: needs repro
           # Only the number crosses into the prompt. The agent fetches the text
           # itself, so no attacker-controlled string lands in this file.
           prompt: |
+            Do not reproduce suspected security vulnerabilities or create exploit tests. Stop and leave security reports for human review.
             Reproduce GitHub issue #${{ github.event.issue.number }} of
             ${{ github.repository }} as a failing Playwright E2E test.
             Read .github/prompts/issue-reproduce.md first and follow it exactly.
           # Prefix-matched allowlist mirroring the exact commands in the prompt:
           # no force pushes, no pushes outside repro/*, no edits outside
           # e2e/tests, no test runs outside the credential-free wrapper.
-          claude_args: --max-turns 150 --allowedTools "Read,Glob,Grep,Edit(e2e/tests/**),Edit(.tmp/**),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git ls-remote:*),Bash(git switch -c repro/*),Bash(git add e2e/tests/*),Bash(git commit -m *),Bash(git push -u origin repro/*),Bash(.github/scripts/run-repro-test.sh:*)"
+          claude_args: --permission-mode default --max-turns 150 --allowedTools "Read,Glob,Grep,Edit(e2e/tests/**),Edit(.tmp/**),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git ls-remote:*),Bash(git switch -c repro/*),Bash(git add e2e/tests/*),Bash(git commit -m *),Bash(git push -u origin repro/*),Bash(.github/scripts/run-repro-test.sh:*)"
 
       # The verdict comment is the agent's last step, so a timeout or a
       # max-turns stop would otherwise leave the issue silent.
