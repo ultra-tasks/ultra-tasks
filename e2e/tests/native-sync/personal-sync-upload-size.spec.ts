@@ -235,10 +235,12 @@ for (const upgrade of [false, true]) {
           ({ bytes, status }) => bytes > 0 && bytes <= REQUEST_LIMIT && status === 200,
         ),
       ).toBe(true);
-      expect(await engineView(writer.page)).toMatchObject({
-        pendingChanges: 0,
-        error: '',
-      });
+      await expect
+        .poll(() => engineView(writer.page), {
+          message: 'the writer should settle after the peer applies the uploaded edits',
+          timeout: 30_000,
+        })
+        .toMatchObject({ pendingChanges: 0, error: '' });
 
       for (const device of [writer, peer]) {
         await device.page.reload();
