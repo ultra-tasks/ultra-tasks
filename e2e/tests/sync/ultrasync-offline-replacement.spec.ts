@@ -1,6 +1,6 @@
 import { test, expect } from '../../fixtures/webdav.fixture';
 import { readFile } from 'node:fs/promises';
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { SyncPage } from '../../pages/sync.page';
 import { WorkViewPage } from '../../pages/work-view.page';
 import { waitForStatePersistence } from '../../utils/waits';
@@ -11,6 +11,10 @@ import {
   setupSyncClient,
   waitForSyncComplete,
 } from '../../utils/sync-helpers';
+import {
+  dataChoiceDialog as dataChoice,
+  replaceAccountData,
+} from '../native-sync/native-account-helpers';
 
 const server = process.env.E2E_ULTRA_URL;
 if (!server && process.env.E2E_REQUIRE_ULTRA === 'true')
@@ -51,28 +55,12 @@ const expectConnected = async (page: Page): Promise<void> => {
   await expect(page.locator('native-sync [role=alert]')).toHaveCount(0);
 };
 
-/** The focused dialog that asks which data to keep, when both sides hold real data. */
-const dataChoice = (page: Page): Locator =>
-  page.getByRole('dialog').filter({ hasText: 'Download account data' });
-
 /** Chooses the account's data when asked. An empty device downloads it without asking. */
 const downloadAccountData = async (page: Page): Promise<void> => {
   const choice = dataChoice(page).getByRole('button', { name: 'Download account data' });
   await choice
     .waitFor({ state: 'visible', timeout: 5000 })
     .then(() => choice.click())
-    .catch(() => undefined);
-};
-
-/** Replaces the account's data with this device's; replacement asks for one more confirmation. */
-const replaceAccountData = async (page: Page): Promise<void> => {
-  await dataChoice(page)
-    .getByRole('button', { name: 'Replace account data with this device' })
-    .click();
-  const confirm = page.locator('dialog-confirm button[e2e="confirmBtn"]');
-  await confirm
-    .waitFor({ state: 'visible', timeout: 5000 })
-    .then(() => confirm.click())
     .catch(() => undefined);
 };
 
@@ -158,11 +146,13 @@ test.describe('@webdav Ultra Tasks account replacement while another device is o
           { exact: false },
         ),
       ).toBeVisible({ timeout: 30000 });
-      const exported = stale.page.waitForEvent('download');
-      await stale.page
-        .getByRole('button', { name: 'Export private conflict drafts' })
-        .click();
-      const exportedPath = await (await exported).path();
+      const [exported] = await Promise.all([
+        stale.page.waitForEvent('download'),
+        stale.page
+          .getByRole('button', { name: 'Export private drafts', exact: true })
+          .click(),
+      ]);
+      const exportedPath = await exported.path();
       expect(await readFile(exportedPath, 'utf8')).toContain(offlineEdit);
 
       await fresh.page.goto('/#/native-sync');

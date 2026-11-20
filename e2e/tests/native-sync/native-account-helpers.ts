@@ -302,6 +302,25 @@ export const dataChoiceDialog = (page: Page): Locator =>
     .getByRole('dialog')
     .filter({ has: page.getByRole('button', { name: 'Download account data' }) });
 
+export const replaceAccountData = async (page: Page): Promise<void> => {
+  const dialog = dataChoiceDialog(page);
+  const finish = page.locator('native-sync').getByRole('button', {
+    name: 'Finish connecting',
+    exact: true,
+  });
+  // The account page can still show its resume button while the choice dialog is open.
+  await expect
+    .poll(async () => (await dialog.isVisible()) || (await finish.isVisible()), {
+      timeout: 30000,
+    })
+    .toBe(true);
+  if (!(await dialog.isVisible())) await finish.click();
+  await dialog
+    .getByRole('button', { name: 'Replace account data with this device', exact: true })
+    .click();
+  await page.locator('dialog-confirm button[e2e="confirmBtn"]').click();
+};
+
 /** Classifies the screen so a failure names what the person is stuck on. */
 export const firstSyncOutcome = async (
   page: Page,

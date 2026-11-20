@@ -1,5 +1,5 @@
 import { test, expect } from '../../fixtures/webdav.fixture';
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { SyncPage } from '../../pages/sync.page';
 import { WorkViewPage } from '../../pages/work-view.page';
 import { waitForStatePersistence } from '../../utils/waits';
@@ -11,6 +11,10 @@ import {
   waitForSyncComplete,
   confirmSyncConflictOverwriteIfShown,
 } from '../../utils/sync-helpers';
+import {
+  dataChoiceDialog as dataChoice,
+  replaceAccountData,
+} from '../native-sync/native-account-helpers';
 
 const ultraUrl = process.env.E2E_ULTRA_URL;
 if (!ultraUrl && process.env.E2E_REQUIRE_ULTRA === 'true')
@@ -59,35 +63,12 @@ const expectConnected = async (page: Page): Promise<void> => {
   await expect(page.locator('native-sync [role=alert]')).toHaveCount(0);
 };
 
-/** The focused dialog that asks which data to keep, when both sides hold real data. */
-const dataChoice = (page: Page): Locator =>
-  page.getByRole('dialog').filter({ hasText: 'Download account data' });
-
 /** Chooses the account's data when asked. An empty device downloads it without asking. */
 const downloadAccountData = async (page: Page): Promise<void> => {
   const choice = dataChoice(page).getByRole('button', { name: 'Download account data' });
   await choice
     .waitFor({ state: 'visible', timeout: 5000 })
     .then(() => choice.click())
-    .catch(() => undefined);
-};
-
-/**
- * Replaces the account's data with this device's. The choice reopens from "Data connection not
- * finished" when an earlier attempt failed; replacement asks for one more confirmation.
- */
-const replaceAccountData = async (page: Page): Promise<void> => {
-  const dialog = dataChoice(page);
-  const finish = page.getByRole('button', { name: 'Finish connecting' });
-  await expect(dialog.or(finish)).toBeVisible({ timeout: 30000 });
-  if (!(await dialog.isVisible())) await finish.click();
-  await dialog
-    .getByRole('button', { name: 'Replace account data with this device' })
-    .click();
-  const confirm = page.locator('dialog-confirm button[e2e="confirmBtn"]');
-  await confirm
-    .waitFor({ state: 'visible', timeout: 5000 })
-    .then(() => confirm.click())
     .catch(() => undefined);
 };
 

@@ -9,6 +9,11 @@ import {
   generateSyncFolderName,
   setupSyncClient,
 } from '../../utils/sync-helpers';
+import {
+  dataChoiceDialog as dataChoice,
+  replaceAccountData,
+  signIn as signInToConfiguredAccount,
+} from '../native-sync/native-account-helpers';
 
 const ultraUrl = process.env.E2E_ULTRA_URL;
 if (!ultraUrl && process.env.E2E_REQUIRE_ULTRA === 'true')
@@ -47,35 +52,12 @@ const expectConnected = async (page: Page): Promise<void> => {
     .toBe(true);
 };
 
-/** The focused dialog that asks which data to keep, when both sides hold real data. */
-const dataChoice = (page: Page): Locator =>
-  page.getByRole('dialog').filter({ hasText: 'Download account data' });
-
 /** Chooses the account's data when asked. An empty device downloads it without asking. */
 const downloadAccountData = async (page: Page): Promise<void> => {
   const choice = dataChoice(page).getByRole('button', { name: 'Download account data' });
   await choice
     .waitFor({ state: 'visible', timeout: 5000 })
     .then(() => choice.click())
-    .catch(() => undefined);
-};
-
-/**
- * Replaces the account's data with this device's. The choice reopens from "Data connection not
- * finished" when an earlier attempt failed; replacement asks for one more confirmation.
- */
-const replaceAccountData = async (page: Page): Promise<void> => {
-  const dialog = dataChoice(page);
-  const finish = page.getByRole('button', { name: 'Finish connecting' });
-  await expect(dialog.or(finish)).toBeVisible({ timeout: 30000 });
-  if (!(await dialog.isVisible())) await finish.click();
-  await dialog
-    .getByRole('button', { name: 'Replace account data with this device' })
-    .click();
-  const confirm = page.locator('dialog-confirm button[e2e="confirmBtn"]');
-  await confirm
-    .waitFor({ state: 'visible', timeout: 5000 })
-    .then(() => confirm.click())
     .catch(() => undefined);
 };
 
@@ -266,11 +248,9 @@ for (const writer of ['local', 'foreign'] as const) {
         );
         await editingPage.reload();
       } else {
-        await source.page.goto('/#/native-sync');
         await expect(
-          source.page.getByRole('button', { name: 'Sync now', exact: true }),
-        ).toBeEnabled({ timeout: 60000 });
-        await source.page.goto('/#/tag/TODAY/tasks');
+          source.page.getByRole('button', { name: /^Up to date\b/ }),
+        ).toBeVisible({ timeout: 60000 });
       }
       await tasks.waitForTaskList();
       await expect(
@@ -323,7 +303,10 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
     await source.page.route(stage, (route) => route.abort());
     await replaceAccountData(source.page);
     await expect(
-      source.page.getByRole('alert').filter({ hasText: 'Sync is off on this device' }),
+      source.page
+        .locator('native-sync')
+        .getByRole('alert')
+        .filter({ hasText: 'Sync is off on this device' }),
     ).toBeVisible({ timeout: 60000 });
     await source.page.unroute(stage);
     await source.page.goto('/#/tag/TODAY/tasks');
@@ -363,8 +346,7 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
     await owner.page.goto('/#/tag/TODAY/tasks');
     await expect(owner.page.locator('task').filter({ hasText: oldTitle })).toBeVisible();
 
-    await source.page.goto('/#/native-sync');
-    await signIn(source.page, 'latefailure');
+    await signInToConfiguredAccount(source.page, 'latefailure');
     await replaceAccountData(source.page);
     await expectConnected(source.page);
     await source.page.goto('/#/tag/TODAY/tasks');
