@@ -238,13 +238,16 @@ jobs:
 
           if [ "$ACCOUNT_SUITE" = verification ]; then
             specs=(account-device-verification device-verification)
+            workers=2
           else
             specs=(first-sync-both-populated first-sync-discovery-failure first-sync-empty-device
               first-sync-interrupted personal-sync-edits personal-sync-tabs personal-sync-upload-size
               session-database-outage)
+            # The outage spec disables the fixture database for every account.
+            workers=1
           fi
           for i in "${!specs[@]}"; do specs[$i]="e2e/tests/native-sync/${specs[$i]}.spec.ts"; done
-          npm run quiet -- e2e:file "${specs[@]}" --project=chromium --workers=2 --retries=0 --reporter=line,junit
+          npm run quiet -- e2e:file "${specs[@]}" --project=chromium --workers="$workers" --retries=0 --reporter=line,junit
           grep -Eq '^<testsuites [^>]* tests="[1-9][0-9]*" [^>]*skipped="0" ' "$PLAYWRIGHT_JUNIT_OUTPUT_FILE" \
             || { echo '::error::Private account tests were skipped or none ran'; exit 1; }
 
