@@ -94,6 +94,7 @@ test('offers the four ways to begin, and the new one is reachable by keyboard', 
     /Restore backup/,
     /Import tasks/,
   ]);
+  await expect(setup.getByRole('button', { name: 'Continue' })).toBeFocused();
   const sync = choices.getByRole('button', { name: /Sync from another device/ });
   await sync.focus();
   await page.keyboard.press('Enter');
