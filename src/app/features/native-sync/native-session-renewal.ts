@@ -23,14 +23,21 @@ export class NativeSessionRenewal {
   private refreshRefused = false;
   private renewed = false;
 
-  /** Wraps the account transport to see whether the server refused the refresh credential itself. */
+  /** Prevents an account client from sending its refused refresh credential again. */
   guard(transport: Transport): Transport {
+    // A queued SDK call can reach the transport after its in-flight refresh has settled.
+    // Keep the refusal on this client even if a later sign-in resets the renewal state.
+    let refused: AccountApiError | undefined;
     return async (path, body, accessToken, method) => {
+      const isRefresh = path === REFRESH;
+      if (isRefresh && refused) throw refused;
       try {
         return await transport(path, body, accessToken, method);
       } catch (error) {
-        if (path === REFRESH && error instanceof AccountApiError && error.status === 401)
+        if (isRefresh && error instanceof AccountApiError && error.status === 401) {
+          refused = error;
           this.refreshRefused = true;
+        }
         throw error;
       }
     };

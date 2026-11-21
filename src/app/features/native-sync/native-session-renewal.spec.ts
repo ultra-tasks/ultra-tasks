@@ -54,6 +54,35 @@ describe('NativeSessionRenewal', () => {
       expect(renewal.renew(asClient(account()))).toBeFalse();
     });
 
+    it('does not send a refused refresh credential again, even after a new sign-in', async () => {
+      const refused = new AccountApiError(401, 'refused');
+      const body = { refreshToken: 'revoked' };
+      const previousTransport = jasmine.createSpy<Transport>('previousTransport');
+      previousTransport.and.rejectWith(refused);
+      const previous = renewal.guard(previousTransport);
+
+      await expectAsync(previous('/sessions/refresh', body)).toBeRejectedWith(refused);
+      await expectAsync(previous('/sessions/refresh', body)).toBeRejectedWith(refused);
+
+      renewal.reset();
+      const nextTransport = jasmine.createSpy<Transport>('nextTransport');
+      const tokens = { accessToken: 'next', refreshToken: 'rotated', expiresIn: 600 };
+      nextTransport.and.resolveTo(tokens);
+      const next = renewal.guard(nextTransport);
+
+      await expectAsync(previous('/sessions/refresh', body)).toBeRejectedWith(refused);
+      expect(previousTransport).toHaveBeenCalledOnceWith(
+        '/sessions/refresh',
+        body,
+        undefined,
+        undefined,
+      );
+      expect(renewal.renew(asClient(account()))).toBeTrue();
+      await expectAsync(
+        next('/sessions/refresh', { refreshToken: 'new-session' }),
+      ).toBeResolvedTo(tokens);
+    });
+
     it('does not read a network failure of the refresh as a refused credential', async () => {
       const guarded = renewal.guard(async () => {
         throw new TypeError('Failed to fetch');
