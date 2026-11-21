@@ -87,6 +87,8 @@ const gapBetweenAddRowAndHint = async (page: Page): Promise<number> => {
 };
 
 const addTaskViaComposer = async (page: Page, title: string): Promise<void> => {
+  // The global shortcut can open before the first-run task view and hint are ready.
+  await expect(page.locator('onboarding-hint')).toContainText(CREATE_TASK_HINT);
   await openGlobalAddTaskBar(page);
   const composer = page.locator('add-task-bar.global');
   const input = composer.locator('.main-input');
