@@ -381,16 +381,22 @@
       "minimatch": "3.1.5"
     },
     "@angular/build": {
-      "undici": "7.29.1"
+      "undici": "7.30.2"
     },
     "node-gyp": {
-      "undici": "6.27.0"
+      "undici": "6.29.1"
     },
     "sockjs": {
       "uuid": "11.1.1"
     },
     "ws": "8.21.0",
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "@electron/get": {
+      "undici": "7.30.2"
+    },
+    "karma": {
+      "qs": "6.16.2"
+    }
   },
   "optionalDependencies": {
     "@lmdb/lmdb-darwin-x64": "^3.5.4",
