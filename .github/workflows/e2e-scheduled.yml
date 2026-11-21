@@ -121,7 +121,7 @@ jobs:
           path: .tmp/angular-dist
           retention-days: 1
 
-  # Job 1: Regular E2E tests (excludes WebDAV and SuperSync)
+  # Job 1: Regular E2E tests (provider and account suites run separately)
   # Skipped on push: PR CI already ran this suite, and build.yml runs the same
   # `npm run e2e:ci` on master and release/* pushes.
   e2e-regular:
@@ -152,7 +152,7 @@ jobs:
       - name: Run Regular E2E Tests
         env:
           REGULAR_GREP: ${{ inputs.regular_grep || '' }}
-        run: npm run quiet -- e2e:all --grep-invert '@supersync|@webdav' --grep "$REGULAR_GREP"
+        run: npm run quiet -- e2e:all --grep-invert '@supersync|@webdav|@ultra' --grep "$REGULAR_GREP"
 
       - name: Upload E2E Results on Failure
         if: ${{ failure() }}
@@ -160,6 +160,100 @@ jobs:
         with:
           name: e2e-results-regular-${{ github.run_id }}
           path: .tmp/e2e-test-results/**/*.*
+          retention-days: 30
+
+  e2e-ultra-accounts:
+    name: E2E Tests (UltraSync account ${{ matrix.suite }})
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [sync, verification]
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup E2E Environment
+        uses: ./.github/actions/setup-e2e
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v4
+        with:
+          name: e2e-build-${{ github.run_id }}
+          path: .tmp/angular-dist
+
+      # The old client predates both the tracked-time merge and upload batching fixes.
+      - name: Check out mixed-version client baseline
+        if: matrix.suite == 'sync'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: 5d7a77836e2a03790f75ffd991c74ec3de47183a
+          path: .tmp/ultra-account-baseline
+          persist-credentials: false
+
+      - name: Build mixed-version client baseline
+        if: matrix.suite == 'sync'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 2
+          retry_wait_seconds: 20
+          command: |
+            set -eu
+            cd .tmp/ultra-account-baseline
+            npm ci
+            npm run quiet -- buildFrontend:e2e
+            test -f .tmp/angular-dist/browser/index.html
+
+      - name: Run private account E2E against the disposable server
+        env:
+          ACCOUNT_SUITE: ${{ matrix.suite }}
+          ULTRA_MIGRATION_PORT: '4244'
+          ULTRA_MIGRATION_DEVICE_EMAIL: ${{ matrix.suite == 'verification' && '1' || '0' }}
+          E2E_ULTRA_VERIFY_DEVICE: ${{ matrix.suite == 'verification' && '1' || '0' }}
+          E2E_BASE_URL: http://127.0.0.1:4244
+          E2E_ULTRA_URL: http://127.0.0.1:4244
+          E2E_ULTRA_BASELINE_DIST: ${{ github.workspace }}/.tmp/ultra-account-baseline/.tmp/angular-dist/browser
+          E2E_ULTRA_UPLOAD_BASELINE_DIST: ${{ github.workspace }}/.tmp/ultra-account-baseline/.tmp/angular-dist/browser
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: .tmp/e2e-test-results/ultra-accounts.xml
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/e2e-test-results
+          harness_log=.tmp/e2e-test-results/ultra-accounts-harness.log
+          setsid npm run ultra-accounts:harness > "$harness_log" 2>&1 &
+          harness=$!
+          trap 'kill -- "-$harness" 2>/dev/null || true' EXIT
+          if ! timeout 480 bash -c 'until curl -fsS "$E2E_ULTRA_URL/provider-migration-ready" 2>/dev/null \
+              | grep -q "\"nativeAccountFixtures\":true"; do
+              kill -0 "$1" 2>/dev/null || exit 1
+              sleep 1
+            done' -- "$harness"; then
+            tail -n 60 "$harness_log"
+            exit 1
+          fi
+
+          if [ "$ACCOUNT_SUITE" = verification ]; then
+            specs=(account-device-verification device-verification)
+          else
+            specs=(first-sync-both-populated first-sync-discovery-failure first-sync-empty-device
+              first-sync-interrupted personal-sync-edits personal-sync-tabs personal-sync-upload-size
+              session-database-outage)
+          fi
+          for i in "${!specs[@]}"; do specs[$i]="e2e/tests/native-sync/${specs[$i]}.spec.ts"; done
+          npm run quiet -- e2e:file "${specs[@]}" --project=chromium --workers=2 --retries=0 --reporter=line,junit
+          grep -Eq '^<testsuites [^>]* tests="[1-9][0-9]*" [^>]*skipped="0" ' "$PLAYWRIGHT_JUNIT_OUTPUT_FILE" \
+            || { echo '::error::Private account tests were skipped or none ran'; exit 1; }
+
+      - name: Upload Account E2E Results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-results-ultra-${{ matrix.suite }}-${{ github.run_id }}
+          path: .tmp/e2e-test-results/
           retention-days: 30
 
   # Job 2: WebDAV E2E tests
@@ -240,7 +334,8 @@ jobs:
     name: E2E Tests (SuperSync ${{ matrix.shard }}/6)
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # Run 44711134411 exhausted 40 minutes at case 75/84 in shard 6 after lock retries.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

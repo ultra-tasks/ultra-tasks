@@ -1,0 +1,51 @@
+diff --git a/provider-migration.harness.ts b/provider-migration.harness.ts
+index daef70b..91028d4 100644
+--- a/provider-migration.harness.ts
++++ b/provider-migration.harness.ts
+@@ -19,7 +19,9 @@ it('serves synthetic accounts to the provider migration browser tests', async ()
+     let ready = false;
+     let seededMailCount = 0;
+     harness.app.get('/provider-migration-ready', async (_request, reply) =>
+-      ready ? { ready: true } : reply.code(503).send({ ready: false }),
++      ready
++        ? { ready: true, nativeAccountFixtures: true }
++        : reply.code(503).send({ ready: false }),
+     );
+     if (verifyDevice)
+       harness.app.get('/provider-device-verification', async (_request, reply) => {
+@@ -32,6 +34,14 @@ it('serves synthetic accounts to the provider migration browser tests', async ()
+           );
+         return email ? { code: email.token } : reply.code(404).send();
+       });
++    if (verifyDevice)
++      harness.app.get('/__mail', async (_request, reply) =>
++        reply.header('cache-control', 'no-store').send(
++          harness.mail
++            .slice(seededMailCount)
++            .filter(({ kind }) => kind === 'device'),
++        ),
++      );
+     harness.app.put<{ Body: { available: boolean } }>(
+       '/provider-database-availability',
+       async (request, reply) => {
+@@ -74,6 +84,20 @@ it('serves synthetic accounts to the provider migration browser tests', async ()
+       'sessionoutage',
+     ])
+       await harness.register(`${username}@example.test`, username);
++    if (verifyDevice) {
++      for (let i = 1; i <= 16; i += 1) {
++        await harness.register(`device${i}@example.test`, `device${i}`);
++      }
++      for (let i = 1; i <= 4; i += 1) {
++        const { client } = await harness.register(`optout${i}@example.test`, `optout${i}`);
++        await client.setNewDeviceEmailVerification(false);
++      }
++    } else {
++      for (let i = 1; i <= 24; i += 1) {
++        await harness.register(`first${i}@example.test`, `first${i}`);
++        await harness.register(`restore${i}@example.test`, `restore${i}`);
++      }
++    }
+     seededMailCount = harness.mail.length;
+     ready = true;
+     process.stdout.write('PROVIDER_MIGRATION_READY\n');

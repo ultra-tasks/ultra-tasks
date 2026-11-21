@@ -301,10 +301,12 @@ test('@webdav reports an interrupted upload and permits a retry after restart', 
     await expect(dataChoice(source.page)).toBeVisible();
     const stage = /\/sync\/scopes\/[^/]+\/replacement\/stage$/;
     await source.page.route(stage, (route) => route.abort());
-    await replaceAccountData(source.page);
+    await Promise.all([
+      source.page.waitForRequest(stage),
+      replaceAccountData(source.page),
+    ]);
     await expect(
-      source.page
-        .locator('native-sync')
+      dataChoice(source.page)
         .getByRole('alert')
         .filter({ hasText: 'Sync is off on this device' }),
     ).toBeVisible({ timeout: 60000 });

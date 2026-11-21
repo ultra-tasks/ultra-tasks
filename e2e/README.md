@@ -38,7 +38,7 @@ Our E2E tests are built with Playwright and follow the Page Object Model (POM) p
 ### Basic Commands
 
 ```bash
-# Run regular browser tests (excludes SuperSync and WebDAV)
+# Run regular browser tests (excludes SuperSync, WebDAV, and private accounts)
 npm run e2e
 
 # Run tests in UI mode (interactive)
@@ -79,6 +79,24 @@ are working on. Provider tests still need their provider-specific commands.
 # Run WebDAV tests (starts Docker container)
 npm run e2e:webdav
 ```
+
+### Private account sync tests
+
+The scheduled workflow runs `@ultra` browser tests against a disposable account
+server built from the pinned server source. Build the E2E frontend before
+starting the account fixture on loopback.
+
+```bash
+npm run buildFrontend:e2e
+npm run ultra-accounts:harness
+```
+
+Set `E2E_BASE_URL` and `E2E_ULTRA_URL` to `http://127.0.0.1:4244` when running a
+focused account spec. For the device verification specs, start a fresh fixture
+with `ULTRA_MIGRATION_DEVICE_EMAIL=1` and set `E2E_ULTRA_VERIFY_DEVICE=1` when
+running Playwright. The mixed-version tests also need the older browser bundle
+used in the [scheduled workflow](../.github/workflows/e2e-scheduled.yml). Start a
+fresh fixture when rerunning scenarios that mutate their seeded accounts.
 
 ### Released-Client Compatibility Tests
 
