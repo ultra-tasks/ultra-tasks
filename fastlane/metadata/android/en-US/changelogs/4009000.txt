@@ -1,0 +1,1 @@
+Sign in with your Ultra Tasks account and see one sync status across the app. Empty devices download account data after sign-in, and sync recovery preserves pending edits. Publish an opt-in calendar feed from a supported account server. Connect GitHub, GitLab, Linear, and Trello with guided sign-in where available. Copy and paste tasks and undo common task actions.
