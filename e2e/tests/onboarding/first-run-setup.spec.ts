@@ -1,4 +1,13 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from '../../fixtures/test.fixture';
+
+const expectEmptyInbox = async (page: Page): Promise<void> => {
+  await page.goto('/#/project/INBOX_PROJECT/tasks');
+  // The previous Today view can remain mounted during the route transition.
+  const inbox = page.locator('work-view-page work-view');
+  await expect(inbox).toBeAttached();
+  await expect(inbox.locator('task')).toHaveCount(0);
+};
 
 test('offers a skippable setup once and keeps the chosen appearance', async ({
   isolatedContext,
@@ -48,9 +57,7 @@ test('restore opens the existing import settings without replacing data', async 
   await expect(page.locator('file-imex input[type="file"]')).toHaveValue('');
 
   // Someone bringing their own data gets no example task, now or later.
-  await page.goto('/#/project/INBOX_PROJECT/tasks');
-  await expect(page.locator('work-view')).toBeAttached();
-  await expect(page.locator('task')).toHaveCount(0);
+  await expectEmptyInbox(page);
 });
 
 test('syncing from another device opens the Account page and seeds no example task', async ({
@@ -70,9 +77,7 @@ test('syncing from another device opens the Account page and seeds no example ta
   await expect(page.locator('dialog-sync-cfg')).toHaveCount(0);
 
   // Their tasks come from elsewhere: no example task, now or later.
-  await page.goto('/#/project/INBOX_PROJECT/tasks');
-  await expect(page.locator('work-view')).toBeAttached();
-  await expect(page.locator('task')).toHaveCount(0);
+  await expectEmptyInbox(page);
 });
 
 test('offers the four ways to begin, and the new one is reachable by keyboard', async ({
