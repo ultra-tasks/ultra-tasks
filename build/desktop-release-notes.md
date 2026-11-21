@@ -8,7 +8,7 @@ This release improves account setup and sync recovery, adds opt-in calendar subs
 
 - Sign in by email in the app or continue in your browser. The account page, Settings, search, and the header show the same sync status. Desktop sign-in persists across restarts using protected operating-system storage.
 - A device with no tasks downloads your account data after sign-in. When both this device and the account already have tasks, you can choose which data to keep after reviewing the options. Sync recovery and retries preserve pending edits.
-- New-device email verification is enabled by default on supported servers and can be managed from the account dashboard. An authenticator app or security key takes precedence when configured. Keep an exported backup and your recovery key before upgrading.
+- Compatible servers support email verification for sign-ins on new devices and let you manage it from the account dashboard. The official service keeps this check off during the rollout so older app versions can still sign in. An authenticator app or security key takes precedence when configured. Keep an exported backup and your recovery key before upgrading.
 
 ### Calendars and integrations
 
