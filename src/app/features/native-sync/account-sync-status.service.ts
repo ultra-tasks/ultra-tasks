@@ -39,12 +39,12 @@ export class AccountSyncStatusService {
 
   // The injectable form of the shared `isOnline$` (same stream at runtime), so a spec can drive it.
   private readonly online = toSignal(inject(IS_ONLINE$), { initialValue: true });
-  private readonly providerConfigured = toSignal(
+  private readonly providerId = toSignal(
     this.legacy.syncCfg$.pipe(
-      map((cfg) => !!cfg?.isEnabled && toSyncProviderId(cfg.syncProvider) !== null),
+      map((cfg) => (cfg?.isEnabled ? toSyncProviderId(cfg.syncProvider) : null)),
       distinctUntilChanged(),
     ),
-    { initialValue: false },
+    { initialValue: null },
   );
   private readonly providerReady = toSignal(this.legacy.isEnabledAndReady$, {
     initialValue: false,
@@ -67,12 +67,23 @@ export class AccountSyncStatusService {
 
   /** Account or provider: something is configured, so sync status must stay reachable. */
   readonly isConfigured = computed(
-    () => this.isAccountEngine() || this.providerConfigured(),
+    () => this.isAccountEngine() || this.providerId() !== null,
   );
 
   readonly status = computed<AccountSyncStatus>(() =>
     this.isAccountEngine() ? this.accountStatus() : this.providerStatus(),
   );
+
+  /** Display only the account origin host or the validated legacy provider, never its endpoint. */
+  readonly syncSource = computed(() => {
+    const engine = this.status().engine;
+    if (engine !== 'account') return engine === 'provider' ? this.providerId() : null;
+    try {
+      return new URL(this.native.serverUrl).host || null;
+    } catch {
+      return null;
+    }
+  });
 
   /**
    * Something is configured and needs the user (sign in again, unlock, choose data, a failed
@@ -184,6 +195,19 @@ export class AccountSyncStatusService {
         break;
     }
 
+    if (native.timedOut() && !native.busy()) {
+      return account({
+        id: 'timed-out',
+        severity: 'warning',
+        icon: 'schedule',
+        ...MATERIAL,
+        labelKey: T.ACCOUNT_STATUS.TIMED_OUT,
+        detailKey: T.ACCOUNT_STATUS.TIMED_OUT_DETAIL,
+        action: 'retry',
+        actionLabelKey: T.ACCOUNT_STATUS.ACTION_RETRY,
+      });
+    }
+
     // A failure outranks any earlier "up to date": stale success is never shown over an error.
     if (error && !native.busy()) {
       return account({
@@ -226,6 +250,42 @@ export class AccountSyncStatusService {
         labelKey: labels[phase],
       });
     }
+    if (native.quotaBlocked()) {
+      return account({
+        id: 'quota-blocked',
+        severity: 'warning',
+        icon: 'cloud_off',
+        ...MATERIAL,
+        labelKey: T.ACCOUNT_STATUS.QUOTA_BLOCKED,
+        detailKey: T.ACCOUNT_STATUS.QUOTA_BLOCKED_DETAIL,
+        action: 'sync',
+        actionLabelKey: T.ACCOUNT_STATUS.ACTION_SYNC,
+      });
+    }
+    if (native.pendingChanges() > 0) {
+      return account({
+        id: 'queued',
+        severity: 'neutral',
+        icon: 'schedule',
+        ...MATERIAL,
+        labelKey: T.ACCOUNT_STATUS.QUEUED,
+        detailKey: T.ACCOUNT_STATUS.QUEUED_DETAIL,
+        action: 'sync',
+        actionLabelKey: T.ACCOUNT_STATUS.ACTION_SYNC,
+      });
+    }
+    if (!native.verifiedPass()) {
+      return account({
+        id: 'unverified',
+        severity: 'neutral',
+        icon: 'sync',
+        ...MATERIAL,
+        labelKey: T.ACCOUNT_STATUS.UNVERIFIED,
+        detailKey: T.ACCOUNT_STATUS.UNVERIFIED_DETAIL,
+        action: 'sync',
+        actionLabelKey: T.ACCOUNT_STATUS.ACTION_SYNC,
+      });
+    }
     return account({
       id: native.emptyAccount() ? 'up-to-date-empty' : 'up-to-date',
       severity: 'ok',
@@ -240,7 +300,7 @@ export class AccountSyncStatusService {
   }
 
   private providerStatus(): AccountSyncStatus {
-    if (!this.providerConfigured()) {
+    if (!this.providerId()) {
       return this.build(
         {
           id: 'local-only',

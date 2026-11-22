@@ -285,6 +285,21 @@ describe('NativeSyncService', () => {
     expect(TestBed.inject(NativePersonalBridgeService).unlink).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem('ultra-native-account:http://localhost:1900')).toBeNull();
   });
+  const downloadedPersonal = (): SyncClient['state']['scopes'] => ({
+    personal: {
+      downloaded: true,
+      info: {
+        id: 'personal',
+        kind: 'personal',
+        state: 'active',
+      } as SyncClient['state']['scopes'][string]['info'],
+      key: '',
+      counter: 0,
+      heads: {},
+      intents: [],
+      conflicts: [],
+    },
+  });
   const preparePrivateClient = (): SyncClient => {
     const account = new AccountClient(async () => ({}));
     account.capabilities = {
@@ -298,7 +313,7 @@ describe('NativeSyncService', () => {
       load: async () => null,
       save: async () => undefined,
     });
-    client.state = { scopes: {} } as SyncClient['state'];
+    client.state = { scopes: downloadedPersonal() } as SyncClient['state'];
     service.client = client;
     service.unlocked.set(true);
     spyOn(client, 'refreshScopes').and.resolveTo([]);
@@ -708,7 +723,20 @@ describe('NativeSyncService', () => {
       await syncing;
       expect(service.lastSyncedAt()).toEqual(jasmine.any(Number));
       expect(service.status()).toBe('NATIVE_SYNC.SYNCED');
+      expect(service.verifiedPass()).toBe(1);
       expect(service.error()).toBe('');
+    });
+
+    it('does not count a clean SDK call without a downloaded personal scope', async () => {
+      const client = preparePrivateClient();
+      client.state.scopes['personal'].downloaded = false;
+      service.linked.set(true);
+      spyOn(client, 'syncAll').and.resolveTo({});
+      const apply = spyOn(TestBed.inject(NativePersonalBridgeService), 'apply');
+      await service.syncNow();
+      expect(apply).not.toHaveBeenCalled();
+      expect(service.verifiedPass()).toBe(0);
+      expect(service.lastSyncedAt()).toBeNull();
     });
 
     it('clears a stale success when new work starts and shows a failure ahead of it', async () => {
@@ -1257,7 +1285,8 @@ describe('NativeSyncService', () => {
       expect(service.reauth()).toBeFalse();
       expect(service.unlocked()).toBeTrue();
       expect(service.phase()).toBe('synced');
-      expect(service.lastSyncedAt()).toEqual(jasmine.any(Number));
+      // This mock server has no personal dataset; transport renewal is not a completed sync.
+      expect(service.lastSyncedAt()).toBeNull();
       expect(service.error()).toBe('');
     });
 

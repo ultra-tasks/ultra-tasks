@@ -58,6 +58,7 @@ export class AccountSyncSummaryComponent implements OnDestroy {
   private _copiedTimer?: ReturnType<typeof setTimeout>;
 
   readonly T = T;
+  readonly syncSource = this._statusService.syncSource;
   /** Unique per instance: the provider dialog can open over the Account window's summary. */
   readonly hintId = `account-sync-id-hint-${AccountSyncSummaryComponent._nextId++}`;
 

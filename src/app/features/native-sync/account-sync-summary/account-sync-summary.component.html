@@ -36,6 +36,13 @@
             }}
           </p>
         }
+        @if (isAccount() || !provider()?.providerId) {
+          @if (syncSource(); as source) {
+            <p class="ass__meta">
+              {{ T.ACCOUNT_STATUS.SYNC_SOURCE | translate: { source } }}
+            </p>
+          }
+        }
         @if (lastSynced(); as lastSyncedText) {
           <p class="ass__meta">{{ lastSyncedText }}</p>
         }

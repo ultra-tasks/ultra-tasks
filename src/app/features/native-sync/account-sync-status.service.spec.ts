@@ -20,6 +20,9 @@ describe('AccountSyncStatusService', () => {
   let offline: ReturnType<typeof signal<boolean>>;
   let emptyAccount: ReturnType<typeof signal<boolean>>;
   let lastSyncedAt: ReturnType<typeof signal<number | null>>;
+  let timedOut: ReturnType<typeof signal<boolean>>;
+  let quotaBlocked: ReturnType<typeof signal<boolean>>;
+  let verifiedPass: ReturnType<typeof signal<number>>;
   let pendingChanges: ReturnType<typeof signal<number>>;
   let syncCfg$: BehaviorSubject<{ isEnabled: boolean; syncProvider: unknown }>;
   let ready$: BehaviorSubject<boolean>;
@@ -39,6 +42,9 @@ describe('AccountSyncStatusService', () => {
     emptyAccount = signal(false);
     lastSyncedAt = signal<number | null>(null);
     pendingChanges = signal(0);
+    verifiedPass = signal(0);
+    quotaBlocked = signal(false);
+    timedOut = signal(false);
     syncCfg$ = new BehaviorSubject<{ isEnabled: boolean; syncProvider: unknown }>({
       isEnabled: false,
       syncProvider: null,
@@ -66,6 +72,11 @@ describe('AccountSyncStatusService', () => {
             emptyAccount,
             lastSyncedAt,
             pendingChanges,
+            verifiedPass,
+            quotaBlocked,
+            timedOut,
+            serverUrl:
+              'https://login:synthetic@sync.example.test/private?token=synthetic',
             dataChoice: signal<AccountDataChoice | null>(null),
           },
         },
@@ -100,6 +111,7 @@ describe('AccountSyncStatusService', () => {
   it('reports a configured account as up to date, with the account engine', () => {
     account('synced');
     lastSyncedAt.set(1_700_000_000_000);
+    verifiedPass.set(1);
     const status = service.status();
     expect(status.id).toBe('up-to-date');
     expect(status.engine).toBe('account');
@@ -111,7 +123,58 @@ describe('AccountSyncStatusService', () => {
   it('distinguishes an account with no tasks from an incomplete fetch', () => {
     account('synced');
     emptyAccount.set(true);
+    expect(service.status().id).toBe('unverified');
+    verifiedPass.set(1);
     expect(service.status().id).toBe('up-to-date-empty');
+  });
+
+  it('does not treat an old last-synced timestamp as current verification', () => {
+    account('synced');
+    lastSyncedAt.set(1);
+    expect(service.status()).toEqual(
+      jasmine.objectContaining({
+        id: 'unverified',
+        severity: 'neutral',
+        lastSyncedAt: 1,
+      }),
+    );
+    expect(service.syncSource()).toBe('sync.example.test');
+  });
+
+  it('does not show green while this device still has changes to send', () => {
+    account('synced');
+    verifiedPass.set(1);
+    pendingChanges.set(2);
+    expect(service.status()).toEqual(
+      jasmine.objectContaining({
+        id: 'queued',
+        severity: 'neutral',
+        pendingChanges: 2,
+      }),
+    );
+    pendingChanges.set(0);
+    expect(service.status().id).toBe('up-to-date');
+  });
+
+  it('distinguishes a verified quota-blocked pull from a completed sync', () => {
+    account('synced');
+    quotaBlocked.set(true);
+    pendingChanges.set(2);
+    expect(service.status().id).toBe('quota-blocked');
+    expect(service.status().detailKey).toBe(T.ACCOUNT_STATUS.QUOTA_BLOCKED_DETAIL);
+  });
+
+  it('reports a typed network deadline as retryable, not offline', () => {
+    account('synced');
+    timedOut.set(true);
+    error.set('timeout');
+    expect(service.status()).toEqual(
+      jasmine.objectContaining({
+        id: 'timed-out',
+        action: 'retry',
+        severity: 'warning',
+      }),
+    );
   });
 
   it('says why a locked account is locked when secure storage cannot be read', () => {

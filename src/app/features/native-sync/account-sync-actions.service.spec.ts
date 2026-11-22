@@ -28,6 +28,7 @@ describe('AccountSyncActionsService', () => {
   let dialogs: jasmine.SpyObj<MatDialog>;
   let snack: jasmine.SpyObj<SnackService>;
   let share: jasmine.SpyObj<ShareService>;
+  let verifiedPass: ReturnType<typeof signal<number>>;
   let providerReady: BehaviorSubject<boolean>;
 
   const make = (
@@ -64,6 +65,8 @@ describe('AccountSyncActionsService', () => {
       'resumeDataConnection',
     ]);
     native.syncNow.and.resolveTo();
+    verifiedPass = signal(0);
+    Object.assign(native, { verifiedPass });
     native.resumeDataConnection.and.resolveTo();
     legacy = jasmine.createSpyObj('SyncWrapperService', ['sync']);
     legacy.sync.and.resolveTo('HANDLED_ERROR');
@@ -170,10 +173,13 @@ describe('AccountSyncActionsService', () => {
     });
 
     it('answers a manual account sync once, with the result', async () => {
+      native.syncNow.and.callFake(async () => {
+        verifiedPass.set(1);
+      });
       await service.syncNow();
       expect(snack.open).toHaveBeenCalledOnceWith({
         type: 'SUCCESS',
-        msg: T.ACCOUNT_STATUS.UP_TO_DATE,
+        msg: 'LABEL.up-to-date',
       });
     });
 
@@ -188,12 +194,33 @@ describe('AccountSyncActionsService', () => {
       });
     });
 
-    it('stays quiet when it ends offline: that has its own status', async () => {
+    it('uses the shared status label when a manual sync ends offline', async () => {
       native.syncNow.and.callFake(async () => {
         status.set(withAction('offline', 'sync'));
       });
       await service.syncNow();
+      expect(snack.open).toHaveBeenCalledOnceWith({
+        type: 'WARNING',
+        msg: 'LABEL.offline',
+      });
+    });
+
+    it('does not toast success for a no-op against a prior verified pass', async () => {
+      verifiedPass.set(1);
+      await service.syncNow();
       expect(snack.open).not.toHaveBeenCalled();
+    });
+
+    it('does not toast success while a successful pass still leaves pending changes', async () => {
+      native.syncNow.and.callFake(async () => {
+        verifiedPass.set(1);
+        status.set(withAction('queued', 'sync'));
+      });
+      await service.syncNow();
+      expect(snack.open).toHaveBeenCalledOnceWith({
+        type: 'WARNING',
+        msg: 'LABEL.queued',
+      });
     });
 
     it('does not replace a persistent recovery action waiting in the snack slot', async () => {

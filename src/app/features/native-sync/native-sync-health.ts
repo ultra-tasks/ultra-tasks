@@ -10,7 +10,7 @@ import type { AccountDataSummary } from './account-sync.types';
  * - `data`: what arrived could not be verified, decrypted or validated.
  * - `other`: anything else; shown as a failure with Retry.
  */
-export type FailureKind = 'offline' | 'auth' | 'data' | 'other';
+export type FailureKind = 'offline' | 'timeout' | 'auth' | 'data' | 'other';
 
 // `SyncClient.syncAll` returns per-dataset failures as plain messages, so the browsers'
 // wording for "the request never completed" has to be recognised there. A TypeError is
@@ -24,6 +24,12 @@ const BAD_GATEWAY_BODY = /json|unexpected (token|end)|unexpected character/i;
 const GATEWAY_STATUSES: ReadonlySet<number> = new Set([408, 429, 502, 503, 504]);
 
 export const classifyFailure = (error: unknown): FailureKind => {
+  if (
+    error instanceof TypeError &&
+    'code' in error &&
+    error.code === 'ACCOUNT_HTTP_TIMEOUT'
+  )
+    return 'timeout';
   if (error instanceof AccountApiError) {
     if (error.status === 401) return 'auth';
     return GATEWAY_STATUSES.has(error.status) ? 'offline' : 'other';
@@ -69,6 +75,11 @@ export class NativeSyncHealth {
   readonly offline = signal(false);
   /** Last fully successful sync (including the apply), in ms since epoch. */
   readonly lastSyncedAt = signal<number | null>(null);
+  /** A durable personal-dataset pass in this open vault, never restored from a cache. */
+  readonly verifiedPass = signal(0);
+  readonly quotaBlocked = signal(false);
+  readonly timedOut = signal(false);
+  private passSerial = 0;
   /** Unsent local change intents (bounded count, never content). */
   readonly pendingChanges = signal(0);
   /** The last complete fetch found no tasks in the account. */
@@ -103,7 +114,7 @@ export class NativeSyncHealth {
 
   /** The vault closed: what was true of the open account is not true any more. */
   closed(): void {
-    this.offline.set(false);
+    this.unverified();
     this.pendingChanges.set(0);
     this.emptyAccount.set(false);
     this.emptyChecked = '';
@@ -127,17 +138,29 @@ export class NativeSyncHealth {
 
   succeeded(at: number): void {
     this.offline.set(false);
+    this.quotaBlocked.set(false);
+    this.timedOut.set(false);
     this.reauth.set(false);
     this.lastSyncedAt.set(at);
+    this.verifiedPass.set(++this.passSerial);
+  }
+
+  unverified(quotaBlocked = false): void {
+    this.verifiedPass.set(0);
+    this.quotaBlocked.set(quotaBlocked);
+    this.timedOut.set(false);
+    this.offline.set(false);
   }
 
   failed(kind: FailureKind): void {
+    this.quotaBlocked.set(false);
     this.offline.set(kind === 'offline');
+    this.timedOut.set(kind === 'timeout');
     if (kind === 'auth') this.reauth.set(true);
   }
 
   reset(): void {
-    this.offline.set(false);
+    this.unverified();
     this.lastSyncedAt.set(null);
     this.pendingChanges.set(0);
     this.emptyAccount.set(false);

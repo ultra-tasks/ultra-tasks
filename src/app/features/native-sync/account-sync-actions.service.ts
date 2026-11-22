@@ -62,7 +62,7 @@ export class AccountSyncActionsService {
     const status = this._status.status();
     if (status.engine === 'account') {
       if (!status.action || status.action === 'sync' || status.action === 'retry') {
-        await this._syncAccount();
+        await this._native.syncNow(!isUserTriggered);
       }
     } else if (status.engine === 'provider') {
       if (await firstValueFrom(this._legacy.isEnabledAndReady$.pipe(first()))) {
@@ -124,15 +124,26 @@ export class AccountSyncActionsService {
    * toast; a persistent recovery action that is waiting keeps the snack slot to itself.
    */
   private async _syncAccount(): Promise<void> {
+    const before = this._native.verifiedPass();
     await this._native.syncNow();
     if (this._snack.hasPendingPersistentAction()) {
       return;
     }
     const after = this._status.status();
     if (after.id === 'up-to-date' || after.id === 'up-to-date-empty') {
-      this._snack.open({ type: 'SUCCESS', msg: T.ACCOUNT_STATUS.UP_TO_DATE });
+      if (this._native.verifiedPass() > before) {
+        this._snack.open({ type: 'SUCCESS', msg: after.labelKey });
+      }
     } else if (after.id === 'error') {
-      this._snack.open({ type: 'ERROR', msg: after.reason || T.ACCOUNT_STATUS.ERROR });
+      this._snack.open({ type: 'ERROR', msg: after.reason || after.labelKey });
+    } else if (
+      after.id === 'queued' ||
+      after.id === 'unverified' ||
+      after.id === 'offline' ||
+      after.id === 'quota-blocked' ||
+      after.id === 'timed-out'
+    ) {
+      this._snack.open({ type: 'WARNING', msg: after.labelKey });
     }
   }
 }

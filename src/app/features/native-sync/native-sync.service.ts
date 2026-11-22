@@ -19,10 +19,10 @@ import { NativePersonalBridgeService } from './native-personal-bridge.service';
 import {
   detachPersonal,
   HISTORY_CHANGED,
-  isHistoryFailure,
   personalRecoveryScope,
   supportsRecovery,
 } from './native-personal-recovery';
+import { syncPersonalPass } from './native-sync-pass';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
 import { normalizeServerUrl } from './native-server-url.util';
 import { Capacitor } from '@capacitor/core';
@@ -133,15 +133,13 @@ export class NativeSyncService {
   private readonly health = new NativeSyncHealth();
   /** One renewal for a refused access token, never for a refused refresh credential. */
   private readonly renewal = new NativeSessionRenewal();
-  /** The last attempt failed because the device or the server was unreachable. */
   readonly offline = this.health.offline;
-  /** Last fully successful sync (including the apply), in ms since epoch. */
   readonly lastSyncedAt = this.health.lastSyncedAt;
-  /** Number of local change intents not yet uploaded (bounded count, never content). */
+  readonly verifiedPass = this.health.verifiedPass;
+  readonly quotaBlocked = this.health.quotaBlocked;
+  readonly timedOut = this.health.timedOut;
   readonly pendingChanges = this.health.pendingChanges;
-  /** The last complete fetch found no tasks in the account. */
   readonly emptyAccount = this.health.emptyAccount;
-  /** The server refused the session: only a new sign-in helps. The identity is kept. */
   readonly reauth = this.health.reauth;
   /** Password, browser return, two-factor step or session restore in progress. */
   readonly signingIn = signal(false);
@@ -777,7 +775,6 @@ export class NativeSyncService {
   private async sync(automatic: boolean): Promise<void> {
     this.busy.set(true);
     this.error.set('');
-    // Stale success ends the moment new work starts.
     this.status.set('ACCOUNT_DATA.SYNCING');
     try {
       if (automatic && typeof navigator !== 'undefined' && navigator.onLine === false)
@@ -790,18 +787,19 @@ export class NativeSyncService {
         this.health.captured(this.client);
       }
       await this.adoptNativeSession();
-      const errors = await this.client!.syncAll();
-      const personalError = this.bridge.scopeId && errors[this.bridge.scopeId];
-      if (personalError && isHistoryFailure(personalError))
-        throw new Error(HISTORY_CHANGED);
-      if (this.linked() && !errors[this.bridge.scopeId!]) {
+      const pass = await syncPersonalPass(this.client!, this.bridge.scopeId);
+      if (pass.canApply && this.linked()) {
         await this.bridge.apply();
         await this.platform.personalSynced(this.account!, reminderBarrier);
       }
       await this.refresh();
-      if (Object.keys(errors).length) throw new Error(Object.values(errors).join('; '));
+      if (pass.error) throw pass.error;
       await this.updatePlatform();
-      this.syncSucceeded();
+      if (pass.canApply && this.linked() && !pass.quotaBlocked) this.syncSucceeded();
+      else {
+        this.health.unverified(pass.quotaBlocked);
+        this.status.set('NATIVE_SYNC.READY');
+      }
     } catch (error) {
       this.failure(error);
     } finally {
@@ -840,6 +838,7 @@ export class NativeSyncService {
         this.linked.set(false);
         this.localFlags.write('synced', null);
         this.health.lastSyncedAt.set(null);
+        this.health.unverified();
       });
       if (detached) {
         this.localFlags.write('recovering', null);

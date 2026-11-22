@@ -93,7 +93,7 @@ describe('AccountSyncSummaryComponent', () => {
         { provide: LiveAnnouncer, useValue: announcer },
         {
           provide: AccountSyncStatusService,
-          useValue: { status },
+          useValue: { status, syncSource: signal('sync.example.test') },
         },
         { provide: NativeSyncService, useValue: { accountIdentity: identity } },
         { provide: AccountSyncTextService, useValue: { lastSynced } },
