@@ -15,6 +15,7 @@ import {
   type Transport,
 } from '@sp/sync-providers/ultra-tasks';
 import { generateNotificationId } from '../android/android-notification-id.util';
+import { NativeRefreshRefusedError } from './native-session-renewal';
 
 interface NativeAccountPlugin {
   command(options: { method: string; input: object }): Promise<unknown>;
@@ -57,7 +58,17 @@ export class NativeSyncPlatformService {
   }
   private command(method: string, input: object): Promise<unknown> {
     const bridge = android();
-    if (!bridge) return plugin.command({ method, input });
+    if (!bridge)
+      return plugin.command({ method, input }).catch((error: unknown) => {
+        const code = (error as { code?: unknown } | null)?.code;
+        // A refused refresh has already removed the session; teardown is still clean.
+        if (method === 'detach' && code === 'SESSION_ABSENT') return undefined;
+        if (method !== 'refresh' && method !== 'current') throw error;
+        if (code === 'REFRESH_REFUSED') throw new NativeRefreshRefusedError();
+        if (code === 'REFRESH_UNREACHABLE') throw new TypeError('Network request failed');
+        // The native rejection is deliberately redacted and contains no OS error text.
+        throw new Error('NATIVE_SYNC.ERROR_NATIVE');
+      });
     return new Promise((resolve, reject) => {
       const requestId = crypto.randomUUID();
       const cleanup = (): void => {
@@ -104,8 +115,8 @@ export class NativeSyncPlatformService {
   async bind(
     client: SyncClient,
     baseUrl: string,
-    resume: () => Promise<void>,
-    flushShared: () => Promise<void>,
+    resume: () => void,
+    flushBeforeExit: () => Promise<void>,
     cachedRefreshToken?: string,
   ): Promise<void> {
     const account = client.account;
@@ -128,17 +139,19 @@ export class NativeSyncPlatformService {
         });
       this.bound = account;
     }
-    if (Capacitor.isNativePlatform())
+    if (Capacitor.isNativePlatform()) {
+      const generation = this.generation;
       this.listener = await App.addListener('appStateChange', ({ isActive }) => {
         this.lifecycle = this.lifecycle
           .then(async () => {
+            if (generation !== this.generation) return;
             if (isActive) {
-              await resume();
+              resume();
               return;
             }
             const taskId = await BackgroundTask.beforeExit(async () => {
               try {
-                await flushShared();
+                if (generation === this.generation) await flushBeforeExit();
               } finally {
                 await BackgroundTask.finish({ taskId });
               }
@@ -146,6 +159,7 @@ export class NativeSyncPlatformService {
           })
           .catch(() => undefined);
       });
+    }
   }
   async current(account: AccountClient): Promise<Tokens | undefined> {
     if (!this.bound || !this.supported) return undefined;

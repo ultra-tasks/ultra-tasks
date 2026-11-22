@@ -6,6 +6,13 @@ import {
 
 const REFRESH = '/sessions/refresh';
 
+/** The platform refresh owner refused the credential, which may happen during `current`. */
+export class NativeRefreshRefusedError extends AccountApiError {
+  constructor() {
+    super(401, 'Native refresh credential refused');
+  }
+}
+
 /**
  * A 401 on an ordinary call does not yet mean the session is over.
  *
@@ -22,15 +29,25 @@ const REFRESH = '/sessions/refresh';
 export class NativeSessionRenewal {
   private refreshRefused = false;
   private renewed = false;
+  get pending(): boolean {
+    return this.renewed;
+  }
 
-  /** Wraps the account transport to see whether the server refused the refresh credential itself. */
+  /** Prevents an account client from sending its refused refresh credential again. */
   guard(transport: Transport): Transport {
+    // A queued SDK call can reach the transport after its in-flight refresh has settled.
+    // Keep the refusal on this client even if a later sign-in resets the renewal state.
+    let refused: AccountApiError | undefined;
     return async (path, body, accessToken, method) => {
+      const isRefresh = path === REFRESH;
+      if (isRefresh && refused) throw refused;
       try {
         return await transport(path, body, accessToken, method);
       } catch (error) {
-        if (path === REFRESH && error instanceof AccountApiError && error.status === 401)
+        if (isRefresh && error instanceof AccountApiError && error.status === 401) {
+          refused = error;
           this.refreshRefused = true;
+        }
         throw error;
       }
     };
@@ -41,8 +58,14 @@ export class NativeSessionRenewal {
    * to refresh on its next request and returns true: the caller tries again. False means the
    * session has ended (the refresh credential was refused, or the renewal did not help).
    */
-  renew(account: AccountClient | undefined): boolean {
-    if (!account?.tokens || this.refreshRefused || this.renewed) return false;
+  renew(account: AccountClient | undefined, error?: unknown): boolean {
+    if (
+      !account?.tokens ||
+      this.refreshRefused ||
+      this.renewed ||
+      error instanceof NativeRefreshRefusedError
+    )
+      return false;
     this.renewed = true;
     // An access token that has run out makes the next request refresh first, in the SDK's own
     // single-flight path: never a second refresh next to it.

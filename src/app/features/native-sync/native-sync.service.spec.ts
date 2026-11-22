@@ -12,6 +12,7 @@ import {
   type Transport,
 } from '@sp/sync-providers/ultra-tasks';
 import { NativeSyncPlatformService } from './native-sync-platform.service';
+import { NativeRefreshRefusedError } from './native-session-renewal';
 import { NativeSyncService } from './native-sync.service';
 import { NativePersonalBridgeService } from './native-personal-bridge.service';
 import { CertTrustService } from '../issue/cert-trust.service';
@@ -1258,6 +1259,38 @@ describe('NativeSyncService', () => {
       expect(service.phase()).toBe('synced');
       expect(service.lastSyncedAt()).toEqual(jasmine.any(Number));
       expect(service.error()).toBe('');
+    });
+
+    it('does not adopt a still-valid native access token over a forced renewal', async () => {
+      const platform = TestBed.inject(NativeSyncPlatformService);
+      const getCurrent = spyOn(platform, 'current').and.resolveTo({
+        accessToken: 'access-0',
+        refreshToken: 'refresh-1',
+        expiresIn: 600,
+      });
+      spyOn(
+        service as unknown as { cache: () => Promise<void> },
+        'cache',
+      ).and.resolveTo();
+      stepClockBack();
+      await service.syncNow();
+      await settle();
+      expect(getCurrent).toHaveBeenCalledTimes(1);
+      expect(refreshes).toEqual(['refresh-1']);
+      expect(service.reauth()).toBeFalse();
+      expect(service.error()).toBe('');
+    });
+
+    it('does not attempt SDK renewal after the native owner says refresh was refused', async () => {
+      const platform = TestBed.inject(NativeSyncPlatformService);
+      const getCurrent = spyOn(platform, 'current').and.rejectWith(
+        new NativeRefreshRefusedError(),
+      );
+      await service.syncNow();
+      await settle();
+      expect(getCurrent).toHaveBeenCalledTimes(1);
+      expect(refreshes).toEqual([]);
+      expect(service.reauth()).toBeTrue();
     });
 
     it('is armed again after it worked: a later refusal is renewed too', async () => {

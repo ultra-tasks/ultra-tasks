@@ -490,9 +490,12 @@ export class NativeSyncService {
         await this.platform.bind(
           client,
           this.serverUrl,
-          () => this.syncNow(true),
+          this.resume,
           async () => {
-            if (this.client !== client) return;
+            if (this.client !== client || this.closing) return;
+            await this.writeFlush.flushPendingWrites();
+            if (Capacitor.getPlatform() === 'ios' && this.linked())
+              return this.syncNow(true);
             for (const scope of Object.values(client.state.scopes))
               if (scope.info.kind === 'project' && !scope.revoked)
                 await client.syncScope(scope.info.id);
@@ -632,6 +635,8 @@ export class NativeSyncService {
     if (this.backgroundError() === only) this.backgroundError.set('');
   }
   private async adoptNativeSession(): Promise<void> {
+    // Do not replace the SDK's forced expiry with the same rejected native token.
+    if (this.renewal.pending) return;
     const native = await this.platform.current(this.account!);
     if (native) {
       this.account!.adoptTokens(native);
@@ -869,7 +874,7 @@ export class NativeSyncService {
    */
   private failure(error: unknown, connecting = false): FailureKind {
     const kind = classifyFailure(error);
-    if (kind === 'auth' && this.renewal.renew(this.account)) {
+    if (kind === 'auth' && this.renewal.renew(this.account, error)) {
       // The refresh credential was not refused: the access token only looked fine on this
       // device. The SDK renews it on its next request; try again, once.
       this.status.set('ACCOUNT_DATA.SYNCING');

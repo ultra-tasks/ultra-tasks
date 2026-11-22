@@ -10,6 +10,11 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
     public let pluginMethods: [CAPPluginMethod] = [CAPPluginMethod(name: "command", returnType: CAPPluginReturnPromise)]
     private let queue = DispatchQueue(label: "app.ultratasks.native-account")
     private let service = "app.ultratasks.native-account-v2"
+    private enum RefreshFailure: String, Error {
+        case refused = "REFRESH_REFUSED"
+        case unreachable = "REFRESH_UNREACHABLE"
+        case invalidResponse = "REFRESH_INVALID_RESPONSE"
+    }
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 20
@@ -63,16 +68,30 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
         let done = DispatchSemaphore(value: 0)
         var responseData: Data?
         var responseStatus: Int?
-        let task = session.dataTask(with: request) { data, response, _ in
+        var responseError: URLError.Code?
+        let task = session.dataTask(with: request) { data, response, error in
             responseData = data
             responseStatus = (response as? HTTPURLResponse)?.statusCode
+            responseError = (error as? URLError)?.code
             done.signal()
         }
         task.resume()
-        guard done.wait(timeout: .now() + 30) == .success else { task.cancel(); throw failure() }
-        if responseStatus == 401 || responseStatus == 403 { try clear(); throw failure() }
+        guard done.wait(timeout: .now() + 30) == .success else { task.cancel(); throw RefreshFailure.unreachable }
+        if responseStatus == 401 || responseStatus == 403 {
+            try clear()
+            throw RefreshFailure.refused
+        }
+        switch responseError {
+        case .notConnectedToInternet, .timedOut, .networkConnectionLost, .cannotConnectToHost,
+             .cannotFindHost, .dnsLookupFailed, .dataNotAllowed:
+            throw RefreshFailure.unreachable
+        default: break
+        }
+        if let code = responseStatus, [408, 429, 502, 503, 504].contains(code) {
+            throw RefreshFailure.unreachable
+        }
         guard responseStatus == 200, let bytes = responseData,
-              let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw failure() }
+              let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw RefreshFailure.invalidResponse }
         let nextTokens = try tokens(value)
         var next = profile
         next["tokens"] = nextTokens
@@ -117,8 +136,11 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
                     if method == "configure", let supplied = input["tokens"] as? [String: Any] { rawTokens = supplied }
                     else if let refresh = input["refreshToken"] as? String { rawTokens = ["accessToken": "pending", "refreshToken": refresh, "expiresIn": 0] }
                     else { throw self.failure() }
+                    let issued = try self.tokens(rawTokens)
+                    let lifetime = (issued["expiresIn"] as? NSNumber)?.doubleValue ?? 0
+                    let expiry = Date().timeIntervalSince1970 * 1000 + max(0, min(600, lifetime)) * 1000
                     try self.write(["serverId": server, "accountId": account, "baseUrl": base,
-                                    "tokens": try self.tokens(rawTokens), "expiresAt": method == "configure" ? Date().timeIntervalSince1970 * 1000 + 600000 : 0])
+                                    "tokens": issued, "expiresAt": method == "configure" ? expiry : 0])
                     call.resolve(["configured": true]); return
                 }
                 var profile = try self.read()
@@ -143,11 +165,17 @@ public class NativeAccountPlugin: CAPPlugin, CAPBridgedPlugin, URLSessionTaskDel
                 result["expiresIn"] = max(1, Int((validUntil - Date().timeIntervalSince1970 * 1000) / 1000))
                 call.resolve(result)
             } catch {
-                // Only expose our numeric status, never the stored profile or a
-                // Foundation/network error description that might contain data.
+                // Only expose fixed categories or our OSStatus number, never the
+                // stored profile or a Foundation/network error description.
                 let nativeError = error as NSError
-                let code = nativeError.domain == self.service ? String(nativeError.code) : "1"
-                call.reject("Native account storage or session unavailable. Sign in again.", code)
+                let code = (error as? RefreshFailure)?.rawValue ??
+                    (nativeError.domain == self.service ? String(nativeError.code) : "1")
+                if method == "detach", nativeError.domain == self.service,
+                   nativeError.code == Int(errSecItemNotFound) {
+                    call.reject("No native session to detach.", "SESSION_ABSENT")
+                } else {
+                    call.reject("Native account storage or session unavailable.", code)
+                }
             }
         }
     }
