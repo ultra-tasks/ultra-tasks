@@ -53,6 +53,7 @@ describe('NativePersonalBridgeService', () => {
       records: () => ({}),
       edit: jasmine.createSpy().and.resolveTo(),
       syncScope: jasmine.createSpy().and.resolveTo(),
+      migrate: jasmine.createSpy().and.resolveTo('personal'),
     } as unknown as SyncClient;
     TestBed.configureTestingModule({
       providers: [
@@ -118,7 +119,9 @@ describe('NativePersonalBridgeService', () => {
         },
         {
           provide: ValidateStateService,
-          useValue: { validateAndRepair: async () => ({ isValid: true }) },
+          useValue: {
+            validateAndRepair: jasmine.createSpy().and.resolveTo({ isValid: true }),
+          },
         },
       ],
     });
@@ -242,9 +245,63 @@ describe('NativePersonalBridgeService', () => {
         (stage) => steps.push(stage),
       ),
     ).toBeRejectedWithError('choice guard reached');
-    expect(backups).toHaveBeenCalledOnceWith('REMOTE_IMPORT');
+    expect(backups).toHaveBeenCalledOnceWith('REMOTE_IMPORT', jasmine.any(Function));
     expect(steps).toEqual(['recovery copy', 'downloading', 'fetch', 'applying']);
   });
+  it('publishes the repaired working copy without recapturing the old value', async () => {
+    const s = (title: string): Record<string, unknown> => ({
+      task: { ids: ['t1'], entities: { t1: { id: 't1', title } } },
+      globalConfig: { sync: { isEnabled: false } },
+    });
+    snapshot.and.resolveTo(s('before repair'));
+    const repaired = s('after repair');
+    const validation = TestBed.inject(ValidateStateService)
+      .validateAndRepair as jasmine.Spy;
+    validation.and.resolveTo({ isValid: true, repairedState: repaired });
+    const rawClient = client as unknown as {
+      state: { scopes: SyncClient['state']['scopes'] };
+    };
+    const existing = rawClient.state.scopes;
+    rawClient.state.scopes = {};
+    expect(await service.bind(client)).toBeFalse();
+    (client.migrate as jasmine.Spy).and.callFake(async (records: RecordChange[]) => {
+      rawClient.state.scopes = existing;
+      client.records = () =>
+        Object.fromEntries(
+          records.map((record) => [
+            record.entityId,
+            { ...record, revision: 1, deleted: false },
+          ]),
+        );
+      return 'personal';
+    });
+    await service.migrate();
+    const payload = (client.migrate as jasmine.Spy).calls.mostRecent().args[0];
+    expect(JSON.stringify(payload)).toContain('after repair');
+    expect(JSON.stringify(payload)).not.toContain('before repair');
+    expect(client.edit).not.toHaveBeenCalled();
+  });
+
+  it('does not publish the deletion of a passive archive repair', async () => {
+    const source = {
+      task: { ids: [], entities: {} },
+      globalConfig: { sync: { isEnabled: false, syncProvider: null } },
+      archiveYoung: { task: { ids: [], entities: {} } },
+    };
+    const raw = await personalRecords(
+      {
+        ...source,
+        archiveYoung: { task: { ids: ['child'], entities: { child: { id: 'child' } } } },
+      },
+      'device',
+    );
+    await baseline({ source, records: raw.records });
+    snapshot.and.resolveTo(source);
+    expect(await service.bind(client)).toBeTrue();
+    await service.capture();
+    expect(client.edit).not.toHaveBeenCalled();
+  });
+
   it('retains local changes and refuses to dual-write while a legacy provider is enabled', async () => {
     await baseline();
     await service.bind(client);

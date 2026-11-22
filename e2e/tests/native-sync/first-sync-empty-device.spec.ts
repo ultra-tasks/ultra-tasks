@@ -1,6 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { readRecoveryRing } from '../../utils/recovery-ring-helpers';
+import { flushPendingWrites } from '../../utils/waits';
 import {
   accountPage,
+  addLocalTask,
   closeDevices,
   connectFirstDevice,
   dismissFirstRunSetup,
@@ -14,6 +17,42 @@ import {
   signIn,
   taskTitles,
 } from './native-account-helpers';
+
+const disableAnimations = (page: Page, set = false): Promise<boolean> =>
+  page.evaluate((write) => {
+    type State = { globalConfig: { misc: { isDisableAnimations: boolean } } };
+    const { store } = (
+      window as unknown as {
+        __e2eTestHelpers: {
+          store: {
+            dispatch: (action: unknown) => void;
+            subscribe: (cb: (value: State) => void) => { unsubscribe: () => void };
+          };
+        };
+      }
+    ).__e2eTestHelpers;
+    if (write) {
+      store.dispatch({
+        type: '[Global Config] Update Global Config Section',
+        sectionKey: 'misc',
+        sectionCfg: { isDisableAnimations: true },
+        isSkipSnack: true,
+        meta: {
+          isPersistent: true,
+          entityType: 'GLOBAL_CONFIG',
+          entityId: 'misc',
+          opType: 'UPD',
+        },
+      });
+    }
+    let disabled = false;
+    store
+      .subscribe((state) => {
+        disabled = state.globalConfig.misc.isDisableAnimations;
+      })
+      .unsubscribe();
+    return disabled;
+  }, set);
 
 /**
  * Incident (2026-11): an iPhone with nothing but the first-run example task signed in to
@@ -71,6 +110,63 @@ test.describe('@ultra first sync on an empty device', () => {
       await phone.page.goto('/#/native-sync');
       await expect(accountPage(phone.page)).toContainText(/Up to date|Sync complete/);
       await expect(accountPage(phone.page).locator('[role=alert]')).toHaveCount(0);
+    } finally {
+      await closeDevices(desktop, phone);
+    }
+  });
+
+  test('backs up overwritten preferences on a settings-only device that downloads automatically', async ({
+    browser,
+  }) => {
+    const account = process.env.E2E_RECOVERY_SETTINGS_ACCOUNT ?? 'recovery-settings';
+    const title = `Account-side task ${Date.now()}`;
+    const desktop = await newDevice(browser, 'Desktop');
+    const phone = await newDevice(browser, 'Settings-only phone');
+    try {
+      await addLocalTask(desktop, title);
+      await connectFirstDevice(desktop, account);
+      await expect.poll(() => disableAnimations(phone.page, true)).toBe(true);
+      await flushPendingWrites(phone.page);
+      expect(await taskTitles(phone.page)).toEqual([]);
+
+      await signIn(phone.page, account);
+      await expect
+        .poll(() => firstSyncOutcome(phone.page, title), { timeout: 90000 })
+        .toBe('tasks');
+      await expect.poll(() => disableAnimations(phone.page)).toBe(false);
+
+      const recovery = (await readRecoveryRing(phone.page)).find(
+        (entry) => entry.reason === 'REMOTE_IMPORT',
+      );
+      expect(
+        recovery,
+        'the settings-only working copy must not be treated as disposable',
+      ).toBeDefined();
+      expect(recovery?.taskCount).toBe(0);
+      const backedUpSetting = await phone.page.evaluate(
+        (id) =>
+          new Promise<boolean>((resolve, reject) => {
+            const opening = indexedDB.open('SUP_OPS');
+            opening.onerror = () => reject(opening.error);
+            opening.onsuccess = () => {
+              const db = opening.result;
+              const request = db
+                .transaction('import_backup', 'readonly')
+                .objectStore('import_backup')
+                .get(id);
+              request.onsuccess = () => {
+                resolve(request.result?.state?.globalConfig?.misc?.isDisableAnimations);
+                db.close();
+              };
+              request.onerror = () => {
+                reject(request.error);
+                db.close();
+              };
+            };
+          }),
+        recovery!.backupId,
+      );
+      expect(backedUpSetting).toBe(true);
     } finally {
       await closeDevices(desktop, phone);
     }

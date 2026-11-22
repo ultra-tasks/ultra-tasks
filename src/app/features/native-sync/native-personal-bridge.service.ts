@@ -1,3 +1,5 @@
+import { hasNativeRecoveryData } from './account-data-summary.service';
+import { normalizeGlobalConfigStartOfNextDay } from '../config/normalize-start-of-next-day-config';
 import { inject, Injectable } from '@angular/core';
 import { Store } from '@ngrx/store';
 import {
@@ -227,12 +229,23 @@ export class NativePersonalBridgeService {
   ): Promise<void> {
     const client: RestartableSyncClient = this.client!;
     const source = await this.snapshot();
-    const validation = await this.validation.validateAndRepair(
-      this.withLocalSettings(withDefaultModelSlices(source)),
+    const validationInput = this.withLocalSettings(withDefaultModelSlices(source));
+    const normalizedConfig = normalizeGlobalConfigStartOfNextDay(
+      validationInput.globalConfig,
     );
+    const normalized = normalizedConfig
+      ? { ...validationInput, globalConfig: normalizedConfig }
+      : validationInput;
+    const validation = await this.validation.validateAndRepair(normalized);
     if (!validation.isValid) throw new Error('NATIVE_SYNC.ERROR_DATA');
-    await this.backups.captureRecoveryPointUnlessCovered('LOCAL_IMPORT');
-    const baseline = await personalRecords(source, client.state.device.id);
+    await this.backups.captureRecoveryPointUnlessCovered(
+      'LOCAL_IMPORT',
+      hasNativeRecoveryData,
+    );
+    const wire = stripLocalOnlySyncSettingsFromAppData(
+      validation.repairedState ?? normalized,
+    ) as Record<string, unknown>;
+    const baseline = await personalRecords(wire, client.state.device.id);
     const incomplete = this.scopeId && hasPendingPersonalSetup(client, this.scopeId);
     const records = Object.values(baseline.records);
     if (restartScopeId) {
@@ -249,7 +262,10 @@ export class NativePersonalBridgeService {
       this.scopeId = await client.migrate(records);
     }
     const imported = client.records(this.scopeId);
-    this.baseline = baselineFromHeads(imported, restorePersonal(imported));
+    // Account heads contain the repaired upload, while the app still shows the
+    // original working copy. Diff late edits against that actual local copy so
+    // a passive capture cannot upload repaired fields back in their old form.
+    this.baseline = baselineFromHeads(imported, source);
     this.resetDocumentCapture();
     onStage?.('applying');
     await this.applySnapshot(T.NATIVE_SYNC.ERROR_LOCAL_CHANGED);
@@ -262,7 +278,10 @@ export class NativePersonalBridgeService {
     await this.snapshot();
     // The recovery copy holds THIS device's data (archives included) before it is replaced.
     // It is saved on this device only: the account's own data is never copied anywhere.
-    await this.backups.captureRecoveryPointUnlessCovered('REMOTE_IMPORT');
+    await this.backups.captureRecoveryPointUnlessCovered(
+      'REMOTE_IMPORT',
+      hasNativeRecoveryData,
+    );
     const scope = this.client!.state.scopes[this.scopeId];
     if (scope.intents.length || scope.uncertain)
       throw new Error('NATIVE_SYNC.ERROR_PENDING_ACCOUNT_CHANGES');

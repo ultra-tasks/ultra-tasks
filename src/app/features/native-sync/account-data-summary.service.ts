@@ -119,6 +119,10 @@ export const summarizeAccountData = (
   };
 };
 
+/** Unlike first-connection choice, preserving the working copy must include settings. */
+export const hasNativeRecoveryData = (source: unknown): boolean =>
+  summarizeAccountData(source, undefined, { settings: true }).hasUserData;
+
 /**
  * Measures what a dataset holds so a device can tell "empty" from "has real work". It
  * decides whether the account's data may be downloaded without asking: only a device

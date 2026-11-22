@@ -301,9 +301,10 @@ export class BackupService {
    */
   async captureRecoveryPointUnlessCovered(
     reason: ImportBackupReason,
+    shouldPreserve: (snapshot: unknown) => boolean = hasRecoverableData,
   ): Promise<ImportBackupMeta | null> {
     const currentState = await this._stateSnapshotService.getStateSnapshotAsync();
-    if (!hasRecoverableData(currentState)) {
+    if (!shouldPreserve(currentState)) {
       return null;
     }
     const [newest] = await this._opLogStore.listImportBackups();

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import {
   AccountDataSummaryService,
   summarizeAccountData,
+  hasNativeRecoveryData,
 } from './account-data-summary.service';
 import { StateSnapshotService } from '../../op-log/backup/state-snapshot.service';
 import { OperationLogStoreService } from '../../op-log/persistence/operation-log-store.service';
@@ -243,6 +244,19 @@ describe('summarizeAccountData', () => {
       expect(
         summarizeAccountData(plain, new Set(), { settings: true }).hasUserData,
       ).toBeFalse();
+    });
+
+    it('protects the exact non-task work the first connection could overwrite', () => {
+      const pristine = { globalConfig: MODEL_CONFIGS.globalConfig.defaultData };
+      expect(hasNativeRecoveryData(pristine)).toBeFalse();
+      for (const extra of [
+        { globalConfig: { ...pristine.globalConfig, customised: true } },
+        { section: { ids: ['section'] } },
+        { boards: { boardCfgs: [] } },
+        { timeTracking: { project: { p1: { ['2026-11-22']: { b: 100 } } } } },
+      ]) {
+        expect(hasNativeRecoveryData({ ...pristine, ...extra })).toBeTrue();
+      }
     });
 
     it('counts settings for the account only: a device with nothing else is still pristine', () => {
