@@ -300,7 +300,7 @@ describe('NativeSyncService', () => {
       conflicts: [],
     },
   });
-  const preparePrivateClient = (): SyncClient => {
+  const preparePrivateClient = (hasPersonal = false): SyncClient => {
     const account = new AccountClient(async () => ({}));
     account.capabilities = {
       protocol: 2,
@@ -313,7 +313,9 @@ describe('NativeSyncService', () => {
       load: async () => null,
       save: async () => undefined,
     });
-    client.state = { scopes: downloadedPersonal() } as SyncClient['state'];
+    client.state = {
+      scopes: hasPersonal ? downloadedPersonal() : {},
+    } as SyncClient['state'];
     service.client = client;
     service.unlocked.set(true);
     spyOn(client, 'refreshScopes').and.resolveTo([]);
@@ -708,7 +710,7 @@ describe('NativeSyncService', () => {
     });
 
     it('success sets the last sync only once everything including the apply finished', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       const apply = spyOn(TestBed.inject(NativePersonalBridgeService), 'apply');
       let finish!: () => void;
@@ -728,7 +730,7 @@ describe('NativeSyncService', () => {
     });
 
     it('does not count a clean SDK call without a downloaded personal scope', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       client.state.scopes['personal'].downloaded = false;
       service.linked.set(true);
       spyOn(client, 'syncAll').and.resolveTo({});
@@ -740,7 +742,7 @@ describe('NativeSyncService', () => {
     });
 
     it('clears a stale success when new work starts and shows a failure ahead of it', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       const upload = spyOn(client, 'syncAll');
       upload.and.resolveTo({});
@@ -757,7 +759,7 @@ describe('NativeSyncService', () => {
     });
 
     it('an unreachable server is "offline": calm, nothing lost, never a revocation', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       spyOn(client, 'syncAll').and.rejectWith(new TypeError('Failed to fetch'));
       await service.syncNow();
@@ -773,7 +775,7 @@ describe('NativeSyncService', () => {
     });
 
     it('the app’s own loops do not try while the browser says there is no network', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       const upload = spyOn(client, 'syncAll').and.resolveTo({});
       spyOnProperty(navigator, 'onLine', 'get').and.returnValue(false);
@@ -784,7 +786,7 @@ describe('NativeSyncService', () => {
     });
 
     it('a person pressing Sync now always reaches the server, whatever the browser claims', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       const upload = spyOn(client, 'syncAll').and.resolveTo({});
       // The flag is unreliable (Linux, Electron) and is exactly what the person is checking.
@@ -796,7 +798,7 @@ describe('NativeSyncService', () => {
     });
 
     it('keeps a person’s request a real one when it is folded into a sync that is already running', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       let release!: () => void;
       const upload = spyOn(client, 'syncAll').and.callFake(
@@ -817,7 +819,7 @@ describe('NativeSyncService', () => {
     });
 
     it('success after an offline period clears offline and the error', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       const upload = spyOn(client, 'syncAll');
       upload.and.rejectWith(new TypeError('Failed to fetch'));
@@ -831,7 +833,7 @@ describe('NativeSyncService', () => {
     });
 
     it('counts unsent intents (bounded, no content) after a failed attempt', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       client.state.scopes = {
         personal: {
@@ -846,7 +848,7 @@ describe('NativeSyncService', () => {
     });
 
     it('a refused session (HTTP 401) keeps the identity and local edits and says "sign in again"', async () => {
-      const client = preparePrivateClient();
+      const client = preparePrivateClient(true);
       service.linked.set(true);
       service.configured.set(true);
       spyOn(client, 'syncAll').and.rejectWith(new AccountApiError(401, 'Unauthorized'));
@@ -865,7 +867,7 @@ describe('NativeSyncService', () => {
     });
 
     it('a failed connection retries from a manual or periodic sync, but an idle unconnected device does not', async () => {
-      preparePrivateClient();
+      preparePrivateClient(true);
       const connect = spyOn(internals().dataConnection, 'connect').and.resolveTo();
       await service.syncNow();
       expect(connect).not.toHaveBeenCalled();

@@ -64,6 +64,9 @@ const createNative = () => ({
   lastSyncedAt: signal<number | null>(null),
   lockReason: signal<'storage-unavailable' | null>(null),
   pendingChanges: signal(0),
+  verifiedPass: signal(1),
+  quotaBlocked: signal(false),
+  timedOut: signal(false),
   dataChoice: signal<AccountDataChoice | null>(null),
   canRecoverPersonal: signal(false),
   abandonedPersonalSetup:

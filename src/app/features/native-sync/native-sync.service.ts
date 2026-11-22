@@ -794,6 +794,7 @@ export class NativeSyncService {
       }
       await this.refresh();
       if (pass.error) throw pass.error;
+      this.renewal.succeeded();
       await this.updatePlatform();
       if (pass.canApply && this.linked() && !pass.quotaBlocked) this.syncSucceeded();
       else {
@@ -857,7 +858,6 @@ export class NativeSyncService {
   private syncSucceeded(): void {
     const at = Date.now();
     this.status.set('NATIVE_SYNC.SYNCED');
-    this.renewal.succeeded();
     this.health.succeeded(at);
     if (hasUploadDrafts(this.client)) this.error.set('NATIVE_SYNC.UPLOAD_DRAFTS');
     this.localFlags.write('synced', String(at));

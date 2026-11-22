@@ -442,6 +442,9 @@ describe('MainHeaderComponent action placement', () => {
     lastSyncedAt: signal<number | null>(null),
     lockReason: signal<'storage-unavailable' | null>(null),
     pendingChanges: signal(0),
+    verifiedPass: signal(1),
+    quotaBlocked: signal(false),
+    timedOut: signal(false),
     dataChoice: signal<AccountDataChoice | null>(null),
     accountIdentity: signal<{ email: string; id: string } | null>(null),
   };
@@ -613,6 +616,9 @@ describe('MainHeaderComponent action placement', () => {
       lastSyncedAt: signal<number | null>(null),
       lockReason: signal<'storage-unavailable' | null>(null),
       pendingChanges: signal(0),
+      verifiedPass: signal(1),
+      quotaBlocked: signal(false),
+      timedOut: signal(false),
       dataChoice: signal<AccountDataChoice | null>(null),
       accountIdentity: signal<{ email: string; id: string } | null>(null),
     };
