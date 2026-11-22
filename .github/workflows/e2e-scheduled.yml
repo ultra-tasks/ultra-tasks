@@ -152,7 +152,7 @@ jobs:
       - name: Run Regular E2E Tests
         env:
           REGULAR_GREP: ${{ inputs.regular_grep || '' }}
-        run: npm run quiet -- e2e:all --grep-invert '@supersync|@webdav' --grep "$REGULAR_GREP"
+        run: npm run quiet -- e2e:all --grep-invert '@supersync|@webdav|@ultra' --grep "$REGULAR_GREP"
 
       - name: Upload E2E Results on Failure
         if: ${{ failure() }}

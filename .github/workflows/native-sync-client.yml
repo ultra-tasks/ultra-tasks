@@ -7,8 +7,14 @@ on:
       - 'src/app/core/account-login-callback*'
       - 'src/app/core/app-url-open-router*'
       - 'electron/**'
+      - 'ios/**'
+      - 'android/**'
+      - 'src/app/features/config/local-only-sync-settings.util.ts'
+      - 'src/app/features/time-tracking/**'
       - 'src/app/op-log/**'
       - 'src/app/imex/sync/**'
+      - 'e2e/tests/native-sync/**'
+      - 'tools/native-account-test-fixtures.*'
       - 'e2e/tests/sync/ultrasync-provider-migration.spec.ts'
       - 'e2e/tests/sync/ultrasync-provider-save-in-flight.spec.ts'
       - 'e2e/tests/sync/ultrasync-offline-replacement.spec.ts'
@@ -99,3 +105,96 @@ jobs:
         with:
           name: windows-account-login-screenshots
           path: .tmp/account-login-screenshots/*.png
+
+  e2e-ultra-accounts:
+    name: Native account acceptance (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [sync, verification]
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup E2E Environment
+        uses: ./.github/actions/setup-e2e
+
+      - name: Build account acceptance bundle
+        run: npm run quiet -- buildFrontend:e2e
+
+      # The old client predates both the tracked-time merge and upload batching fixes.
+      - name: Check out mixed-version client baseline
+        if: matrix.suite == 'sync'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: 5d7a77836e2a03790f75ffd991c74ec3de47183a
+          path: .tmp/ultra-account-baseline
+          persist-credentials: false
+
+      - name: Build mixed-version client baseline
+        if: matrix.suite == 'sync'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 2
+          retry_wait_seconds: 20
+          command: |
+            set -eu
+            cd .tmp/ultra-account-baseline
+            npm ci
+            npm run quiet -- buildFrontend:e2e
+            test -f .tmp/angular-dist/browser/index.html
+
+      - name: Run private account E2E against the disposable server
+        env:
+          ACCOUNT_SUITE: ${{ matrix.suite }}
+          ULTRA_MIGRATION_PORT: '4244'
+          ULTRA_MIGRATION_DEVICE_EMAIL: ${{ matrix.suite == 'verification' && '1' || '0' }}
+          E2E_ULTRA_VERIFY_DEVICE: ${{ matrix.suite == 'verification' && '1' || '0' }}
+          E2E_BASE_URL: http://127.0.0.1:4244
+          E2E_ULTRA_URL: http://127.0.0.1:4244
+          E2E_ULTRA_BASELINE_DIST: ${{ github.workspace }}/.tmp/ultra-account-baseline/.tmp/angular-dist/browser
+          E2E_ULTRA_UPLOAD_BASELINE_DIST: ${{ github.workspace }}/.tmp/ultra-account-baseline/.tmp/angular-dist/browser
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: .tmp/e2e-test-results/ultra-accounts.xml
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/e2e-test-results
+          harness_log=.tmp/e2e-test-results/ultra-accounts-harness.log
+          setsid npm run ultra-accounts:harness > "$harness_log" 2>&1 &
+          harness=$!
+          trap 'kill -- "-$harness" 2>/dev/null || true' EXIT
+          if ! timeout 480 bash -c 'until curl -fsS "$E2E_ULTRA_URL/provider-migration-ready" 2>/dev/null \
+              | grep -q "\"nativeAccountFixtures\":true"; do
+              kill -0 "$1" 2>/dev/null || exit 1
+              sleep 1
+            done' -- "$harness"; then
+            tail -n 60 "$harness_log"
+            exit 1
+          fi
+
+          if [ "$ACCOUNT_SUITE" = verification ]; then
+            specs=(account-device-verification device-verification)
+            workers=2
+          else
+            specs=(first-sync-both-populated first-sync-discovery-failure first-sync-empty-device
+              first-sync-interrupted personal-sync-edits personal-sync-tabs personal-sync-upload-size
+              session-database-outage)
+            # The outage spec disables the fixture database for every account.
+            workers=1
+          fi
+          for i in "${!specs[@]}"; do specs[$i]="e2e/tests/native-sync/${specs[$i]}.spec.ts"; done
+          npm run quiet -- e2e:file "${specs[@]}" --project=chromium --workers="$workers" --retries=0 --reporter=line,junit
+          grep -Eq '^<testsuites [^>]* tests="[1-9][0-9]*" [^>]*skipped="0" ' "$PLAYWRIGHT_JUNIT_OUTPUT_FILE" \
+            || { echo '::error::Private account tests were skipped or none ran'; exit 1; }
+
+      - name: Upload Account E2E Results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-results-ultra-${{ matrix.suite }}-${{ github.run_id }}
+          path: .tmp/e2e-test-results/
+          retention-days: 30

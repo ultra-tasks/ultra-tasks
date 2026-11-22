@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Response, type Route } from '@playwright/test';
 import { createSimulatedClient } from '../../utils/supersync-helpers';
 import {
   addLocalTask,
@@ -163,7 +163,7 @@ for (const upgrade of [false, true]) {
 
       const reconnect = await disconnectSync(writer.page);
       expect(await editNotes(writer.page, true)).toBe(NOTES.length);
-      writer.page.on('response', (response) => {
+      const recordUploadResponse = (response: Response): void => {
         if (response.url().endsWith('/transactions'))
           uploads.push({
             status: response.status(),
@@ -171,8 +171,9 @@ for (const upgrade of [false, true]) {
           });
         if (new URL(response.url()).pathname.endsWith('/receipt') && response.ok())
           receipts++;
-      });
+      };
       if (!upgrade) {
+        writer.page.on('response', recordUploadResponse);
         let heldSecondUpload = false;
         await writer.page.route('**/api/v2/accounts/**/transactions', async (route) => {
           if (!heldSecondUpload && uploads.some(({ status }) => status === 200)) {
@@ -203,10 +204,14 @@ for (const upgrade of [false, true]) {
       await engineCall(writer.page, 'syncNow');
       if (upgrade) {
         expect(await pendingUpload(writer.page)).toEqual(originalPending);
-        uploads.length = 0;
-        receipts = 0;
+        const writerUrl = writer.page.url();
+        // Keep the device's stored state and stop the old renderer's retries before
+        // observing requests from the upgraded app.
+        await writer.page.close();
         await restoreCurrentBundle();
-        await writer.page.reload();
+        writer.page = await writer.context.newPage();
+        writer.page.on('response', recordUploadResponse);
+        await writer.page.goto(writerUrl);
         await signIn(writer.page, account);
         await expect
           .poll(() => engineView(writer.page), { timeout: 45_000 })
@@ -234,6 +239,7 @@ for (const upgrade of [false, true]) {
         uploads.every(
           ({ bytes, status }) => bytes > 0 && bytes <= REQUEST_LIMIT && status === 200,
         ),
+        diagnostics,
       ).toBe(true);
       await expect
         .poll(() => engineView(writer.page), {
