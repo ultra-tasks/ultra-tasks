@@ -257,6 +257,33 @@ describe('NativeSyncComponent', () => {
     else localStorage.setItem('ultra-native-server', previousServer);
   });
 
+  describe('conflict draft dismissal', () => {
+    for (const accepted of [false, true]) {
+      it(`only dismisses all conflict drafts after confirmation (${accepted})`, async () => {
+        await configure();
+        await render();
+        const dismissDrafts = jasmine.createSpy().and.resolveTo();
+        Object.assign(native, {
+          client: {
+            state: { scopes: { personal: { info: { id: 'personal' } } } },
+            dismissDrafts,
+          },
+        });
+        spyOn(fixture.componentInstance, 'hasConflictDrafts').and.returnValue(true);
+        const open = jasmine
+          .createSpy()
+          .and.returnValue({ afterClosed: () => of(accepted) });
+        TestBed.inject(MatDialog).open = open;
+        await fixture.componentInstance.dismissDrafts();
+        expect(open).toHaveBeenCalledWith(jasmine.any(Function), {
+          data: { message: 'NATIVE_SYNC.DISMISS_DRAFTS_CONFIRM' },
+        });
+        if (accepted) expect(dismissDrafts).toHaveBeenCalledOnceWith('personal');
+        else expect(dismissDrafts).not.toHaveBeenCalled();
+      });
+    }
+  });
+
   describe('server selection', () => {
     beforeEach(configure);
     const create = (): NativeSyncComponent =>

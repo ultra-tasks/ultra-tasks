@@ -883,6 +883,8 @@ export class NativeSyncComponent implements OnInit {
     );
   }
   async dismissDrafts(): Promise<void> {
+    if (!this.hasConflictDrafts()) return;
+    if (!(await this.confirm(T.NATIVE_SYNC.DISMISS_DRAFTS_CONFIRM))) return;
     await this.run(async () => {
       for (const scope of Object.values(this.native.client!.state.scopes))
         await this.native.client!.dismissDrafts(scope.info.id);
