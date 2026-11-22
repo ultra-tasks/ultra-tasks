@@ -248,6 +248,13 @@ export class NativePersonalBridgeService {
     const baseline = await personalRecords(wire, client.state.device.id);
     const incomplete = this.scopeId && hasPendingPersonalSetup(client, this.scopeId);
     const records = Object.values(baseline.records);
+    // A resumed SDK migration uploads its original journal and clears the
+    // records on success. Keep that starting point to identify edits made since.
+    const pendingMigrations = new Map(
+      Object.entries(client.state.migrations)
+        .filter(([scopeId]) => hasPendingPersonalSetup(client, scopeId))
+        .map(([scopeId, journal]) => [scopeId, journal.records]),
+    );
     if (restartScopeId) {
       if (!client.restartPersonalMigration) throw new Error(T.NATIVE_SYNC.ERROR_SYNC);
       this.scopeId = await client.restartPersonalMigration(restartScopeId, records);
@@ -261,11 +268,22 @@ export class NativePersonalBridgeService {
     } else {
       this.scopeId = await client.migrate(records);
     }
-    const imported = client.records(this.scopeId);
+    const resumedRecords = pendingMigrations.get(this.scopeId);
+    if (resumedRecords) {
+      const uploaded = Object.fromEntries(
+        resumedRecords.map((record) => [
+          record.entityId,
+          { ...record, revision: 0, deleted: false },
+        ]),
+      );
+      this.baseline = baselineFromHeads(uploaded, restorePersonal(uploaded));
+      this.resetDocumentCapture();
+      await this.captureSnapshot(wire);
+    }
     // Account heads contain the repaired upload, while the app still shows the
     // original working copy. Diff late edits against that actual local copy so
     // a passive capture cannot upload repaired fields back in their old form.
-    this.baseline = baselineFromHeads(imported, source);
+    this.baseline = baselineFromHeads(client.records(this.scopeId), source);
     this.resetDocumentCapture();
     onStage?.('applying');
     await this.applySnapshot(T.NATIVE_SYNC.ERROR_LOCAL_CHANGED);

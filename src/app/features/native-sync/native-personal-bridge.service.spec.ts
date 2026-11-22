@@ -43,6 +43,7 @@ describe('NativePersonalBridgeService', () => {
       account: { identity: () => identity, unlocked: { masterKey: randomKey() } },
       state: {
         device: { id: 'device' },
+        migrations: {},
         scopes: {
           personal: {
             info: { id: 'personal', kind: 'personal', state: 'active', generation: 1 },
@@ -280,6 +281,61 @@ describe('NativePersonalBridgeService', () => {
     expect(JSON.stringify(payload)).toContain('after repair');
     expect(JSON.stringify(payload)).not.toContain('before repair');
     expect(client.edit).not.toHaveBeenCalled();
+  });
+
+  it('keeps edits added after the migration journal without overwriting newer account data', async () => {
+    const state = (title: string, includeLateTask = false): Record<string, unknown> => ({
+      task: {
+        ids: includeLateTask ? ['t1', 't2'] : ['t1'],
+        entities: {
+          t1: { id: 't1', title },
+          ...(includeLateTask ? { t2: { id: 't2', title: 'added while offline' } } : {}),
+        },
+      },
+      globalConfig: { sync: { isEnabled: false } },
+    });
+    const original = await personalRecords(state('original'), 'device');
+    const remote = await personalRecords(state('renamed on another device'), 'device');
+    const heads: Record<string, PlainHead> = Object.fromEntries(
+      Object.values(remote.records).map((record) => [
+        record.entityId,
+        { ...record, revision: 2, deleted: false },
+      ]),
+    );
+    client.state.migrations['personal'] = {
+      scopeId: 'personal',
+      records: Object.values(original.records),
+      offset: 0,
+      complete: false,
+    };
+    snapshot.and.resolveTo(state('original', true));
+    client.records = () => heads;
+    (client.migrate as jasmine.Spy).and.callFake(async () => {
+      client.state.migrations['personal'] = {
+        ...client.state.migrations['personal'],
+        complete: true,
+        records: [],
+      };
+      return 'personal';
+    });
+    (client.edit as jasmine.Spy).and.callFake(
+      async (_scopeId: string, changes: RecordChange[]) => {
+        for (const change of changes)
+          heads[change.entityId] = { ...change, revision: 2, deleted: !!change.deleted };
+      },
+    );
+
+    expect(await service.bind(client)).toBeFalse();
+    await service.migrate();
+
+    expect(applied?.['task']).toEqual(
+      jasmine.objectContaining({
+        entities: jasmine.objectContaining({
+          t1: jasmine.objectContaining({ title: 'renamed on another device' }),
+          t2: jasmine.objectContaining({ title: 'added while offline' }),
+        }),
+      }),
+    );
   });
 
   it('does not publish the deletion of a passive archive repair', async () => {
