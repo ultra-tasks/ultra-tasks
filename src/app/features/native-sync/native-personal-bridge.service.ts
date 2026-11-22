@@ -28,7 +28,7 @@ import type { GlobalConfigState } from '../config/global-config.model';
 import { selectCurrentTaskId } from '../tasks/store/task.selectors';
 import { ValidateStateService } from '../../op-log/validation/validate-state.service';
 import { replacePersonalRecords } from './native-personal-replacement';
-import { hasPendingPersonalSetup } from './native-personal-recovery';
+import { hasPendingPersonalSetup, HISTORY_CHANGED } from './native-personal-recovery';
 import { TabSeqFrontierService } from '../../op-log/persistence/tab-seq-frontier.service';
 import { OperationWriteFlushService } from '../../op-log/sync/operation-write-flush.service';
 import { T } from '../../t.const';
@@ -51,12 +51,49 @@ interface TaskTimeBucket {
   foldedTime?: { path: string[]; elapsed: number };
 }
 
-type TaskLists = Partial<Record<'taskIds' | 'backlogTaskIds', string[]>>;
-interface TaskListDocument {
-  path: string[];
-  data: TaskLists;
+const NATIVE_BASELINE = 'native-sync-active';
+const CAPTURE_CHECKPOINT = 'native-sync-capture';
+
+interface EncryptedBaseline {
+  data: { namespace: string; envelope: Envelope };
 }
-const TASK_LIST_KEYS = ['taskIds', 'backlogTaskIds'] as const;
+
+interface EncryptedCheckpoint {
+  data: { namespace: string; baselineNonce: string; envelope: Envelope };
+}
+
+interface CapturedDocuments {
+  deviceId: string;
+  scopeId: string;
+  changes: RecordChange[];
+}
+
+// Applied state includes device-local settings that must not become document edits.
+const captureSource = (source: Record<string, unknown>): Record<string, unknown> => {
+  const snapshot = stripLocalOnlySyncSettingsFromAppData(source) as Record<
+    string,
+    unknown
+  >;
+  return snapshot['task']
+    ? {
+        ...snapshot,
+        task: {
+          ...(snapshot['task'] as object),
+          currentTaskId: null,
+          selectedTaskId: null,
+        },
+      }
+    : snapshot;
+};
+
+const documentRecords = (
+  records: PersonalBaseline['records'],
+): PersonalBaseline['records'] =>
+  Object.fromEntries(
+    Object.entries(records).filter(
+      ([, record]) => record.entityType === 'personal.document',
+    ),
+  );
 
 const taskTimeBucket = (
   record?: Pick<RecordChange, 'entityType' | 'value' | 'deleted'>,
@@ -92,7 +129,16 @@ export class NativePersonalBridgeService {
   private readonly writeFlush = inject(OperationWriteFlushService);
   private readonly currentTaskId = inject(Store).selectSignal(selectCurrentTaskId);
   private baseline?: PersonalBaseline;
+  // The local documents last durably queued, even if downloading or applying failed.
+  // Unlike the applied baseline, this can move ahead before the app has hydrated.
+  private capturedDocuments?: CapturedDocuments;
+  private baselineNonce?: string;
+  private appliedDocuments?: PersonalBaseline['records'];
   private client?: SyncClient;
+  // A failed SDK edit can leave an intent visible in memory but absent on disk.
+  // Do not let this exact client advance the durable capture checkpoint.
+  private failedEditClient?: SyncClient;
+  private requiresReload = false;
   scopeId?: string;
 
   private namespace(client: SyncClient): string {
@@ -105,34 +151,55 @@ export class NativePersonalBridgeService {
     return applyLocalOnlySyncSettingsToAppData(source, config.sync);
   }
   private async snapshot(): Promise<Record<string, unknown>> {
-    const snapshot = stripLocalOnlySyncSettingsFromAppData(
-      structuredClone(await this.snapshots.getStateSnapshotForOperationLogAsync()),
-    ) as unknown as Record<string, unknown>;
+    const snapshot = captureSource(
+      structuredClone(
+        await this.snapshots.getStateSnapshotForOperationLogAsync(),
+      ) as unknown as Record<string, unknown>,
+    );
     const config = snapshot['globalConfig'] as { sync?: { isEnabled?: boolean } };
     if (config.sync?.isEnabled) throw new Error('NATIVE_SYNC.ERROR_LEGACY');
-    const task = snapshot['task'] as Record<string, unknown>;
-    task['currentTaskId'] = null;
-    task['selectedTaskId'] = null;
     return snapshot;
   }
+
   async bind(client: SyncClient): Promise<boolean> {
+    if (client !== this.failedEditClient) this.failedEditClient = undefined;
     this.client = client;
+    this.resetDocumentCapture();
     this.scopeId = Object.values(client.state.scopes).find(
       (s) => s.info.kind === 'personal' && !s.revoked,
     )?.info.id;
-    const saved = (await this.opStore.loadNativeSyncBaseline('native-sync-active')) as
-      | { data: { namespace: string; envelope: Envelope } }
+    const namespace = this.namespace(client);
+    const saved = (await this.opStore.loadNativeSyncBaseline(NATIVE_BASELINE)) as
+      | EncryptedBaseline
       | undefined;
     this.baseline =
-      saved?.data.namespace === this.namespace(client)
+      saved?.data.namespace === namespace
         ? (JSON.parse(
             await open(
               client.account.unlocked!.masterKey,
               saved.data.envelope,
-              this.namespace(client),
+              namespace,
             ),
           ) as PersonalBaseline)
         : undefined;
+    if (this.baseline && saved && this.scopeId) {
+      this.baselineNonce = saved.data.envelope.nonce;
+      const checkpoint = (await this.opStore.loadNativeSyncBaseline(
+        CAPTURE_CHECKPOINT,
+      )) as EncryptedCheckpoint | undefined;
+      if (
+        checkpoint?.data.namespace === namespace &&
+        checkpoint.data.baselineNonce === this.baselineNonce
+      ) {
+        this.capturedDocuments = JSON.parse(
+          await open(
+            client.account.unlocked!.masterKey,
+            checkpoint.data.envelope,
+            this.checkpointContext(namespace, this.baselineNonce),
+          ),
+        ) as CapturedDocuments;
+      }
+    }
     return !!this.baseline && !!this.scopeId;
   }
   canRecoverSetup(uploaded: boolean): boolean {
@@ -183,6 +250,7 @@ export class NativePersonalBridgeService {
     }
     const imported = client.records(this.scopeId);
     this.baseline = baselineFromHeads(imported, restorePersonal(imported));
+    this.resetDocumentCapture();
     onStage?.('applying');
     await this.applySnapshot(T.NATIVE_SYNC.ERROR_LOCAL_CHANGED);
   }
@@ -204,6 +272,7 @@ export class NativePersonalBridgeService {
       throw new Error('Personal migration is still in progress on another device');
     // The user explicitly chose the account's existing dataset; the recovery copy retains this device's data.
     this.baseline = undefined;
+    this.resetDocumentCapture();
     onStage?.('applying');
     await this.applySnapshot(T.NATIVE_SYNC.ERROR_LOCAL_CHANGED, assertUnchanged);
   }
@@ -228,16 +297,46 @@ export class NativePersonalBridgeService {
   private async captureSnapshot(source: Record<string, unknown>): Promise<void> {
     const baseline = this.baseline;
     if (!this.client || !this.scopeId || !baseline) return;
-    const next = await personalRecords(source, this.client.state.device.id, baseline);
+    if (this.requiresReload || this.failedEditClient === this.client)
+      throw new Error(T.NATIVE_SYNC.ERROR_CAPTURE_RELOAD);
+    const deviceId = this.client.state.device.id;
+    const next = await personalRecords(source, deviceId, baseline);
     const projection = this.client.records(this.scopeId, true);
     const pending = new Map<string, RecordChange>();
-    for (const change of personalChanges(baseline, next)) {
-      const intent = this.preserveTaskLists(
-        change,
-        baseline,
-        projection[change.entityId],
-      );
-      if (intent) pending.set(intent.entityId, intent);
+    const checkpoint = this.capturedDocuments;
+    if (
+      checkpoint &&
+      (checkpoint.deviceId !== deviceId || checkpoint.scopeId !== this.scopeId)
+    )
+      throw new Error(HISTORY_CHANGED);
+    const appliedDocuments = (this.appliedDocuments ??= documentRecords(
+      (await personalRecords(captureSource(baseline.source), deviceId, baseline)).records,
+    ));
+    const observedDocuments = { ...appliedDocuments };
+    for (const record of checkpoint?.changes ?? []) {
+      if (record.deleted) delete observedDocuments[record.entityId];
+      else observedDocuments[record.entityId] = record;
+    }
+    let changedDocuments = false;
+    for (const change of personalChanges(
+      {
+        source: baseline.source,
+        records: {
+          ...Object.fromEntries(
+            Object.entries(baseline.records).filter(
+              ([, record]) => record.entityType !== 'personal.document',
+            ),
+          ),
+          ...observedDocuments,
+        },
+      },
+      next,
+    )) {
+      changedDocuments ||= change.entityType === 'personal.document';
+      const observed = observedDocuments[change.entityId];
+      const head = projection[change.entityId];
+      const intent = this.rebaseDocument(change, observed, head);
+      pending.set(intent.entityId, intent);
     }
     this.reconcileMovedTaskTime(baseline, next, projection, pending);
     const changes = [...pending.values()].filter((change) => {
@@ -256,44 +355,71 @@ export class NativePersonalBridgeService {
       )
         change.restore = true;
     }
-    for (let offset = 0; offset < changes.length; offset += 100)
-      await this.client.edit(this.scopeId, changes.slice(offset, offset + 100));
+    try {
+      for (let offset = 0; offset < changes.length; offset += 100)
+        await this.client.edit(this.scopeId, changes.slice(offset, offset + 100));
+    } catch (error) {
+      this.failedEditClient = this.client;
+      throw error;
+    }
+    if (changedDocuments) {
+      const capture = {
+        deviceId,
+        scopeId: this.scopeId,
+        changes: personalChanges(
+          { source: baseline.source, records: appliedDocuments },
+          { source: next.source, records: documentRecords(next.records) },
+        ),
+      };
+      // Commit only after every SDK edit is durable, but before this call can return
+      // to syncAll(). If queuing stops partway, the next attempt compares with the
+      // queued projection; no account merge could have run from this failed pass.
+      if (this.baselineNonce) {
+        const namespace = this.namespace(this.client);
+        await this.opStore.saveNativeSyncCheckpoint(CAPTURE_CHECKPOINT, {
+          namespace,
+          baselineNonce: this.baselineNonce,
+          envelope: await seal(
+            this.client.account.unlocked!.masterKey,
+            JSON.stringify(capture),
+            this.checkpointContext(namespace, this.baselineNonce),
+          ),
+        });
+      }
+      this.capturedDocuments = capture;
+    }
   }
-  private preserveTaskLists(
-    change: RecordChange,
-    baseline: PersonalBaseline,
-    head?: PlainHead,
-  ): RecordChange | null {
-    if (change.entityType !== 'personal.document' || change.deleted) return change;
-    const document = change.value as TaskListDocument;
-    const [model, collection, id] = document.path;
-    if (
-      (model !== 'project' && model !== 'tag') ||
-      collection !== 'entities' ||
-      document.path.length !== 3
-    )
-      return change;
-    const signed = (
-      baseline.records[change.entityId]?.value as TaskListDocument | undefined
-    )?.data;
-    const applied = (
-      baseline.source[model] as { entities?: Record<string, TaskLists> } | undefined
-    )?.entities?.[id];
-    if (
-      !signed ||
-      !applied ||
-      !TASK_LIST_KEYS.some(
-        (key) => canonical(applied[key] ?? null) !== canonical(signed[key] ?? null),
-      )
-    )
-      return change;
 
-    // The local projection can repair missing references while a peer is still uploading.
-    // Keep that repair local, and merge deliberate edits into the latest account document.
-    if (canonical(document.data) === canonical(applied)) return null;
-    const latest = (head?.value as TaskListDocument | undefined)?.data ?? signed;
-    const data = mergeRecord(applied, latest, document.data).value;
-    return { ...change, value: { ...document, data } };
+  private checkpointContext(namespace: string, nonce: string): string {
+    return namespace + ':capture:' + nonce;
+  }
+
+  private resetDocumentCapture(): void {
+    this.capturedDocuments = undefined;
+    this.appliedDocuments = undefined;
+    this.baselineNonce = undefined;
+  }
+
+  private rebaseDocument(
+    change: RecordChange,
+    observed?: RecordChange,
+    head?: PlainHead,
+  ): RecordChange {
+    if (
+      change.entityType !== 'personal.document' ||
+      change.deleted ||
+      !observed ||
+      !head ||
+      head.deleted
+    )
+      return change;
+    // edit() uses the SDK projection as its intent base. Overlay only fields the
+    // app changed since it last observed/queued the document; unchanged fields
+    // from the pre-hydration app snapshot must not undo server changes.
+    return {
+      ...change,
+      value: mergeRecord(observed.value, head.value, change.value).value,
+    };
   }
   private reconcileMovedTaskTime(
     before: PersonalBaseline,
@@ -354,52 +480,80 @@ export class NativePersonalBridgeService {
     const client = this.client!;
     if (!this.scopeId) return;
     let committed: PersonalBaseline | undefined;
-    await this.sync.applyNativeSnapshot(async () => {
-      // Called inside the op-log cutoff with deferred capture already open.
-      await this.assertSafeTabFrontier(frontierError);
-      if (assertUnchanged) await assertUnchanged();
-      if (this.baseline) await this.captureSnapshot(await this.snapshot());
-      const heads = client.records(this.scopeId!);
-      const restored = restorePersonal(heads);
-      const data = this.withLocalSettings(withDefaultModelSlices(restored));
-      const validation = await this.validation.validateAndRepair(data);
-      if (!validation.isValid) throw new Error('NATIVE_SYNC.ERROR_DATA');
-      const source = validation.repairedState ?? data;
-      committed = baselineFromHeads(heads, source as unknown as Record<string, unknown>);
-      const currentTaskId = this.currentTaskId();
-      const task = (source as typeof data).task;
-      const snapshotState = {
-        ...source,
-        task: {
-          ...task,
-          currentTaskId:
-            currentTaskId && task.entities[currentTaskId] ? currentTaskId : null,
-        },
-      } as unknown as Record<string, unknown>;
-      return {
-        snapshotState,
-        nativeBaseline: {
-          id: 'native-sync-active',
-          data: {
-            namespace: this.namespace(client),
-            envelope: await seal(
-              client.account.unlocked!.masterKey,
-              JSON.stringify(committed),
-              this.namespace(client),
-            ),
+    let nextBaselineNonce: string | undefined;
+    if (this.requiresReload) throw new Error(T.NATIVE_SYNC.ERROR_CAPTURE_RELOAD);
+    try {
+      await this.sync.applyNativeSnapshot(async () => {
+        // Called inside the op-log cutoff with deferred capture already open.
+        await this.assertSafeTabFrontier(frontierError);
+        if (assertUnchanged) await assertUnchanged();
+        if (this.baseline) await this.captureSnapshot(await this.snapshot());
+        const heads = client.records(this.scopeId!);
+        const restored = restorePersonal(heads);
+        const data = this.withLocalSettings(withDefaultModelSlices(restored));
+        const validation = await this.validation.validateAndRepair(data);
+        if (!validation.isValid) throw new Error('NATIVE_SYNC.ERROR_DATA');
+        const source = validation.repairedState ?? data;
+        committed = baselineFromHeads(
+          heads,
+          source as unknown as Record<string, unknown>,
+        );
+        const currentTaskId = this.currentTaskId();
+        const task = (source as typeof data).task;
+        const snapshotState = {
+          ...source,
+          task: {
+            ...task,
+            currentTaskId:
+              currentTaskId && task.entities[currentTaskId] ? currentTaskId : null,
           },
-        },
-      };
-    });
+        } as unknown as Record<string, unknown>;
+        const envelope = await seal(
+          client.account.unlocked!.masterKey,
+          JSON.stringify(committed),
+          this.namespace(client),
+        );
+        nextBaselineNonce = envelope.nonce;
+        return {
+          snapshotState,
+          nativeBaseline: {
+            id: NATIVE_BASELINE,
+            data: { namespace: this.namespace(client), envelope },
+          },
+        };
+      });
+    } catch (error) {
+      if (nextBaselineNonce) {
+        // A failure can happen before commit, or afterward but before NgRx loaded
+        // that snapshot. If the durable baseline moved, only a full reload can
+        // safely reestablish consistency between the persisted and running data.
+        try {
+          const saved = (await this.opStore.loadNativeSyncBaseline(NATIVE_BASELINE)) as
+            | EncryptedBaseline
+            | undefined;
+          this.requiresReload = saved?.data.envelope.nonce === nextBaselineNonce;
+        } catch {
+          this.requiresReload = true;
+        }
+      }
+      if (this.requiresReload) throw new Error(T.NATIVE_SYNC.ERROR_CAPTURE_RELOAD);
+      throw error;
+    }
     this.baseline = committed;
+    // Hydration replaced the applied baseline atomically. Any previous capture
+    // checkpoint now has a different nonce, including after an abrupt reload.
+    this.resetDocumentCapture();
+    this.baselineNonce = nextBaselineNonce;
   }
   async unlink(): Promise<void> {
-    await this.opStore.clearNativeSyncBaseline('native-sync-active');
+    await this.opStore.clearNativeSyncBaseline(NATIVE_BASELINE);
+    await this.opStore.clearNativeSyncBaseline(CAPTURE_CHECKPOINT);
     this.clear();
   }
   clear(): void {
     this.client = undefined;
     this.baseline = undefined;
+    this.resetDocumentCapture();
     this.scopeId = undefined;
   }
 }

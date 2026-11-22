@@ -3,8 +3,11 @@ import {
   archiveTask,
   createSimulatedClient,
   expectExactTaskTime,
+  markTaskDone,
+  renameTask,
   recordTaskTimeDelta,
 } from '../../utils/supersync-helpers';
+import { waitForStatePersistence } from '../../utils/waits';
 import {
   addLocalTask,
   closeDevices,
@@ -12,6 +15,7 @@ import {
   engineCall,
   engineView,
   newDevice,
+  readContent,
   signIn,
   taskTitles,
   ultraUrl,
@@ -365,6 +369,63 @@ test.describe('@ultra personal sync preserves edits', () => {
       await expect.poll(() => engineView(writer.page)).toMatchObject({ error: '' });
     } finally {
       await closeDevices(writer, peer);
+    }
+  });
+  test('does not undo a remote completion when an offline device renames the same task', async ({
+    browser,
+  }) => {
+    // A stock disposable harness can run just this test with
+    // E2E_ULTRA_COMPLETION_ACCOUNT=personaledittimer; do not reuse that account in parallel.
+    const account = process.env.E2E_ULTRA_COMPLETION_ACCOUNT ?? 'personaleditcompletion';
+    const title = 'Concurrent completion marker';
+    const renamed = title + ' renamed';
+    const desktop = await newDevice(browser, 'Completing device');
+    const phone = await newDevice(browser, 'Renaming device');
+    const fresh = await newDevice(browser, 'Fresh device');
+    const completed = (page: Page, match: string): Promise<boolean | undefined> =>
+      readContent(page).then(
+        ({ tasks }) => tasks.find((task) => task.title === match)?.isDone,
+      );
+    const expectCompletion = (
+      page: Page,
+      match: string,
+      isDone: boolean,
+    ): Promise<void> =>
+      expect.poll(() => completed(page, match), { timeout: 30000 }).toBe(isDone);
+
+    try {
+      await addLocalTask(desktop, title);
+      await connectFirstDevice(desktop, account);
+      await signIn(phone.page, account);
+      await expectCompletion(phone.page, title, false);
+      await expect.poll(async () => (await engineView(phone.page)).linked).toBe(true);
+
+      const reconnect = await disconnectSync(phone.page);
+      await phone.page.goto('/#/tag/TODAY/tasks');
+      await renameTask(phone, title, renamed);
+      await expectCompletion(phone.page, renamed, false);
+
+      await desktop.page.goto('/#/tag/TODAY/tasks');
+      await markTaskDone(desktop, title);
+      await waitForStatePersistence(desktop.page);
+      const lastSync = (await engineView(desktop.page)).lastSyncedAt ?? 0;
+      await engineCall(desktop.page, 'syncNow');
+      await expect
+        .poll(async () => (await engineView(desktop.page)).lastSyncedAt ?? 0)
+        .toBeGreaterThan(lastSync);
+      await expectCompletion(desktop.page, title, true);
+
+      await reconnect();
+      await engineCall(phone.page, 'syncNow');
+      // Any spurious intent created during apply can be uploaded on a later pass.
+      await engineCall(phone.page, 'syncNow');
+      await engineCall(desktop.page, 'syncNow');
+      await signIn(fresh.page, account);
+      for (const device of [fresh, desktop, phone]) {
+        await expectCompletion(device.page, renamed, true);
+      }
+    } finally {
+      await closeDevices(desktop, phone, fresh);
     }
   });
 });

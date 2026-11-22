@@ -4363,6 +4363,7 @@
     "ERROR_PASSKEY": "The security key could not be used here. Use a 2FA recovery code or a browser that supports passkeys.",
     "ERROR_BROWSER": "This browser cannot safely coordinate account sync storage. Use a current supported browser.",
     "ERROR_TAB": "This account is already unlocked in another tab. Lock it there first.",
+    "ERROR_CAPTURE_RELOAD": "Sync paused to protect this device’s edits. Close and reopen the app before trying again.",
     "ERROR_RELOAD_TAB": "Sync paused because another tab saved changes. Close the other tab and reload this one to sync all your edits.",
     "OPEN": "Ultra Tasks account settings",
     "DISMISS_DRAFTS": "Dismiss exported conflict drafts",

@@ -26,11 +26,15 @@ describe('NativePersonalBridgeService', () => {
   let service: NativePersonalBridgeService;
   let saved: { data: { namespace: string; envelope: unknown } } | undefined;
   let applied: Record<string, unknown> | undefined;
+  let captureCheckpoint: unknown;
+  let failApply: 'before commit' | 'after commit' | undefined;
   let snapshot: jasmine.Spy;
   let client: SyncClient;
   beforeEach(() => {
     saved = undefined;
     applied = undefined;
+    captureCheckpoint = undefined;
+    failApply = undefined;
     snapshot = jasmine.createSpy().and.resolveTo({
       task: { ids: [], entities: {} },
       globalConfig: { sync: { isEnabled: false } },
@@ -41,7 +45,7 @@ describe('NativePersonalBridgeService', () => {
         device: { id: 'device' },
         scopes: {
           personal: {
-            info: { id: 'personal', kind: 'personal', state: 'active' },
+            info: { id: 'personal', kind: 'personal', state: 'active', generation: 1 },
             intents: [],
           },
         },
@@ -70,9 +74,16 @@ describe('NativePersonalBridgeService', () => {
         {
           provide: OperationLogStoreService,
           useValue: {
-            loadNativeSyncBaseline: () => Promise.resolve(saved),
-            clearNativeSyncBaseline: async () => {
-              saved = undefined;
+            loadNativeSyncBaseline: (id: string) =>
+              Promise.resolve(id === 'native-sync-capture' ? captureCheckpoint : saved),
+            saveNativeSyncCheckpoint: jasmine
+              .createSpy()
+              .and.callFake(async (id: string, data: unknown) => {
+                captureCheckpoint = { id, data };
+              }),
+            clearNativeSyncBaseline: async (id: string) => {
+              if (id === 'native-sync-capture') captureCheckpoint = undefined;
+              else saved = undefined;
             },
             getFirstOpEntry: jasmine
               .createSpy('getFirstOpEntry')
@@ -84,9 +95,18 @@ describe('NativePersonalBridgeService', () => {
           provide: OperationLogSyncService,
           useValue: {
             applyNativeSnapshot: async (
-              prepare: () => Promise<{ snapshotState: Record<string, unknown> }>,
+              prepare: () => Promise<{
+                snapshotState: Record<string, unknown>;
+                nativeBaseline: { data: { namespace: string; envelope: unknown } };
+              }>,
             ) => {
-              applied = (await prepare()).snapshotState;
+              const result = await prepare();
+              if (failApply === 'before commit')
+                throw new Error('simulated durable apply failure');
+              saved = result.nativeBaseline;
+              if (failApply === 'after commit')
+                throw new Error('simulated durable apply failure');
+              applied = result.snapshotState;
             },
           },
         },
@@ -501,5 +521,133 @@ describe('NativePersonalBridgeService', () => {
       restore?: boolean;
     }[];
     expect(stale.find((change) => change.entityId === entityId)?.restore).toBeUndefined();
+  });
+  for (const mode of [
+    'late edit',
+    'reload',
+    'apply retry',
+    'resolved overlap',
+    'resolved overlap after reload',
+    'server generation change',
+  ] as const) {
+    it(`preserves a remote completion during ${mode}`, async () => {
+      type TestTask = { id: string; title: string; isDone: boolean };
+      const make = (title: string, isDone: boolean): Record<string, unknown> => ({
+        globalConfig: { sync: { isEnabled: false } },
+        task: {
+          ids: ['one'],
+          entities: { one: { id: 'one', title, isDone } },
+          currentTaskId: null,
+          selectedTaskId: null,
+        },
+      });
+      const asHeads = (records: PersonalBaseline['records']): Record<string, PlainHead> =>
+        Object.fromEntries(
+          Object.values(records).map((record) => [
+            record.entityId,
+            { ...record, revision: 1, deleted: false },
+          ]),
+        );
+      const initial = await personalRecords(make('original', false), 'device');
+      await baseline(initial);
+      let heads = asHeads(initial.records);
+      spyOn(client, 'records').and.callFake(() => heads);
+      (client.edit as jasmine.Spy).and.callFake(
+        async (_scopeId: string, changes: RecordChange[]) => {
+          heads = {
+            ...heads,
+            ...asHeads(Object.fromEntries(changes.map((r) => [r.entityId, r]))),
+          };
+        },
+      );
+      await service.bind(client);
+      snapshot.and.resolveTo(make('first rename', false));
+      await service.capture();
+      const overlap = mode.startsWith('resolved overlap');
+      heads = asHeads(
+        (
+          await personalRecords(
+            make(overlap ? 'committed rename' : 'first rename', true),
+            'device',
+          )
+        ).records,
+      );
+
+      if (mode === 'server generation change')
+        client.state.scopes['personal'].info.generation++;
+      if (mode.endsWith('reload')) await service.bind(client);
+      if (mode === 'apply retry') {
+        failApply = 'before commit';
+        await expectAsync(service.apply()).toBeRejectedWithError(
+          'simulated durable apply failure',
+        );
+        failApply = undefined;
+      }
+
+      if (!overlap) snapshot.and.resolveTo(make('late rename', false));
+      await service.apply();
+
+      const readTask = (value: Record<string, unknown>): TestTask =>
+        (value['task'] as { entities: Record<string, TestTask> }).entities['one'];
+      expect(readTask(applied!)).toEqual({
+        id: 'one',
+        title: overlap ? 'committed rename' : 'late rename',
+        isDone: true,
+      });
+      const expectedEdits = overlap ? 1 : 2;
+      expect(client.edit).toHaveBeenCalledTimes(expectedEdits);
+
+      // The newly hydrated source now reflects the merged document; a new pass is a no-op.
+      snapshot.and.resolveTo(applied);
+      await service.bind(client);
+      await service.capture();
+      expect(client.edit).toHaveBeenCalledTimes(expectedEdits);
+    });
+  }
+  it('cannot checkpoint a volatile SDK intent after a partially failed capture batch', async () => {
+    await baseline();
+    await service.bind(client);
+    const tasks = Array.from({ length: 105 }, (_value, n) => ({ id: String(n) }));
+    snapshot.and.resolveTo({
+      globalConfig: { sync: { isEnabled: false } },
+      task: {
+        ids: tasks.map(({ id }) => id),
+        entities: Object.fromEntries(tasks.map((task) => [task.id, task])),
+      },
+    });
+    const edits = client.edit as jasmine.Spy;
+    const volatile: Record<string, PlainHead> = {};
+    spyOn(client, 'records').and.returnValue(volatile);
+    edits.and.callFake(async (_scopeId: string, changes: RecordChange[]) => {
+      for (const change of changes)
+        volatile[change.entityId] = { ...change, revision: 1, deleted: false };
+      if (edits.calls.count() === 2) throw new Error('failed to persist SDK queue');
+    });
+    await expectAsync(service.capture()).toBeRejectedWithError(
+      'failed to persist SDK queue',
+    );
+    expect(edits.calls.first().args[1].length).toBe(100);
+    expect(captureCheckpoint).toBeUndefined();
+    // Even if a previous SDK edit is visible through records(), it might be absent on disk.
+    await expectAsync(service.capture()).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_CAPTURE_RELOAD',
+    );
+    expect(edits).toHaveBeenCalledTimes(2);
+    expect(captureCheckpoint).toBeUndefined();
+  });
+
+  it('blocks a retry in the same renderer if durable apply committed before an error', async () => {
+    await baseline();
+    await service.bind(client);
+    failApply = 'after commit';
+    await expectAsync(service.apply()).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_CAPTURE_RELOAD',
+    );
+    failApply = undefined;
+    await service.bind(client);
+    await expectAsync(service.capture()).toBeRejectedWithError(
+      'NATIVE_SYNC.ERROR_CAPTURE_RELOAD',
+    );
+    expect(applied).toBeUndefined();
   });
 });

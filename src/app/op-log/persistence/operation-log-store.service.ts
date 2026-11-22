@@ -874,13 +874,16 @@ export class OperationLogStoreService implements RemoteOperationApplyStorePort<O
     return this._appendBatchSkipDuplicates(ops, 'remote', undefined, true);
   }
 
-  /** Read an account-namespaced encrypted native-sync projection baseline. */
   async loadNativeSyncBaseline(id: string): Promise<unknown> {
     await this._ensureInit();
     return this._adapter.get(STORE_NAMES.META, id);
   }
 
-  /** Retire only the device-local link, preserving tasks, operations and queues. */
+  async saveNativeSyncCheckpoint(id: string, data: unknown): Promise<void> {
+    await this._ensureInit();
+    await this._adapter.put(STORE_NAMES.META, { id, data }, id);
+  }
+
   async clearNativeSyncBaseline(id: string): Promise<void> {
     await this._ensureInit();
     await this._adapter.delete(STORE_NAMES.META, id);
