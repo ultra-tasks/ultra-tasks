@@ -118,7 +118,7 @@ test.describe('@ultra first sync on an empty device', () => {
   test('backs up overwritten preferences on a settings-only device that downloads automatically', async ({
     browser,
   }) => {
-    const account = process.env.E2E_RECOVERY_SETTINGS_ACCOUNT ?? 'recovery-settings';
+    const account = process.env.E2E_RECOVERY_SETTINGS_ACCOUNT ?? 'recoverysettings';
     const title = `Account-side task ${Date.now()}`;
     const desktop = await newDevice(browser, 'Desktop');
     const phone = await newDevice(browser, 'Settings-only phone');

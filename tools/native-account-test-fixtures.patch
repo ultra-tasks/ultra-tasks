@@ -42,7 +42,7 @@ index daef70b..91028d4 100644
 +      }
 +    } else {
 +      await harness.register('personaleditcompletion@example.test', 'personaleditcompletion');
-+      await harness.register('recovery-settings@example.test', 'recovery-settings');
++      await harness.register('recoverysettings@example.test', 'recoverysettings');
 +      for (let i = 1; i <= 24; i += 1) {
 +        await harness.register(`first${i}@example.test`, `first${i}`);
 +        await harness.register(`restore${i}@example.test`, `restore${i}`);
