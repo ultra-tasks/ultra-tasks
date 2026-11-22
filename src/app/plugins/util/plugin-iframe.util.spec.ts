@@ -74,6 +74,40 @@ describe('handlePluginMessage()', () => {
     boundMethods,
   });
 
+  it('does not expose Microsoft To Do bridge methods to other plugin frames', async () => {
+    const source = jasmine.createSpyObj<{ postMessage: jasmine.Spy }>('iframe', [
+      'postMessage',
+    ]);
+    const loadMsTodoImportData = jasmine.createSpy('loadMsTodoImportData');
+    const config = createConfig({
+      createBoundMethods: () => ({}),
+      loadMsTodoImportData,
+    } as unknown as PluginBridgeService);
+    expect(createPluginApiScript(config)).not.toContain('loadMsTodoImportData:');
+    await handlePluginMessage(
+      {
+        source,
+        data: {
+          type: PluginIframeMessageType.API_CALL,
+          bridgeToken: config.bridgeToken,
+          bridgeGeneration: config.bridgeGeneration,
+          method: 'loadMsTodoImportData',
+          callId: 46,
+        },
+      } as unknown as MessageEvent,
+      config,
+    );
+    expect(loadMsTodoImportData).not.toHaveBeenCalled();
+    expect(source.postMessage).toHaveBeenCalledWith(
+      {
+        type: PluginIframeMessageType.API_ERROR,
+        callId: 46,
+        error: 'Importer API is not available.',
+      },
+      '*',
+    );
+  });
+
   it('rebuilds iframe dialog button handlers and returns the selected result', async () => {
     let bridgedDialogCfg:
       | {

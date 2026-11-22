@@ -1,3 +1,5 @@
+import { MS_TODO_OAUTH_CONFIG } from './oauth/ms-todo-import-oauth';
+
 // Each plugin's `id` (from its manifest.json, distinct from the asset path
 // here) becomes the entityId prefix for all data it persists via
 // `persistDataSynced` — keyed entries land under `<pluginId>:<key>` in IDB,
@@ -25,7 +27,10 @@ export const BUNDLED_PLUGIN_PATHS = [
   'assets/bundled-plugins/doc-mode',
   'assets/bundled-plugins/app-auto-track',
   'assets/bundled-plugins/parallel-code',
-] as const;
+  'assets/bundled-plugins/ms-todo-import',
+].filter(
+  (path) => MS_TODO_OAUTH_CONFIG || path !== 'assets/bundled-plugins/ms-todo-import',
+);
 
 // Reserved ids: an uploaded plugin may not reuse a bundled plugin's manifest id (it would
 // let unverified code impersonate a built-in — and, with nodeExecution now openable to
@@ -48,6 +53,7 @@ export const BUNDLED_PLUGIN_IDS = new Set<string>([
   'github-issue-provider',
   'google-calendar-provider',
   'linear-issue-provider',
+  'ms-todo-import',
   'nextcloud-deck-issue-provider',
   'parallel-code',
   'procrastination-buster',

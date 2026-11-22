@@ -1,8 +1,13 @@
 import { PluginBridgeService } from '../plugin-bridge.service';
+import type { MsTodoImportService } from '../ms-todo-import.service';
 import { PluginBaseCfg, PluginManifest } from '../plugin-api.model';
 import { PluginHooks, PluginIframeMessageType } from '@super-productivity/plugin-api';
 import { PluginLog } from '../../core/log';
 import { PLUGIN_UI_KIT_CSS } from './plugin-ui-kit.css';
+import {
+  MS_TODO_IMPORT_PLUGIN_ID,
+  MS_TODO_OAUTH_CONFIG,
+} from '../oauth/ms-todo-import-oauth';
 
 /**
  * Simplified plugin iframe utilities following KISS principles.
@@ -15,6 +20,7 @@ export interface PluginIframeConfig {
   indexHtml: string;
   baseCfg: PluginBaseCfg;
   pluginBridge: PluginBridgeService;
+  msTodoImport?: MsTodoImportService;
   bridgeToken: string;
   bridgeGeneration: number;
   boundMethods?: ReturnType<typeof PluginBridgeService.prototype.createBoundMethods>;
@@ -245,6 +251,11 @@ export const createPluginCssInjection = (): string => {
 /**
  * Create the plugin API script - simple and direct
  */
+const canUseMsTodoImport = (config: PluginIframeConfig): boolean =>
+  !!MS_TODO_OAUTH_CONFIG &&
+  !!config.msTodoImport &&
+  config.pluginId === MS_TODO_IMPORT_PLUGIN_ID;
+
 export const createPluginApiScript = (config: PluginIframeConfig): string => {
   return `
     <script>
@@ -390,7 +401,7 @@ export const createPluginApiScript = (config: PluginIframeConfig): string => {
                 pendingCalls.delete(id);
                 reject(new Error('API call timeout'));
               }
-            }, 30000);
+            }, method === 'loadMsTodoImportData' ? 600000 : 30000);
           });
         }
 
@@ -444,6 +455,14 @@ export const createPluginApiScript = (config: PluginIframeConfig): string => {
           },
           notify: (cfg) => callApi('notify', [cfg]),
           request: (url, options) => callApi('request', [url, options]),
+          ${
+            canUseMsTodoImport(config)
+              ? `
+          loadMsTodoImportData: () => callApi('loadMsTodoImportData'),
+          addTaskRepeatCfg: (taskId, schedule) => callApi('addMsTodoImportRepeat', [taskId, schedule]),
+          `
+              : ''
+          }
           openDialog: (cfg) => callApi('openDialog', [cfg]),
           showIndexHtmlAsView: () => callApi('showIndexHtmlAsView'),
           showIndexHtmlInSidePanel: () => callApi('showIndexHtmlInSidePanel'),
@@ -632,6 +651,21 @@ export const handlePluginMessage = async (
     const { method, args = [], callId } = data;
 
     try {
+      if (method === 'loadMsTodoImportData' || method === 'addMsTodoImportRepeat') {
+        const importer = config.msTodoImport;
+        if (!importer || !canUseMsTodoImport(config)) {
+          throw new Error('Importer API is not available.');
+        }
+        const result =
+          method === 'loadMsTodoImportData'
+            ? await importer.loadData()
+            : await importer.addRepeat(args[0], args[1]);
+        (event.source as Window)?.postMessage(
+          { type: PluginIframeMessageType.API_RESPONSE, callId, result },
+          '*',
+        );
+        return;
+      }
       if (!ALLOWED_IFRAME_API_METHODS.has(method)) {
         throw new Error(`Unknown API method: ${method}`);
       }

@@ -4,6 +4,7 @@ import {
   ElementRef,
   inject,
   Input,
+  Injector,
   OnDestroy,
   OnInit,
   signal,
@@ -34,6 +35,10 @@ import { LayoutService } from '../../../core-ui/layout/layout.service';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import {
+  MS_TODO_IMPORT_PLUGIN_ID,
+  MS_TODO_OAUTH_CONFIG,
+} from '../../oauth/ms-todo-import-oauth';
 
 @Component({
   selector: 'plugin-index',
@@ -79,6 +84,7 @@ export class PluginIndexComponent implements OnInit, OnDestroy {
   @Input() skipCleanupOnDestroy: boolean = false;
 
   private readonly _route = inject(ActivatedRoute);
+  private readonly _injector = inject(Injector);
   private readonly _router = inject(Router);
   private readonly _elRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly _sanitizer = inject(DomSanitizer);
@@ -251,6 +257,12 @@ export class PluginIndexComponent implements OnInit, OnDestroy {
     }
 
     const baseCfg = await this._pluginService.getBaseCfg();
+    const msTodoImport =
+      MS_TODO_OAUTH_CONFIG && pluginId === MS_TODO_IMPORT_PLUGIN_ID
+        ? this._injector.get(
+            (await import('../../ms-todo-import.service')).MsTodoImportService,
+          )
+        : undefined;
     // Checked after the LAST await: ngOnDestroy has already run cleanup, so a
     // message listener added below would never be removed.
     if (this._isDestroyed) {
@@ -263,6 +275,7 @@ export class PluginIndexComponent implements OnInit, OnDestroy {
       manifest: plugin.manifest,
       indexHtml: indexContent,
       baseCfg,
+      msTodoImport,
       pluginBridge: this._pluginBridge,
       bridgeToken: this._createBridgeToken(),
       bridgeGeneration: this._pluginService.getPluginIframeGeneration(pluginId),

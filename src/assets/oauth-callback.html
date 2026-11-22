@@ -5,6 +5,10 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'unsafe-inline'"
     />
+    <meta
+      name="referrer"
+      content="no-referrer"
+    />
     <title>Authorization Complete</title>
   </head>
   <body>
@@ -15,6 +19,7 @@
         var code = params.get('code');
         var error = params.get('error');
         var state = params.get('state');
+        window.history.replaceState(null, '', window.location.pathname);
         if (window.opener) {
           window.opener.postMessage(
             { type: 'SP_OAUTH_CALLBACK', code: code, error: error, state: state },

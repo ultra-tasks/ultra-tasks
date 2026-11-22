@@ -22,6 +22,7 @@
 - [[2.20-Import-from-Todoist]]
 - [[2.21-Manage-Plugins]]
 - [[2.22-Import-from-TickTick]]
+- [[2.27-Import-from-Microsoft-To-Do]]
 - [[2.13-Run-with-Docker]]
 
 ### Contributing to Ultra Tasks

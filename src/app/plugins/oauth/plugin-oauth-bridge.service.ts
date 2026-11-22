@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OAuthFlowConfig, OAuthTokenResult } from '@super-productivity/plugin-api';
+import { MS_TODO_IMPORT_PLUGIN_ID, MS_TODO_OAUTH_CONFIG } from './ms-todo-import-oauth';
 import { PluginOAuthService } from './plugin-oauth.service';
 import { resolveEffectiveOAuthConfig } from './resolve-effective-oauth-config.util';
 import {
@@ -82,6 +83,32 @@ export class PluginOAuthBridgeService {
     config: OAuthFlowConfig,
     tokenKey?: string,
   ): Promise<OAuthTokenResult> {
+    const { tokens, ...tokenConfig } = await this._authorize(pluginId, config);
+    const scopedPluginId = this._oauthPersistenceKey(pluginId, tokenKey);
+    this._pluginOAuthService.storeTokens(scopedPluginId, { ...tokens, ...tokenConfig });
+    await this._persistOAuthTokens(scopedPluginId);
+    return tokens;
+  }
+
+  /** One-time Microsoft import: keep the access token in memory, not in the token store. */
+  async authorizeMsTodoImport(): Promise<string> {
+    if (!MS_TODO_OAUTH_CONFIG)
+      throw new Error('Microsoft To Do import is not configured.');
+    const {
+      tokens: { accessToken },
+    } = await this._authorize(MS_TODO_IMPORT_PLUGIN_ID, MS_TODO_OAUTH_CONFIG);
+    return accessToken;
+  }
+
+  private async _authorize(
+    pluginId: string,
+    config: OAuthFlowConfig,
+  ): Promise<{
+    tokens: OAuthTokenResult;
+    tokenUrl: string;
+    clientId: string;
+    clientSecret?: string;
+  }> {
     // Validate URLs before starting the loopback server. On Electron,
     // prepareRedirectUri() starts a server — avoid leaking it if config is invalid.
     this._pluginOAuthService.validateOAuthConfig(config);
@@ -113,7 +140,6 @@ export class PluginOAuthBridgeService {
     this._openOAuthWindow(url);
 
     const code = await this._pluginOAuthService.waitForRedirectCode(pluginId, state);
-    const scopedPluginId = this._oauthPersistenceKey(pluginId, tokenKey);
 
     const tokens = await this._pluginOAuthService.exchangeCodeForTokens({
       tokenUrl: effectiveConfig.tokenUrl,
@@ -124,16 +150,12 @@ export class PluginOAuthBridgeService {
       clientSecret: effectiveConfig.clientSecret,
     });
 
-    this._pluginOAuthService.storeTokens(scopedPluginId, {
-      ...tokens,
+    return {
+      tokens,
       tokenUrl: effectiveConfig.tokenUrl,
       clientId: effectiveConfig.clientId,
       clientSecret: effectiveConfig.clientSecret,
-    });
-
-    await this._persistOAuthTokens(scopedPluginId);
-
-    return tokens;
+    };
   }
 
   async clearOAuthToken(pluginId: string, tokenKey?: string): Promise<void> {

@@ -16,6 +16,7 @@ import {
   Component,
   ElementRef,
   inject,
+  Injector,
   viewChild,
   OnInit,
 } from '@angular/core';
@@ -66,6 +67,12 @@ import {
 } from '../importers/builtin-import.service';
 import { ImportResult } from '../../../../packages/plugin-dev/todoist-import/src/map/run-import';
 
+import { PluginService } from '../../plugins/plugin.service';
+import {
+  MS_TODO_IMPORT_PLUGIN_ID,
+  MS_TODO_OAUTH_CONFIG,
+} from '../../plugins/oauth/ms-todo-import-oauth';
+
 @Component({
   selector: 'file-imex',
   templateUrl: './file-imex.component.html',
@@ -96,6 +103,8 @@ export class FileImexComponent implements OnInit {
   private _importEncryptionHandler = inject(ImportEncryptionHandlerService);
   private _builtinImport = inject(BuiltinImportService);
   private _cd = inject(ChangeDetectorRef);
+  private _injector = inject(Injector);
+  readonly isMsTodoImportAvailable = !!MS_TODO_OAUTH_CONFIG;
 
   readonly fileInputRef = viewChild<ElementRef>('fileInput');
   T: typeof T = T;
@@ -149,6 +158,25 @@ export class FileImexComponent implements OnInit {
   async importSelected(): Promise<void> {
     if (this.importSource === 'url') this.openUrlImportDialog();
     else this.fileInputRef()?.nativeElement.click();
+  }
+
+  async openMsTodoImport(): Promise<void> {
+    if (!this.isMsTodoImportAvailable) return;
+    try {
+      const plugins = this._injector.get(PluginService);
+      if (!plugins.isInitialized()) await plugins.initializePlugins();
+      const instance = await plugins.activatePlugin(MS_TODO_IMPORT_PLUGIN_ID, true);
+      if (!instance) throw new Error('Microsoft To Do import is unavailable.');
+      if (await this._router.navigate(['/plugins', MS_TODO_IMPORT_PLUGIN_ID, 'index'])) {
+        // Settings is a persistent dialog, so routing does not remove its overlay.
+        this._matDialog.getDialogById('settings-window')?.close();
+      }
+    } catch {
+      this._snackService.open({
+        type: 'ERROR',
+        msg: T.FILE_IMEX.S_ERR_MS_TODO_IMPORT_OPEN,
+      });
+    }
   }
 
   async importTasks(): Promise<void> {

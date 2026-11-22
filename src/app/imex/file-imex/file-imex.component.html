@@ -69,6 +69,17 @@
     type="file"
     [accept]="isCsvImport ? '.csv,text/csv' : '.json,application/json'"
   />
+  @if (isMsTodoImportAvailable) {
+    <button
+      (click)="openMsTodoImport()"
+      [disabled]="isImporting"
+      mat-stroked-button
+      type="button"
+    >
+      <mat-icon>move_to_inbox</mat-icon>
+      {{ T.FILE_IMEX.IMPORT_FROM_MS_TODO | translate }}
+    </button>
+  }
   @if (importError) {
     <p
       class="callout callout--danger"
