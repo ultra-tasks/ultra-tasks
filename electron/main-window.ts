@@ -316,7 +316,12 @@ export const createWindow = async ({
     removeKeyInAnyCase(requestHeaders, 'accept-encoding');
     removeKeyInAnyCase(requestHeaders, 'accept-language');
     removeKeyInAnyCase(requestHeaders, 'priority');
-    removeKeyInAnyCase(requestHeaders, 'accept');
+    // GitHub's device endpoints return form data by default. The app asks for JSON.
+    const isGitHubDeviceFlowPost =
+      details.method === 'POST' &&
+      (details.url === 'https://github.com/login/device/code' ||
+        details.url === 'https://github.com/login/oauth/access_token');
+    if (!isGitHubDeviceFlowPost) removeKeyInAnyCase(requestHeaders, 'accept');
 
     // NOTE this is needed for GitHub api requests to work :(
     // office365 needs a User-Agent as well (#4677)
