@@ -57,14 +57,36 @@ const beforeSendHeaders = vm.runInNewContext(
     apiUserAgent: 'SuperProductivity/test',
   },
 );
-const headersFor = (method, host, requestHeaders = {}) => {
+const headersFor = (method, host, requestHeaders = {}, pathname = '/sync-data.json') => {
   let result;
   beforeSendHeaders(
-    { method, url: `https://${host}/sync-data.json`, requestHeaders },
+    { method, url: `https://${host}${pathname}`, requestHeaders },
     (response) => (result = response.requestHeaders),
   );
   return result;
 };
+
+test('preserves JSON negotiation for both GitHub device-flow POSTs', () => {
+  const accept = { Accept: 'application/json' };
+  for (const pathname of ['/login/device/code', '/login/oauth/access_token']) {
+    assert.equal(
+      headersFor('POST', 'github.com', { ...accept }, pathname).Accept,
+      accept.Accept,
+    );
+    assert.equal(
+      headersFor('GET', 'github.com', { ...accept }, pathname).Accept,
+      undefined,
+    );
+    assert.equal(
+      headersFor('POST', 'example.com', { ...accept }, pathname).Accept,
+      undefined,
+    );
+  }
+  assert.equal(
+    headersFor('POST', 'github.com', { ...accept }, '/login/device').Accept,
+    undefined,
+  );
+});
 
 test('the hook recognises the exact marker the adapter emits (#9985)', () => {
   // Guards the cross-target string contract in both directions: the hook must
