@@ -6,6 +6,10 @@ on:
         description: Desktop GitHub Release run with successful validation and package jobs
         required: true
         type: string
+      publish_existing_draft:
+        description: Publish the staged release at the tested commit and keep its files and notes
+        type: boolean
+        default: false
 permissions:
   contents: write
   actions: read
@@ -41,30 +45,47 @@ jobs:
       - name: Publish tested packages
         env:
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          PUBLISH_EXISTING_DRAFT: ${{ inputs.publish_existing_draft }}
         shell: bash
         run: |
           set -euo pipefail
-          # The release token cannot tag a historical workflow revision. Permit
-          # a current tag only when the packaged app source is still identical.
-          gh api "repos/$GH_REPO/compare/$SOURCE_SHA...$GITHUB_SHA" > /tmp/changes.json
-          jq -e '.files | all(.filename | startswith(".github/workflows/") or startswith("docs/"))' /tmp/changes.json
           VERSION=$(node -p "require('./package.json').version")
           TAG="ultra-tasks-v${VERSION}"
           PRERELEASE=$(node -p "require('./tools/release-version').getReleaseInfo('ultra-tasks-v'+require('./package.json').version).prerelease")
+          LATEST=true
+          if [ "$PRERELEASE" = true ]; then LATEST=false; fi
           test "$(find downloads -name '*.exe' | wc -l)" -eq 2
           test "$(find downloads -name '*.dmg' | wc -l)" -eq 3
           test "$(find downloads -name '*.zip' | wc -l)" -eq 2
           test "$(find downloads -name '*.AppImage' | wc -l)" -eq 1
           test "$(find downloads -name '*.deb' | wc -l)" -eq 1
           test "$(find downloads -name '*.rpm' | wc -l)" -eq 1
+          if [ "$PUBLISH_EXISTING_DRAFT" = true ]; then
+            gh api --paginate --slurp "repos/$GH_REPO/releases?per_page=100" |
+              jq -e --arg tag "$TAG" --arg sha "$SOURCE_SHA" --argjson prerelease "$PRERELEASE" '
+                [flatten(1)[] | select(.tag_name == $tag)]
+                | select(length == 1) | .[0]
+                | select(.draft and .target_commitish == $sha and .prerelease == $prerelease)
+                | select(all(.assets[]; .state == "uploaded" and ((.digest // "") | test("^sha256:[a-f0-9]{64}$"))))
+                | select(any(.assets[]; .name == "SHA256SUMS.txt"))
+              ' > /tmp/release-draft.json
+            for file in downloads/*; do
+              digest="sha256:$(sha256sum < "$file" | cut -d ' ' -f 1)"
+              jq -e --arg name "${file##*/}" --arg digest "$digest" \
+                'any(.assets[]; .name == $name and .digest == $digest)' /tmp/release-draft.json
+            done
+            # Use the workflow token so only explicitly dispatched store jobs run.
+            gh release edit "$TAG" --draft=false --latest="$LATEST"
+            exit
+          fi
+          # For a new release, a current tag is allowed only when the packaged
+          # app source is identical to the source from the desktop build.
+          gh api "repos/$GH_REPO/compare/$SOURCE_SHA...$GITHUB_SHA" > /tmp/changes.json
+          jq -e '.files | all(.filename | startswith(".github/workflows/") or startswith("docs/"))' /tmp/changes.json
           (cd downloads && sha256sum * > SHA256SUMS.txt)
           cp build/desktop-release-notes.md /tmp/notes.md
           printf '\nA Universal Mac DMG supporting both Intel and Apple Silicon is also included.\n' >> /tmp/notes.md
           printf '\nPackages were built and tested from commit `%s`; subsequent changes affect release automation and documentation only.\n' "$SOURCE_SHA" >> /tmp/notes.md
           # GITHUB_TOKEN avoids triggering the inherited store-publishing workflows.
           gh release create "$TAG" downloads/* --target "$GITHUB_SHA" --title "Ultra Tasks ${VERSION}" --notes-file /tmp/notes.md --draft --prerelease="$PRERELEASE"
-          if [ "$PRERELEASE" = true ]; then
-            gh release edit "$TAG" --draft=false --latest=false
-          else
-            gh release edit "$TAG" --draft=false --latest
-          fi
+          gh release edit "$TAG" --draft=false --latest="$LATEST"
