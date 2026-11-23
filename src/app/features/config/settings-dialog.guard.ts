@@ -1,7 +1,8 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, NavigationEnd, Router } from '@angular/router';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogState } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
+import { firstValueFrom } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 import { T } from '../../t.const';
 import { dialogSize, dialogWindowHeight } from '../../ui/dialog-size.util';
@@ -9,6 +10,7 @@ import { dialogSize, dialogWindowHeight } from '../../ui/dialog-size.util';
 /** Keep the current workspace mounted underneath settings, including shortcut entry. */
 export const settingsDialogGuard: CanActivateFn = async (route) => {
   const router = inject(Router);
+  const navigation = router.currentNavigation();
   const dialogs = inject(MatDialog);
   const translate = inject(TranslateService);
   const isPlugins = route.data['plugins'] || route.queryParams['tab'] === '4';
@@ -56,6 +58,13 @@ export const settingsDialogGuard: CanActivateFn = async (route) => {
       )
       .subscribe(open);
     return router.parseUrl('/active/tasks');
+  }
+  const existing = dialogs.getDialogById(id);
+  if (existing?.getState() === MatDialogState.CLOSING) {
+    // The dialog keeps its ID until dismissal finishes. A quick reopen must wait
+    // for that instance, and must not open if a newer navigation superseded it.
+    await firstValueFrom(existing.afterClosed());
+    if (router.currentNavigation() !== navigation) return false;
   }
   open();
   return false;
