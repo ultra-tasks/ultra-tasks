@@ -48,6 +48,7 @@ import { isAppOriginUrl } from './navigation-guard';
 import { assertSecureWebPreferences } from './web-preferences-guard';
 import { isAllowedSessionPermission } from './session-permissions';
 import { applyJiraImageAuth } from './jira-image-auth';
+import { configureWindowsTaskbar } from './windows-taskbar';
 import {
   getNativeGlassWindowOptions,
   initNativeGlassIpc,
@@ -288,6 +289,7 @@ export const createWindow = async ({
     // maximize stay native.
     ...getNativeGlassWindowOptions(nativeGlassMaterial, persistedNativeGlass),
   });
+  configureWindowsTaskbar(mainWin, app.isPackaged);
   initNativeGlassIpc({
     ipcMain,
     win: mainWin,

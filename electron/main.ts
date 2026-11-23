@@ -3,6 +3,7 @@ import { PROTOCOL_PREFIX } from './protocol-handler';
 import { startApp } from './start-app';
 import { applyLegacyForkUserDataDir, applySnapUserDataDir } from './user-data-dir';
 import { getWindowsStoreIdentity } from './windows-store-identity';
+import { WINDOWS_DESKTOP_APP_ID } from './windows-taskbar';
 
 const IS_MAC = process.platform === 'darwin';
 
@@ -11,7 +12,7 @@ if (process.platform === 'win32') {
   app.setAppUserModelId(
     storeIdentity
       ? `${storeIdentity.packageFamilyName}!${storeIdentity.applicationId}`
-      : 'app.ultratasks',
+      : WINDOWS_DESKTOP_APP_ID,
   );
 }
 
